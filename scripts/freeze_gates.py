@@ -165,6 +165,15 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "tests/test_stage10_synthesis.py",
     "docs/19_*.md",
     "outputs/week9/**/*",
+    # Stage 11 (Week 10): the sigma anatomy -- the closed-form resolution
+    # criterion, its counterfactual controls, the predictability test and the
+    # subset-drift curve, with their figures, tests and report.  Like Stage 10
+    # this runs no new electronic structure: it is algebra on frozen numbers.
+    "scripts/analyze_stage11_sigma_anatomy.py",
+    "scripts/make_stage11_figure.py",
+    "tests/test_stage11_sigma_anatomy.py",
+    "docs/20_*.md",
+    "outputs/week10/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large

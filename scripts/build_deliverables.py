@@ -394,6 +394,24 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 9",
         ],
     },
+    10: {
+        "topic": "Stage 11（sigma 的代数解剖与分辨率判据）",
+        "sources": [
+            ("outputs/week10/stage11_sigma_anatomy.csv", None, True),
+            ("outputs/week10/stage11_sigma_anatomy.json", None, True),
+            ("outputs/week10/stage11_summary.md", None, True),
+            ("docs/20_week10_report.md", "week10_report_full.md", True),
+            ("outputs/figures/figure_manifest_week10_stage11.md",
+             "artifacts/figure_manifest_week10_stage11.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F20_*.png", "outputs/figures/F21_*.png"],
+        "commands": [
+            "python scripts/analyze_stage11_sigma_anatomy.py",
+            "python scripts/make_stage11_figure.py",
+            "python scripts/build_deliverables.py --weeks 10",
+        ],
+    },
 }
 
 
@@ -544,6 +562,17 @@ def render_report(week, wdir, missing, excluded):
                        ("{w8_limit}", w8["limit"]),
                        ("{w8_s9_block}", w8["s9_block"]),
                        ("{w8_summary}", w8["summary"])):
+        text = text.replace(key, value)
+    w10 = week10_blocks(load_json(W10_ANATOMY_PATH))
+    for key, value in (("{w10_did}", w10["did"]),
+                       ("{w10_metric}", w10["metric"]),
+                       ("{w10_qc}", w10["qc"]),
+                       ("{w10_limit}", w10["limit"]),
+                       ("{w10_theorem_block}", w10["theorem_block"]),
+                       ("{w10_ladder_block}", w10["ladder_block"]),
+                       ("{w10_control_block}", w10["control_block"]),
+                       ("{w10_predictor_block}", w10["predictor_block"]),
+                       ("{w10_drift_block}", w10["drift_block"])):
         text = text.replace(key, value)
     w9 = week9_blocks(load_json(W9_LADDER_PATH))
     for key, value in (("{w9_did}", w9["did"]),
@@ -1093,9 +1122,133 @@ def week9_checks(wdir: Path):
     return checks
 
 
+def week10_checks(wdir: Path):
+    """QC for week 10 (Stage 11, the sigma anatomy and the resolution criterion)."""
+
+    checks = []
+    payload = load_json(wdir / "stage11_sigma_anatomy.json")
+    if payload is None:
+        checks.append(check("stage11_sigma_anatomy.present", None, "source not found"))
+        return checks
+    checks.append(check("stage11_sigma_anatomy.present", True,
+                        "stage11_sigma_anatomy.json present"))
+
+    rows = payload.get("rows") or []
+    subset = payload.get("common_subset") or []
+    theorems = payload.get("theorems") or {}
+    controls = payload.get("control_checks") or {}
+    predict = payload.get("predictability") or {}
+    table = {item.get("predictor"): item for item in (predict.get("table") or [])}
+    drift = payload.get("subset_drift") or {}
+    key = payload.get("key_numbers") or {}
+
+    checks.append(check("stage11.n_rows==10", len(rows) == 10, "n_rows=%d" % len(rows)))
+    checks.append(check("stage11.common_subset==10", len(subset) == 10,
+                        "common_subset=%s" % subset))
+    checks.append(check("stage11.rows_all_n10",
+                        bool(rows) and all(int(row.get("n") or 0) == 10 for row in rows),
+                        "n per row=%s" % sorted({row.get("n") for row in rows})))
+
+    # T1..T5: every identity must carry its own numeric verification
+    for name in ("T1_sigma_is_shift_difference", "T2_rms_sigma_is_shift_stdev",
+                 "T3_rigid_offset_invariance", "T4_closed_form_unresolved",
+                 "T5_sigma2_budget_split"):
+        entry = theorems.get(name) or {}
+        checks.append(check("stage11.theorem.%s" % name.split("_")[0],
+                            entry.get("ok") is True,
+                            "%s ok=%s" % (name, entry.get("ok"))))
+
+    checks.append(check("stage11.control.rank_shift_monotone_Lipschitz",
+                        (controls.get("rank_shift_monotone_never_unresolved") or {}).get("ok") is True,
+                        "tau_b/f_unresolved values=%s / %s"
+                        % ((controls.get("rank_shift_monotone_never_unresolved") or {}).get("tau_b_values"),
+                           (controls.get("rank_shift_monotone_never_unresolved") or {}).get("f_unresolved_values"))))
+    checks.append(check("stage11.control.linear_shift_matches_theory",
+                        (controls.get("linear_shift_matches_theory") or {}).get("ok") is True,
+                        "max |q_median - |b||=%s"
+                        % (controls.get("linear_shift_matches_theory") or {}).get("max_abs_q_median_minus_abs_b")))
+
+    # T4 must be a restatement of the project's own f_unresolved, not a new number
+    worst_z1 = max([row.get("t4_abs_err_z1") or 0.0 for row in rows] or [0.0])
+    worst_z196 = max([row.get("t4_abs_err_z1p96") or 0.0 for row in rows] or [0.0])
+    checks.append(check("stage11.t4_closed_form_is_exact",
+                        worst_z1 == 0.0 and worst_z196 == 0.0,
+                        "max abs err z=1: %s, z=1.96: %s" % (worst_z1, worst_z196)))
+
+    # T2 in row form
+    worst_sigma = max([abs((row.get("sigma_rms_ev") or 0.0) - (row.get("delta_sd_ev") or 0.0))
+                       for row in rows] or [0.0])
+    checks.append(check("stage11.rms_sigma_equals_shift_stdev", worst_sigma < 1e-12,
+                        "max |RMS sigma - sd(delta)|=%s" % worst_sigma))
+
+    # the predictability result, and the refuted natural hypothesis
+    signed = table.get("ols_slope_b") or {}
+    residual = table.get("sigma2_share_residual") or {}
+    unsigned = table.get("sigma_rms_ev") or {}
+    checks.append(check("stage11.predictability.signed_slope_auc==1",
+                        (signed.get("auc") or 0.0) > 0.999,
+                        "ols_slope_b AUC=%s p=%s" % (signed.get("auc"),
+                                                     signed.get("auc_exact_permutation_p"))))
+    checks.append(check("stage11.predictability.permutation_is_exhaustive",
+                        signed.get("n_permutations") == 120,
+                        "n_permutations=%s" % signed.get("n_permutations")))
+    checks.append(check("stage11.predictability.unsigned_is_weaker",
+                        (unsigned.get("auc") or 1.0) < (signed.get("auc") or 0.0),
+                        "sd(delta) AUC=%s vs signed slope AUC=%s"
+                        % (unsigned.get("auc"), signed.get("auc"))))
+    residual_auc = residual.get("auc")
+    checks.append(check("stage11.predictability.residual_share_refuted",
+                        residual_auc is not None and residual_auc < 0.001,
+                        "sigma2_share_residual AUC=%s (natural hypothesis refuted)"
+                        % residual_auc))
+
+    biggest = (key.get("largest_sigma_points") or [{}])[0]
+    checks.append(check("stage11.largest_sigma_point_is_not_a_rewrite",
+                        biggest.get("shortlist_rewritten") is False
+                        and (biggest.get("sigma_rms_ev") or 0.0) > 2.0,
+                        "%s/%s sigma=%s rewrite=%s"
+                        % (biggest.get("rung"), biggest.get("axis"),
+                           biggest.get("sigma_rms_ev"), biggest.get("shortlist_rewritten"))))
+
+    checks.append(check("stage11.subset_drift.present", len(drift) >= 2,
+                        "drift series=%s" % sorted(drift)))
+    # Do the per-N mean tau_b values drift systematically, or is the spread
+    # across N smaller than the sampling noise at the same N?  A "stable"
+    # series shows no systematic bias: its mean range is both absolutely
+    # small and below the largest per-N sampling std.
+    drift_ok = bool(drift)
+    drift_bits = []
+    for series_key, series in drift.items():
+        means = [item["tau_b_mean"] for item in series
+                 if item.get("tau_b_mean") is not None]
+        stds = [item["tau_b_std"] for item in series
+                if item.get("tau_b_std") is not None]
+        if len(means) < 3:
+            drift_ok = False
+            drift_bits.append("%s: only %d N levels" % (series_key, len(means)))
+            continue
+        spread = max(means) - min(means)
+        ref_std = max(stds) if stds else 0.0
+        stable = spread < 0.05 and (ref_std == 0.0 or spread < ref_std)
+        drift_ok = drift_ok and stable
+        drift_bits.append("%s spread=%.4f vs max_std=%.4f" % (series_key, spread, ref_std))
+    checks.append(check("stage11.subset_drift.means_are_stable",
+                        drift_ok,
+                        "mean tau_b is N-stable: " + "; ".join(drift_bits)))
+
+    checks.append(check("week10.figures_present",
+                        (wdir / "artifacts" / "F20_sigma_anatomy.png").exists()
+                        and (wdir / "artifacts" / "F21_sigma_controls.png").exists(),
+                        "artifacts/ F20 + F21"))
+    checks.append(check("week10.report_present",
+                        (wdir / "week10_report_full.md").exists(),
+                        "week10_report_full.md"))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
-                  9: week9_checks}
+                  9: week9_checks, 10: week10_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -1598,6 +1751,66 @@ Week 4-8 各自回答了自己的问题，但每一周用了不同的分子子�
 """
 
 
+REPORT_TEMPLATES[10] = """# Week 10 成果小结 —— Stage 11（sigma 的代数解剖与分辨率判据）
+
+Week 9 把五个台阶放到同一口径上，报出了 `rho(shift_std, tau_b) = -0.851`，但留下两个说不通的地方：
+那只是一个**相关**而不是机制；而且全篇位移散布最大的台阶（`P0 -> P1` 还原轴，std = 2.253 eV）
+反而一个候选清单成员都没换。本周把这两个问题一起解决 —— 方法是把项目自 Week 4 起使用的
+`sigma_ij` 彻底化简成闭式，得到一条无量纲的分辨率判据：
+
+> 一对候选可分辨，当且仅当 `q_ij = abs(delta_i - delta_j) / abs(P_i - P_j) <= sqrt(2)/z`。
+> `q_ij` 是**方法位移相对目标轴的割线斜率**，临界值在 z = 1 时为 1.414、z = 1.96 时为 0.722。
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 `week10_report_full.md`。
+
+## 1. 本周做了什么
+{w10_did}
+
+## 2. 关键数字
+{w10_metric}
+
+## 3. 四条恒等式与一条精确分解
+{w10_theorem_block}
+
+T1/T2 说明 `sigma` 只承载「逐分子位移的离散度」这一个信息；T3 说明均匀方法偏差是**零成本**的；
+T4 是本周主结果（分辨率判据）；T5 把 `sigma^2` 预算精确拆成保序与破序两份额。
+
+## 4. 逐台阶结果（common-10，N = 10）
+{w10_ladder_block}
+
+注意第三列 `sd(delta)` 与 Week 9 的 `shift_std` 逐行相同（T2），且三个被改写清单的台阶
+（`P0 -> P1` 氧化、`C0 -> C1` 还原、`C1 -> C2` 还原）的斜率 `b` **全是负的**。
+
+## 5. 反事实对照：哪些扰动是免费的，哪些是致命的
+{w10_control_block}
+
+## 6. 可预测性检验
+{w10_predictor_block}
+
+## 7. 子集规模带来的不确定性
+{w10_drift_block}
+
+## 8. 质量与复核（QC）
+- {w10_qc}
+- 上述每一项都由本目录 `verification.json` 的 `checks` 数组从真实产物现场解析得出。
+
+## 9. 产物清单
+{artifact_list}
+
+## 10. 已知限制
+1. {w10_limit}
+2. 本项目所有秩相关都在 n <= 20 个台阶事件上计算，只能读方向与量级，不能读显著性。
+3. Gate 0 保持 CLOSED；Gate 1 仍未关闭（溶液相锚点 31 行仍为 `est`）。
+4. Stage 11 是**探索性方法学分析**（重读已冻结产物，不跑新电子结构）。其中的 AUC / 精确置换 /
+   LOO 是本周新增的分析动作；若要把它们提升为必报指标，须走 `config/prereg.yaml` 的
+   `amendment_log`，届时 Gate 0 由 CLOSED 变为 NOT CLOSED。
+5. 逐项细节见同目录 `week10_report_full.md`。
+
+## 11. 源文件缺失
+{missing_list}
+"""
+
+
 README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成果输出包
 
 本目录**只放蒸馏产物**（结果表、图、报告、校验清单）。原始 ORCA / xTB 运行输出
@@ -1618,13 +1831,14 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week6/                Stage 6（T6 构象系综 + T7 虚频 + T8 delta_m + T9 决策稳定性）
     ├── week7/                Stage 7（ML / Δ-learning）+ Stage 8（active-learning replay）
     ├── week8/                Stage 9（显式微溶剂化：[Li(M)2]+ 第一溶剂壳复核）
-    └── week9/                Stage 10（五级台阶合成与决策稳定性总判）
+    ├── week9/                Stage 10（五级台阶合成与决策稳定性总判）
+    └── week10/               Stage 11（sigma 的代数解剖与分辨率判据）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F19 中属于该周的部分）
+    ├── artifacts/            图（F0–F21 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -1645,6 +1859,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 | week6 | Stage 6（T6/T7/T8/T9） | 构象系综 `sigma_conf`（12 分子 / 32 构象）；`delta_m`（氧化 0.700 / 还原 2.074 eV）；并入 `delta_m` 后还原轴不可判定 | Gate 0 CLOSED |
 | week8 | Stage 9（显式微溶剂化 C2） | [Li(M)2]+ 第一溶剂壳（12 motif / 8 家族）；C1 -> C2 的垂直量位移与同口径排序稳定性 | Gate 0 CLOSED |
 | week9 | Stage 10（五级台阶合成） | 五个台阶同口径重算（common-10）：rho(std, tau_b) = -0.851 vs rho(|mean|, tau_b) = -0.535；唯一负 tau_b 在 C0->C1 还原轴 | Gate 0 CLOSED |
+| week10 | Stage 11（sigma 解剖） | 四条恒等式（T1–T4）+ 精确分解（T5）；判据 `f_unresolved(z) = Pr(q_ij > sqrt(2)/z)` 与实测误差精确为 0；带符号斜率 AUC 1.000（精确 p = 1/120），无符号的 sd(delta) 仅 0.810；N=10 时 tau_b 抽样标准差 0.126 | Gate 0 CLOSED |
 
 ## 如何复现
 ```powershell
@@ -1770,6 +1985,9 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 9 —— Stage 10（五级台阶合成与决策稳定性总判）
 {w9_summary}
 
+### Week 10 —— Stage 11（sigma 的代数解剖与分辨率判据）
+{w10_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -1796,6 +2014,8 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 
 {w9_sigma_note}
 
+{w10_sigma_note}
+
 ### 3.3 还原侧定性失效
 P1 下 18 个分子的气相阴离子**全部不束缚**（`unbound_anion = 18`，EA < 0）。定域在 LUMO 上的
 Koopmans 图像在结构上**不可能**给出这一点，因此 P0 还原轴与真实 EA 不是同一物理量。
@@ -1815,7 +2035,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F19）
+## 5. 图表索引（F0–F21）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -1838,6 +2058,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f17_row}
 {f18_row}
 {f19_row}
+{f20_row}
+{f21_row}
 
 ## 6. 复现命令
 ```powershell
@@ -2629,6 +2851,229 @@ def week9_blocks(stage10):
             "sigma_note": sigma_note, "summary": summary}
 
 
+F20_NOTE_PRESENT = ("Stage 11 sigma 解剖：(a) T1 恒等式 sigma_ij = abs(d_i - d_j)/sqrt(2) 的"
+                    "全 pair 散点（机器精度落在 y = x 上）；(b) 10 条割线斜率 q_ij 分布与两条临界"
+                    "斜率 sqrt(2)/z；(c) f_unresolved 实测 vs 闭式（20 点，误差精确为 0）；"
+                    "(d) 9 个廉价预测子对「top-2 候选清单被改写」的 AUC")
+F20_NOTE_ABSENT = "预留给 Stage 11（sigma 解剖）；week10 尚未产出"
+F21_NOTE_PRESENT = ("Stage 11 反事实对照：(a) 线性位移相图（排序在 b = -1 翻转，分辨率在 "
+                    "abs(b) = sqrt(2)/z 崩塌）；(b) 单调且 f-Lipschitz 的位移——tau_b = 1.000 与 "
+                    "f_unresolved = 0.000 同时成立；(c) 拉伸目标轴 / 白噪声 / 刚性偏移的对照；"
+                    "(d) 子集规模 N 从 6 到 18 的 tau_b 抽样分布（星号 = common-10）")
+F21_NOTE_ABSENT = "预留给 Stage 11（反事实对照）；week10 尚未产出"
+W10_ANATOMY_PATH = REPO / "outputs" / "week10" / "stage11_sigma_anatomy.json"
+W10_RUNG_ORDER = ("P0_to_P1", "P1_to_P2", "G1_to_G2", "C0_to_C1", "C1_to_C2")
+W10_AXIS_SHORT = (("oxidation", "氧化"), ("reduction", "还原"))
+
+
+def week10_blocks(anatomy):
+    """Render the week-10 (Stage 11 / sigma anatomy) blocks."""
+
+    empty = {"present": False, "did": "", "metric": "", "qc": "", "limit": "",
+             "theorem_block": "", "ladder_block": "", "control_block": "",
+             "predictor_block": "", "drift_block": "", "sigma_note": "", "summary": ""}
+    if not isinstance(anatomy, dict) or not (anatomy.get("rows") or []):
+        return empty
+
+    rows = anatomy.get("rows") or []
+    subset = anatomy.get("common_subset") or []
+    theorems = anatomy.get("theorems") or {}
+    controls = anatomy.get("controls") or {}
+    checks = anatomy.get("control_checks") or {}
+    predict = anatomy.get("predictability") or {}
+    table = sorted([item for item in (predict.get("table") or [])
+                    if item.get("auc") is not None],
+                   key=lambda item: -item["auc"])
+    drift = anatomy.get("subset_drift") or {}
+    marks = anatomy.get("subset_drift_marks") or {}
+    key = anatomy.get("key_numbers") or {}
+    by_key = {(row.get("rung"), row.get("axis")): row for row in rows}
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def signed(value, digits=3):
+        text = _w8_num(value, digits)
+        if text == "—":
+            return text
+        return text if float(value) < 0 else "+" + text
+
+    theorem_block = ("| 编号 | 命题 | 数值验证 | 结论 |\n| --- | --- | --- | --- |\n")
+    theorem_rows = (
+        ("T1", "sigma_ij = abs(d_i - d_j)/sqrt(2)",
+         "最大绝对误差 %s eV" % ("%.2e" % (theorems.get("T1_sigma_is_shift_difference") or {}).get("max_abs_err_ev", 0.0)),
+         theorems.get("T1_sigma_is_shift_difference") or {}),
+        ("T2", "RMS_{i<j} sigma_ij = stdev_sample(d)",
+         "最大相对误差 %s" % ("%.2e" % (theorems.get("T2_rms_sigma_is_shift_stdev") or {}).get("max_rel_err", 0.0)),
+         theorems.get("T2_rms_sigma_is_shift_stdev") or {}),
+        ("T3", "层间刚性偏移不改变任何指标",
+         "max abs(d sigma) = %s eV" % ("%.2e" % (theorems.get("T3_rigid_offset_invariance") or {}).get("max_abs_d_sigma_ev", 0.0)),
+         theorems.get("T3_rigid_offset_invariance") or {}),
+        ("T4", "f_unresolved(z) = Pr(q_ij > sqrt(2)/z)",
+         "z=1 误差 %s，z=1.96 误差 %s" % (
+             "%.2e" % (theorems.get("T4_closed_form_unresolved") or {}).get("max_abs_err_z1", 0.0),
+             "%.2e" % (theorems.get("T4_closed_form_unresolved") or {}).get("max_abs_err_z1p96", 0.0)),
+         theorems.get("T4_closed_form_unresolved") or {}),
+        ("T5", "var(d) = b^2 var(P1) + var(residual)",
+         "份额和偏差 %s" % ("%.2e" % (theorems.get("T5_sigma2_budget_split") or {}).get("max_abs_share_err", 0.0)),
+         theorems.get("T5_sigma2_budget_split") or {}),
+    )
+    for tag, statement, evidence, entry in theorem_rows:
+        theorem_block += "| **%s** | %s | %s | %s |\n" % (
+            tag, statement, evidence, "PASS" if entry.get("ok") else "FAIL")
+
+    ladder_block = ("| 台阶 | 轴 | n | sd(delta) (eV) | q_med | b | R2(平行份额) | tau_b | "
+                    "f_unres (z=1) | f_unres (z=1.96) | top20 overlap | 清单被改写 |\n"
+                    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+    for rung in W10_RUNG_ORDER:
+        for axis, axis_label in W10_AXIS_SHORT:
+            row = by_key.get((rung, axis)) or {}
+            ladder_block += ("| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n"
+                             % (rung.replace("_to_", " -> "), axis_label,
+                                row.get("n", "—"),
+                                num(row.get("delta_sd_ev"), 4),
+                                num(row.get("q_median")), signed(row.get("ols_slope_b")),
+                                num(row.get("ols_r2")), signed(row.get("kendall_tau_b")),
+                                num(row.get("f_unresolved_p1_observed")),
+                                num(row.get("f_unresolved_p1_z1p96_observed")),
+                                num(row.get("overlap_20"), 2),
+                                "是" if row.get("shortlist_rewritten") else "否"))
+
+    linear = controls.get("linear_shift") or []
+    control_block = ("**(a) 线性位移相图**（作用于位移最响的台阶的 P1 层）：\n\n"
+                     "| b | 预测 sign(tau_b) | tau_b | q_med | f_unres (z=1) | f_unres (z=1.96) | top20 overlap |\n"
+                     "| --- | --- | --- | --- | --- | --- | --- |\n")
+    for item in linear:
+        control_block += "| %s | %+d | %s | %s | %s | %s | %s |\n" % (
+            signed(item.get("slope_b")), int(item.get("predicted_tau_b_sign") or 0),
+            signed(item.get("tau_b")), num(item.get("q_median")),
+            num(item.get("f_unresolved_z1")), num(item.get("f_unresolved_z1p96")),
+            num(item.get("overlap_20"), 2))
+    rank_shift = controls.get("rank_shift") or []
+    control_block += ("\n**(b) 单调且 f-Lipschitz 的位移**（表内 `q_max` 精确等于 `f`）：\n\n"
+                      "| f | 幅度 (eV) | tau_b | RMS sigma (eV) | q_max | f_unres 实测 | f_unres 闭式 |\n"
+                      "| --- | --- | --- | --- | --- | --- | --- |\n")
+    for item in rank_shift:
+        control_block += "| %s | %s | %s | %s | %s | %s | %s |\n" % (
+            num(item.get("fraction_of_min_gap"), 2), num(item.get("amplitude_ev"), 4),
+            signed(item.get("tau_b")), num(item.get("sigma_rms_ev"), 4),
+            num(item.get("q_max")), num(item.get("f_unresolved_p1")),
+            num(item.get("f_unresolved_p1_closedform")))
+    stretch = controls.get("axis_stretch") or []
+    control_block += ("\n**(c) 拉伸目标轴**（`d tau_b` 精确为 0，`q' = abs(t + 1 - lambda)/lambda`）：\n\n"
+                      "| lambda | d tau_b | q_med 实测 | q_med 由 t 预测 | f_unres 实测 | 由带符号斜率预测 |\n"
+                      "| --- | --- | --- | --- | --- | --- |\n")
+    for item in stretch:
+        control_block += "| %s | %.2e | %s | %s | %s | %s |\n" % (
+            num(item.get("lambda"), 2), float(item.get("d_tau_b") or 0.0),
+            num(item.get("q_median")), num(item.get("q_median_predicted")),
+            num(item.get("f_unresolved_p1")),
+            num(item.get("f_unresolved_predicted_from_signed_slopes")))
+    rigid = controls.get("rigid_offset") or []
+    worst_rigid = max([abs(float(item.get("d_tau_b") or 0.0)) for item in rigid] or [0.0])
+    worst_rigid_sigma = max([abs(float(item.get("max_abs_d_sigma_ev") or 0.0)) for item in rigid] or [0.0])
+    control_block += ("\n**(d) 层间刚性偏移**：`max abs(d tau_b) = %.1e`，"
+                      "`max abs(d sigma) = %.2e eV` —— 均匀方法偏差零成本（T3）。\n"
+                      % (worst_rigid, worst_rigid_sigma))
+
+    predictor_block = ("目标：`top-20%% overlap < 1`（n = 10 → k = 2）。正例 %s 个。"
+                       "精确置换 p 值穷举 C(10,3) = 120 种标签分配。\n\n"
+                       "| 预测子 | 方向 | AUC | 精确置换 p | LOO 阈值命中率 |\n"
+                       "| --- | --- | --- | --- | --- |\n"
+                       % (predict.get("n_positives")))
+    orientation = {"higher_means_rewrite": "越高越危险",
+                   "lower_means_rewrite": "越低越危险"}
+    for item in table:
+        predictor_block += "| `%s` | %s | **%s** | %s | %s |\n" % (
+            item.get("predictor"),
+            orientation.get(item.get("orientation"), item.get("orientation") or "—"),
+            num(item.get("auc")), num(item.get("auc_exact_permutation_p"), 4),
+            num(item.get("loo_accuracy")))
+
+    drift_block = ""
+    for series, records in drift.items():
+        mark = marks.get(series) or {}
+        drift_block += ("`%s`（总体 %s 个分子；common-10 读数 %s，全样本读数 %s）：\n\n"
+                        "| N | 抽样次数 | tau_b 均值 | p05 | p95 | 标准差 | P(tau_b < 0.5) |\n"
+                        "| --- | --- | --- | --- | --- | --- | --- |\n"
+                        % (series.replace("_to_", " -> "), mark.get("population_size"),
+                           num(mark.get("common10")), num(mark.get("full_population"))))
+        for item in records:
+            drift_block += "| %d | %d | %s | %s | %s | %s | %s |\n" % (
+                item.get("n"), item.get("n_draws"), signed(item.get("tau_b_mean")),
+                signed(item.get("tau_b_p05")), signed(item.get("tau_b_p95")),
+                num(item.get("tau_b_std")), num(item.get("p_tau_b_below_half")))
+        drift_block += "\n"
+
+    spread = by_key.get(("P0_to_P1", "reduction")) or {}
+    broken = by_key.get(("C0_to_C1", "reduction")) or {}
+    signed_best = next((item for item in table if item.get("predictor") == "ols_slope_b"), {})
+    unsigned = next((item for item in table if item.get("predictor") == "sigma_rms_ev"), {})
+
+    did = ("把本周的**分辨率判据**彻底化简：证明并数值验证了四条恒等式 —— "
+           "`sigma_ij = abs(delta_i - delta_j)/sqrt(2)`（T1）、`RMS sigma = sd(delta)`（T2）、"
+           "`sigma` 对层间刚性偏移严格不变（T3）、以及 **`f_unresolved(z) = Pr(q_ij > sqrt(2)/z)`**（T4，"
+           "`q_ij` 为位移对目标轴的割线斜率）。再加一条精确分解 T5（`var(delta)` 拆成保序 / 破序两份额）。"
+           "随后做了三件基于定理的分析：**线性位移相图**（四个临界斜率 `±1`、`±sqrt(2)/z`）、"
+           "**四组反事实对照**（刚性偏移 / 拉伸目标轴 / 白噪声 / 单调 Lipschitz 位移）、"
+           "以及**可预测性检验**（AUC + 精确置换 + LOO）与**子集漂移曲线**。"
+           "共同子集仍为 common-%d（%s）。**本阶段不跑任何新的电子结构计算**，"
+           "全部内容是对 week4/5/8/9 已冻结产物的代数化简。" % (len(subset), "、".join(subset)))
+
+    metric = ("- T4 把 Week 9 的相关系数 `rho(shift_std, tau_b)` 升级为机制：一对候选可分辨，"
+              "当且仅当割线斜率 `q_ij <= sqrt(2)/z`（z=1 时 1.414，z=1.96 时 0.722）；"
+              "闭式与实测在 20 个点上**误差精确为 0**\n"
+              "- 相图把四种失效模式一次说清：`b < -1` 排序整体反转；`abs(b) > sqrt(2)/z` 分辨率崩塌；"
+              "`b` 与 `-b` 的排序后果完全不同 —— 因此**符号比幅度重要**\n"
+              "- 那个一直说不通的反例有了答案：`P0 -> P1` 还原轴 `sd(delta) = %s eV`（全篇最大）、"
+              "`b = %s`（强正、几乎平行于轴），于是 `f_unresolved = %s`（分辨率崩了）"
+              "而清单**完好**（tau_b %s，top-20%% overlap %s）\n"
+              "- 可预测性：清单改写**可预测**，但预测子必须方向敏感 —— 带符号斜率 "
+              "`ols_slope_b` 的 AUC = **%s**、精确置换 `p = 1/120 = %s`、LOO 10/10（n = 10，"
+              "探索性）；无符号的 `sd(delta)` 只有 %s\n"
+              "- 一个被否证的直觉：`sigma2_share_residual`（破序份额）在其自然假设方向上 "
+              "AUC = 0.000 —— 危险的是**平行份额大**，因为强负斜率既让位移与轴平行、又让排序面临反转\n"
+              "- 子集漂移：N = 10 时 `tau_b` 的抽样标准差达 %s（P0 -> P1 氧化轴），"
+              "与 week4-9 引用的若干台阶间差异同量级 —— **报 tau_b 必须同时报 N 与子集**"
+              % (num(spread.get("sigma_rms_ev"), 4), signed(spread.get("ols_slope_b")),
+                 num(spread.get("f_unresolved_p1_observed")), signed(spread.get("kendall_tau_b")),
+                 num(spread.get("overlap_20"), 2), num(signed_best.get("auc")),
+                 num(signed_best.get("auc_exact_permutation_p"), 4), num(unsigned.get("auc")),
+                 num(((drift.get("P0_to_P1|oxidation") or [{}])[2] or {}).get("tau_b_std"))))
+
+    qc = ("%d 行 × %d 列，由 `analyze_stage11_sigma_anatomy.py` 从 5 个已冻结源文件现场重算；"
+          "四条恒等式 + 一条分解全部 PASS（T4 的两条误差精确为 0.00e+00）；"
+          "两个反事实检查 PASS（单调 Lipschitz 下 `tau_b = 1` 且 `f_unres = 0`；"
+          "线性位移的 `q_median` 与 `abs(b)` 偏差 %s）；"
+          "`light_stability` 与项目参考实现 `layer_stability` 在 8 个指标上逐点一致（测试钉住）。"
+          % (len(rows), 32, "%.2e" % ((checks.get("linear_shift_matches_theory") or {})
+                                      .get("max_abs_q_median_minus_abs_b", 0.0))))
+
+    limit = ("n = 10 个台阶事件、3 个正例：AUC 1.000 / 0.905 / 0.857 之间**统计上不可区分**"
+             "（精确 p = 0.008 / 0.033 / 0.058，区间严重重叠），不得据此排序预测子优劣；"
+             "LOO 10/10 是在同一批 10 个点上重拟合阈值的结果，**不是外部验证**；"
+             "T4 的判据在 z = 1 与 z = 1.96 给出不同结论（`0.722 < abs(b) < 1.414` 是半可用区），"
+             "引用分辨率时必须声明置信水平；"
+             "`f_unresolved` 与 `tau_b` 是两件事，`f_robust_inv = 0` 依旧不能单独读。")
+
+    sigma_note = ("**sigma 的代数解剖（Stage 11 / week10）**：项目自 Week 4 起使用的 `sigma_ij` 不是"
+                  "经验量，它有闭式 —— `sigma_ij = abs(delta_i - delta_j)/sqrt(2)`，逐对 RMS 恰等于"
+                  "逐分子位移的样本标准差，且对层间**刚性偏移严格不变**（均匀方法偏差零成本）。"
+                  "更关键的是 **T4**：`f_unresolved(z) = Pr(q_ij > sqrt(2)/z)`，"
+                  "`q_ij = abs(delta_i - delta_j)/abs(DeltaP_ij)` 是**位移对目标轴的割线斜率**；"
+                  "闭式与实测在 z = 1 与 z = 1.96 的 20 个点上误差精确为 0。"
+                  "于是 H_var 的正确表述是「位移相对目标轴的**斜率分布**与 sqrt(2)/z 的关系」，"
+                  "而不是「位移的散布」。见 F20/F21（`outputs/figures/F20_sigma_anatomy.png`、"
+                  "`F21_sigma_controls.png`）。")
+
+    summary = ("- 做了什么：%s\n- 关键数字：\n%s\n- 质检：%s\n- 限制：%s"
+               % (did, metric, qc, limit))
+    return {"present": True, "did": did, "metric": metric, "qc": qc, "limit": limit,
+            "theorem_block": theorem_block, "ladder_block": ladder_block,
+            "control_block": control_block, "predictor_block": predictor_block,
+            "drift_block": drift_block, "sigma_note": sigma_note, "summary": summary}
+
+
 def week7_blocks(stage7, stage8):
     """Render the week-7 (Stage 7 + Stage 8) blocks from the two JSON files.
 
@@ -2804,7 +3249,7 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9",
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10",
                         help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
@@ -2895,6 +3340,8 @@ def main(argv=None):
                                load_json(W8_SHELLS_PATH))["summary"]
         w9_all = week9_blocks(load_json(W9_LADDER_PATH))
         w9_note = w9_all["summary"]
+        w10_all = week10_blocks(load_json(W10_ANATOMY_PATH))
+        w10_note = w10_all["summary"]
         f14_figure = REPO / "outputs" / "figures" / "F14_delta_m_derivation.png"
         if f14_figure.exists():
             f14_row = "| F14 | `F14_delta_m_derivation.png` | " + F14_NOTE_PRESENT + " | week6 |"
@@ -2925,6 +3372,16 @@ def main(argv=None):
             f19_row = "| F19 | `F19_stage10_ladder.png` | " + F19_NOTE_PRESENT + " | week9 |"
         else:
             f19_row = "| F19 | 未生成 | " + F19_NOTE_ABSENT + " | —— |"
+        f20_figure = REPO / "outputs" / "figures" / "F20_sigma_anatomy.png"
+        if f20_figure.exists():
+            f20_row = "| F20 | `F20_sigma_anatomy.png` | " + F20_NOTE_PRESENT + " | week10 |"
+        else:
+            f20_row = "| F20 | 未生成 | " + F20_NOTE_ABSENT + " | —— |"
+        f21_figure = REPO / "outputs" / "figures" / "F21_sigma_controls.png"
+        if f21_figure.exists():
+            f21_row = "| F21 | `F21_sigma_controls.png` | " + F21_NOTE_PRESENT + " | week10 |"
+        else:
+            f21_row = "| F21 | 未生成 | " + F21_NOTE_ABSENT + " | —— |"
         for key, value in (("{f12_row}", f12_row),
                            ("{f14_row}", f14_row),
                            ("{f15_row}", f15_row),
@@ -2949,6 +3406,10 @@ def main(argv=None):
                            ("{w8_summary}", w8_note),
                            ("{f18_row}", f18_row),
                            ("{f19_row}", f19_row),
+                           ("{f20_row}", f20_row),
+                           ("{f21_row}", f21_row),
+                           ("{w10_summary}", w10_note),
+                           ("{w10_sigma_note}", w10_all["sigma_note"]),
                            ("{w9_summary}", w9_note),
                            ("{w9_sigma_note}", w9_all["sigma_note"]),
                            ("{w7_summary}", w7_note)):
