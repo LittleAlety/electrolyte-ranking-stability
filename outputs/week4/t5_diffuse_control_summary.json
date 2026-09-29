@@ -1,0 +1,364 @@
+{
+  "stage": "T5",
+  "title": "gas-phase radical-anion control: same functional (r2SCAN), basis set only",
+  "engine": "ORCA",
+  "engine_version": "6.1.1",
+  "orca_executable": "E:\\ORCA\\orca_6_1_1\\orca.exe",
+  "question": "docs/10 section 2.6 reports all 18 core-set gas-phase radical anions unbound under r2SCAN-3c, while AN (0.011 eV) and DMSO (0.014 eV) carry weakly positive external EA anchors. r2SCAN-3c's basis (def2-mTZVPP) has no diffuse functions. Does adding them (def2-TZVPD) move the sign of the anion stability?",
+  "arms": [
+    {
+      "key": "tzvpp",
+      "method_keyword": "r2SCAN def2-TZVPP def2/J RIJCOSX D4",
+      "basis": "def2-TZVPP",
+      "basis_has_diffuse": false
+    },
+    {
+      "key": "tzvpd",
+      "method_keyword": "r2SCAN def2-TZVPD def2/J RIJCOSX D4",
+      "basis": "def2-TZVPD",
+      "basis_has_diffuse": true
+    },
+    {
+      "key": "scan3c",
+      "method_keyword": "r2SCAN-3c",
+      "basis": "def2-mTZVPP",
+      "basis_has_diffuse": false
+    }
+  ],
+  "geometry": "G1 (GFN2-xTB optimised), frozen; outputs/_week3_scratch/<mol_id>/xtbopt.xyz",
+  "environment": "gas phase (no CPCM/SMD)",
+  "states": [
+    {
+      "label": "neutral",
+      "charge": 0,
+      "multiplicity": 1
+    },
+    {
+      "label": "anion",
+      "charge": -1,
+      "multiplicity": 2
+    }
+  ],
+  "hartree_to_ev": 27.211386245988,
+  "definitions": {
+    "EA_dscf_eV": "(E_anion - E_neutral) * 27.211386245988, vertical, on the frozen G1 geometry",
+    "sign_convention": "Under this formula a NEGATIVE value means the anion lies below the neutral (bound) and a POSITIVE value means the anion is unbound; the r2SCAN-3c baseline is large positive for the molecules section 2.6 calls unbound.",
+    "bound": "EA_dscf_eV < 0",
+    "EA_conventional_eV": "-EA_dscf_eV = E_neutral - E_anion, the sign convention the external anchors use (positive = bound), so it is directly comparable to anchor_ea_eV",
+    "delta_vs_anchor_eV": "EA_dscf_eV - anchor_ea_eV (literal reading of the specification)",
+    "delta_conventional_vs_anchor_eV": "EA_conventional_eV - anchor_ea_eV (the comparable one)",
+    "applicability_domain_caveat": "0.01 eV-scale dipole-bound anchors sit two orders of magnitude below any DFT functional's error bar (~0.1-0.2 eV). This control measures the DIRECTION and SIZE of the diffuse-function shift, not whether AN is bound."
+  },
+  "molecules": {
+    "AN": {
+      "mol_id": "C16",
+      "name": "AN",
+      "smiles": "CC#N",
+      "anchor_ea_eV": 0.011,
+      "role_note": "anchor EA = 0.011 +/- 0.007 eV (dipole-bound, only 1.6 sigma)",
+      "arms": {
+        "tzvpp": {
+          "method_keyword": "r2SCAN def2-TZVPP def2/J RIJCOSX D4",
+          "basis": "def2-TZVPP",
+          "basis_has_diffuse": false,
+          "e_neutral_hartree": -132.724633089445,
+          "e_anion_hartree": -132.641424879417,
+          "EA_dscf_eV": 2.264211,
+          "EA_conventional_eV": -2.264211,
+          "bound": false,
+          "delta_vs_anchor_eV": 2.253211,
+          "delta_conventional_vs_anchor_eV": -2.275211,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.751962
+        },
+        "tzvpd": {
+          "method_keyword": "r2SCAN def2-TZVPD def2/J RIJCOSX D4",
+          "basis": "def2-TZVPD",
+          "basis_has_diffuse": true,
+          "e_neutral_hartree": -132.72373227786,
+          "e_anion_hartree": -132.689475630041,
+          "EA_dscf_eV": 0.932171,
+          "EA_conventional_eV": -0.932171,
+          "bound": false,
+          "delta_vs_anchor_eV": 0.921171,
+          "delta_conventional_vs_anchor_eV": -0.943171,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.750379
+        },
+        "scan3c": {
+          "method_keyword": "r2SCAN-3c",
+          "basis": "def2-mTZVPP",
+          "basis_has_diffuse": false,
+          "e_neutral_hartree": -132.715575381489,
+          "e_anion_hartree": -132.59811076688,
+          "EA_dscf_eV": 3.196375,
+          "EA_conventional_eV": -3.196375,
+          "bound": false,
+          "delta_vs_anchor_eV": 3.185375,
+          "delta_conventional_vs_anchor_eV": -3.207375,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.751923
+        }
+      },
+      "diffuse_shift_eV": {
+        "definition": "EA_dscf(tzvpd) - EA_dscf(other arm); negative = the diffuse basis pulled the anion down toward bound",
+        "tzvpd_minus_tzvpp": -1.33204,
+        "tzvpd_minus_scan3c": -2.264204
+      },
+      "flip_to_bound_with_diffuse": false
+    },
+    "DMSO": {
+      "mol_id": "C15",
+      "name": "DMSO",
+      "smiles": "CS(C)=O",
+      "anchor_ea_eV": 0.014,
+      "role_note": "anchor EA = 0.014 +/- 0.001 eV (dipole-bound, 14 sigma)",
+      "arms": {
+        "tzvpp": {
+          "method_keyword": "r2SCAN def2-TZVPP def2/J RIJCOSX D4",
+          "basis": "def2-TZVPP",
+          "basis_has_diffuse": false,
+          "e_neutral_hartree": -553.177672392766,
+          "e_anion_hartree": -553.086664264001,
+          "EA_dscf_eV": 2.476457,
+          "EA_conventional_eV": -2.476457,
+          "bound": false,
+          "delta_vs_anchor_eV": 2.462457,
+          "delta_conventional_vs_anchor_eV": -2.490457,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.755294
+        },
+        "tzvpd": {
+          "method_keyword": "r2SCAN def2-TZVPD def2/J RIJCOSX D4",
+          "basis": "def2-TZVPD",
+          "basis_has_diffuse": true,
+          "e_neutral_hartree": -553.177152100392,
+          "e_anion_hartree": -553.145094825185,
+          "EA_dscf_eV": 0.872323,
+          "EA_conventional_eV": -0.872323,
+          "bound": false,
+          "delta_vs_anchor_eV": 0.858323,
+          "delta_conventional_vs_anchor_eV": -0.886323,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.750168
+        },
+        "scan3c": {
+          "method_keyword": "r2SCAN-3c",
+          "basis": "def2-mTZVPP",
+          "basis_has_diffuse": false,
+          "e_neutral_hartree": -553.134578887453,
+          "e_anion_hartree": -553.032441900039,
+          "EA_dscf_eV": 2.779289,
+          "EA_conventional_eV": -2.779289,
+          "bound": false,
+          "delta_vs_anchor_eV": 2.765289,
+          "delta_conventional_vs_anchor_eV": -2.793289,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.755202
+        }
+      },
+      "diffuse_shift_eV": {
+        "definition": "EA_dscf(tzvpd) - EA_dscf(other arm); negative = the diffuse basis pulled the anion down toward bound",
+        "tzvpd_minus_tzvpp": -1.604134,
+        "tzvpd_minus_scan3c": -1.906966
+      },
+      "flip_to_bound_with_diffuse": false
+    },
+    "SN": {
+      "mol_id": "C18",
+      "name": "SN",
+      "smiles": "N#CCCC#N",
+      "anchor_ea_eV": null,
+      "role_note": "flips to bound in acetonitrile per docs/10 section 2.7",
+      "arms": {
+        "tzvpp": {
+          "method_keyword": "r2SCAN def2-TZVPP def2/J RIJCOSX D4",
+          "basis": "def2-TZVPP",
+          "basis_has_diffuse": false,
+          "e_neutral_hartree": -264.24531125505,
+          "e_anion_hartree": -264.19961128994,
+          "EA_dscf_eV": 1.243559,
+          "EA_conventional_eV": -1.243559,
+          "bound": false,
+          "delta_vs_anchor_eV": null,
+          "delta_conventional_vs_anchor_eV": null,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.752207
+        },
+        "tzvpd": {
+          "method_keyword": "r2SCAN def2-TZVPD def2/J RIJCOSX D4",
+          "basis": "def2-TZVPD",
+          "basis_has_diffuse": true,
+          "e_neutral_hartree": -264.244337805395,
+          "e_anion_hartree": -264.211181031796,
+          "EA_dscf_eV": 0.902242,
+          "EA_conventional_eV": -0.902242,
+          "bound": false,
+          "delta_vs_anchor_eV": null,
+          "delta_conventional_vs_anchor_eV": null,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.750322
+        },
+        "scan3c": {
+          "method_keyword": "r2SCAN-3c",
+          "basis": "def2-mTZVPP",
+          "basis_has_diffuse": false,
+          "e_neutral_hartree": -264.230489729351,
+          "e_anion_hartree": -264.162345389076,
+          "EA_dscf_eV": 1.854302,
+          "EA_conventional_eV": -1.854302,
+          "bound": false,
+          "delta_vs_anchor_eV": null,
+          "delta_conventional_vs_anchor_eV": null,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.752592
+        }
+      },
+      "diffuse_shift_eV": {
+        "definition": "EA_dscf(tzvpd) - EA_dscf(other arm); negative = the diffuse basis pulled the anion down toward bound",
+        "tzvpd_minus_tzvpp": -0.341317,
+        "tzvpd_minus_scan3c": -0.95206
+      },
+      "flip_to_bound_with_diffuse": false
+    },
+    "VC": {
+      "mol_id": "C07",
+      "name": "VC",
+      "smiles": "O=C1OC=CO1",
+      "anchor_ea_eV": null,
+      "role_note": "flips to bound in acetonitrile per docs/10 section 2.7",
+      "arms": {
+        "tzvpp": {
+          "method_keyword": "r2SCAN def2-TZVPP def2/J RIJCOSX D4",
+          "basis": "def2-TZVPP",
+          "basis_has_diffuse": false,
+          "e_neutral_hartree": -341.148943191168,
+          "e_anion_hartree": -341.076720361661,
+          "EA_dscf_eV": 1.965283,
+          "EA_conventional_eV": -1.965283,
+          "bound": false,
+          "delta_vs_anchor_eV": null,
+          "delta_conventional_vs_anchor_eV": null,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.755988
+        },
+        "tzvpd": {
+          "method_keyword": "r2SCAN def2-TZVPD def2/J RIJCOSX D4",
+          "basis": "def2-TZVPD",
+          "basis_has_diffuse": true,
+          "e_neutral_hartree": -341.149376910006,
+          "e_anion_hartree": -341.116553250588,
+          "EA_dscf_eV": 0.893177,
+          "EA_conventional_eV": -0.893177,
+          "bound": false,
+          "delta_vs_anchor_eV": null,
+          "delta_conventional_vs_anchor_eV": null,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.750233
+        },
+        "scan3c": {
+          "method_keyword": "r2SCAN-3c",
+          "basis": "def2-mTZVPP",
+          "basis_has_diffuse": false,
+          "e_neutral_hartree": -341.129299405538,
+          "e_anion_hartree": -341.056194980578,
+          "EA_dscf_eV": 1.989273,
+          "EA_conventional_eV": -1.989273,
+          "bound": false,
+          "delta_vs_anchor_eV": null,
+          "delta_conventional_vs_anchor_eV": null,
+          "neutral_status": "ok",
+          "anion_status": "ok",
+          "neutral_s_squared": null,
+          "anion_s_squared": 0.755064
+        }
+      },
+      "diffuse_shift_eV": {
+        "definition": "EA_dscf(tzvpd) - EA_dscf(other arm); negative = the diffuse basis pulled the anion down toward bound",
+        "tzvpd_minus_tzvpp": -1.072106,
+        "tzvpd_minus_scan3c": -1.096096
+      },
+      "flip_to_bound_with_diffuse": false
+    }
+  },
+  "EA_dscf_eV_by_arm": {
+    "tzvpp": {
+      "AN": 2.264211,
+      "DMSO": 2.476457,
+      "SN": 1.243559,
+      "VC": 1.965283
+    },
+    "tzvpd": {
+      "AN": 0.932171,
+      "DMSO": 0.872323,
+      "SN": 0.902242,
+      "VC": 0.893177
+    },
+    "scan3c": {
+      "AN": 3.196375,
+      "DMSO": 2.779289,
+      "SN": 1.854302,
+      "VC": 1.989273
+    }
+  },
+  "bound_by_arm": {
+    "tzvpp": {
+      "AN": false,
+      "DMSO": false,
+      "SN": false,
+      "VC": false
+    },
+    "tzvpd": {
+      "AN": false,
+      "DMSO": false,
+      "SN": false,
+      "VC": false
+    },
+    "scan3c": {
+      "AN": false,
+      "DMSO": false,
+      "SN": false,
+      "VC": false
+    }
+  },
+  "n_jobs": 24,
+  "n_ok": 24,
+  "n_failed": 0,
+  "n_cached": 0,
+  "nprocs_per_job": 8,
+  "jobs_concurrency": 2,
+  "wall_clock_seconds_total": 377.78,
+  "failed_jobs": [],
+  "output_csv": "outputs/week4/t5_diffuse_control.csv",
+  "generated_utc": "2026-09-29T03:47:15.289905+00:00",
+  "command_line": [
+    "E:\\Claude Code\\电解液溶剂-HB\\电解液溶剂HB-Code\\.venv\\Scripts\\python.exe",
+    "scripts/run_diffuse_control.py",
+    "--jobs",
+    "2",
+    "--force"
+  ],
+  "wall_clock_seconds_elapsed": 195.01
+}

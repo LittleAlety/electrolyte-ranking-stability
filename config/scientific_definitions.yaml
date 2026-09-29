@@ -1,0 +1,367 @@
+# =============================================================================
+# 冻结的科学定义 (Stage 0 / Gate 0)
+# 项目: 电解液溶剂 ranking 稳定性 (decision-centric ranking stability)
+# 依据: ranking-electrolyte-materials-v2.md 第 3/4/5/6/8 节 + 第 19 节 Stage 0
+# 状态: FROZEN, 见 config/prereg.yaml 的冻结声明
+# 编码: UTF-8; 字段名英文, 说明中文
+# =============================================================================
+schema_version: "1.0"
+frozen: true
+frozen_date: "2026-09-29"
+project: electrolyte-solvent-ranking-stability
+
+provenance:
+  source_document: "E:/Claude Code/电解液溶剂-HB/核心文件/ranking-electrolyte-materials-v2.md"
+  source_sections:
+    - "3  三层研究框架 (A: proxy/电子结构, B: 环境条件态, C: 外部参考)"
+    - "4  目标量与方向定义"
+    - "5  数据集设计 (双层结构) 与 chemical-space metadata"
+    - "6  构象与状态采样"
+    - "8  solution thermochemistry (8.1 分离 association, 8.2 相对 ligand-exchange, 8.3 continuum sensitivity)"
+    - "19 Stage 0 / Gate 0"
+  reading_list: "E:/Claude Code/电解液溶剂-HB/核心文件/ranking-electrolyte-materials-reading-list.md"
+
+# -----------------------------------------------------------------------------
+# 总体口径
+# -----------------------------------------------------------------------------
+framing:
+  is_not:
+    - "不是预测真实电解液分解电位或完整电化学稳定窗口"
+    - "不是把 HOMO/LUMO 解释成 redox 自由能"
+    - "不是把 [LiM]+ 当作 M 的'更高保真度估计'"
+  is:
+    - "intact-species / conditional-species one-electron redox thermodynamic proxy 的排序稳定性研究"
+    - "严格区分 model complexity != accuracy != physical representativeness"
+  core_identities:
+    - "model complexity != accuracy != physical representativeness"
+    - "different conditional species != different-fidelity estimates of the same observable"
+
+# -----------------------------------------------------------------------------
+# Axis A: proxy / electronic-structure hierarchy
+# 只改变电子结构/性质定义的精细程度, 尽量保持条件态与目标物理量相同。
+# -----------------------------------------------------------------------------
+axis_A_proxy_hierarchy:
+  P0:
+    label: "cheap scalar proxy"
+    must_be_scalar: true
+    oxidation:
+      formula: "P0_ox(M) = -epsilon_HOMO(M)"
+      objective_direction: maximize
+    reduction:
+      formula: "P0_red(M) = +epsilon_LUMO(M)"
+      objective_direction: maximize
+      note: "Koopmans-like proxy, 与'越大越难发生一电子还原'同方向; 也可使用符号统一后的 xTB vertical electron-attachment proxy"
+    allowed_sources:
+      - "GFN2-xTB 单点轨道能"
+      - "其他紧束缚/半经验轨道能 (必须记录版本)"
+    explicitly_excluded_from_P0:
+      - "偶极矩 mu"
+      - "极化率 alpha"
+      - "ESP"
+      - "分子体积"
+      - "分子 fingerprint"
+      - "任何多维 descriptor 组合 (features 不等于一个 fidelity level)"
+    interpretation: "只回答'极低成本 scalar proxy 是否已经保留目标排序', 不得解释为真实 redox potential"
+  P1:
+    label: "gas-phase molecular redox thermodynamics"
+    oxidation:
+      formula: "dG_ox_gas(M) = G_gas(M+) - G_gas(M)"
+      objective_direction: maximize
+    reduction:
+      formula: "dG_red_gas(M) = G_gas(M-) - G_gas(M)"
+      objective_direction: maximize
+    failure_flag: "unbound_anion"
+    failure_rule: "若气相阴离子不是稳定电子束缚态, 标记 unbound_anion, 不强制给出伪精确 adiabatic electron affinity"
+  P2:
+    label: "fixed-background continuum molecular redox thermodynamics"
+    oxidation:
+      formula: "dG_ox_cont(M) = G_cont(M+) - G_cont(M)"
+      objective_direction: maximize
+    reduction:
+      formula: "dG_red_cont(M) = G_cont(M-) - G_cont(M)"
+      objective_direction: maximize
+    embedding_rule: "所有候选使用同一固定背景介质; 用于研究共同 embedding 引起的 rank shift, 不模拟每个候选自己的 neat-liquid bulk 环境"
+
+# -----------------------------------------------------------------------------
+# Axis B: environment / conditional-species hierarchy
+# 环境变化可能同时改变 chemical species, 因此不属于"同一 observable 的更高 fidelity"。
+# -----------------------------------------------------------------------------
+axis_B_environment_states:
+  C0:
+    label: "free molecular state"
+    species: "M"
+    redox_states: ["M", "M+", "M-"]
+  C1:
+    label: "Li+-coordinated conditional state"
+    species: "[LiM]+ 及其相应 redox states"
+    question: "候选分子处于 Li+ 配位态时, 其 redox thermodynamic proxy 相对于自由态如何变化?"
+    quantities:
+      dG_ox_free: "G(M+) - G(M)"
+      dG_ox_Li: "G([LiM]2+) - G([LiM]+)"
+      dG_red_free: "G(M-) - G(M)"
+      dG_red_Li: "G([LiM]0) - G([LiM]+)"
+      dGdG_ox_coord: "dG_ox_Li - dG_ox_free"
+      dGdG_red_coord: "dG_red_Li - dG_red_free"
+    priority: "dGdG_coord 是本项目最重要的环境响应量之一"
+  C2:
+    label: "selected explicit microsolvation states"
+    species: "少量代表体系在相同化学计量下的显式局域溶剂化 cluster"
+    scope: "第一阶段只做 targeted sensitivity check"
+    forbidden: "不得把不同配位数/不同阴离子数/不同化学计量的 cluster 用裸 Gibbs energy 做简单 Boltzmann 平均"
+
+# -----------------------------------------------------------------------------
+# Axis C: external reference layer (判断 accuracy, 不定义模型复杂度)
+# -----------------------------------------------------------------------------
+axis_C_external_reference:
+  R_gas:
+    description: "约 8-10 个结构小、实验 IP/EA 或高等级计算可靠的分子"
+    audits: P1
+    targets: ["absolute scale", "family trend", "ranking"]
+  R_sol:
+    description: "约 10-20 个实验 solution redox 数据点"
+    audits: P2
+    condition_fields: ["solvent", "supporting_salt", "concentration", "temperature", "reference_electrode", "scan_conditions"]
+    pooling_rule: "条件不可严格统一时, 不强行对全部文献做绝对值 pooled regression, 优先 within-series 相对排序, 条件信息保存在 metadata"
+  R_env:
+    description: "少量典型 Li-coordination case 的已发表 explicit-cluster / 溶液模拟 / 实验趋势"
+    audits: C1
+    strength: "第一阶段只要求定性/半定量, 不要求覆盖全部候选"
+
+# -----------------------------------------------------------------------------
+# 目标量与筛选方向
+# -----------------------------------------------------------------------------
+objectives:
+  oxidation:
+    symbol: S_ox
+    definition: "S_ox(M) = dG_ox(M) = G(M+) - G(M)"
+    unit: kJ/mol
+    objective_direction: maximize
+    interpretation: "S_ox 越大 => 一电子氧化越困难 (氧化侧越稳定)"
+  reduction:
+    symbol: S_red
+    definition: "S_red(M) = dG_red(M) = G(M-) - G(M)"
+    unit: kJ/mol
+    objective_direction: maximize
+    interpretation: "S_red 越大 => 电子附着越不利 => 该一电子还原越困难"
+  direction_policy:
+    rule: "所有 Top-k / selection regret / threshold metric 必须分别记录 objective_direction; 代码禁止默认'所有指标越大越好'"
+    allowed_values: ["maximize", "minimize"]
+    project_default: "oxidation 与 reduction 均为 maximize"
+  scope_disclaimer: "上述目标量是 one-electron redox thermodynamic proxy, 不等于真实分解顺序; 真实分解涉及 solvent-anion charge transfer, 质子/氢转移, 协同断键, 表面催化, EDL enrichment 与 SEI/CEI passivation"
+
+# -----------------------------------------------------------------------------
+# 热化学约定
+# -----------------------------------------------------------------------------
+thermochemistry:
+  temperature:
+    value_K: 298.15
+    value_C: 25.0
+    RT:
+      kJ_per_mol: 2.4789
+      eV: 0.025693
+  standard_state:
+    gas_phase:
+      definition: "ideal gas, p = 1 bar, T = 298.15 K"
+      used_by: [P1, R_gas]
+    solution:
+      definition: "ideal solution, c = 1 mol/L, T = 298.15 K"
+      used_by: [P2, C1, R_sol]
+    molecularity_warning: "redox difference 前后 molecularity 不变, 标准态与平动项大量抵消; 但 Li+ + M -> [LiM]+ 改变 molecularity, 会引入明显 solution translational-entropy artifact (v2 8.1)"
+    free_energy_formula_policy: "G = E_elec + G_thermal + dG_solv 不得作为无需说明的通用公式; 必须显式记录 thermodynamic cycle 与每一项来源"
+  reference_electrode:
+    primary_convention: "Li/Li+ (1 M Li+, 298.15 K)"
+    conversion_constants:
+      E_Li_Liplus_vs_SHE_V: -3.0401
+      FARADAY_C_per_mol: 96485.33212
+    rule: "以自由能差 (kJ/mol) 为主要报告量; 若换算为电位刻度, 必须显式记录 reference electrode 约定"
+    forbidden:
+      - "把 HOMO/LUMO 能级直接解释为电极电位"
+      - "把气相 redox 量直接当作溶液电位"
+      - "把不同实验系列的绝对值强行合并成单一绝对 benchmark"
+
+# -----------------------------------------------------------------------------
+# Reference ligand R (v2 8.2)
+# -----------------------------------------------------------------------------
+reference_ligand:
+  exchange_reaction: "[LiR]+ + M -> [LiM]+ + R"
+  quantity:
+    symbol: dGdG_bind
+    definition: "dGdG_bind(M;R) = G([LiM]+) + G(R) - G([LiR]+) - G(M)"
+    unit: kJ/mol
+    rationale: "反应前后 molecularity 相同, 显著降低标准态与平动熵伪差, 并减少对 Li+ 绝对 solvation free energy 的依赖"
+  primary_R:
+    mol_id: C08
+    name: DME
+    smiles: COCCOC
+    selection_rule: "结构最简单、配位模式明确且在 core set 中稳定的代表分子 (v2 8.2)"
+    rationale: "core set 内; 双齿 2x O 螯合, 配位 motif 唯一且无环张力/无开环副反应通道; 分子量小、易得高纯样品; 实验与计算中广泛作为 Li+ 溶剂化参照"
+    excluded_alternatives:
+      DOL: "环状醚存在开环/聚合倾向, 不满足'稳定'要求"
+      EC: "高熔点固体且还原开环倾向强, [LiR]+ 的 motif 定义不干净"
+      AN: "单齿 N 给体, 与多数 O 给体候选的配位模式差异过大, 会造成 chelate 效应偏置"
+      TMP: "既参与还原成膜, 又有多个近似等价 O, 参考态不唯一"
+  secondary_R_robustness_check:
+    mol_id: C16
+    name: AN
+    smiles: CC#N
+    role: "sensitivity check only"
+    rule: "关键结论必须在 R = DME 与 R = AN 下分别检查; 若不一致, 结论必须标记为 R-dependent"
+  absolute_binding_policy:
+    symbol: dG_bind_abs
+    definition: "dG_bind_abs = G([LiM]+) - G(Li+) - G(M)"
+    policy: "可保留作辅助量, 但不作为核心 mechanistic truth"
+
+# -----------------------------------------------------------------------------
+# Continuum 两类 sensitivity test 必须分开 (v2 8.3)
+# -----------------------------------------------------------------------------
+continuum_sensitivity:
+  A_fixed_solvent_benchmark:
+    rule: "选择一个被所用 continuum 模型明确参数化、且与 external anchor 兼容的固定参考溶剂, 全部候选使用同一设定"
+    freeze_point: "Stage 1 / Gate 1 (method audit 之后) 冻结具体溶剂"
+  B_dielectric_only:
+    model_family: "CPCM/COSMO 类"
+    epsilon_values: [5, 10, 20, 40]
+    purpose: "研究纯静电力 screening 变化是否导致稳健 rank inversion"
+  separation_rule: "不得把 SMD 的 solvent-specific non-electrostatic 参数与'只改变 dielectric constant'混成同一操作"
+
+# -----------------------------------------------------------------------------
+# 构象与状态采样 (v2 6)
+# -----------------------------------------------------------------------------
+conformers_and_states:
+  parent_conformer_workflow:
+    - "canonical SMILES 生成 3D 初始结构"
+    - "CREST / GFN2-xTB 构象搜索"
+    - "预设能量窗口内保留候选"
+    - "按结构/扭转角/RMSD 聚类"
+    - "选取约 3-10 个独立低能构象进入 DFT"
+    - "neutral / cation / anion 不假定共享同一最优构象空间"
+  ensemble_free_energy: "G_q^ens = -RT ln sum_i g_i exp(-G_q,i / RT)"
+  ensemble_rule: "同一 charge state、同一化学计量、同一模型内建 ensemble; 不同 charge state 分别建 ensemble, redox 量由 ensemble 自由能差给出, 而不是强制一一对应同一 conformer"
+  li_motif_generation:
+    - "识别 O/N/S/P 等 donor atoms"
+    - "对每个 donor 生成单齿 Li+ 初始位点"
+    - "对几何允许的 donor pairs 生成双齿候选"
+    - "依据 molecular ESP minima 补充可能遗漏的位点"
+    - "xTB 预优化"
+    - "依据 Li-donor connectivity / 关键距离 / 结构相似度 / 能量去重"
+    - "若干低能 motif 进入 DFT"
+    - "不同 redox states 重新允许 motif relaxation, 不机械固定 neutral-state 配位方式"
+  state_identity_qc:
+    stored_fields: ["fragment_charge", "spin_density", "SOMO/LUMO 或 frontier-state localization", "Li-M 键合变化", "connectivity", "主要电子密度变化区域"]
+    labels:
+      - molecule_centered_redox
+      - Li_centered_or_mixed_redox
+      - motif_switch
+      - no_intact_minimum_found
+      - dissociated_optimized_product
+      - reaction_path_verified
+    rule: "只有具备额外 reaction-path/TS/动力学证据时, 才可解释为已验证反应路径; 几何优化导致断键本身不能证明实际溶液中该反应无势垒或足够快"
+
+# -----------------------------------------------------------------------------
+# 数据集设计 (v2 5)
+# -----------------------------------------------------------------------------
+dataset:
+  core_set:
+    file: data/metadata/core_set.csv
+    n_rows: 18
+    builder: scripts/build_metadata.py
+    purpose: "paired benchmark: 完成 P0 / P1 / P2 以及 C1 conditional Li-coordination, 用于严格的 paired rank comparison"
+    size_note: "v2 建议 N_core 约 60-100; 本课题侧重物理与化学机制, 主动缩小到 18 个 family 覆盖分子, 其中 2-3 个为机理对照分子"
+    mechanism_control_molecules:
+      - mol_id: C06
+        name: FEC
+        contrast: "氟化 vs 非氟化环状碳酸酯 (F 取代 -> LiF 生成路径)"
+      - mol_id: C07
+        name: VC
+        contrast: "不饱和 vs 饱和环状碳酸酯 (还原开环/聚合路径)"
+      - mol_id: C18
+        name: SN
+        contrast: "双齿 vs 单齿腈 (螯合与配位数效应, 对照 C16 AN)"
+  broad_pool:
+    file: data/metadata/broad_pool.csv
+    n_rows: 40
+    purpose: "只做廉价结构 descriptor 与 xTB proxy (P0), 用于化学空间覆盖检查与 active-learning 候选池"
+    note: "结构与 metadata 一次性建立 (v2 5.1)"
+  pair_counts:
+    core_set: 153
+    broad_pool: 780
+  layering_rule: "两个 CSV 共享完全相同的列定义 (core 的 reason_included 在 pool 中为 pool_reason), 以便同构读取"
+
+# -----------------------------------------------------------------------------
+# 受控词表 (family / role / functionalization_tags)
+# -----------------------------------------------------------------------------
+controlled_vocabularies:
+  family:
+    rule: "互斥的骨架主家族; 氟化等取代属于 functionalization, 不得另立平行 family"
+    values: [linear_carbonate, cyclic_carbonate, ether, ester, sulfone, sulfoxide, nitrile, phosphate, sulfite, sultone, siloxane]
+    examples_of_wrong_usage: "fluoroether 不是 family; 应写成 family=ether + tag fluorinated"
+  role:
+    values: [solvent, co-solvent, additive]
+    note: "v2 的原字段名为 use_role, 本项目 MVP 只使用上述三种取值; anchor 由 config 中的 reference 层承担"
+  functionalization_tags:
+    separator: "|"
+    values:
+      linear: "非环骨架"
+      cyclic: "含环骨架"
+      chelating: "几何允许的双齿/多齿配位"
+      flexible: "rotatable_bonds >= 4 的柔性分子"
+      fluorinated: "含 C-F 键"
+      halogenated: "含 F 以外的卤素"
+      unsaturated: "含 C=C / C=C 等不饱和键"
+      aromatic: "含芳环"
+      acetal: "含 O-C-O 缩醛中心"
+      sulfur_containing: "含 S 的官能团"
+      phosphorus_containing: "含 P 的官能团"
+      silicon_containing: "含 Si 的官能团"
+      mixed_donor: "同一分子含两种及以上给体原子类型"
+
+# -----------------------------------------------------------------------------
+# metadata 字段约定 (与 scripts/build_metadata.py 保持一致)
+# -----------------------------------------------------------------------------
+metadata_conventions:
+  donor_atoms:
+    format: "分号分隔的标签列表, 顺序固定为 O= ; O- ; N"
+    labels:
+      "O=": "与 C/P/S 成双键的氧 (羰基/磷氧/磺酰/亚砜氧)"
+      "O-": "单键氧 (醚氧/酯氧/硅氧)"
+      "N": "氮给体 (腈氮/胺氮)"
+    rule: "S 与 P 视为受主中心而非给体, 不计入 donor_atoms"
+  donor_count: "donor_atoms 中各类原子的总数 (所有 O 与所有 N)"
+  heteroatom_count: "非碳重原子数 (O, N, S, P, F, Si, Cl ...)"
+  n_heavy: "非氢原子总数"
+  mw: "平均分子量 [g/mol], 保留 2 位小数 (RDKit MolWt)"
+  rotatable_bonds: "RDKit strict 定义的可旋转键数 (柔性代理量); 排除端基键、环内键与酰胺 C-N 键"
+  tpsa: "拓扑极性表面积 [A^2], 保留 2 位小数 (Ertl)"
+  canonicalisation_rule: "CSV 中写入手写 SMILES 原样; RDKit 仅用于校验可解析性与计算描述符, 以保证有/无 RDKit 时产物字节一致"
+
+# -----------------------------------------------------------------------------
+# 计算预算与产物可追溯 (v2 7.4 / 28)
+# -----------------------------------------------------------------------------
+provenance_requirements:
+  every_final_number_must_trace_to:
+    - molecule ID
+    - conformer / motif ID
+    - geometry
+    - charge / multiplicity
+    - software / version
+    - method / basis
+    - solvent model
+    - temperature / standard state
+    - raw output
+    - QC state
+    - state-identity label
+  record_machine_readably:
+    - software/version
+    - functional
+    - basis
+    - auxiliary basis / RI approximation
+    - dispersion correction
+    - integration grid
+    - SCF threshold
+    - geometry threshold
+    - charge/multiplicity
+    - solvent model
+    - temperature
+    - standard state
+    - conformer/motif ID
+    - QC flags

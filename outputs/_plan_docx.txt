@@ -1,0 +1,546 @@
+电解液分子筛选的决策导向排序稳定性研究
+——详细执行计划（Stage 0–9）
+配套文件：ranking-electrolyte-materials-v2.md（研究方案 v2）
+版本：执行计划 v1.0　　日期：2026-09-29
+适用范围：本科阶段首轮 MVP，约 8–12 周
+
+目录
+右键目录并选择“更新域”可刷新页码。
+
+一、计划总览3
+1.1 项目定位与核心科学问题3
+1.2 本计划与研究方案 v2 的关系3
+1.3 总体里程碑3
+二、Stage 0：定义冻结与预注册（第 1 周）5
+2.1 必须冻结的定义清单5
+2.2 预注册文件结构5
+2.3 Gate 0 放行条件5
+三、数据集构建计划7
+3.1 Core paired benchmark set（N≈64）7
+3.2 Broad cheap pool（N≈500）7
+3.3 Metadata 数据结构7
+四、工具链与方法审计（Stage 1，第 1–2 周）9
+4.1 软件栈9
+4.2 方法审计设计9
+4.3 生产协议候选参数（审计后冻结）9
+4.4 Gate 1 放行条件9
+五、批量计算执行计划（Stage 2–5）11
+5.1 Stage 2：broad cheap pool（第 3–4 周）11
+5.2 Stage 3：core 自由分子电子结构（第 3–4 周并行）11
+5.3 Stage 4：固定背景连续介质（第 5–6 周）11
+5.4 Stage 5：条件 Li+ 配位态（第 7–8 周）11
+六、Stage 6：不确定性感知排序分析（预注册统计计划，第 9 周）13
+6.1 指标定义（全部预注册）13
+6.2 不确定性来源与 δ 的确定13
+6.3 统计推断13
+七、Stage 7–8：机器学习与主动学习（第 9–11 周）15
+7.1 特征成本分层15
+7.2 模型与数据拆分15
+7.3 Δ-learning 对比设计15
+7.4 Active-learning replay（Stage 8）15
+八、Stage 9 与计算资源预算17
+8.1 Stage 9：可选显式微溶剂化验证（第 11–12 周，视资源）17
+8.2 计算预算估算17
+8.3 预算超限缩减预案17
+九、风险管理19
+十、十二周时间线21
+十一、交付物与目录结构23
+11.1 交付物清单23
+11.2 项目目录结构23
+11.3 最小成果判据 checklist23
+附录 A：QC 状态机25
+附录 B：Metadata 字段表26
+附录 C：结果分支与应对预案27
+
+一、计划总览
+1.1 项目定位与核心科学问题
+本计划是研究方案 v2 的执行层文档：方案回答“为什么做、做什么”，本计划回答“谁来做、按什么顺序做、用什么参数做、做到什么程度算完成、出问题怎么办”。项目研究对象为固定背景电解液中的候选小分子/共溶剂/添加剂，研究目标不是宣称预测完整电池性能，而是系统回答三个核心问题：
+哪些缺失物理（溶剂化、Li+ 配位、构象、state identity 变化）只是数值 offset，哪些会产生超出方法不确定性的稳健排序翻转（robust inversion）？
+一个明显的排序翻转是否真的大于模型不确定性（robustness 判据）？
+在给定且经外部验证的 target model 下，恢复筛选决策（Top-k / 整体排序）所需的最小昂贵计算预算是多少？
+第一阶段严格区分四件事：模型复杂度、数值准确性、化学物种状态、材料决策。任何结论都必须通过外部 reference layer 或不确定性审计之后才能下。
+1.2 本计划与研究方案 v2 的关系
+本计划不改变 v2 的科学定义，只补充执行细节：具体分子清单、软件与参数、逐周时间安排、逐 Stage 的交付物与放行 Gate、计算预算、风险预案。凡本计划与 v2 不一致处，以 v2 的科学定义为准并记录偏差原因。
+1.3 总体里程碑
+里程碑
+计划时点
+放行判据
+M0 定义冻结
+第 1 周末
+预注册文件签署：目标量方向、k 值、δ 确定规则、reference ligand、anchor 搜集规则全部冻结，记入版本库
+M1 方法审计通过
+第 2 周末
+8–10 个审计分子的 functional/basis/continuum sensitivity 完成；gas-phase anchor 偏差与排序一致性达标；生产协议冻结
+M2 cheap pool 完成
+第 4 周中
+broad pool 全部候选的 X(0) 与 P0 就绪；core set 自由分子 P1 完成并过 QC
+M3 continuum 完成
+第 6 周末
+core set 全部候选的 P2 就绪；首轮 P0→P1→P2 排序稳定性矩阵产出
+M4 配位态完成
+第 8 周末
+core set 的 C1 条件态计算与 state-identity QC 完成；ΔΔG_coord 表冻结
+M5 统计与 ML 完成
+第 10 周末
+robust inversion 机制分析、direct vs Δ-learning、LOFO 结果齐备
+M6 项目闭环
+第 12 周末
+active-learning replay 曲线、最终图表与报告完成；全部数据可追溯
+二、Stage 0：定义冻结与预注册（第 1 周）
+2.1 必须冻结的定义清单
+以下项目在查看任何批量计算结果之前冻结，写入 preregistration.yaml 并纳入版本控制；事后修改必须新建版本号并记录动机与时间。
+冻结项
+建议取值/规则
+依据（v2 章节）
+氧化目标量
+S_ox(M) = ΔG_ox(M) = G(M+) − G(M)，越大越难一电子氧化
+§4.1
+还原目标量
+S_red(M) = ΔG_red(M) = G(M−) − G(M)，越大越难一电子还原
+§4.1
+objective_direction
+每个 Top-k/regret/threshold 指标显式记录方向，代码中禁止默认“越大越好”
+§4.1
+common embedding
+全部候选置于同一固定连续介质背景；不等价于各自 neat-liquid 行为
+§2.1, §3.1
+参考溶剂
+建议乙腈（AN）：continuum 参数化成熟、实验 anchor 丰富；Stage 1 审计后确认
+§8.3
+reference ligand R
+建议 DME（结构简单、单/双齿明确）；Stage 0 冻结后不得更换
+§8.2
+Top-k 预注册
+k/N = 10%、20%、30% 三档
+§10.1
+robust-pair tolerance δ
+δ_m = max（构象 ensemble 90 分位展宽, 方法审计得到的 inter-method 展宽, 0.05 eV 下限）；Stage 1 结束后写入数值
+§9.1
+probabilistic pair 阈值
+p_ij > 0.9 判 i > j；p_ij < 0.1 判 i < j；其间记 unresolved
+§9.4
+external anchor 搜集规则
+气相：NIST 实验 IP/EA；液相：同一实验系列、溶剂/盐/浓度/温度/参比电极尽可能一致，条件存 metadata
+§15
+family 划分
+按互斥 structural_family；fluorinated 等作为 functionalization_tags
+§5.2
+2.2 预注册文件结构
+建议 preregistration.yaml 至少包含以下字段：objective_definitions（含方向）、dataset_freeze（core_set 版本号与分子数）、metric_registration（k 档、δ 规则、p 阈值）、reference_ligand、anchor_protocol、family_map、qc_policy、变更日志 changelog。该文件是 Gate 0 的唯一判据载体。
+2.3 Gate 0 放行条件
+预注册文件提交并打 tag（v0.1-prereg）。
+core set 与 broad pool 候选清单冻结，family/tag 覆盖检查通过。
+任何目标量、family 定义、筛选方向或阈值此后不得在看完整结果后无记录修改。
+三、数据集构建计划
+3.1 Core paired benchmark set（N≈64）
+core set 完成 P0、P1、P2 与 C1 全部计算，用于严格 paired rank comparison。选择原则：覆盖不同 donor 原子、单齿/双齿配位、极性/极化率梯度、刚性与柔性、家族内系统取代与跨家族差异，并包含可识别 anchor。建议清单如下（72 个候选，最终冻结 60–70 个）：
+structural_family
+建议分子（缩写）
+覆盖目的
+环状碳酸酯
+EC*、PC*、BC、VC*、FEC*、DFEC
+主溶剂 anchor；additive role；氟化取代对照
+线性碳酸酯
+DMC*、EMC*、DEC*、MPC、FEMC、TFEMC
+家族内链长/氟化系统取代
+醚/缩醛
+DME*、DOL、DEE、G2、G3*、G4、THF、2-MeTHF
+单齿/双齿/多齿配位；柔性梯度
+腈类
+AN*、PN、BN、SN、GN、ADN、MPN
+N-donor 配位；双齿腈；抗氧化候选
+砜类
+SL*、3-MeSL、DMS、EMS、DES、EiPS
+强极性 S=O donor；抗氧化候选
+磷酸酯/膦酸酯
+TMP*、TEP、DMMP、DEEP、TTFP、TPP
+P=O donor；阻燃 role；氟化对照（TTFP）
+羧酸酯/内酯
+MF、MA、EA、MP、EP、GBL*、GVL
+低黏度共溶剂 role；羰基配位
+氟代醚
+TTE、BTFE、F3EA、HFE-356
+弱溶剂化稀释剂；跨家族氟化 tag
+其他添加剂
+PS、DTD、ES、TMSP
+成膜添加剂 role；环张力/杂原子多样性
+注：* 为建议 anchor 分子（约 12 个，覆盖全部 family）。氟化物不单独设 family，统一用 functionalization_tags 标记 fluorinated。
+每个家族保留 5–8 个成员，保证 LOFO 时每个 test family 约 8–12 个样本。
+禁止用单一母骨架枚举几十个极相似衍生物充当 core set。
+3.2 Broad cheap pool（N≈500）
+broad pool 只计算廉价 descriptor、xTB proxy，必要时加自由分子 DFT，用于回答“如何从大选候选池挑选最值得做昂贵 C1/P2 的点”。来源建议：Electrolyte Genome 分子库、PubChem 筛选与本课题组历史分子。
+筛选维度
+规则
+分子量
+MW ≤ 250（添加剂可放宽至 350）
+组成元素
+限 H/C/N/O/F/S/P，排除金属与卤素（Cl/Br/I）
+donor 原子
+至少含 1 个 O/N/S/P 潜在配位原子
+结构可用性
+RDKit 可解析、可生成 3D；排除反应性官能团（如游离酸、过氧键）
+覆盖检查
+用 fingerprint + PCA/UMAP 检查 chemical-space 覆盖，core set 各 family 周边均有 pool 邻居
+规模
+目标 500，资源允许可扩至 1000
+3.3 Metadata 数据结构
+所有候选在计算开始前建表（metadata/core_set.csv、metadata/broad_pool.csv），字段见附录 B。三条纪律：family 互斥、tag 可多选；state_identity_status 与 reactivity_status 在 C1 计算后回填；qc_status 按附录 A 状态机逐层记录，异常样本不得静默删除。
+四、工具链与方法审计（Stage 1，第 1–2 周）
+4.1 软件栈
+用途
+软件（建议版本）
+备注
+结构/描述符
+RDKit 2025.03
+canonical SMILES、fingerprint、TPSA、rotatable bonds
+构象搜索
+CREST 3.0 + GFN2-xTB（xTB 6.7）
+能量窗口 6 kcal/mol；RMSD/扭转角聚类后取 3–10 个构象
+DFT 生产计算
+ORCA 6.0/6.1
+几何、频率、单点、continuum；RI 加速
+波函数分析
+Multiwfn 3.8
+ESP、fragment charge、spin density、state identity
+解析/后处理
+cclib + 自研 Python 脚本
+统一解析 log，写入 qc_status
+统计/ML
+Python 3.12 + scikit-learn、scipy
+τb、bootstrap、GPR/KRR/RF
+自动化
+Snakemake 或 bash+队列脚本
+任务数预计上千，必须自动化
+4.2 方法审计设计
+审计分子（10 个）：EC、DMC、DEC、DME、G2、AN、GBL、SL、TMP、FEC——覆盖主要 family、柔性梯度与配位模式，且多数有可靠实验数据。审计在三个维度上交叉进行，严格区分 method sensitivity（方法间比较）与 method accuracy（对照外部 anchor）：
+审计维度
+候选设置
+评估对象
+几何/频率方法
+r2SCAN-3c（生产候选）对照 ωB97X-D4/def2-SVP
+几何差异、频率成本、ΔG 敏感度
+单点电子能
+ωB97X-D4/def2-TZVP（生产候选）对照 def2-QZVPP 与 B3LYP-D4/def2-TZVP
+IP/EA 类量的 functional/basis sensitivity
+阴离子 diffuse
+ma-def2-TZVP 对照 def2-TZVP
+SOMO 扩展、电子脱附稳定性、伪束缚态检查
+continuum 模型
+CPCM 对照 SMD（同一固定溶剂 AN）
+P2 数值与排序的模型敏感度
+外部 anchor
+气相：NIST 实验 IP/EA（8–10 个）；液相：统一条件文献 redox 系列（10–20 个）
+绝对误差、family trend、排序一致性
+4.3 生产协议候选参数（审计后冻结）
+环节
+候选冻结参数
+构象/预优化
+CREST/GFN2-xTB，窗口 6 kcal/mol，聚类后 3–10 构象/电荷态
+几何与频率
+r2SCAN-3c，tight 收敛；每态查虚频、SCF 收敛、spin contamination、connectivity
+单点
+ωB97X-D4/def2-TZVP；阴离子单独启用 ma-def2-TZVP 协议
+连续介质
+SMD（AN），全候选统一；审计子集另做 CPCM ε=5/10/20/40 dielectric-only 扫描
+热化学
+298.15 K，1 mol/L 标准态；association 量改用 ligand-exchange 相对量；显式记录 thermodynamic cycle 每一项来源
+可追溯性
+software/version、functional、basis、grid、阈值、charge/multiplicity、solvent、conformer/motif ID、QC flags 全部机器可读记录
+4.4 Gate 1 放行条件
+审计分子在 state identity、SCF 稳定性、几何收敛上无系统性失败。
+gas-phase anchor：绝对误差与 family trend 可接受（预注册阈值，建议 MAD ≤ 0.2 eV 且 Spearman ρ ≥ 0.9，最终以审计结果写入）。
+液相 anchor：within-series 相对排序与实验系列一致，或偏差可解释。
+robust-pair tolerance δ 的数值由审计结果确定并写入预注册文件。
+生产协议冻结（protocol v1.0 tag）。未通过 Gate 1 不得启动批量计算。
+五、批量计算执行计划（Stage 2–5）
+5.1 Stage 2：broad cheap pool（第 3–4 周）
+任务：canonical SMILES 生成 3D → RDKit descriptors → CREST/GFN2-xTB 预优化 → 提取 P0 scalar proxies（−ε_HOMO、ε_LUMO、xTB vertical EA proxy）→ 建 X(0) 特征表。
+QC：duplicate 检查、chemical-space 覆盖图、xTB 失败样本单独统计。
+产出：broad_pool.csv（含 X(0) 与 P0）、cheap chemical-space map 图。
+若时间紧张，broad pool 只做到 P0，但结构与 metadata 必须一次性建全。
+5.2 Stage 3：core 自由分子电子结构（第 3–4 周并行）
+任务：core set 每分子的 neutral/cation/anion 分别做构象搜索与 DFT refinement（不假定共享最优构象），建立 state-specific ensemble（G_q^ens = −RT ln Σ_i g_i exp(−G_q,i/RT)），得到 P1 = ΔG_ox/red^gas。
+QC：阴离子非束缚态标 unbound_anion，不强行给出伪精确 EA；异常样本按附录 A 状态机记录。
+敏感性子任务：对 6–8 个柔性分子比较 single minimum → small ensemble → expanded ensemble 是否改变排序。
+产出：P1 表（含 ensemble 展宽）、外部 anchor validation 小结。
+核心问题：P0 → P1 是否保持排序？哪些 family 最先失效？
+5.3 Stage 4：固定背景连续介质（第 5–6 周）
+任务：全部 core 候选用同一生产 continuum 设定得到 P2 = ΔG_ox/red^cont；审计子集做 ε=5/10/20/40 dielectric-only 扫描（不把 SMD 非静电参数混入）。
+产出：P2 表；P1→P2 的 common offset / family-dependent shift / robust rank shifts 分解。
+核心问题：continuum 环境主要产生共同平移、家族依赖平移，还是真实 pairwise 重排？
+5.4 Stage 5：条件 Li+ 配位态（第 7–8 周）
+motif 枚举：识别 O/N/S/P donor → 单齿位点 + 几何允许的双齿对 → ESP minima 补漏 → xTB 预优化 → 按 Li–donor connectivity/距离/能量去重 → 低能 motif 送 DFT。
+redox states 允许 motif 重新弛豫，不机械固定 neutral 配位方式。
+state identity QC（每态必做）：fragment charge、spin density、SOMO/LUMO 定域、Li–M 键合变化、connectivity，分类为 molecule_centered_redox / Li_centered_or_mixed_redox / motif_switch / no_intact_minimum_found / dissociated_optimized_product / reaction_path_verified。
+产出：ΔΔG_ox/red^coord 表；相对 ligand-exchange ΔΔG_bind(M;R)（R 为冻结参考配体，不做裸绝对 Li+ 结合能结论）；robust inversion cases 人工结构审查记录。
+核心问题：Li+ 配位是否引起超出 method uncertainty 的真实 decision shift？
+六、Stage 6：不确定性感知排序分析（预注册统计计划，第 9 周）
+6.1 指标定义（全部预注册）
+指标
+定义
+预注册参数
+Kendall τb
+允许 ties 的秩相关；Spearman ρ 作辅助
+—
+unresolved-pair fraction
+|ΔP_ij| < δ_m（或 < z·σ_ij）的 pair 占比
+δ_m 来自 Stage 1；z=1
+robust inversion fraction
+两模型均解析且符号相反的 pair 数 / 双方均解析的 pair 数
+双侧 separation 均超 δ
+Top-k overlap O_k
+|S_A(k) ∩ S_B(k)| / k，同报 Jaccard
+k/N = 10%/20%/30%
+selection regret R_k
+mean P_T(S_T(k)) − mean P_T(S_M(k))
+沿 objective_direction 统一最大化方向
+threshold decision error
+外部阈值下的分类不一致率
+阈值必须来自外部设计要求，禁止事后挑选
+probabilistic pair ordering
+p_ij = P(P_i > P_j)，posterior/bootstrap 估计
+0.9 / 0.1 双阈值
+6.2 不确定性来源与 δ 的确定
+构象 ensemble 展宽：同一分子不同低能构象的 ΔG 分布（90 分位）。
+方法展宽：审计矩阵中 functional/basis/continuum 引起的 ΔG 变化。
+数值下限：0.05 eV，避免 δ 被人为压小。
+δ_m 按模型层（P0/P1/P2/C1）分别取值并写入预注册；分析脚本从预注册文件读取，不写死。
+6.3 统计推断
+所有关键指标报告 bootstrap 1000 次 BCa 95% 置信区间；LOFO 的每个 test family 样本少，必须给区间而非点估计。
+报告必须同时区分 rank change 与 robust rank change beyond uncertainty；某模型 inversion 少但 unresolved 多时不得称为筛选稳定。
+产出：τb/ρ 矩阵、unresolved/robust-inversion fraction 表、Top-k overlap 与 regret 曲线、family-resolved 与 cross-family 统计。
+七、Stage 7–8：机器学习与主动学习（第 9–11 周）
+7.1 特征成本分层
+层级
+内容
+允许用途
+X(0)
+MW、family/tags、杂原子数、donor 数、TPSA、rotatable bonds、fingerprint、xTB orbital proxy、μ/α、xTB partial charge、xTB ESP extrema、cheap conformer spread
+query 前可得；可作 active-learning acquisition 输入
+X(1)
+自由分子 DFT 后可得：vertical/adiabatic gas redox、DFT μ/α、几何响应、continuum 自由分子量、DFT ESP
+可预测昂贵的 C1 配位响应
+X(2)
+Li-complex DFT 后可得：ΔΔG_bind、Li–X 距离、配位电荷重分布
+仅 post hoc 机制解释；禁止用于证明“低成本预测 C1”
+所有 ML 表格必须含 feature_cost_level 列；acquisition 依赖的特征必须在 query 前真实可用。
+7.2 模型与数据拆分
+模型复杂度顺序：linear/ridge → KRR → GPR → random forest / gradient boosting 对照；第一阶段不用深度神经网络。
+三种拆分同时报告：random split（仅 interpolation baseline）、group/scaffold split、LOFO（leave-one-structural-family-out，transferability 主证据）。
+统计边界：core 60–100 点，LOFO 每 family 约 10 样本，结论强度受 bootstrap 区间约束；若要把 AL/跨家族迁移作为主要结论，需扩大 broad pool 与 core labels。
+7.3 Δ-learning 对比设计
+Direct model：P_T = f(X(0/1))；Conditional-shift model：Δ_coord = f(X(0/1))，P(C1) = P(C0) + Δ_coord。
+四项检验：Δ_coord 方差是否小于完整 target；descriptor dependence 是否更简单；LOFO 下是否仍保持优势；MAE 优势是否同步转化为 τb、Top-k overlap、regret 优势。
+若 Δ 出现与 motif switching / state identity change / dissociation 共现的不连续，先做 state classification 再做 conditional regression，不继续加回归模型复杂度。
+7.4 Active-learning replay（Stage 8）
+设置：core set 完整 target labels 先隐藏，模拟真实 loop；每轮仅用当时可见 labels/features 做 normalization、调参与特征选择，禁止偷看完整 target set。
+对照 acquisition：random、diversity（cheap descriptor 空间最远点）、uncertainty（GPR epistemic，先查 calibration）、ranking-aware（posterior 估计 p_i = P(i ∈ Top-k)，按二元 entropy 优先 query“最不确定该不该选”的候选）。
+重复性：≥ 8 个初始 seeds × ≥ 10 次随机重复，报告 median 与置信区间，禁止只展示单条最漂亮 trajectory。
+产出曲线：n_T → τb、O_k、R_k（n_T 为已完成昂贵 target 计算数）。这张“最小昂贵信息预算”图是项目最有方法学辨识度的产出。
+八、Stage 9 与计算资源预算
+8.1 Stage 9：可选显式微溶剂化验证（第 11–12 周，视资源）
+对象：8–12 个候选，覆盖 ranking-stable、robust inversion、high uncertainty 与不同 family 代表。
+做法：相同化学计量的局域 cluster 做 targeted check，验证 1:1 Li 配位结论的稳健性；不同配位数/阴离子数的 microstates 不做裸 Gibbs 机械平均。
+本科项目时间有限时，Stage 9 不作为项目完成必要条件。
+8.2 计算预算估算
+任务数近似为 N_mol × N_charge × N_conformer × N_environment × N_motif。以 core set 64 个分子估算：
+任务类型
+数量估算
+单任务成本
+小计（core·h）
+P0/xTB（pool 500 + core）
+约 600 job
+约 0.1
+60
+P1 自由分子 opt+freq（3 电荷态 × 平均 4 构象）
+约 770 job
+约 2–6
+2300–4600
+P1/P2 高层单点
+约 770 job
+约 4–12
+3100–9200
+C1 Li 配合物 opt+freq（平均 3 motif × 3 态）
+约 580 job
+约 4–10
+2300–5800
+C1 高层单点
+约 580 job
+约 6–15
+3500–8700
+审计与 ε 扫描
+约 200 job
+约 3–8
+600–1600
+合计
+约 3500 job
+—
+约 1.2–2.5 万 core·h
+估算为数量级参考；Stage 1 后必须用实测的 median 与 90 分位 job 成本、failure rate、conformer/motif survival rate 回填此表，再冻结 core set 最终规模。
+8.3 预算超限缩减预案
+只对低能构象做频率；高层单点与低层热化学修正分离；只在 near-degenerate、排序可能改变的候选上升级热化学。
+core set 从 72 缩减到 48（每 family 保留 anchor + 2–3 成员），优先保住 family 覆盖而非总数。
+宁可缩小 core set，也不批量生成物理定义不一致的数据；不牺牲 state-identity QC 与 method audit。
+九、风险管理
+风险
+等级
+影响
+预案
+气相阴离子非束缚态大量出现
+高
+气相还原排序缺失
+标记 unbound_anion；还原方向结论主要基于 P2/C1；如实报告占比
+SCF/几何收敛失败率高
+中
+预算膨胀、数据缺口
+自动化重试策略（初猜/阻尼/换初值）；失败率纳入 Stage 1 统计后调整协议
+柔性分子构象爆炸
+中
+成本失控
+窗口与聚类收紧；只对排序敏感候选扩 ensemble
+Li motif 枚举遗漏
+中
+ΔΔG_coord 偏差
+ESP minima 补漏 + 人工抽查 robust inversion cases
+state identity 改变（Li-centered 还原/断键）
+高
+连续回归失效
+转入情形 D：先 state classification；这本身是重要科学结果
+液相实验 anchor 条件不统一
+中
+绝对 benchmark 弱
+不强行 pooled regression；优先 within-series 相对排序；条件存 metadata
+core set 规模不足以支撑 ML 结论
+中
+LOFO 区间过宽
+ML 结论降为 proof-of-concept；扩 broad pool；表述上不夸大泛化
+AL 各 acquisition 差异不显著
+低
+Figure 7 不“漂亮”
+如实报告；negative result 同样构成结论（适用域判定）
+时间/机时超限
+中
+Stage 8–9 压缩
+执行 8.3 缩减预案；Stage 9 可裁撤，Stage 6–8 为最小闭环不可裁
+十、十二周时间线
+周次
+阶段
+关键任务
+里程碑/交付物
+第 1 周
+Stage 0 + Stage 1 启动
+预注册冻结；审计分子与 anchor 清单确定；自动化流程搭建
+M0：preregistration v0.1
+第 2 周
+Stage 1
+functional/basis/diffuse/continuum 审计；gas 与 solution anchor 比对；δ 数值确定
+M1：protocol v1.0 冻结
+第 3–4 周
+Stage 2 + 3
+broad pool 廉价计算；core 自由分子三电荷态 DFT 与 ensemble
+M2：X(0)/P0/P1 表
+第 5–6 周
+Stage 4
+统一 continuum 批量计算；ε 扫描；首轮 P0→P1→P2 排序分析
+M3：P2 表 + 排序稳定性矩阵
+第 7–8 周
+Stage 5
+motif 枚举与 DFT；state identity QC；ΔΔG_coord 与 ligand-exchange
+M4：C1 数据冻结
+第 9 周
+Stage 6
+τb/unresolved/robust inversion/Top-k/regret 全套统计 + bootstrap
+M5 前半：统计结果
+第 10 周
+Stage 7
+direct vs Δ-learning；random/group/LOFO；机制分析
+M5：ML 结果
+第 11 周
+Stage 8
+active-learning replay 多 seed 多重复
+预算—决策精度曲线
+第 12 周
+Stage 8 收尾 + 9（可选）
+图表定稿、报告撰写、数据归档；有余力做 microsolvation check
+M6：项目闭环
+进度以 Stage 1 实测计算成本为准调整；任何压缩不牺牲 method audit 与 state-identity QC。
+十一、交付物与目录结构
+11.1 交付物清单
+交付物
+说明
+preregistration.yaml
+冻结定义与指标参数，含 changelog
+metadata 三表
+core_set.csv / broad_pool.csv / references.csv
+P0/P1/P2/C1 数据表
+每数值可追溯至 conformer/motif ID、软件版本、QC 状态
+统计结果包
+τb 矩阵、unresolved/robust inversion、Top-k/regret 曲线、置信区间
+机制分析报告
+robust inversion 与 donor type/ESP/chelation/flexibility/tag 的关系
+ML/AL 结果包
+direct vs Δ-learning（LOFO 为重点）、n_T → τb/O_k/R_k 曲线
+核心图 1–7
+两轴层级图、外部验证审计图、排序稳定性矩阵、robust rank-flow 图、机制图、LOFO 对比图、最小预算图
+最终报告
+按情形 A–G 框架组织结论
+11.2 项目目录结构
+沿用 v2 §28 目录树：metadata/、structures/（neutral、charged、li_motifs）、P0_cheap_proxy/、P1_gas_dft/、P2_fixed_continuum/、C1_li_conditional/、C2_microsolvation_optional/、external_reference/（gas、solution）、analysis/（uncertainty、ranking、inversion、delta_learning、active_learning）、results/。所有目录纳入 git 版本控制，原始 QC 输出只读归档。
+11.3 最小成果判据 checklist
+metadata 严格、chemical-space 平衡的 core set + broad cheap pool。
+P0/P1/P2 一致定义与 C1 条件配位分析完成。
+external gas/solution anchors 与 uncertainty-aware rank comparison 完成。
+robust inversion 机制分析、random/group/LOFO、direct vs Δ-learning 完成。
+feature-cost-aware active-learning replay 与“昂贵标签预算 vs 决策精度”曲线完成。
+满足以上即构成完整科学闭环，不以发现“最佳电解液分子”为成功条件。
+附录 A：QC 状态机
+主链：generated → prescreened → submitted → scf_converged → geometry_converged → frequency_checked → state_identity_checked → accepted。
+异常分支：scf_failed、geometry_failed、imaginary_mode_unresolved、unbound_anion、spin_contamination_flag、motif_switch、no_intact_minimum_found、dissociated_optimized_product、state_identity_ambiguous。
+纪律：异常样本不得当作普通缺失值自动删除；每类异常统计发生率与 chemical-family dependence。
+附录 B：Metadata 字段表
+字段
+含义
+molecule_id
+唯一编号
+canonical_smiles
+规范结构
+structural_family
+carbonate/ether/nitrile/sulfone/phosphate 等互斥主家族
+functionalization_tags
+fluorinated/unsaturated/cyclic/chelating 等可多选标签
+use_role
+solvent/co-solvent/additive/anchor
+donor_atoms
+潜在 Li 配位原子
+formal_charge
+母分子形式电荷
+rotatable_bonds
+柔性指标
+conformer_count
+进入 QC 的构象数
+Li_motif_count
+配位异构体数
+state_identity_status
+redox 状态身份 QC 结果
+reactivity_status
+intact/motif switch/dissociation 等
+qc_status
+各模型层计算状态（按附录 A）
+附录 C：结果分支与应对预案
+情形
+应对与结论形式
+A：cheap proxy 稳定保持排序
+划定适用域；结论为“额外计算的边际价值有限”而非“高层计算没用”
+B：数值变化大但排序稳定
+检验 family-dependent correction P2 = P1 + b_f 是否足够
+C：少量结构集中的 robust inversion
+提出 missing-physics 机制（chelation/donor/ESP/氟化/柔性）
+D：Li 配位引发 state identity 改变
+先 state classification 再 conditional regression；Δ 不是统一平滑函数
+E：Δ-learning 在 LOFO 下仍优于 direct
+支撑扩大 cheap pool、只做少量 target 计算的策略
+F：Δ 无法由 cheap features 学习
+优先补 cheap coordination geometry/flexibility/ESP topology/donor-pair 特征，而非换更大网络
+G：大部分 pairs unresolved
+输出 equivalence classes/tiered sets 而非强行全序排名
+以上任一结果均构成可证伪、可解释、可迁移的方法学结论，项目不依赖预设的“漂亮结果”。

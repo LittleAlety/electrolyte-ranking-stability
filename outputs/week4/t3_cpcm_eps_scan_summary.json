@@ -1,0 +1,529 @@
+{
+  "stage": "T3",
+  "engine": "ORCA",
+  "engine_version": "6.1.1",
+  "method": "r2SCAN-3c",
+  "environment": "bare CPCM (epsilon only; no SMD non-electrostatic terms)",
+  "geometry": "G1, reused from T1 (unchanged, vertical)",
+  "reference_layer": "outputs/week4/p1_core_set.csv",
+  "runner": "scripts/run_core_set_p2.py --epsilon <eps> --only <subset> --jobs 2",
+  "eps_values": [
+    5.0,
+    10.0,
+    20.0,
+    40.0
+  ],
+  "molecules": [
+    {
+      "mol_id": "C04",
+      "name": "EC",
+      "family": "cyclic_carbonate",
+      "role": "solvent"
+    },
+    {
+      "mol_id": "C05",
+      "name": "PC",
+      "family": "cyclic_carbonate",
+      "role": "co-solvent"
+    },
+    {
+      "mol_id": "C01",
+      "name": "DMC",
+      "family": "linear_carbonate",
+      "role": "solvent"
+    },
+    {
+      "mol_id": "C02",
+      "name": "EMC",
+      "family": "linear_carbonate",
+      "role": "solvent"
+    },
+    {
+      "mol_id": "C08",
+      "name": "DME",
+      "family": "ether",
+      "role": "solvent"
+    },
+    {
+      "mol_id": "C09",
+      "name": "DOL",
+      "family": "ether",
+      "role": "co-solvent"
+    },
+    {
+      "mol_id": "C13",
+      "name": "GBL",
+      "family": "ester",
+      "role": "co-solvent"
+    },
+    {
+      "mol_id": "C16",
+      "name": "AN",
+      "family": "nitrile",
+      "role": "co-solvent"
+    },
+    {
+      "mol_id": "C18",
+      "name": "SN",
+      "family": "nitrile",
+      "role": "additive"
+    },
+    {
+      "mol_id": "C15",
+      "name": "DMSO",
+      "family": "sulfoxide",
+      "role": "co-solvent"
+    },
+    {
+      "mol_id": "C14",
+      "name": "SL",
+      "family": "sulfone",
+      "role": "co-solvent"
+    },
+    {
+      "mol_id": "C17",
+      "name": "TMP",
+      "family": "phosphate",
+      "role": "additive"
+    }
+  ],
+  "family_coverage": {
+    "families_in_subset": [
+      "cyclic_carbonate",
+      "ester",
+      "ether",
+      "linear_carbonate",
+      "nitrile",
+      "phosphate",
+      "sulfone",
+      "sulfoxide"
+    ],
+    "n_families_in_subset": 8,
+    "families_in_core_set": [
+      "cyclic_carbonate",
+      "ester",
+      "ether",
+      "linear_carbonate",
+      "nitrile",
+      "phosphate",
+      "sulfone",
+      "sulfoxide"
+    ],
+    "families_not_in_subset": []
+  },
+  "n_molecules": 12,
+  "n_states": 3,
+  "n_expected_jobs": 144,
+  "n_jobs": 144,
+  "n_ok": 144,
+  "n_failed": 0,
+  "n_missing": 0,
+  "n_rows_ok": 48,
+  "definitions": {
+    "ip_ev": "vertical IP = E(cation) - E(neutral) on the shared G1 geometry, in eV",
+    "ea_ev": "vertical EA = E(neutral) - E(anion) on the shared G1 geometry, in eV",
+    "d_ip_vs_gas_ev": "IP(bare CPCM eps) - IP(gas-phase P1), in eV; negative means the continuum lowers the ionisation energy",
+    "d_ea_vs_gas_ev": "EA(bare CPCM eps) - EA(gas-phase P1), in eV",
+    "sigma_env_ev": "sigma_env_ev(eps) = population standard deviation (statistics.pstdev) across the N molecules of the oxidation (vertical IP) vertical shift from the gas-phase P1 layer to bare CPCM(eps); a pure common translation would give 0.0 eV, so it measures the molecule-dependent (family-dependent) part of the dielectric screening.",
+    "sigma_env_ea_ev": "sigma_env_ev(eps) = population standard deviation (statistics.pstdev) across the N molecules of the reduction (vertical EA) vertical shift from the gas-phase P1 layer to bare CPCM(eps); a pure common translation would give 0.0 eV, so it measures the molecule-dependent (family-dependent) part of the dielectric screening.",
+    "kendall_tau_b": "Kendall tau-b between the bare CPCM(eps) ranking and the gas-phase P1 ranking; +1 = identical order",
+    "spearman_rho": "Spearman rho between the same two rankings",
+    "o_k": "top-k fraction overlap O_k for k in {0.10, 0.20, 0.30}, k = max(1, round(fraction*N))",
+    "j_k_20": "Jaccard index of the top-20% sets",
+    "selection_regret_20_ev": "mean (p_gas - p_cpcm) over the CPCM top-20% set: the gas-phase value lost by picking on the screened layer, in eV",
+    "f_unresolved_gas": "fraction of unordered pairs the gas-phase P1 layer cannot resolve (|dP| < z*sigma_ij)",
+    "f_unresolved_cpcm": "fraction of unordered pairs the bare CPCM(eps) layer cannot resolve",
+    "f_robust_inv": "fraction of unordered pairs that BOTH layers resolve and yet order the other way round",
+    "z_primary": "1.0",
+    "z_primary_note": "config/prereg.yaml pair_comparison.z_factor.value, frozen; the primary decision criterion",
+    "z_sensitivity": "1.96",
+    "z_sensitivity_note": "conservative 95% two-sided band, reported alongside",
+    "multi_source_sigma": "sigma_ij pooled over every realization at once (the gas-phase P1 layer plus all four bare-CPCM dielectrics) with uncertainty.quantify_method_sigma(ddof=1, stat='std'), then fed to ranking.resolved_mask(z=1.0); this is the docs/08 section 5 'multi-source' upgrade of the two-arm sigma of docs/10 section 2.4"
+  },
+  "per_eps": {
+    "5": {
+      "eps": 5.0,
+      "n_molecules": 12,
+      "n_ok": 12,
+      "d_ip_mean_ev": -1.8731792144977504,
+      "d_ip_std_ev": 0.1909516214319761,
+      "d_ip_min_ev": -2.2234529280144866,
+      "d_ip_max_ev": -1.425229112461638,
+      "d_ea_mean_ev": 1.9074086973641042,
+      "d_ea_std_ev": 0.19732614633723453,
+      "d_ea_min_ev": 1.6284563150577807,
+      "d_ea_max_ev": 2.2426260555524555,
+      "sigma_env_ev": 0.1909516214319761,
+      "sigma_env_ea_ev": 0.19732614633723453
+    },
+    "10": {
+      "eps": 10.0,
+      "n_molecules": 12,
+      "n_ok": 12,
+      "d_ip_mean_ev": -2.1123812397349835,
+      "d_ip_std_ev": 0.21253088713650467,
+      "d_ip_min_ev": -2.4988418038860747,
+      "d_ip_max_ev": -1.629681148994468,
+      "d_ea_mean_ev": 2.187805989002333,
+      "d_ea_std_ev": 0.23287665917957812,
+      "d_ea_min_ev": 1.8665835039370993,
+      "d_ea_max_ev": 2.5430509933035137,
+      "sigma_env_ev": 0.21253088713650467,
+      "sigma_env_ea_ev": 0.23287665917957812
+    },
+    "20": {
+      "eps": 20.0,
+      "n_molecules": 12,
+      "n_ok": 12,
+      "d_ip_mean_ev": -2.2321233046986766,
+      "d_ip_std_ev": 0.22367644311478455,
+      "d_ip_min_ev": -2.6362769264130232,
+      "d_ip_max_ev": -1.7318550073577246,
+      "d_ea_mean_ev": 2.3069859296071384,
+      "d_ea_std_ev": 0.2287199006887959,
+      "d_ea_min_ev": 1.9907545373022602,
+      "d_ea_max_ev": 2.695222908455259,
+      "sigma_env_ev": 0.22367644311478455,
+      "sigma_env_ea_ev": 0.2287199006887959
+    },
+    "40": {
+      "eps": 40.0,
+      "n_molecules": 12,
+      "n_ok": 12,
+      "d_ip_mean_ev": -2.2920345285070316,
+      "d_ip_std_ev": 0.22934217385624947,
+      "d_ip_min_ev": -2.70492728453201,
+      "d_ip_max_ev": -1.7829287219748693,
+      "d_ea_mean_ev": 2.3762003832216334,
+      "d_ea_std_ev": 0.23358930402190986,
+      "d_ea_min_ev": 2.0541970352307115,
+      "d_ea_max_ev": 2.771824045873026,
+      "sigma_env_ev": 0.22934217385624947,
+      "sigma_env_ea_ev": 0.23358930402190986
+    }
+  },
+  "sigma_env_ev": {
+    "5": 0.1909516214319761,
+    "10": 0.21253088713650467,
+    "20": 0.22367644311478455,
+    "40": 0.22934217385624947
+  },
+  "sigma_env_ea_ev": {
+    "5": 0.19732614633723453,
+    "10": 0.23287665917957812,
+    "20": 0.2287199006887959,
+    "40": 0.23358930402190986
+  },
+  "decisions": {
+    "5": {
+      "oxidation": {
+        "n": 12,
+        "higher_is_better": true,
+        "kendall_tau_b": 0.9393939393939394,
+        "kendall_tau_b_ci95": [
+          0.7288135593220338,
+          1.0
+        ],
+        "spearman_rho": 0.9790209790209791,
+        "o_k": {
+          "0.10": 1.0,
+          "0.20": 1.0,
+          "0.30": 1.0
+        },
+        "j_k_20": 1.0,
+        "selection_regret_20_ev": 0.0,
+        "f_unresolved_gas": 0.06060606060606061,
+        "f_unresolved_cpcm": 0.10606060606060606,
+        "f_robust_inv": 0.0,
+        "f_unresolved_gas_z1p96": 0.15151515151515152,
+        "f_unresolved_cpcm_z1p96": 0.19696969696969696,
+        "f_robust_inv_z1p96": 0.0,
+        "sigma_pair_median_ev": 0.12333311100823345,
+        "z_primary": 1.0,
+        "z_sensitivity": 1.96
+      },
+      "reduction": {
+        "n": 12,
+        "higher_is_better": true,
+        "kendall_tau_b": 0.8484848484848485,
+        "kendall_tau_b_ci95": [
+          0.5292796610169492,
+          1.0
+        ],
+        "spearman_rho": 0.9370629370629371,
+        "o_k": {
+          "0.10": 1.0,
+          "0.20": 1.0,
+          "0.30": 0.75
+        },
+        "j_k_20": 1.0,
+        "selection_regret_20_ev": 0.0,
+        "f_unresolved_gas": 0.06060606060606061,
+        "f_unresolved_cpcm": 0.18181818181818182,
+        "f_robust_inv": 0.0,
+        "f_unresolved_gas_z1p96": 0.30303030303030304,
+        "f_unresolved_cpcm_z1p96": 0.30303030303030304,
+        "f_robust_inv_z1p96": 0.0,
+        "sigma_pair_median_ev": 0.1488909897725322,
+        "z_primary": 1.0,
+        "z_sensitivity": 1.96
+      }
+    },
+    "10": {
+      "oxidation": {
+        "n": 12,
+        "higher_is_better": true,
+        "kendall_tau_b": 0.9090909090909091,
+        "kendall_tau_b_ci95": [
+          0.7,
+          1.0
+        ],
+        "spearman_rho": 0.972027972027972,
+        "o_k": {
+          "0.10": 1.0,
+          "0.20": 1.0,
+          "0.30": 1.0
+        },
+        "j_k_20": 1.0,
+        "selection_regret_20_ev": 0.0,
+        "f_unresolved_gas": 0.07575757575757576,
+        "f_unresolved_cpcm": 0.13636363636363635,
+        "f_robust_inv": 0.0,
+        "f_unresolved_gas_z1p96": 0.16666666666666666,
+        "f_unresolved_cpcm_z1p96": 0.19696969696969696,
+        "f_robust_inv_z1p96": 0.0,
+        "sigma_pair_median_ev": 0.13805085386657745,
+        "z_primary": 1.0,
+        "z_sensitivity": 1.96
+      },
+      "reduction": {
+        "n": 12,
+        "higher_is_better": true,
+        "kendall_tau_b": 0.8484848484848485,
+        "kendall_tau_b_ci95": [
+          0.5333333333333333,
+          1.0
+        ],
+        "spearman_rho": 0.9230769230769231,
+        "o_k": {
+          "0.10": 1.0,
+          "0.20": 1.0,
+          "0.30": 0.75
+        },
+        "j_k_20": 1.0,
+        "selection_regret_20_ev": 0.0,
+        "f_unresolved_gas": 0.09090909090909091,
+        "f_unresolved_cpcm": 0.25757575757575757,
+        "f_robust_inv": 0.0,
+        "f_unresolved_gas_z1p96": 0.3333333333333333,
+        "f_unresolved_cpcm_z1p96": 0.3939393939393939,
+        "f_robust_inv_z1p96": 0.0,
+        "sigma_pair_median_ev": 0.18847723546099282,
+        "z_primary": 1.0,
+        "z_sensitivity": 1.96
+      }
+    },
+    "20": {
+      "oxidation": {
+        "n": 12,
+        "higher_is_better": true,
+        "kendall_tau_b": 0.8787878787878788,
+        "kendall_tau_b_ci95": [
+          0.5932203389830508,
+          1.0
+        ],
+        "spearman_rho": 0.9440559440559441,
+        "o_k": {
+          "0.10": 1.0,
+          "0.20": 1.0,
+          "0.30": 0.75
+        },
+        "j_k_20": 1.0,
+        "selection_regret_20_ev": 0.0,
+        "f_unresolved_gas": 0.07575757575757576,
+        "f_unresolved_cpcm": 0.15151515151515152,
+        "f_robust_inv": 0.0,
+        "f_unresolved_gas_z1p96": 0.21212121212121213,
+        "f_unresolved_cpcm_z1p96": 0.21212121212121213,
+        "f_robust_inv_z1p96": 0.0,
+        "sigma_pair_median_ev": 0.14792236664895667,
+        "z_primary": 1.0,
+        "z_sensitivity": 1.96
+      },
+      "reduction": {
+        "n": 12,
+        "higher_is_better": true,
+        "kendall_tau_b": 0.8484848484848485,
+        "kendall_tau_b_ci95": [
+          0.5292796610169492,
+          1.0
+        ],
+        "spearman_rho": 0.9370629370629371,
+        "o_k": {
+          "0.10": 1.0,
+          "0.20": 1.0,
+          "0.30": 0.75
+        },
+        "j_k_20": 1.0,
+        "selection_regret_20_ev": 0.0,
+        "f_unresolved_gas": 0.09090909090909091,
+        "f_unresolved_cpcm": 0.21212121212121213,
+        "f_robust_inv": 0.0,
+        "f_unresolved_gas_z1p96": 0.3333333333333333,
+        "f_unresolved_cpcm_z1p96": 0.36363636363636365,
+        "f_robust_inv_z1p96": 0.0,
+        "sigma_pair_median_ev": 0.18414936073506583,
+        "z_primary": 1.0,
+        "z_sensitivity": 1.96
+      }
+    },
+    "40": {
+      "oxidation": {
+        "n": 12,
+        "higher_is_better": true,
+        "kendall_tau_b": 0.8787878787878788,
+        "kendall_tau_b_ci95": [
+          0.5932203389830508,
+          1.0
+        ],
+        "spearman_rho": 0.9440559440559441,
+        "o_k": {
+          "0.10": 1.0,
+          "0.20": 1.0,
+          "0.30": 0.75
+        },
+        "j_k_20": 1.0,
+        "selection_regret_20_ev": 0.0,
+        "f_unresolved_gas": 0.07575757575757576,
+        "f_unresolved_cpcm": 0.15151515151515152,
+        "f_robust_inv": 0.0,
+        "f_unresolved_gas_z1p96": 0.21212121212121213,
+        "f_unresolved_cpcm_z1p96": 0.21212121212121213,
+        "f_robust_inv_z1p96": 0.0,
+        "sigma_pair_median_ev": 0.15338797321512967,
+        "z_primary": 1.0,
+        "z_sensitivity": 1.96
+      },
+      "reduction": {
+        "n": 12,
+        "higher_is_better": true,
+        "kendall_tau_b": 0.8484848484848485,
+        "kendall_tau_b_ci95": [
+          0.5292796610169492,
+          1.0
+        ],
+        "spearman_rho": 0.9370629370629371,
+        "o_k": {
+          "0.10": 1.0,
+          "0.20": 1.0,
+          "0.30": 0.75
+        },
+        "j_k_20": 1.0,
+        "selection_regret_20_ev": 0.0,
+        "f_unresolved_gas": 0.09090909090909091,
+        "f_unresolved_cpcm": 0.22727272727272727,
+        "f_robust_inv": 0.0,
+        "f_unresolved_gas_z1p96": 0.3333333333333333,
+        "f_unresolved_cpcm_z1p96": 0.3484848484848485,
+        "f_robust_inv_z1p96": 0.0,
+        "sigma_pair_median_ev": 0.19081636583438616,
+        "z_primary": 1.0,
+        "z_sensitivity": 1.96
+      }
+    }
+  },
+  "multi_source_sigma": {
+    "available": true,
+    "n": 12,
+    "realizations": [
+      "P1 gas phase",
+      "bare CPCM 5",
+      "bare CPCM 10",
+      "bare CPCM 20",
+      "bare CPCM 40"
+    ],
+    "oxidation": {
+      "sigma_ij_median_ev": 0.0902611527145758,
+      "per_eps": {
+        "5": {
+          "n": 12,
+          "z_primary": 1.0,
+          "f_unresolved_gas": 0.030303030303030304,
+          "f_unresolved_cpcm": 0.06060606060606061,
+          "f_robust_inv": 0.016666666666666666
+        },
+        "10": {
+          "n": 12,
+          "z_primary": 1.0,
+          "f_unresolved_gas": 0.030303030303030304,
+          "f_unresolved_cpcm": 0.10606060606060606,
+          "f_robust_inv": 0.017543859649122806
+        },
+        "20": {
+          "n": 12,
+          "z_primary": 1.0,
+          "f_unresolved_gas": 0.030303030303030304,
+          "f_unresolved_cpcm": 0.12121212121212122,
+          "f_robust_inv": 0.017857142857142856
+        },
+        "40": {
+          "n": 12,
+          "z_primary": 1.0,
+          "f_unresolved_gas": 0.030303030303030304,
+          "f_unresolved_cpcm": 0.12121212121212122,
+          "f_robust_inv": 0.017857142857142856
+        }
+      }
+    },
+    "reduction": {
+      "sigma_ij_median_ev": 0.1205812500349106,
+      "per_eps": {
+        "5": {
+          "n": 12,
+          "z_primary": 1.0,
+          "f_unresolved_gas": 0.06060606060606061,
+          "f_unresolved_cpcm": 0.12121212121212122,
+          "f_robust_inv": 0.0
+        },
+        "10": {
+          "n": 12,
+          "z_primary": 1.0,
+          "f_unresolved_gas": 0.06060606060606061,
+          "f_unresolved_cpcm": 0.16666666666666666,
+          "f_robust_inv": 0.0196078431372549
+        },
+        "20": {
+          "n": 12,
+          "z_primary": 1.0,
+          "f_unresolved_gas": 0.06060606060606061,
+          "f_unresolved_cpcm": 0.16666666666666666,
+          "f_robust_inv": 0.0
+        },
+        "40": {
+          "n": 12,
+          "z_primary": 1.0,
+          "f_unresolved_gas": 0.06060606060606061,
+          "f_unresolved_cpcm": 0.16666666666666666,
+          "f_robust_inv": 0.0
+        }
+      }
+    }
+  },
+  "robust_inversion": {
+    "f_robust_inv_gt_0_at_z1p0": [],
+    "f_robust_inv_gt_0_at_z1p96": [],
+    "any_robust_inversion_z1p0": false,
+    "any_robust_inversion_z1p96": false
+  },
+  "outputs": {
+    "csv": "outputs/week4/t3_cpcm_eps_scan.csv",
+    "summary": "outputs/week4/t3_cpcm_eps_scan_summary.json",
+    "report": "outputs/week4/t3_cpcm_eps_scan_report.md",
+    "figure": "outputs/figures/F10_cpcm_eps_scan.png"
+  },
+  "generated_utc": "2026-09-29T05:25:09.825947+00:00",
+  "command_line": [
+    "E:\\Claude Code\\电解液溶剂-HB\\电解液溶剂HB-Code\\.venv\\Scripts\\python.exe",
+    "scripts/analyze_cpcm_eps_scan.py"
+  ]
+}
