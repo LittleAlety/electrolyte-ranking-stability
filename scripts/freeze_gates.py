@@ -156,6 +156,15 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "docs/18_*.md",
     "outputs/week8/**/*",
     "structures/microsolvation/**/*",
+    # Stage 10 (Week 9): the five-rung synthesis -- the ladder analysis, its
+    # figure, the tests and the week-9 report.  This stage runs no new electronic
+    # structure; it re-reads the already-frozen week-4/5/8 artefacts under one
+    # convention and one molecule subset.
+    "scripts/analyze_stage10_synthesis.py",
+    "scripts/make_stage10_figure.py",
+    "tests/test_stage10_synthesis.py",
+    "docs/19_*.md",
+    "outputs/week9/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large

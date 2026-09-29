@@ -375,6 +375,25 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 8",
         ],
     },
+    9: {
+        "topic": "Stage 10（五级台阶合成与决策稳定性总判）",
+        "sources": [
+            ("outputs/week9/stage10_ladder.csv", None, True),
+            ("outputs/week9/stage10_ladder.json", None, True),
+            ("outputs/week9/stage10_verdicts.json", None, True),
+            ("outputs/week9/stage10_summary.md", None, True),
+            ("docs/19_week9_report.md", "week9_report_full.md", True),
+            ("outputs/figures/figure_manifest_week9_stage10.md",
+             "artifacts/figure_manifest_week9_stage10.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F19_*.png"],
+        "commands": [
+            "python scripts/analyze_stage10_synthesis.py",
+            "python scripts/make_stage10_figure.py",
+            "python scripts/build_deliverables.py --weeks 9",
+        ],
+    },
 }
 
 
@@ -525,6 +544,15 @@ def render_report(week, wdir, missing, excluded):
                        ("{w8_limit}", w8["limit"]),
                        ("{w8_s9_block}", w8["s9_block"]),
                        ("{w8_summary}", w8["summary"])):
+        text = text.replace(key, value)
+    w9 = week9_blocks(load_json(W9_LADDER_PATH))
+    for key, value in (("{w9_did}", w9["did"]),
+                       ("{w9_metric}", w9["metric"]),
+                       ("{w9_qc}", w9["qc"]),
+                       ("{w9_limit}", w9["limit"]),
+                       ("{w9_ladder_block}", w9["ladder_block"]),
+                       ("{w9_verdict_block}", w9["verdict_block"]),
+                       ("{w9_sigma_note}", w9["sigma_note"])):
         text = text.replace(key, value)
     if missing:
         rows = []
@@ -980,8 +1008,94 @@ def week8_checks(wdir: Path):
     return checks
 
 
+def week9_checks(wdir: Path):
+    """QC for week 9 (Stage 10, the five-rung synthesis on one yardstick)."""
+
+    checks = []
+    payload = load_json(wdir / "stage10_ladder.json")
+    if payload is None:
+        checks.append(check("stage10_ladder.present", None, "source not found"))
+        return checks
+
+    rows = payload.get("ladder") or []
+    common = [row for row in rows if row.get("population") == "common10"]
+    native = [row for row in rows if row.get("population") == "native"]
+    subsets = payload.get("common_subset") or []
+    hypothesis = payload.get("hypothesis_test") or {}
+    verdicts = payload.get("verdicts") or {}
+    checklist = payload.get("minimum_outcome_checklist") or []
+
+    checks.append(check("stage10.n_rows==20", len(rows) == 20,
+                        "n_rows=%d (native %d / common10 %d)"
+                        % (len(rows), len(native), len(common))))
+    checks.append(check("stage10.rungs==5", len({row.get("rung") for row in rows}) == 5,
+                        "rungs=%s" % sorted({row.get("rung") for row in rows})))
+    checks.append(check("stage10.common_subset==10", len(subsets) == 10,
+                        "common_subset=%s" % subsets))
+    checks.append(check("stage10.common10.rows_computed_on_10",
+                        bool(common) and all(int(row.get("n") or 0) == 10
+                                             for row in common),
+                        "n per common10 row=%s"
+                        % sorted({row.get("n") for row in common})))
+
+    spread = hypothesis.get("spearman_shift_std_vs_tau_b")
+    magnitude = hypothesis.get("spearman_abs_shift_mean_vs_tau_b")
+    unres = hypothesis.get("spearman_shift_std_vs_f_unresolved")
+    checks.append(check("stage10.hypothesis.n_points==10",
+                        hypothesis.get("n_points") == 10,
+                        "n_points=%s" % hypothesis.get("n_points")))
+    checks.append(check("stage10.hypothesis.spread_beats_magnitude",
+                        spread is not None and magnitude is not None
+                        and abs(spread) > abs(magnitude),
+                        "rho(std,tau)=%s vs rho(|mean|,tau)=%s" % (spread, magnitude)))
+    checks.append(check("stage10.hypothesis.spread_vs_unresolved_positive",
+                        unres is not None and unres > 0,
+                        "rho(std,f_unresolved)=%s" % unres))
+
+    negatives = [(row.get("rung"), row.get("axis")) for row in common
+                 if (row.get("kendall_tau_b") or 0) < 0]
+    checks.append(check("stage10.exactly_one_negative_tau_b",
+                        negatives == [("C0_to_C1", "reduction")],
+                        "negative=%s" % negatives))
+
+    robust = [row.get("f_robust_inv") for row in rows]
+    robust96 = [row.get("f_robust_inv_z1p96") for row in rows]
+    worst = max([row.get("f_unresolved_after") or 0.0 for row in rows] or [0.0])
+    checks.append(check("stage10.f_robust_inv.zero_everywhere",
+                        bool(robust) and all((value or 0.0) == 0.0 for value in robust)
+                        and all((value or 0.0) == 0.0 for value in robust96),
+                        "max f_robust_inv=%s (z=1.96 max=%s)"
+                        % (max(robust or [0.0]), max(robust96 or [0.0]))))
+    checks.append(check("stage10.zero_is_not_stability",
+                        worst > 0.5,
+                        "max f_unresolved_after=%.3f" % worst))
+
+    letters = [key[0] for key in verdicts if not key.startswith("_")]
+    checks.append(check("stage10.verdicts.a_to_g", letters == list("ABCDEFG"),
+                        "verdicts=%s" % letters))
+    unsafe = [key for key, entry in verdicts.items() if not key.startswith("_")
+              and any("|" in str(entry.get(field) or "")
+                      for field in ("short", "definition", "verdict", "evidence"))]
+    checks.append(check("stage10.verdicts.table_safe", not unsafe,
+                        "fields with a raw pipe: %s" % (unsafe or "none")))
+    checks.append(check("stage10.checklist.n==11", len(checklist) == 11,
+                        "n=%d" % len(checklist)))
+    statuses = {item.get("id"): item.get("status") for item in checklist}
+    checks.append(check("stage10.checklist.only_anchors_partial",
+                        statuses.get("5") == "PARTIAL"
+                        and all(str(status).startswith("PASS")
+                                for key, status in statuses.items() if key != "5"),
+                        "statuses=%s" % statuses))
+
+    checks.append(check("week9.figures_present",
+                        (wdir / "artifacts" / "F19_stage10_ladder.png").exists(),
+                        "artifacts/ F19"))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
-                  5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks}
+                  5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
+                  9: week9_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -1441,6 +1555,49 @@ Week 5 把自由分子 C0 换成了 Li+ 配位条件态 C1（[Li M]+）。本周
 """
 
 
+REPORT_TEMPLATES[9] = """# Week 9 成果小结 —— Stage 10（五级台阶合成与决策稳定性总判）
+
+Week 4-8 各自回答了自己的问题，但每一周用了不同的分子子集和自己的口径，跨周的 tau_b 因此
+不能直接比较。本周把五个台阶放到**同一口径**（`p_red = -EA`，两轴都 `higher_is_better`）与
+**同一批分子**（common-10：在每一级都有完整值的 10 个分子）上重算，然后回答本项目的中心命题：
+
+> 决定排序是否被改写的，是这一级位移的**离散度**（std），不是它的**大小**（|mean|）。
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 `week9_report_full.md`。
+
+## 1. 本周做了什么
+{w9_did}
+
+## 2. 关键数字
+{w9_metric}
+
+## 3. 共同子集（N = 10）上的五级台阶
+{w9_ladder_block}
+
+## 4. v2 第 22 节：情形 A-G 判定
+{w9_verdict_block}
+
+## 5. 质量与复核（QC）
+- {w9_qc}
+- 上述每一项都由本目录 `verification.json` 的 `checks` 数组从真实产物现场解析得出。
+
+## 6. 产物清单
+{artifact_list}
+
+## 7. 已知限制
+1. {w9_limit}
+2. 本项目所有秩相关都在 n <= 20 个台阶事件上计算，只能读方向与量级，不能读显著性。
+3. Gate 0 保持 CLOSED；Gate 1 仍未关闭（溶液相锚点 31 行仍为 `est`）。
+4. Stage 10 是**探索性合成分析**（重读已冻结产物，不跑新电子结构）；若要把 Spearman 汇总
+   提升为必报指标，须走 `config/prereg.yaml` 的 `amendment_log`，届时 Gate 0 由 CLOSED 变为
+   NOT CLOSED。
+5. 逐项细节见同目录 `week9_report_full.md`。
+
+## 8. 源文件缺失
+{missing_list}
+"""
+
+
 README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成果输出包
 
 本目录**只放蒸馏产物**（结果表、图、报告、校验清单）。原始 ORCA / xTB 运行输出
@@ -1460,13 +1617,14 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week5/                Stage 5（T4：Li+ 配位条件态 C1）
     ├── week6/                Stage 6（T6 构象系综 + T7 虚频 + T8 delta_m + T9 决策稳定性）
     ├── week7/                Stage 7（ML / Δ-learning）+ Stage 8（active-learning replay）
-    └── week8/                Stage 9（显式微溶剂化：[Li(M)2]+ 第一溶剂壳复核）
+    ├── week8/                Stage 9（显式微溶剂化：[Li(M)2]+ 第一溶剂壳复核）
+    └── week9/                Stage 10（五级台阶合成与决策稳定性总判）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F17 中属于该周的部分）
+    ├── artifacts/            图（F0–F19 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -1486,6 +1644,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 | week7 | Stage 7（ML / Δ-learning）+ Stage 8（AL replay） | 特征表 cost 分级 `X0`/`X1`/`X2`（core 18 / broad 40）；三种拆分下的 direct vs Δ-learning；`n_T → τ_b` 四条 acquisition 曲线 | Gate 0 CLOSED |
 | week6 | Stage 6（T6/T7/T8/T9） | 构象系综 `sigma_conf`（12 分子 / 32 构象）；`delta_m`（氧化 0.700 / 还原 2.074 eV）；并入 `delta_m` 后还原轴不可判定 | Gate 0 CLOSED |
 | week8 | Stage 9（显式微溶剂化 C2） | [Li(M)2]+ 第一溶剂壳（12 motif / 8 家族）；C1 -> C2 的垂直量位移与同口径排序稳定性 | Gate 0 CLOSED |
+| week9 | Stage 10（五级台阶合成） | 五个台阶同口径重算（common-10）：rho(std, tau_b) = -0.851 vs rho(|mean|, tau_b) = -0.535；唯一负 tau_b 在 C0->C1 还原轴 | Gate 0 CLOSED |
 
 ## 如何复现
 ```powershell
@@ -1496,7 +1655,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -1546,7 +1705,7 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 参考配体：主参考 `R = DME`（C08，双齿 2×O 螯合、配位 motif 唯一）；第二参考 `R = AN`（C16，
 仅用于 robustness check）。核心集 18 个分子、broad pool 40 个分子，合并池 58。
 
-## 2. 逐周结果（Week 1 – Week 8）
+## 2. 逐周结果（Week 1 – Week 9）
 
 ### Week 1 —— Stage 0 定义冻结 / Gate 0
 - 做了什么：冻结科学定义与预注册（`config/scientific_definitions.yaml`、`config/prereg.yaml`），
@@ -1608,6 +1767,9 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 8 —— Stage 9（显式微溶剂化：C2 = [Li(M)2]+ 第一溶剂壳复核）
 {w8_summary}
 
+### Week 9 —— Stage 10（五级台阶合成与决策稳定性总判）
+{w9_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -1632,6 +1794,8 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 
 {w6_sigma_note}
 
+{w9_sigma_note}
+
 ### 3.3 还原侧定性失效
 P1 下 18 个分子的气相阴离子**全部不束缚**（`unbound_anion = 18`，EA < 0）。定域在 LUMO 上的
 Koopmans 图像在结构上**不可能**给出这一点，因此 P0 还原轴与真实 EA 不是同一物理量。
@@ -1651,7 +1815,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F18）
+## 5. 图表索引（F0–F19）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -1673,6 +1837,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f16_row}
 {f17_row}
 {f18_row}
+{f19_row}
 
 ## 6. 复现命令
 ```powershell
@@ -1758,6 +1923,11 @@ F18_NOTE_PRESENT = ("Stage 9 显式第一溶剂壳：把 C1(1:1) 的 [Li M]+ 扩
 F18_NOTE_ABSENT = "预留给 Stage 9（显式微溶剂化）；week8 尚未产出"
 W8_STAGE9_PATH = REPO / "outputs" / "week8" / "stage9_results.json"
 W8_SHELLS_PATH = REPO / "outputs" / "week8" / "ms_shell_generation.json"
+F19_NOTE_PRESENT = ("Stage 10 五级台阶：每个台阶/轴的 tau_b（按位移 std 递增排列）、"
+                    "std vs tau_b（H_var，rho = -0.851）、|mean| vs tau_b（H_mean 对照，"
+                    "rho = -0.535）、std vs f_unresolved（rho = +0.894）")
+F19_NOTE_ABSENT = "预留给 Stage 10（五级台阶合成）；week9 尚未产出"
+W9_LADDER_PATH = REPO / "outputs" / "week9" / "stage10_ladder.json"
 C1_NOTE_PRESENT = ("**C1（Li+ 配位条件态，T4）**：按冻结的 motif 生成规则枚举 [Li M]+，在 r2SCAN-3c 上"
                    "优化配位几何并做三态垂直量，与自由分子 C0（P1 @ G2）逐分子相减；"
                    "`outputs/week5/*` 已自动纳入本目录。")
@@ -2316,6 +2486,149 @@ def week8_blocks(stage9, shells):
             "s9_block": s9_block, "summary": summary}
 
 
+W9_RUNG_ORDER = ("P0_to_P1", "P1_to_P2", "G1_to_G2", "C0_to_C1", "C1_to_C2")
+W9_RUNG_SHORT = {
+    "P0_to_P1": "P0 -> P1 (\u65b9\u6cd5)",
+    "P1_to_P2": "P1 -> P2 (\u73af\u5883)",
+    "G1_to_G2": "G1 -> G2 (\u51e0\u4f55)",
+    "C0_to_C1": "C0 -> C1 (\u914d\u4f4d)",
+    "C1_to_C2": "C1 -> C2 (\u58f3\u5c42)",
+}
+W9_AXIS_SHORT = (("oxidation", "\u6c27\u5316"), ("reduction", "\u8fd8\u539f"))
+
+
+def week9_blocks(stage10):
+    """Render the week-9 (Stage 10 / five-rung synthesis) blocks."""
+
+    empty = {"present": False, "did": "", "metric": "", "qc": "", "limit": "",
+             "ladder_block": "", "verdict_block": "", "sigma_note": "", "summary": ""}
+    if not isinstance(stage10, dict) or not (stage10.get("ladder") or []):
+        return empty
+
+    rows = stage10.get("ladder") or []
+    hypothesis = stage10.get("hypothesis_test") or {}
+    verdicts = stage10.get("verdicts") or {}
+    checklist = stage10.get("minimum_outcome_checklist") or []
+    subset = stage10.get("common_subset") or []
+    table = {(row.get("rung"), row.get("axis")): row for row in rows
+             if row.get("population") == "common10"}
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def signed(value, digits=3):
+        text = _w8_num(value, digits)
+        if text == "\u2014":
+            return text
+        return text if float(value) < 0 else "+" + text
+
+    ladder_block = ("| \u53f0\u9636 | \u8f74 | n | \u4f4d\u79fb\u5747\u503c (eV) | "
+                    "\u4f4d\u79fb std (eV) | tau_b | O_10% | O_20% | f_unresolved (after) | "
+                    "f_robust_inv | sigma_median (eV) |\n"
+                    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+    for key in W9_RUNG_ORDER:
+        for axis, axis_label in W9_AXIS_SHORT:
+            row = table.get((key, axis)) or {}
+            ladder_block += ("| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n"
+                             % (W9_RUNG_SHORT.get(key, key), axis_label,
+                                row.get("n", "\u2014"),
+                                signed(row.get("shift_mean_ev")),
+                                num(row.get("shift_std_ev")),
+                                num(row.get("kendall_tau_b")),
+                                num(row.get("overlap_10")),
+                                num(row.get("overlap_20")),
+                                num(row.get("f_unresolved_after")),
+                                num(row.get("f_robust_inv")),
+                                num(row.get("sigma_median_ev"))))
+
+    verdict_block = ("| \u60c5\u5f62 | \u5224\u5b9a | \u4f9d\u636e |\n| --- | --- | --- |\n")
+    for key in sorted(k for k in verdicts if not k.startswith("_")):
+        entry = verdicts[key] or {}
+        evidence = str(entry.get("evidence") or "")
+        if len(evidence) > 280:
+            evidence = evidence[:280] + "\u2026\u2026"
+        verdict_block += "| %s | **%s** | %s |\n" % (
+            entry.get("short") or key, entry.get("verdict") or "\u2014", evidence)
+
+    spread = hypothesis.get("spearman_shift_std_vs_tau_b")
+    magnitude = hypothesis.get("spearman_abs_shift_mean_vs_tau_b")
+    unres = hypothesis.get("spearman_shift_std_vs_f_unresolved")
+    bad = table.get(("C0_to_C1", "reduction")) or {}
+    big = table.get(("P0_to_P1", "reduction")) or {}
+    statuses = {item.get("id"): item.get("status") for item in checklist}
+
+    did = ("\u628a Week 4-8 \u7684**\u4e94\u7ea7\u53f0\u9636**\u653e\u5230**\u540c\u4e00\u53e3\u5f84**"
+           "\uff08`p_red = -EA`\uff0c\u4e24\u4e2a\u8f74\u90fd `higher_is_better = True`\uff09\u4e0e"
+           "**\u540c\u4e00\u5206\u5b50\u5b50\u96c6**\u4e0a\u91cd\u7b97\uff1a\u7535\u5b50\u7ed3\u6784\u65b9\u6cd5"
+           "\uff08P0 -> P1\uff09\u3001\u73af\u5883\uff08P1 -> P2\uff09\u3001\u51e0\u4f55\uff08G1 -> G2\uff09\u3001"
+           "\u914d\u4f4d\u6761\u4ef6\u6001\uff08C0 -> C1\uff09\u4e0e\u7b2c\u4e8c\u6eb6\u5242\u58f3\uff08C1 -> C2\uff09\u3002"
+           "\u5171\u540c\u5b50\u96c6\u4e3a **%d \u4e2a\u5206\u5b50**\uff08%s\uff09\uff0c"
+           "\u5b83\u4eec\u5728**\u6bcf\u4e00\u7ea7\u90fd\u6709\u5b8c\u6574\u503c**\uff1b"
+           "\u7b2c 4/5 \u7ea7\u53d6 primary m1 motif \u4f5c\u4e3a\u5206\u5b50\u7ea7\u4ee3\u8868\uff0c"
+           "\u4ee5\u514d\u7ed9 DMC / TMP \u7684\u7b2c\u4e8c\u4e2a\u914d\u4f4d\u6a21\u5f0f\u53cc\u500d\u6743\u91cd\u3002"
+           "**\u672c\u9636\u6bb5\u4e0d\u8dd1\u65b0\u7684\u7535\u5b50\u7ed3\u6784\u8ba1\u7b97**\uff0c"
+           "\u53ea\u91cd\u8bfb\u5df2\u51bb\u7ed3\u7684 week-4/5/8 \u4ea7\u7269\u3002"
+           % (len(subset), "\u3001".join(subset)))
+
+    metric = ("- \u4e2d\u5fc3\u547d\u9898\uff1a\u79bb\u6563\u5ea6\u51b3\u5b9a\u6392\u5e8f\u662f\u5426\u88ab\u6539\u5199\u3002"
+              "Spearman rho(shift std, tau_b) = **%s**\uff1brho(abs(shift mean), tau_b) = %s\uff08\u5bf9\u7167\uff09\uff1b"
+              "rho(shift std, f_unresolved) = **%s**\n"
+              "- \u6700\u950b\u5229\u7684\u5bf9\u7167\uff1aP0 -> P1 \u8fd8\u539f\u8f74\u4f4d\u79fb\u6700\u5927\uff08%s eV\uff0c"
+              "std %s\uff09\u5374\u4fdd\u4f4f\u4e86\u6392\u5e8f\uff08tau_b %s\uff09\uff1b"
+              "C0 -> C1 \u8fd8\u539f\u8f74\u4f4d\u79fb\u76f8\u4eff\uff08%s eV\uff0cstd %s\uff09"
+              "\u5374**\u6362\u53f7**\uff08tau_b %s\uff09\u2014\u2014\u5dee\u522b\u5728\u79bb\u6563\u5ea6\n"
+              "- %d \u4e2a (\u53f0\u9636, \u8f74) \u7ec4\u5408\u4e2d `f_robust_inv` \u6052\u4e3a 0.000"
+              "\uff08z = 1.96 \u4e5f\u5168\u4e3a 0\uff09\uff0c\u4f46 `f_unresolved` \u6700\u9ad8\u8fbe %s\uff1a"
+              "\u8fd9\u4e2a 0 \u662f\u300c\u4e0d\u53ef\u5224\u5b9a\u300d\u800c\u975e\u300c\u7a33\u5b9a\u300d\n"
+              "- v2 \u00a723 \u6700\u5c0f\u6210\u679c\u5224\u636e\uff1a11 \u6761\u4e2d 10 \u6761 PASS\uff0c"
+              "\u552f\u4e00 PARTIAL \u662f\u6eb6\u6db2\u951a\u70b9\uff08Gate 1 blocker\uff09"
+              % (num(spread), num(magnitude), num(unres),
+                 signed(big.get("shift_mean_ev")), num(big.get("shift_std_ev")),
+                 num(big.get("kendall_tau_b")),
+                 signed(bad.get("shift_mean_ev")), num(bad.get("shift_std_ev")),
+                 num(bad.get("kendall_tau_b")),
+                 len(rows), num(max([row.get("f_unresolved_after") or 0.0 for row in rows]
+                                    or [0.0]))))
+
+    qc = ("%d \u884c\uff08native + common10 \u5404 10 \u884c\uff09\u00d7 25 \u5217\uff0c"
+          "\u7531 `analyze_stage10_synthesis.py` \u4ece 5 \u4e2a\u5df2\u51bb\u7ed3\u6e90\u6587\u4ef6\u73b0\u573a\u91cd\u7b97\uff1b"
+          "A-G \u60c5\u5f62\u5224\u5b9a + \u00a7 23 \u5224\u636e\u5bf9\u7167\u5747\u7531\u540c\u4e00\u811a\u672c\u4ea7\u51fa\uff1b"
+          "\u5224\u636e 5 = %s\uff0c\u5224\u636e 7 = %s\u3002"
+          % (len(rows), statuses.get("5") or "?", statuses.get("7") or "?"))
+
+    limit = ("common-10 \u662f\u5c0f\u6837\u672c\uff08n = 10 \u4e2a\u53f0\u9636\u4e8b\u4ef6\uff09\uff0c"
+             "\u79e9\u76f8\u5173\u53ea\u80fd\u8bfb\u65b9\u5411\u4e0e\u91cf\u7ea7\uff0c\u4e0d\u80fd\u8bfb\u663e\u8457\u6027\uff1b"
+             "Top-k \u7684 k \u968f N \u53d8\u5316\uff0c\u8df3\u53f0\u9636\u6bd4\u8f83\u53ea\u770b\u8d8b\u52bf\u3002"
+             "C0 -> C1 \u8fd8\u539f\u8f74\u7684\u4f4d\u79fb\u6d4b\u7684\u662f\u300cLi \u4e2d\u5fc3\u8fd8\u539f\u300d"
+             "\uff0811/12 \u4e2a\u8fd8\u539f\u6001\u7684\u7535\u5b50\u843d\u5728 Li \u4e0a\uff09\uff0c"
+             "\u4e0e\u5176\u4ed6\u53f0\u9636\u4e0d\u662f\u540c\u4e00\u7269\u7406\u8fc7\u7a0b\uff0c\u5176 tau_b "
+             "\u4e0d\u5f97\u7528\u4e8e\u300c\u65b9\u6cd5\u53ef\u8fc1\u79fb\u6027\u300d\u8bba\u8bc1\u3002")
+
+    sigma_note = ("**\u4e94\u7ea7\u53f0\u9636\u7684\u540c\u53e3\u5f84\u5408\u6210\uff08Stage 10 / week9\uff09**\uff1a"
+                  "\u628a P0->P1\u3001P1->P2\u3001G1->G2\u3001C0->C1\u3001C1->C2 \u653e\u5728\u540c\u4e00\u7ea6\u5b9a"
+                  "\u4e0e\u540c\u4e00 10 \u5206\u5b50\u5b50\u96c6\u4e0a\u540e\uff0c\u4f4d\u79fb**\u79bb\u6563\u5ea6**"
+                  "\u4e0e tau_b \u7684 Spearman rho = **%s**\uff0c\u800c\u4f4d\u79fb**\u5e45\u5ea6**\u7684 rho "
+                  "\u53ea\u6709 %s\uff1b\u79bb\u6563\u5ea6\u4e0e `f_unresolved` \u7684 rho = **%s**\u3002"
+                  "\u540c\u4e00\u5f20\u8868\u91cc\u6700\u5c16\u9510\u7684\u5bf9\u7167\uff1aP0->P1 \u8fd8\u539f\u8f74"
+                  "\u4f4d\u79fb\u6700\u5927\uff08%s eV\uff09\u5374\u4fdd\u4f4f\u4e86\u6392\u5e8f\uff08tau_b %s\uff09\uff0c"
+                  "\u800c C0->C1 \u8fd8\u539f\u8f74\u4f4d\u79fb\u76f8\u4eff\uff08%s eV\uff09\u5374\u6362\u53f7"
+                  "\uff08tau_b %s\uff09\u2014\u2014\u5dee\u522b\u5728\u79bb\u6563\u5ea6 %s vs %s eV\u3002"
+                  "\u552f\u4e00\u8d1f tau_b \u51fa\u73b0\u7684\u90a3\u4e00\u7ea7\uff0c\u5176\u8fd8\u539f\u6001 11/12 "
+                  "\u662f Li \u4e2d\u5fc3/\u6df7\u5408\u8fd8\u539f\uff08state-identity \u6539\u53d8\uff09\uff0c"
+                  "\u5373\u8be5\u8f74\u6d4b\u7684\u4e0d\u662f\u540c\u4e00\u4e2a\u7269\u7406\u91cf\u3002"
+                  "\u89c1 F19\uff08`outputs/figures/F19_stage10_ladder.png`\uff09\u3002"
+                  % (num(spread), num(magnitude), num(unres),
+                     signed(big.get("shift_mean_ev")), num(big.get("kendall_tau_b")),
+                     signed(bad.get("shift_mean_ev")), num(bad.get("kendall_tau_b")),
+                     num(big.get("shift_std_ev")), num(bad.get("shift_std_ev"))))
+
+    summary = ("- \u505a\u4e86\u4ec0\u4e48\uff1a%s\n- \u5173\u952e\u6570\u5b57\uff1a\n%s\n"
+               "- \u8d28\u68c0\uff1a%s\n- \u9650\u5236\uff1a%s" % (did, metric, qc, limit))
+    return {"present": True, "did": did, "metric": metric, "qc": qc, "limit": limit,
+            "ladder_block": ladder_block, "verdict_block": verdict_block,
+            "sigma_note": sigma_note, "summary": summary}
+
+
 def week7_blocks(stage7, stage8):
     """Render the week-7 (Stage 7 + Stage 8) blocks from the two JSON files.
 
@@ -2491,8 +2804,8 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8",
-                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8)")
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9",
+                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -2580,6 +2893,8 @@ def main(argv=None):
                                load_json(W7_STAGE8_PATH))["summary"]
         w8_note = week8_blocks(load_json(W8_STAGE9_PATH),
                                load_json(W8_SHELLS_PATH))["summary"]
+        w9_all = week9_blocks(load_json(W9_LADDER_PATH))
+        w9_note = w9_all["summary"]
         f14_figure = REPO / "outputs" / "figures" / "F14_delta_m_derivation.png"
         if f14_figure.exists():
             f14_row = "| F14 | `F14_delta_m_derivation.png` | " + F14_NOTE_PRESENT + " | week6 |"
@@ -2605,6 +2920,11 @@ def main(argv=None):
             f18_row = "| F18 | `F18_stage9_explicit_shell.png` | " + F18_NOTE_PRESENT + " | week8 |"
         else:
             f18_row = "| F18 | 未生成 | " + F18_NOTE_ABSENT + " | —— |"
+        f19_figure = REPO / "outputs" / "figures" / "F19_stage10_ladder.png"
+        if f19_figure.exists():
+            f19_row = "| F19 | `F19_stage10_ladder.png` | " + F19_NOTE_PRESENT + " | week9 |"
+        else:
+            f19_row = "| F19 | 未生成 | " + F19_NOTE_ABSENT + " | —— |"
         for key, value in (("{f12_row}", f12_row),
                            ("{f14_row}", f14_row),
                            ("{f15_row}", f15_row),
@@ -2628,6 +2948,9 @@ def main(argv=None):
                            ("{w6_limit}", w6_all["limit"]),
                            ("{w8_summary}", w8_note),
                            ("{f18_row}", f18_row),
+                           ("{f19_row}", f19_row),
+                           ("{w9_summary}", w9_note),
+                           ("{w9_sigma_note}", w9_all["sigma_note"]),
                            ("{w7_summary}", w7_note)):
             summary = summary.replace(key, value)
         write_text(out / "数据结果汇总.md", summary)
