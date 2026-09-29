@@ -244,6 +244,102 @@ P0 -> P1 的 IP 平移（`shift = P1 − P0`，单位 eV；负值表示廉价层
 溶剂对阴离子的稳定化把真实 EA 往正方向推，方向上部分"修好"了 Koopmans 图像的定性错误；
 但这属于两层误差相互抵消，**不能**当作"廉价层在溶液里更可靠"的证据。
 
+### 2.9 介电常数扫描（T3）：位移是共同平移，还是真实重排？
+
+§2.7 用的是 **SMD 乙腈**（除介电 screening 外还含 cavity/dispersion/repulsion 等非静电项）。
+T3 换成 **bare CPCM（只留介电常数 `epsilon`）**，在审计子集（12 分子，覆盖 core set 全部 8 个家族）
+上扫 `eps = 5 / 10 / 20 / 40`；方法、基组、几何、电子态全部不变——**唯一变量是介电常数**。
+144/144 作业成功、0 失败（`scripts/analyze_cpcm_eps_scan.py`、`scripts/make_eps_scan_figure.py`）。
+
+| eps | n | ΔIP 均值 (eV) | ΔIP std | ΔEA 均值 (eV) | ΔEA std | sigma_env(ΔIP) | sigma_env(ΔEA) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 5 | 12 | −1.873 | 0.191 | +1.907 | 0.197 | 0.191 | 0.197 |
+| 10 | 12 | −2.112 | 0.213 | +2.188 | 0.233 | 0.213 | 0.233 |
+| 20 | 12 | −2.232 | 0.224 | +2.307 | 0.229 | 0.224 | 0.229 |
+| 40 | 12 | −2.292 | 0.229 | +2.376 | 0.234 | 0.229 | 0.234 |
+
+`sigma_env(eps)` 的定义：**该位移在 N 个分子上的总体标准差**；纯共同平移会给 0，
+所以它度量的正是「分子依赖（家族依赖）的那一部分介电 screening」。
+
+三条读数：
+
+1. **位移随介电常数饱和**：`5 -> 10` 就走掉了 ΔIP 总变化的一半（−1.873 -> −2.112），
+   而 `20 -> 40` 只再走 0.06 eV。介电 screening 的化学信息主要在前半段。
+2. **以共同平移为主**：`eps = 40` 时 |ΔIP 均值| = **2.292 eV**，是其分子间离散度
+   `sigma_env = 0.229 eV` 的 **10.0 倍**。`sigma_env` 从 0.191 单调升到 0.229 eV，
+   与 §2.7 的 SMD 台阶（std 0.293 eV）同阶，但**远小于** §2.8 里方法台阶的 0.714 eV。
+3. **排序几乎不动**：对气相 P1，四个 eps 的氧化轴 τ_b = 0.879–0.939、还原轴 0.848，
+   top-20% 重叠**全部为 1.000**、`selection regret` 全为 0。这与 §2.8 的结论完全一致：
+   把介电常数从 5 推到 40，位移又大了 0.42 eV，但 τ_b 只从 0.939 变到 0.879
+   —— **位移的方差小，就改写不了决策**。
+
+**robust inversion 的口径必须写明（本项目的一条实测教训）**：
+
+- 用**两臂 sigma**（气相 vs 单个 eps，即 §2.4 的口径）：四个 eps 的 `f_robust_inv` **全为 0**，无稳健重排；
+- 用**多来源合成 sigma**（气相 + 四个 eps 共 5 个 realization 一起池化，`docs/08` §5 的要求）：
+  σ_ij 中位数被压到 **0.090 eV**（氧化轴），于是出现**极少量**稳健重排——
+  绝对计数是 **最多 1 对**（氧化轴四个 eps 各 1 对；还原轴只在 eps = 10 有 1 对），
+  `f_robust_inv` 约 **1.7–2.0%**。注意 `f_robust_inv` 的分母是**两臂都能分辨**的 pair 数
+  （本数据氧化轴为 60/57/56/56，还原轴最少 51），**不是**子集的 C(12,2) = 66 对；
+  因此 1 对对应的**不是** 1/66 = 1.5%，二者不可混读。
+
+因此结论按口径分开陈述：**「有没有 robust inversion」取决于 sigma 怎么估**。
+池化更多 realization 会压小 σ、让少量 pair 跨过分辨率门槛，但绝对计数只有 1 对，
+**不足以宣称存在介电诱导的稳健重排**。本项目所有相关表述都必须同时给出所用口径；
+`t3_cpcm_eps_scan_summary.json` 的 `robust_inversion.sigma_conventions` 已按此结构化记录
+（`two_arm` 与 `multi_source` 各自给出 `max_f_robust_inv_z1p0`、`any_gt_0_z1p0` 与绝对计数）。
+
+---
+
+### 2.10 T2 几何台阶（G1 -> G2）：把「几何效应」从「方法效应」里拆出来
+
+§2.8 对比了方法台阶与环境台阶，但两者都建立在**同一批 G1 几何**（GFN2-xTB 优化）之上。
+T2 补上第三级台阶：对**与 T3 完全相同的 12 分子审计子集**，用 r2SCAN-3c 从 G1 出发做中性
+`Opt`+`Freq` 得到 **G2**，再在 G2 上重算三个电子态的单点。方法、基组、电子态、环境全不变，
+**唯一变量是几何**。12/12 优化收敛、36/36 单点成功、0 失败（`t2_opt_freq_summary.json`）。
+G2 取自输出里**最后一个** `CARTESIAN COORDINATES (ANGSTROEM)` 块，未做任何额外优化。
+
+| 量 | n | 均值 (eV) | 总体标准差 (eV) |
+| --- | --- | --- | --- |
+| ΔIP = IP(G2) − IP(G1) | 12 | −0.002 | **0.049** |
+| ΔEA = EA(G2) − EA(G1) | 12 | **+0.118** | 0.076 |
+
+**三台阶同口径对照**（同一估计量 = 该位移在 12 个分子上的总体标准差；span = P1@G1 的 IP 分子间跨度 3.326 eV）：
+
+| 台阶 | 唯一变量 | 位移均值 (eV) | 位移 std (eV) | std / span | 氧化轴 τ_b | Top-20% 重叠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| P0 -> P1 | 电子结构方法（GFN2-xTB -> r2SCAN-3c） | −1.373 | **0.700** | 21.1% | 0.667 | 0.000 |
+| **G1 -> G2** | **几何（同一方法 r2SCAN-3c）** | **−0.002** | **0.049** | **1.5%** | **0.939** | **1.000** |
+| 气相 -> bare CPCM(40) | 环境（同一几何、同一方法） | −2.292 | 0.229 | 6.9% | 0.879 | 1.000 |
+
+三个台阶都在**同一 12 分子子集**上重算，因此与 §2.4 / §2.8 的 N=18 数字不完全相同；§2.4 / §2.8 的
+N=18 数字仍是各自的权威口径，上表只用于三台阶的**同口径**比较。
+
+四条读数：
+
+1. **G1 是够用的几何**。几何台阶的位移离散度只有方法台阶的 **1/14**（0.049 vs 0.700 eV），
+   也小于环境台阶（0.229 eV）。`docs/08` §3.4 设的判据（「若 sigma_geom 与 sigma_method 同量级，
+   则 P0 -> P1 的变化不能全部归因于电子结构方法」）**没有触发**：P0 -> P1 的改写确实来自
+   电子结构方法本身，而不是「xTB 几何不够好」。
+2. **氧化轴上几何只造成近乎随机的抖动**：ΔIP 有正有负（−0.077 ~ +0.067 eV），均值 −0.002 eV，
+   排序几乎不动（τ_b 0.939、Top-20% 重叠 1.000）。
+3. **还原轴上几何效应反而是系统性的**：12 个分子的 ΔEA **全部为正**（+0.028 ~ +0.330 eV），
+   均值 +0.118 eV —— 在 r2SCAN-3c 的中性驻点几何上，阴离子单点能量系统性升高（EA 下降）。
+   这与 §2.6 的「基组无弥散、气相阴离子不束缚」是同一枚硬币的两面：**中性分子的最优几何
+   并不是阴离子的好几何**。但它不改变定性结论（12 个分子的气相阴离子仍然全部不束缚）。
+4. **位移大小不预测位移大小**：逐分子 G1 -> G2 的 Kabsch RMSD 均值 0.063 Å（最大 TMP 0.192 Å），
+   它与 ΔIP / ΔEA 的相关性只有 r = +0.019 / +0.004。DMC 只移动了 **0.011 Å**，ΔEA 却是全场最大的
+   **+0.330 eV**。几何效应由电子结构对核构型的敏感度决定，**不由原子移动距离决定**。
+   逐分子数值见 `outputs/figures/figure_manifest_week4_t2.md` 的 Geometry diagnostics 表。
+
+**虚频检查（QE 词表 `imaginary_mode_unresolved`）**：12 个分子的中性 `Opt`+`Freq` 中，
+10 个无虚频；**EC（−118.16 cm⁻¹）与 DOL（−68.69 cm⁻¹）各报告 1 个虚频**。这**不是**计算失败
+（两者优化均收敛、SCF 正常、无异常终止），而是 r2SCAN-3c / def2-mTZVPP 在这两个分子势能面上给出的
+**真实结果**：极小点很浅，与「气相 + 单构象 + 无弥散基组」这一组合相符。本项目按 QE 规则
+**照实记录**（`outputs/week4/t2_opt_freq.csv` 的 `qc_flags` 列），**不删除、不隐去**，
+也**不**据此宣称「G2 对 EC/DOL 不可用」；正确的表述是：**这两个分子在该方法下的气相单构象极小点
+未被完全确认**，凡引用其 G2 数值处必须同时带上该 QC 旗标。
+
 ---
 
 ## 3. Gate 状态
@@ -286,6 +382,8 @@ Gate 1 逐条证据的更新：
 | P2 分析 | `outputs/week4/p2_environment_effects.csv`、`p2_decision_stability.{json,md}`（脚本 `scripts/analyze_p2_environment.py`） |
 | 脚本 | `scripts/run_core_set_p1.py`、`scripts/run_core_set_p2.py`、`scripts/analyze_p1_core_set.py` |
 | T5 弥散函数对照 | `outputs/week4/t5_diffuse_control.csv`、`t5_diffuse_control_summary.json`、`outputs/week4/t5_diffuse_control/`（脚本 `scripts/run_diffuse_control.py`） |
+| T3 介电常数扫描 | `outputs/week4/t3_cpcm_eps_scan.{csv,json,md}`、`outputs/week4/orca_cpcm_{5,10,20,40}/`（脚本 `scripts/analyze_cpcm_eps_scan.py`） |
+| T2 几何台阶（Opt+Freq -> G2） | `outputs/week4/t2_opt_freq.{csv,json}`、`outputs/week4/t2_opt_freq/<name>/`（脚本 `scripts/run_t2_opt_freq.py`） |
 
 ## 5. 图表清单
 
@@ -297,21 +395,23 @@ Gate 1 逐条证据的更新：
 | F7 | `outputs/figures/F7_shift_structure.png` | 廉价层是"平移的尺子"还是"另一把尺子"（IP / EA 散点） |
 | F8 | `outputs/figures/F8_environment_layer_p1_to_p2.png` | (a) 每分子的气相->溶剂位移（IP 与 EA）；(b) 逐对间距与 `z*sigma` 不确定带（环境层） |
 | F9 | `outputs/figures/F9_diffuse_function_control.png` | 同泛函三基组对照：加弥散把 EA 系统性下拉但未翻转符号（方法适用域结论） |
+| F10 | `outputs/figures/F10_cpcm_eps_scan.png` | (a) ΔIP / ΔEA 随介电常数的饱和曲线；(b) `sigma_env(eps)` 与对气相 P1 的 Kendall τ_b（bare CPCM 扫描） |
+| F11 | `outputs/figures/F11_opt_freq_g2_sensitivity.png` | (a) G1 -> G2 的逐分子 ΔIP / ΔEA；(b) 方法 / 几何 / 环境三台阶的同一估计量对比（sigma 与排序稳定性） |
 
 图内标签一律用英文（工作区没有保证可用的 CJK 字体）。清单与 SHA256 见
-`outputs/figures/figure_manifest_week4.md`（F4–F8）与 `outputs/figures/figure_manifest_week4_t5.md`（F9）。
+`outputs/figures/figure_manifest_week4.md`（F4–F8）、`outputs/figures/figure_manifest_week4_t5.md`（F9）
+与 `outputs/figures/figure_manifest_week4_t3.md`（F10）与 `outputs/figures/figure_manifest_week4_t2.md`（F11）。
 
 ## 6. 下一步（按优先级）
 
-**本轮已完成**：T5 弥散函数对照臂（结论见 §2.6，产物见 §4，图见 §5 的 F9）。
+**本轮已完成**：T5 弥散函数对照臂（结论见 §2.6，产物见 §4，图见 §5 的 F9）与 T3 介电常数扫描
+（结论见 §2.9，图见 §5 的 F10）。
+
+**本轮追加完成**：T2 几何台阶（G1 -> G2 `Opt`+`Freq`，12 + 36 作业、0 失败；结论见 §2.10，产物见 §4，图见 §5 的 F11）。
 
 1. **Gate 1 收口**：溶液锚点 31 行的核验/替换，特别是 `docs/06` 里那 2 处引用错配。
    这是 Gate 1 现在唯一的 blocker，也是 `R_sol` 层能否成立的根基。
-2. **T2（审计子集 `Opt` + `Freq`）**：给出 `sigma_geom` 与虚频检查，检验 G1 几何是否足够，
-   并把 P0 -> P1 的变化拆成"方法效应 vs 几何效应"。
-3. **T3（CPCM eps 扫描，`eps = 5/10/20/40`）**：给出 `sigma_env` 随介电常数的连续曲线，
-   把 §2.4 的 `sigma` 从"两臂差"升级为"多来源合成"，并检验纯介电 screening 是否产生 robust inversion。
-4. **条件 Li+ 配位层（C1）**：在环境层之上再加阳离子配位，检验机制解释是否稳定。
+2. **条件 Li+ 配位层（C1）**：在环境层之上再加阳离子配位，检验机制解释是否稳定。
 
 ## 7. 已知限制（不得在对外表述中省略）
 
@@ -320,5 +420,12 @@ Gate 1 逐条证据的更新：
 - 全部为**垂直量**（固定 G1 几何），不含绝热弛豫；P1 的垂直 IP 与实验的近垂直 PE 值可比，
   但不能直接当作热力学量用于电位换算。
 - 还原侧结论受"基组无弥散函数"限制（§2.6），氧化侧不受此限制。
+- T3 的 bare CPCM **只有介电常数**，没有 SMD 的非静电项，因此 §2.9 的位移与 §2.7 的 SMD 位移
+  **不是同一个物理量**，只能各自解读。
+- §2.9 的 robust inversion 结论**依赖 sigma 口径**（两臂 vs 多来源合成），引用时必须同时给出所用口径。
+- §2.10 的几何台阶只覆盖 **12 个分子的单构象**，且 `sigma_conf`（构象展宽）**本轮仍未计算**：
+  这里的 `sigma_geom` 是「同一构象、不同优化层级」的离散度，**不含**构象分布带来的不确定性。
+- EC 与 DOL 在 G2 上各报告 1 个虚频（§2.10），引用这两个分子的 G2 数值时必须带上
+  `imaginary_mode_unresolved` 旗标；其余 10 个分子无虚频。
 - 作业耗时是在一台同时运行其它程序的 16 核机器上实测的（2 并发 × `nprocs 8`），
   **不是基准测试**，只用于预算规划。

@@ -452,3 +452,42 @@ def test_run_orca_with_a_real_binary(tmp_path: Path) -> None:
 
     assert result.normal_termination is True
     assert result.final_energy_eh is not None
+
+
+
+def test_run_orca_clears_a_stale_density_left_in_the_scratch_directory(
+    tmp_path: Path,
+) -> None:
+    """Regression: a stale ``<stem>.gbw`` seeded the SCF guess of the next run.
+
+    ``run_orca`` reuses ``<stem>_scratch`` between runs.  When an earlier attempt
+    was killed, the directory survives with its ``<stem>.gbw``, and ORCA reads a
+    same-named ``.gbw`` as the initial guess.  ``SN_m1_reduced_sp`` converged to
+    23 of 45 electrons that way (-126.8 Eh instead of about -271.6 Eh) and still
+    reported normal termination, so the number looked like a result.
+    """
+    scratch = tmp_path / "EC_scratch"
+    scratch.mkdir()
+    (scratch / "EC.gbw").write_text("density of some other state\n", encoding="utf-8")
+
+    _run_orca(tmp_path, ORCA_SAMPLE)
+
+    kept = (tmp_path / "EC.gbw").read_text(encoding="utf-8")
+    assert "density of some other state" not in kept
+    assert "fake gbw" in kept
+
+
+def test_parse_orca_output_flags_a_wrong_electron_count() -> None:
+    """A converged SCF can still hold the wrong number of electrons."""
+    text = ORCA_SAMPLE.replace(
+        "ORCA TERMINATED NORMALLY",
+        "**** WARNING: LOEWDIN FINDS   23.0000000 ELECTRONS INSTEAD OF 45 ****\n"
+        "ORCA TERMINATED NORMALLY",
+    )
+    result = orca.parse_orca_output(text)
+
+    assert result.normal_termination is True
+    assert result.scf_converged is True
+    assert "electron_count_mismatch" in result.qc_flags
+    assert "scf_failed" not in result.qc_flags
+    assert set(result.qc_flags) <= QC_FLAGS

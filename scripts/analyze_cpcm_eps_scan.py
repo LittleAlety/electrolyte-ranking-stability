@@ -50,6 +50,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from analyze_p1_core_set import (  # noqa: E402
     TOP_K_FRACTIONS,
     Z_PRIMARY,
+    Z_SENSITIVITY,
     layer_stability,
 )
 import numpy as np  # noqa: E402
@@ -179,15 +180,15 @@ def sigma_env(shifts) -> float | None:
     return statistics.pstdev(values)
 
 
-def sigma_env_definition(axis: str) -> str:
+def sigma_env_definition(axis: str, symbol: str = "sigma_env_ev") -> str:
     """The prose definition of ``sigma_env`` for the ``oxidation``/``reduction`` axis."""
 
     return (
-        "sigma_env_ev(eps) = population standard deviation (statistics.pstdev) "
+        "%s(eps) = population standard deviation (statistics.pstdev) "
         "across the N molecules of the %s vertical shift from the gas-phase P1 "
         "layer to bare CPCM(eps); a pure common translation would give 0.0 eV, "
         "so it measures the molecule-dependent (family-dependent) part of the "
-        "dielectric screening." % axis
+        "dielectric screening." % (symbol, axis)
     )
 
 # --------------------------------------------------------------------------- #
@@ -623,10 +624,13 @@ def robust_inversion_block(decisions, pooled, eps_values) -> dict:
             "The answer depends on the sigma convention. Two-arm sigma (gas P1 + one bare-CPCM "
             "layer, the docs/10 section 2.4 convention): max f_robust_inv = %.4f at z=1.0 -> no "
             "robust inversion at any dielectric. Multi-source sigma (gas P1 + all four dielectrics "
-            "pooled, docs/08 section 5): at most %d pair(s) out of %d are robust inversions and "
-            "max f_robust_inv = %.4f at z=1.0. The absolute count, not the fraction, is the "
-            "quantity to quote, and any statement about robust inversion must name the convention "
-            "it uses." % (two_arm_z1p0, max_n_z1p0, total_pairs, multi_z1p0)
+            "pooled, docs/08 section 5): at most %d of the %d pairs are robust inversions; max "
+            "f_robust_inv = %.4f at z=1.0. Its denominator is the number of pairs BOTH layers "
+            "resolve (51-60 here), NOT the %d pairs of the subset, so it must not be read as "
+            "1/%d = %.4f. The absolute count, not the fraction, is the quantity to quote, and any "
+            "statement about robust inversion must name the convention it uses."
+            % (two_arm_z1p0, max_n_z1p0, total_pairs, multi_z1p0, total_pairs, total_pairs,
+               1.0 / (total_pairs or 1))
         ),
     }
 
@@ -730,16 +734,20 @@ def write_report(path: Path, subset, coverage, rows, per_eps, decisions, payload
         lines.append("合成 sigma 不可用：%s。" % (pooled.get("reason") or "数据不完整"))
     else:
         lines += [
-            "| 轴 | 合成 sigma 的 σ_ij 中位数 (eV) | eps | f_unresolved(CPCM, 合成 sigma) | f_robust_inv(合成 sigma) |",
-            "| --- | --- | --- | --- | --- |",
+            "| 轴 | 合成 σ_ij 中位数 (eV) | eps | f_unresolved(CPCM) | f_robust_inv | n_pairs_total | n_pairs_resolved_in_both | n_robust_inversions | f_robust_inv (z=1.96) | n_robust_inversions (z=1.96) |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ]
         for axis, label in (("oxidation", "氧化"), ("reduction", "还原")):
             entry = pooled.get(axis) or {}
             for epsilon in payload["eps_values"]:
                 item = (entry.get("per_eps") or {}).get("%g" % epsilon) or {}
-                lines.append("| %s | %s | %g | %s | %s |" % (
+                lines.append("| %s | %s | %g | %s | %s | %s | %s | %s | %s | %s |" % (
                     label, _num(entry.get("sigma_ij_median_ev")), epsilon,
-                    _num(item.get("f_unresolved_cpcm")), _num(item.get("f_robust_inv"))))
+                    _num(item.get("f_unresolved_cpcm")), _num(item.get("f_robust_inv")),
+                    item.get("n_pairs_total", "-"), item.get("n_pairs_resolved_in_both", "-"),
+                    item.get("n_robust_inversions", "-"),
+                    _num(item.get("f_robust_inv_z1p96")),
+                    item.get("n_robust_inversions_z1p96", "-")))
     return _finish_report(path, lines, decisions, payload)
 
 
@@ -792,7 +800,7 @@ def _finish_report(path: Path, lines, decisions, payload) -> Path:
     return path
 
 def _robust_eps(decisions, eps_values, key) -> list:
-    """The dielectrics at which any axis shows f > 0 for the given key."""
+    """The dielectrics at which any axis shows f > 0 for the key (two-arm sigma)."""
 
     return [
         epsilon for epsilon in eps_values
@@ -800,28 +808,60 @@ def _robust_eps(decisions, eps_values, key) -> list:
     ]
 
 
+def _pooled_total_pairs(payload) -> int:
+    """C(N, 2) of the pooled-sigma block, read back rather than recomputed."""
+
+    pooled = payload.get("multi_source_sigma") or {}
+    for axis in ("oxidation", "reduction"):
+        for entry in ((pooled.get(axis) or {}).get("per_eps") or {}).values():
+            total = entry.get("n_pairs_total")
+            if total:
+                return int(total)
+    return 0
+
+
 def _conclusion_lines(decisions, payload) -> list:
     eps_values = payload["eps_values"]
     per_eps = payload["per_eps"]
-    primary = _robust_eps(decisions, eps_values, "f_robust_inv")
-    sensitivity = _robust_eps(decisions, eps_values, "f_robust_inv_z1p96")
+    robust = payload.get("robust_inversion") or {}
+    conventions = robust.get("sigma_conventions") or {}
+    two_arm = conventions.get("two_arm") or {}
+    multi = conventions.get("multi_source") or {}
+    n_pairs = _pooled_total_pairs(payload)
+    n_robust = robust.get("max_n_robust_inversions_z1p0") or 0
+    n_robust_sensitivity = robust.get("max_n_robust_inversions_z1p96") or 0
 
-    lines = []
-    if primary:
-        lines.append("- **纯介电 screening 产生了 robust inversion**（主判据 z = 1.0）："
-                     "出现在 eps = %s。" % ", ".join("%g" % value for value in primary))
-    else:
-        lines.append("- **纯介电 screening 没有产生 robust inversion**："
-                     "eps = %s 下主判据 `f_robust_inv` 全为 0，"
-                     "即没有任何一对分子是「气相与 CPCM 都认为自己分得清、结论却相反」。"
-                     % ", ".join("%g" % value for value in eps_values))
-    if sensitivity and not primary:
-        lines.append("  仅在放宽到 z = 1.96 时出现（eps = %s），"
-                     "属于**边界**翻转，主判据下不计入。"
-                     % ", ".join("%g" % value for value in sensitivity))
-    elif sensitivity and primary:
-        lines.append("  放宽到 z = 1.96 后翻转出现在 eps = %s。"
-                     % ", ".join("%g" % value for value in sensitivity))
+    lines = [
+        "**「有没有 robust inversion」不是一个数就能回答的问题：它依赖于 sigma 口径。**",
+        "下面两种口径都给出，且都必须给出。",
+        "",
+        "**口径 1 —— 两臂 sigma**（气相 P1 + 单个 bare CPCM 层；与 `docs/10` §2.4 同口径，即 §4 表）：",
+        "",
+        "- eps = %s 下主判据 `f_robust_inv` 全为 **0**（最大值 %s），放宽到 z = 1.96 仍为 %s；"
+        "非零的 eps 集合为 %s。"
+        % (", ".join("%g" % value for value in eps_values),
+           _num(two_arm.get("max_f_robust_inv_z1p0")), _num(two_arm.get("max_f_robust_inv_z1p96")),
+           ", ".join("%g" % value for value in _robust_eps(decisions, eps_values, "f_robust_inv")) or "空集（即无）"),
+        "- 即**没有任何一对分子**是「气相与 CPCM 都认为自己分得清、结论却相反」："
+        "**这条口径下纯介电 screening 没有产生稳健重排。**",
+        "",
+        "**口径 2 —— 合成 sigma**（气相 P1 + 四个 bare CPCM 层 = 5 个 realization 池化；§3.1 表）：",
+        "",
+        "- 出现**极少量**稳健重排：`f_robust_inv` 最大 **%s**（z = 1.0）/ %s（z = 1.96），"
+        "对应绝对计数最多 **%d 对**（z = 1.0）与 **%d 对**（z = 1.96）。"
+        "注意 `f_robust_inv` 的分母是**两臂都能分辨**的 pair 数（本数据为 51–60 对），"
+        "而不是子集的 C(12,2) = %d 对，二者不可混读。"
+        % (_num(multi.get("max_f_robust_inv_z1p0")), _num(multi.get("max_f_robust_inv_z1p96")),
+           n_robust, n_robust_sensitivity, n_pairs),
+        "- 机理：池化多个 realization 会把 sigma_ij **压小**，于是少量原本「分不清」的 pair "
+        "跨过分辨率门槛、被计入稳健重排；%d 对这个绝对计数太小，"
+        "**不足以宣称存在稳健的介电诱导重排**。" % n_robust,
+        "",
+        "**总括**：两臂口径下 `f_robust_inv = 0`，合成口径下最多 %d 对（`f_robust_inv` 约 %.1f%%）。"
+        "结论**依赖于 sigma 口径**，因此任何「有没有 robust inversion」的对外表述"
+        "**都必须同时给出所用口径**，不能只报一个数。"
+        % (n_robust, 100.0 * (multi.get("max_f_robust_inv_z1p0") or 0.0)),
+    ]
 
     biggest = eps_values[-1]
     block = per_eps["%g" % biggest]
@@ -948,15 +988,17 @@ def main(argv=None) -> int:
             "d_ip_vs_gas_ev": "IP(bare CPCM eps) - IP(gas-phase P1), in eV; negative means the "
                               "continuum lowers the ionisation energy",
             "d_ea_vs_gas_ev": "EA(bare CPCM eps) - EA(gas-phase P1), in eV",
-            "sigma_env_ev": sigma_env_definition("oxidation (vertical IP)"),
-            "sigma_env_ea_ev": sigma_env_definition("reduction (vertical EA)"),
+            "sigma_env_ev": sigma_env_definition("oxidation (vertical IP)", "sigma_env_ev"),
+            "sigma_env_ea_ev": sigma_env_definition("reduction (vertical EA)", "sigma_env_ea_ev"),
             "kendall_tau_b": "Kendall tau-b between the bare CPCM(eps) ranking and the gas-phase P1 "
                              "ranking; +1 = identical order",
             "spearman_rho": "Spearman rho between the same two rankings",
             "o_k": "top-k fraction overlap O_k for k in {0.10, 0.20, 0.30}, k = max(1, round(fraction*N))",
             "j_k_20": "Jaccard index of the top-20% sets",
-            "selection_regret_20_ev": "mean (p_gas - p_cpcm) over the CPCM top-20% set: the gas-phase "
-                                      "value lost by picking on the screened layer, in eV",
+            "selection_regret_20_ev": "R_k(20%) = mean of the gas-phase P1 value over the gas-phase top-20% "
+                                      "set minus the mean of the gas-phase P1 value over the bare-CPCM "
+                                      "top-20% set, in eV; 0 eV when both layers pick the same set "
+                                      "(ranking.selection_regret with target=gas, cheap=CPCM)",
             "f_unresolved_gas": "fraction of unordered pairs the gas-phase P1 layer cannot resolve "
                                 "(|dP| < z*sigma_ij)",
             "f_unresolved_cpcm": "fraction of unordered pairs the bare CPCM(eps) layer cannot resolve",

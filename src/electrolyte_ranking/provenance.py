@@ -51,6 +51,13 @@ QC_FLAGS: frozenset[str] = frozenset(
         "no_intact_minimum_found",
         "dissociated_optimized_product",
         "state_identity_ambiguous",
+        # Added for stage 5: ORCA reported a converged SCF whose density holds a
+        # different number of electrons than the input asks for.  Seen once when a
+        # scratch directory left behind by an interrupted run seeded the guess
+        # (SN_m1_reduced_sp converged to 23 of 45 electrons, -126.8 instead of
+        # ~-271.6 Eh).  Such a run terminates normally, so without this flag it
+        # would have been indistinguishable from a good one.
+        "electron_count_mismatch",
     }
 )
 

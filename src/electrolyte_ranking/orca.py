@@ -24,7 +24,8 @@ Three jobs are layered here:
 
 The QC flags this layer can emit are all drawn from
 :data:`electrolyte_ranking.provenance.QC_FLAGS` -- ``scf_failed``,
-``geometry_failed`` and ``imaginary_mode_unresolved`` -- so a failed ORCA run and
+``geometry_failed``, ``imaginary_mode_unresolved`` and
+``electron_count_mismatch`` -- so a failed ORCA run and
 a failed xTB run are described with the same words.
 """
 
@@ -102,6 +103,11 @@ _SCF_CONVERGED_AFTER = re.compile(
 )
 _IMAGINARY_MODE = re.compile(r"\*\*\*\s*imaginary mode", re.IGNORECASE)
 _VIBRATIONAL_HEADER = re.compile(r"VIBRATIONAL FREQUENCIES", re.IGNORECASE)
+#: ORCA says so when the converged density does not carry the requested number
+#: of electrons -- e.g. after a stale ``.gbw`` seeded the initial guess.
+_ELECTRON_COUNT_MISMATCH = re.compile(
+    r"LOEWDIN FINDS\s+\d+\.\d+ ELECTRONS INSTEAD OF\s+(\d+)", re.IGNORECASE
+)
 
 #: Fields :func:`parse_orca_output` refuses to return without. Widen via ``required``.
 ORCA_REQUIRED_FIELDS: tuple[str, ...] = ("final_energy_eh",)
@@ -427,6 +433,8 @@ def parse_orca_output(
         flags.append("scf_failed")
     if imaginary:
         flags.append("imaginary_mode_unresolved")
+    if _ELECTRON_COUNT_MISMATCH.search(text) is not None:
+        flags.append("electron_count_mismatch")
 
     ordered_flags = tuple(dict.fromkeys(flags))
     assert set(ordered_flags) <= QC_FLAGS  # keep the vocabulary honest
@@ -523,6 +531,13 @@ def run_orca(
         resolve_scratch_root(directory, scratch_root=scratch_root)
         / f"{stem}{ORCA_SCRATCH_SUFFIX}"
     )
+    # A scratch directory left behind by an interrupted run still holds its
+    # ``<stem>.gbw``, and ORCA reads a same-named ``.gbw`` as the initial guess.
+    # Reusing such a directory therefore seeds the SCF with whatever state was
+    # last written there; one C1 job collapsed to 23 of 45 electrons that way and
+    # still reported normal termination.  Always start from an empty directory.
+    if scratch.exists():
+        shutil.rmtree(scratch, ignore_errors=True)
     scratch.mkdir(parents=True, exist_ok=True)
     (scratch / input_name).write_text(input_text, encoding="utf-8", newline="\n")
 

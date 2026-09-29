@@ -1,8 +1,8 @@
 # Figure manifest - T3 bare-CPCM dielectric scan (F10)
 
-| figure | file | inputs (SHA256) |
-| --- | --- | --- |
-| F10 | `F10_cpcm_eps_scan.png` | `t3_cpcm_eps_scan_summary.json` 9ac4bc5540d11fb247d46695cdc781a6b6c672e3f9964093c7477b375cbee970 | `t3_cpcm_eps_scan.csv` 992f2348ad81a1f3c26c0a00aac2a49ce43905272709656519addb8c1eef75c7 | `p1_core_set.csv` a872f359d93d64ccd97ded9561cf21b6a66917c4d10cfb9b893442c4f067caaa |
+| figure | file | figure SHA256 | inputs (SHA256) |
+| --- | --- | --- | --- |
+| F10 | `F10_cpcm_eps_scan.png` | 7a260d2c17e89e0ed988f139f073357169b128a91ab45ed01f502e62d35c7f2a | `t3_cpcm_eps_scan_summary.json` ce04777bf324683526183ef783177073cb70512f94d623b7bd559391706a28d4 | `t3_cpcm_eps_scan.csv` 992f2348ad81a1f3c26c0a00aac2a49ce43905272709656519addb8c1eef75c7 | `p1_core_set.csv` a872f359d93d64ccd97ded9561cf21b6a66917c4d10cfb9b893442c4f067caaa |
 
 F10 note: panel (a) shows the mean of the vertical gas -> bare-CPCM(eps) shift of IP
 and EA against the dielectric constant on a log axis, with error bars giving the
@@ -17,6 +17,6 @@ non-electrostatic terms.
 
 - n_molecules: 12, n_jobs: 144, n_ok: 144, n_failed: 0, n_missing: 0
 - gas-phase 1-sigma across the subset: IP 0.961 eV, EA 0.562 eV
-- generated_utc: 2026-09-29T05:25:09.825947+00:00
+- generated_utc: 2026-09-29T05:38:41.975735+00:00
 
 Labels are English on purpose (no guaranteed CJK font in the workspace).

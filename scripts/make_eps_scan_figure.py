@@ -188,9 +188,9 @@ def write_manifest(summary, figure: Path, gas) -> Path:
     lines = [
         "# Figure manifest - T3 bare-CPCM dielectric scan (F10)",
         "",
-        "| figure | file | inputs (SHA256) |",
-        "| --- | --- | --- |",
-        "| F10 | `" + figure.name + "` | `t3_cpcm_eps_scan_summary.json` " + sha256_of(SUMMARY)
+        "| figure | file | figure SHA256 | inputs (SHA256) |",
+        "| --- | --- | --- | --- |",
+        "| F10 | `" + figure.name + "` | " + sha256_of(figure) + " | `t3_cpcm_eps_scan_summary.json` " + sha256_of(SUMMARY)
         + " | `t3_cpcm_eps_scan.csv` " + sha256_of(CSV) + " | `p1_core_set.csv` " + sha256_of(P1_CSV) + " |",
         "",
         "F10 note: panel (a) shows the mean of the vertical gas -> bare-CPCM(eps) shift of IP",

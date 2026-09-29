@@ -224,7 +224,7 @@ v2 参考文献：
 - `10.1021/cr030203g` Xu, Chem. Rev. 2004（非水电解液综述）
 - `10.1016/j.jpowsour.2006.07.074` Zhang, J. Power Sources 2006（添加剂综述）
 - `10.1149/1.1415547` Zhang & Kostecki et al., JES 2001（EC/PC/DMC/DEC/EMC 的还原）
-- `10.1149/1.1838419` Ue et al., JES 1998（sulfolane 高阳极稳定性）
+- `10.1149/1.1838419` Xu & Angell, JES 1998（sulfolane 高阳极稳定性）
 - `10.1021/acs.chemmater.6b02282` Michan et al., Chem. Mater. 2016（FEC/VC 还原）
 - `10.1088/0957-4484/26/35/354003` Borodin et al., Nanotechnology 2015（电化学稳定性高通量筛选）
 - `10.1039/d0ma00847h` Materials Advances 2021（EC–PC 氧化还原分解）

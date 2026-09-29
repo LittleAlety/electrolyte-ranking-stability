@@ -8,6 +8,7 @@ the suite stays green on a machine with no engine installed.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -21,7 +22,9 @@ for _directory in (REPO_ROOT / "src", REPO_ROOT / "scripts"):
 from analyze_cpcm_eps_scan import (  # noqa: E402
     COLUMNS,
     EPS_VALUES,
+    EXTRA_NAMES,
     HARTREE_TO_EV,
+    STATES,
     SUBSET_NAMES,
     TARGET_NAMES,
     decision_metrics,
@@ -30,7 +33,10 @@ from analyze_cpcm_eps_scan import (  # noqa: E402
     load_core_set,
     load_rows,
     parse_eps_label,
+    pooled_metrics,
+    pooled_pair_sigma,
     ranking_vectors,
+    robust_inversion_block,
     resolve_subset,
     scan_row,
     shift_stats,
@@ -116,6 +122,38 @@ def test_missing_subset_molecule_is_reported_not_silently_dropped():
         resolve_subset(core)
 
 
+
+
+def test_subset_budget_is_twelve_molecules_three_states_by_four_epsilons():
+    """docs/08 §7 declares 12 x 3 x 4 = 144 ORCA jobs; the constants must say so."""
+    assert len(TARGET_NAMES) == 10
+    assert len(EXTRA_NAMES) == 2
+    assert len(SUBSET_NAMES) == 12
+    assert len(STATES) == 3
+    assert len(EPS_VALUES) == 4
+    assert len(SUBSET_NAMES) * len(STATES) * len(EPS_VALUES) == 144
+
+
+T3_SUMMARY = REPO_ROOT / "outputs" / "week4" / "t3_cpcm_eps_scan_summary.json"
+
+
+@pytest.mark.skipif(not T3_SUMMARY.exists(), reason="T3 summary not produced yet")
+def test_produced_t3_summary_has_no_declared_but_missing_job():
+    """Guard against a silent "12 declared, 10 actually run" mismatch."""
+    payload = json.loads(T3_SUMMARY.read_text(encoding="utf-8"))
+    expected = len(SUBSET_NAMES) * len(STATES) * len(EPS_VALUES)
+    assert expected == 144
+    assert payload["n_expected_jobs"] == expected
+    assert payload["n_molecules"] == len(SUBSET_NAMES) == 12
+    assert payload["n_states"] == len(STATES)
+    assert payload["n_jobs"] == payload["n_ok"] == expected
+    assert payload["n_missing"] == 0
+    assert payload["n_failed"] == 0
+    coverage = payload["family_coverage"]
+    assert coverage["n_families_in_subset"] == 8
+    assert coverage["families_not_in_subset"] == []
+    for epsilon, block in payload["per_eps"].items():
+        assert block["n_ok"] == 12, "eps=%s ran %s/12 molecules" % (epsilon, block["n_ok"])
 # --------------------------------------------------------------------------- #
 # C. the sigma_env definition
 # --------------------------------------------------------------------------- #
@@ -324,3 +362,90 @@ def test_decision_metrics_refuse_to_report_a_single_molecule():
     assert block["n"] == 1
     assert block["kendall_tau_b"] is None
     assert block["f_robust_inv"] is None
+
+# --------------------------------------------------------------------------- #
+# G. the multi-source sigma and the two robust-inversion conventions
+# --------------------------------------------------------------------------- #
+def test_pooled_metrics_reports_integer_pair_counts():
+    gas = [0.0, 1.0, 2.0, 3.0]
+    layer = [0.2, 1.4, 2.6, 3.8]
+    sigma, median = pooled_pair_sigma([gas, layer])
+    assert sigma is not None and median is not None
+    block = pooled_metrics(gas, layer, LABELS, sigma)
+    assert block["n"] == 4
+    assert block["n_pairs_total"] == 6                      # C(4, 2)
+    assert isinstance(block["n_pairs_resolved_in_both"], int)
+    assert isinstance(block["n_robust_inversions"], int)
+    assert 0 <= block["n_robust_inversions"] <= block["n_pairs_resolved_in_both"] <= 6
+    assert block["z"] == pytest.approx(1.0)
+    for key in ("f_unresolved_gas", "f_unresolved_cpcm", "f_robust_inv"):
+        assert 0.0 <= block[key] <= 1.0
+
+
+def test_pooled_metrics_fraction_is_the_count_over_the_pairs_resolved_in_both():
+    gas = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    labels = ["m%d" % index for index in range(7)]
+    layer = [0.1, 1.3, 1.8, 3.6, 4.0, 5.4, 6.1]
+    sigma, _ = pooled_pair_sigma([gas, layer])
+    block = pooled_metrics(gas, layer, labels, sigma)
+    assert block["n_pairs_total"] == 21                     # C(7, 2)
+    assert block["n_pairs_resolved_in_both"] > 0
+    assert block["f_robust_inv"] == pytest.approx(
+        block["n_robust_inversions"] / block["n_pairs_resolved_in_both"])
+
+
+def test_pooled_pair_sigma_refuses_incomplete_realizations_instead_of_guessing():
+    assert pooled_pair_sigma([]) == (None, None)
+    assert pooled_pair_sigma([[0.0, 1.0], [0.0, None]]) == (None, None)
+    assert pooled_pair_sigma([[0.0, 1.0], [0.0, 1.0, 2.0]]) == (None, None)
+
+
+def _two_arm_decisions(f_z1p0, f_z1p96):
+    return {5.0: {axis: {"f_robust_inv": f_z1p0, "f_robust_inv_z1p96": f_z1p96}
+                  for axis in ("oxidation", "reduction")}}
+
+
+def _pooled_entry(f_z1p0, f_z1p96, n_robust, n_robust_z1p96):
+    return {"f_robust_inv": f_z1p0, "f_robust_inv_z1p96": f_z1p96,
+            "n_robust_inversions": n_robust, "n_robust_inversions_z1p96": n_robust_z1p96,
+            "n_pairs_total": 66, "n_pairs_resolved_in_both": 50, "f_unresolved_cpcm": 0.0,
+            "f_unresolved_cpcm_z1p96": 0.0}
+
+
+def test_robust_inversion_block_keeps_the_two_sigma_conventions_apart():
+    decisions = _two_arm_decisions(0.0, 0.0)
+    pooled = {"oxidation": {"per_eps": {"5": _pooled_entry(0.02, 0.0, 1, 0)}},
+              "reduction": {"per_eps": {"5": _pooled_entry(0.0, 0.01, 0, 1)}}}
+    block = robust_inversion_block(decisions, pooled, [5.0])
+    assert block["sigma_conventions"]["two_arm"]["max_f_robust_inv_z1p0"] == pytest.approx(0.0)
+    assert block["sigma_conventions"]["two_arm"]["any_gt_0_z1p0"] is False
+    assert block["sigma_conventions"]["multi_source"]["max_f_robust_inv_z1p0"] == pytest.approx(0.02)
+    assert block["sigma_conventions"]["multi_source"]["any_gt_0_z1p0"] is True
+    assert block["max_n_robust_inversions_z1p0"] == 1
+    assert block["max_n_robust_inversions_z1p96"] == 1
+    verdict = block["verdict"]
+    assert "Two-arm sigma" in verdict and "Multi-source sigma" in verdict
+    assert "1 of the 66 pairs" in verdict
+    assert "BOTH layers" in verdict
+    # the verdict must flag the denominator trap explicitly (1/66 != f_robust_inv)
+    assert "1/66" in verdict
+
+
+def test_the_two_arm_convention_is_the_one_that_says_no():
+    # a clean split: the two-arm sigma sees nothing, the pooled sigma sees a pair
+    block = robust_inversion_block(
+        _two_arm_decisions(0.0, 0.0),
+        {"oxidation": {"per_eps": {"5": _pooled_entry(1 / 66, 0.0, 1, 0)}},
+         "reduction": {"per_eps": {"5": _pooled_entry(0.0, 0.0, 0, 0)}}},
+        [5.0],
+    )
+    two_arm = block["sigma_conventions"]["two_arm"]
+    multi = block["sigma_conventions"]["multi_source"]
+    assert (two_arm["any_gt_0_z1p0"], multi["any_gt_0_z1p0"]) == (False, True)
+    assert multi["max_f_robust_inv_z1p0"] == pytest.approx(1 / 66)
+
+
+def test_an_empty_pooled_block_is_reported_as_unavailable_not_as_zero():
+    block = robust_inversion_block(_two_arm_decisions(0.0, 0.0), {}, [5.0])
+    assert block["sigma_conventions"]["multi_source"]["max_f_robust_inv_z1p0"] == pytest.approx(0.0)
+    assert block["max_n_robust_inversions_z1p0"] == 0

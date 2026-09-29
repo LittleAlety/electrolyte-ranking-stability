@@ -1,0 +1,169 @@
+{
+  "stage": "Stage 7 (feature tables)",
+  "plan_reference": "ranking-electrolyte-materials-v2.md sections 11-13; config/prereg.yaml sections 5-6, 8",
+  "convention": {
+    "direction": "ox = IP (eV), red = -EA (eV); both are maximised",
+    "note": "a consequence, not a sign bug: P1_red - P0_red is the negative of the underlying EA correction, because the P0 layer stores +eps_LUMO"
+  },
+  "feature_cost_levels": {
+    "X0": [
+      "mw",
+      "donor_count",
+      "n_heavy",
+      "rotatable_bonds",
+      "tpsa",
+      "is_cyclic",
+      "has_fluorine",
+      "p0_ox_ev",
+      "p0_red_ev",
+      "hl_gap_ev",
+      "dipole_debye",
+      "aux_alpha_bohr3"
+    ],
+    "X1": [
+      "p1_ox_ev",
+      "p1_red_ev",
+      "p2_ox_ev",
+      "p2_red_ev",
+      "env_d_ox_ev",
+      "env_d_red_ev"
+    ],
+    "X2": [
+      "x2_dgdg_bind_ev",
+      "x2_li_min_distance_a",
+      "x2_li_contacts_n",
+      "x2_motif_switch"
+    ]
+  },
+  "x2_policy": "X2 columns are mechanism-only.  The model runner asserts they never enter a feature set, so no table can claim to predict a C1 quantity cheaply by using a C1-derived descriptor.",
+  "tasks": {
+    "M": {
+      "label": "method (P0 -> P1)",
+      "reference_layer": "P0",
+      "target_layer": "P1",
+      "targets": {
+        "oxidation": "y_m_ox_ev",
+        "reduction": "y_m_red_ev"
+      },
+      "references": {
+        "oxidation": "ref_m_ox_ev",
+        "reduction": "ref_m_red_ev"
+      },
+      "feature_sets": {
+        "X0": [
+          "mw",
+          "donor_count",
+          "n_heavy",
+          "rotatable_bonds",
+          "tpsa",
+          "is_cyclic",
+          "has_fluorine",
+          "p0_ox_ev",
+          "p0_red_ev",
+          "hl_gap_ev",
+          "dipole_debye",
+          "aux_alpha_bohr3"
+        ]
+      }
+    },
+    "E": {
+      "label": "environment (P1 -> P2)",
+      "reference_layer": "P1",
+      "target_layer": "P2",
+      "targets": {
+        "oxidation": "y_e_ox_ev",
+        "reduction": "y_e_red_ev"
+      },
+      "references": {
+        "oxidation": "ref_e_ox_ev",
+        "reduction": "ref_e_red_ev"
+      },
+      "feature_sets": {
+        "X0+P1": [
+          "mw",
+          "donor_count",
+          "n_heavy",
+          "rotatable_bonds",
+          "tpsa",
+          "is_cyclic",
+          "has_fluorine",
+          "p0_ox_ev",
+          "p0_red_ev",
+          "hl_gap_ev",
+          "dipole_debye",
+          "aux_alpha_bohr3",
+          "p1_ox_ev",
+          "p1_red_ev"
+        ]
+      }
+    },
+    "C": {
+      "label": "coordination (C0 -> C1)",
+      "reference_layer": "C0",
+      "target_layer": "C1",
+      "targets": {
+        "oxidation": "y_c_ox_ev",
+        "reduction": "y_c_red_ev"
+      },
+      "references": {
+        "oxidation": "ref_c_ox_ev",
+        "reduction": "ref_c_red_ev"
+      },
+      "feature_sets": {
+        "X0": [
+          "mw",
+          "donor_count",
+          "n_heavy",
+          "rotatable_bonds",
+          "tpsa",
+          "is_cyclic",
+          "has_fluorine",
+          "p0_ox_ev",
+          "p0_red_ev",
+          "hl_gap_ev",
+          "dipole_debye",
+          "aux_alpha_bohr3"
+        ],
+        "X0+X1": [
+          "mw",
+          "donor_count",
+          "n_heavy",
+          "rotatable_bonds",
+          "tpsa",
+          "is_cyclic",
+          "has_fluorine",
+          "p0_ox_ev",
+          "p0_red_ev",
+          "hl_gap_ev",
+          "dipole_debye",
+          "aux_alpha_bohr3",
+          "p1_ox_ev",
+          "p1_red_ev",
+          "p2_ox_ev",
+          "p2_red_ev",
+          "env_d_ox_ev",
+          "env_d_red_ev"
+        ]
+      }
+    }
+  },
+  "counts": {
+    "core_n": 18,
+    "core_n_with_environment_target": 18,
+    "core_n_with_coordination_target": 10,
+    "broad_n": 40,
+    "core_anomalies": []
+  },
+  "sources": {
+    "data/metadata/core_set.csv": "630b0ee8c09dc4141124e335181572bf27a63f297a8df95f9c774683a10cf91b",
+    "data/metadata/broad_pool.csv": "a6ca215e8e217e24c036a4c3571c8096e949b9f46e51571749c7581b9584e346",
+    "outputs/week3/p0_core_set.csv": "8001accb7066b18bdc8b622466163f796ba0b7c527f394d585ff3bdfab5b1cb3",
+    "outputs/week3/p0_broad_pool.csv": "363f67eca29afa0a986e5e48964447f9e821a2c0669c2517397f74f5cc25b2aa",
+    "outputs/week4/p1_core_set_derived.csv": "2987f8771b722d5a07517289a18a486fb2da24ed5775a196ffd7baf2c57517d3",
+    "outputs/week4/p2_environment_effects.csv": "b74de81a66979f04c96b52c4280842ae8df8c8db2a9c50d6fb96675e0b752363",
+    "outputs/week4/t2_opt_freq.csv": "c05c33ac967e436f309588115ac45470a4f540996d3c3a6f868a68feca79ec9e",
+    "outputs/week5/c1_coord_shifts.csv": "1f9597ba376ffb19610e855e4d83a4e2360a8ac5009209cf764be91008634b5d",
+    "outputs/week5/c1_ligand_exchange.csv": "6fbb385a5416044ac910c2d05c32ccffa588b174a6955babe4db3ba263c56a6b",
+    "outputs/week5/c1_state_identity.csv": "cc035b941936842a739d2c23833552acfa3c010283e280276849e0be8d6d1aa3"
+  }
+}

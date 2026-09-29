@@ -161,7 +161,7 @@ SOURCES = {
                  "guideline, not a directly measured quantity."),
     },
     "10.1149/1.1838419": {
-        "short": "Ue et al., J. Electrochem. Soc. 1998",
+        "short": "Xu & Angell, J. Electrochem. Soc. 1998",
         "title": "High Anodic Stability of a New Electrolyte Solvent: Unsymmetric Noncyclic Aliphatic Sulfone",
         "resolved": True,
         "checked_via": "Crossref metadata + OpenAlex abstract",

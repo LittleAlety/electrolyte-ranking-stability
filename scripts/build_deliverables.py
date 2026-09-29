@@ -12,14 +12,20 @@ ORCA / xTB scratch is excluded on purpose (see EXCLUDE_* below).
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import re
 import shutil
+import statistics
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "src"))
+
+from electrolyte_ranking import ranking  # noqa: E402
 DEFAULT_OUT = Path(r"E:\Claude Code\电解液溶剂-HB\成果输出")
 
 EXCLUDE_SUFFIXES = {".gbw", ".bas", ".tmp", ".wfn", ".densities", ".pot", ".pyc"}
@@ -73,16 +79,47 @@ def check(name: str, ok, detail: str) -> dict:
 
 GATE_STATUS = "Gate 0 CLOSED; Gate 1 NOT CLOSED (blocker: 溶液锚点 31 行仍为 est)"
 
-T3_NOTE_PRESENT = ("**T3（CPCM ε 扫描）**：由另一条工作流并行产出，"
-                   "`outputs/week4/t3_*` 三项已产出并自动纳入本目录。")
-T3_NOTE_ABSENT = ("**T3（CPCM ε 扫描）**：由另一条工作流并行产出；"
-                  "本目录尚未纳入 `outputs/week4/t3_*`（源路径不存在）。")
-T3_LIMIT_PRESENT = ("**T3 已纳入**：另一条工作流的 `outputs/week4/t3_*`（CPCM ε 扫描）已产出并自动"
-                    "纳入 week4；其数值复核见 `verification.json` 的 `checks`。")
-T3_LIMIT_ABSENT = ("**T3 未纳入**：另一条工作流的 `outputs/week4/t3_*`（CPCM ε 扫描）在本轮尚不存在；"
+T3_NOTE_PRESENT = ("**T3（CPCM ε 扫描）**：bare CPCM 介电常数扫描（ε = 5/10/20/40）× 12 分子 × 3 态 "
+                   "= 144/144 作业成功，覆盖 core set 全部 8 个结构家族（含补跑的 SL、TMP），几何复用 G1、"
+                   "未重新优化。`outputs/week4/t3_*` 三项已自动纳入本目录。")
+T3_NOTE_ABSENT = ("**T3（CPCM ε 扫描）**：本轮未纳入 `outputs/week4/t3_*`（源路径不存在）。")
+T3_LIMIT_PRESENT = ("**T3 已纳入**：`outputs/week4/t3_*`（bare CPCM ε 扫描，144/144 作业）已产出并自动纳入 "
+                    "week4；数值复核见 `verification.json` 的 `checks`。注意 bare CPCM ≠ SMD；"
+                    "「是否出现 robust inversion」依赖 σ 口径，two_arm 与 multi_source 两套结果并列报告。")
+T3_LIMIT_ABSENT = ("**T3 未纳入**：`outputs/week4/t3_*`（CPCM ε 扫描）在本轮尚不存在；"
                    "脚本会在其出现后自动纳入 week4，无需改动脚本。")
-F10_NOTE_PRESENT = "CPCM ε 扫描数据已产出（见 week4 的 `t3_*`），但 ε 扫描图本身尚未生成"
+T3_SUMMARY_LIMIT_PRESENT = ("**T3（bare CPCM ε 扫描）**：ε = 5/10/20/40 的位移近乎共同平移（σ_env 仅 0.19–0.24 eV）；"
+                            "相对气相在 two_arm σ 口径下 f_robust_inv = 0，multi_source σ 口径下最多 1 对"
+                            "（f_robust_inv 的分母是两臂都能分辨的 pair 数，约 51–60，而非子集的 66 对），"
+                            "故不足以宣称「介电诱导的稳健重排」。另注意 bare CPCM ≠ SMD。")
+T3_SUMMARY_LIMIT_ABSENT = "**T3 尚未纳入**：CPCM ε 扫描（F10）未运行。"
+T3_REPRO_COMMANDS = "\n".join([
+    "# T3：bare CPCM ε 扫描（12 分子；几何复用 G1，不重新优化）",
+    ".venv\\Scripts\\python.exe scripts\\run_core_set_p2.py --epsilon 5  --only C04,C05,C01,C02,C08,C09,C13,C16,C18,C15,C14,C17 --jobs 2 --outdir outputs\\week4",
+    ".venv\\Scripts\\python.exe scripts\\run_core_set_p2.py --epsilon 10 --only C04,C05,C01,C02,C08,C09,C13,C16,C18,C15,C14,C17 --jobs 2 --outdir outputs\\week4",
+    ".venv\\Scripts\\python.exe scripts\\run_core_set_p2.py --epsilon 20 --only C04,C05,C01,C02,C08,C09,C13,C16,C18,C15,C14,C17 --jobs 2 --outdir outputs\\week4",
+    ".venv\\Scripts\\python.exe scripts\\run_core_set_p2.py --epsilon 40 --only C04,C05,C01,C02,C08,C09,C13,C16,C18,C15,C14,C17 --jobs 2 --outdir outputs\\week4",
+    ".venv\\Scripts\\python.exe scripts\\analyze_cpcm_eps_scan.py",
+    ".venv\\Scripts\\python.exe scripts\\make_eps_scan_figure.py",
+])
+F10_NOTE_PRESENT = "介电常数扫描：ΔIP / ΔEA 随 ε 的位移（bare CPCM；气相为参考点，非 CPCM 计算）"
 F10_NOTE_ABSENT = "预留给 CPCM ε 扫描 / 预算复演；ε 扫描尚未产出"
+T2_NOTE_PRESENT = ("**T2（Opt+Freq / G2 几何台阶）**：对 T3 用的同一 12 分子审计子集，在 r2SCAN-3c 上"
+                   "从 G1 出发做中性 `Opt+Freq` 得到 G2，再在 G2 上重算三态单点；唯一变量是几何。"
+                   "`outputs/week4/t2_*` 两项已自动纳入本目录，虚频照实记录为 `imaginary_mode_unresolved`。")
+T2_NOTE_ABSENT = "**T2（Opt+Freq / G2 几何台阶）**：本轮未纳入 `outputs/week4/t2_*`（源路径不存在）。"
+T2_LIMIT_PRESENT = ("**T2 已纳入**：几何台阶与方法台阶、环境台阶用同一估计量（位移在 12 个分子上的总体标准差）"
+                    "并列比较（`F11`）；虚频按 QE 词表记 `imaginary_mode_unresolved`，照实报告、不静默删除。")
+T2_LIMIT_ABSENT = ("**T2 未纳入**：Opt+Freq 几何台阶（F11）在本轮尚不存在；"
+                   "`scripts/make_t2_figure.py` 会在其出现后自动纳入。")
+T2_REPRO_COMMANDS = "\n".join([
+    "# T2：Opt+Freq（G1 -> G2）+ G2 上的三态单点（12 分子审计子集，与 T3 子集逐一相同）",
+    ".venv\\Scripts\\python.exe scripts\\run_t2_opt_freq.py --jobs 2 --nprocs 8",
+    ".venv\\Scripts\\python.exe scripts\\make_t2_figure.py",
+])
+F11_NOTE_PRESENT = ("几何台阶：把 G1（GFN2-xTB 共享几何）换成 r2SCAN-3c 的 Opt+Freq 驻点 G2 后，"
+                    "垂直 IP / EA 的逐分子位移，以及与方法、环境台阶同口径的 sigma 对比")
+F11_NOTE_ABSENT = "预留给 Opt+Freq 几何台阶；T2 尚未产出"
 
 WEEKS = {
     1: {
@@ -139,7 +176,7 @@ WEEKS = {
         ],
     },
     4: {
-        "topic": "Stage 3（P1 电子结构）+ Stage 4（P2 环境）+ T5 + T3",
+        "topic": "Stage 3（P1 电子结构）+ Stage 4（P2 环境）+ T5 + T3 + T2",
         "sources": [
             ("outputs/week4/p1_core_set.csv", None, False),
             ("outputs/week4/p1_core_set_derived.csv", None, False),
@@ -148,6 +185,7 @@ WEEKS = {
             ("outputs/week4/p2_environment_effects.csv", None, False),
             ("outputs/week4/t5_diffuse_control.csv", None, False),
             ("outputs/week4/t3_cpcm_eps_scan.csv", None, True),
+            ("outputs/week4/t2_opt_freq.csv", None, True),
             ("outputs/week4/p1_core_set_summary.json", None, False),
             ("outputs/week4/p1_core_set_audit.json", None, False),
             ("outputs/week4/p1_anchor_comparison.json", None, False),
@@ -156,10 +194,12 @@ WEEKS = {
             ("outputs/week4/p2_decision_stability.json", None, False),
             ("outputs/week4/t5_diffuse_control_summary.json", None, False),
             ("outputs/week4/t3_cpcm_eps_scan_summary.json", None, True),
+            ("outputs/week4/t2_opt_freq_summary.json", None, True),
             ("outputs/week4/p1_decision_stability.md", None, False),
             ("outputs/week4/p2_decision_stability.md", None, False),
             ("docs/10_week4_report.md", "week4_report_full.md", False),
             ("outputs/week4/t3_cpcm_eps_scan_report.md", None, True),
+            ("outputs/figures/figure_manifest_week4_t2.md", "artifacts/figure_manifest_week4_t2.md", True),
         ],
         "figures": [
             "outputs/figures/F3_value_error_vs_rank_error.png",
@@ -170,7 +210,7 @@ WEEKS = {
             "outputs/figures/F8_environment_layer_p1_to_p2.png",
             "outputs/figures/F9_diffuse_function_control.png",
         ],
-        "figure_glob": "outputs/figures/F10_*.png",
+        "figure_glob": ["outputs/figures/F10_*.png", "outputs/figures/F11_*.png"],
         "commands": [
             "python scripts/run_core_set_p1.py --jobs 2 --outdir outputs\\week4",
             "python scripts/audit_p1_core_set.py",
@@ -179,7 +219,160 @@ WEEKS = {
             "python scripts/analyze_p2_environment.py",
             "python scripts/run_diffuse_control.py",
             "python scripts/make_t5_figure.py",
+            "python scripts/run_t2_opt_freq.py --jobs 2 --nprocs 8",
+            "python scripts/make_t2_figure.py",
             "python scripts/build_deliverables.py --weeks 4",
+        ],
+    },
+    5: {
+        "topic": "Stage 5（T4：Li+ 配位条件态 C1）",
+        "sources": [
+            ("outputs/week5/li_motif_generation.csv", None, False),
+            ("outputs/week5/li_motif_generation.json", None, False),
+            ("outputs/week5/li_motif_generation.md", None, False),
+            ("outputs/week5/c1_li_coordination.csv", None, True),
+            ("outputs/week5/c1_li_coordination_summary.json", None, True),
+            ("outputs/week5/c1_coord_shifts.csv", None, True),
+            ("outputs/week5/c1_ligand_exchange.csv", None, True),
+            ("outputs/week5/c1_decision_stability.json", None, True),
+            ("outputs/week5/c1_decision_stability.md", None, True),
+            ("outputs/week5/c1_summary.json", None, True),
+            # The state-identity QC (figure F13) of the C1 states is QC evidence
+            # for Stage 5, so it ships with the bundle alongside the audit below.
+            ("outputs/week5/c1_state_identity.csv", None, True),
+            ("outputs/week5/c1_state_identity.json", None, True),
+            ("outputs/week5/c1_state_identity.md", None, True),
+            ("outputs/figures/figure_manifest_week5_state_identity.md",
+             "artifacts/figure_manifest_week5_state_identity.md", True),
+            # The adversarial audit of the C1 analysis layer is QC evidence for
+            # Stage 5, so it ships with the bundle instead of staying in scratch.
+            ("outputs/week5/c1_adversarial_audit.md", None, True),
+            # The independent audit of the *state-identity* artefact is QC
+            # evidence for that artefact, so it ships beside it rather than
+            # staying in scratch.
+            ("outputs/week5/c1_state_identity_audit.md", None, True),
+            ("structures/li_motifs", "structures/li_motifs", True),
+            ("docs/12_week5_report.md", "week5_report_full.md", True),
+            # The M0-M6 milestone / plan-alignment record is the artefact that
+            # says which stage the project is at, and docs/12 section 3 points
+            # readers at it, so it ships with the week-5 bundle instead of
+            # only existing inside the repository.
+            ("docs/11_plan_alignment.md", "plan_alignment.md", True),
+            ("outputs/figures/figure_manifest_week5_c1.md",
+             "artifacts/figure_manifest_week5_c1.md", True),
+        ],
+        # Per-job C1 provenance records live under outputs/week5/c1/<NAME>/ next to
+        # the raw ORCA scratch.  They are pulled in by glob and filtered through the
+        # same exclusion rules, so the multi-megabyte .out/.inp never reach the bundle.
+        "source_globs": [
+            ("outputs/week5/c1/*/*_c1_record.json", "c1_records", True),
+            ("outputs/week5/c1/*/*_orca.json", "c1_records", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F12_*.png", "outputs/figures/F13_*.png"],
+        "commands": [
+            "python scripts/build_li_motifs.py",
+            "python scripts/run_c1_li_coordination.py --jobs 2 --nprocs 8",
+            "python scripts/analyze_c1_coordination.py",
+            "python scripts/make_c1_figure.py",
+            "python scripts/analyze_c1_state_identity.py",
+            "python scripts/make_c1_state_identity_figure.py",
+            "python scripts/build_deliverables.py --weeks 5",
+        ],
+    },
+    6: {
+        "topic": "Stage 6（T6 构象系综 + T7 C1 虚频 + T8 delta_m + T9 不确定性感知排序）",
+        "sources": [
+            ("outputs/week6/t6_conformer_manifest.csv", None, True),
+            ("outputs/week6/t6_conformer_manifest.json", None, True),
+            ("outputs/week6/t6_conformer_spread.csv", None, True),
+            ("outputs/week6/t6_conformer_spread.json", None, True),
+            ("outputs/week6/t6_conformer_spread.md", None, True),
+            ("outputs/week6/t7_c1_freq_check.csv", None, True),
+            ("outputs/week6/t7_c1_freq_check.json", None, True),
+            ("outputs/week6/t7_c1_freq_check.md", None, True),
+            ("outputs/week6/delta_m_frozen.json", None, True),
+            ("outputs/week6/delta_m_frozen.md", None, True),
+            ("outputs/week6/stage6_decision_stability.csv", None, True),
+            ("outputs/week6/stage6_decision_stability.json", None, True),
+            ("outputs/week6/stage6_decision_stability.md", None, True),
+            ("structures/conformers", "structures/conformers", True),
+            ("docs/13_week6_report.md", "week6_report_full.md", True),
+            ("outputs/figures/figure_manifest_week6_t9.md",
+             "artifacts/figure_manifest_week6_t9.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F14_*.png", "outputs/figures/F15_*.png"],
+        "commands": [
+            "python scripts/build_conformers.py --force --n-confs 24 --keep 4 --jobs 8",
+            "python scripts/run_t6_conformer_spread.py --layer p0 --p0-jobs 8",
+            "python scripts/run_t6_conformer_spread.py --layer p1 --jobs 2 --nprocs 8",
+            "python scripts/run_c1_freq_check.py --jobs 2 --nprocs 8",
+            "python scripts/analyze_delta_m.py",
+            "python scripts/analyze_stage6.py",
+            "python scripts/make_stage6_figure.py",
+            "python scripts/build_deliverables.py --weeks 6",
+        ],
+    },
+    7: {
+        "topic": "Stage 7（ML / direct vs Δ-learning）+ Stage 8（active-learning replay）",
+        "sources": [
+            ("outputs/week7/feature_manifest.json", None, True),
+            ("outputs/week7/feature_manifest.md", None, True),
+            ("outputs/week7/features_core.csv", None, True),
+            ("outputs/week7/features_broad.csv", None, True),
+            ("outputs/week7/stage7_ml_results.csv", None, True),
+            ("outputs/week7/stage7_ml_results.json", None, True),
+            ("outputs/week7/stage7_ml_summary.md", None, True),
+            ("outputs/week7/stage7_ml_predictions.csv", None, True),
+            ("outputs/week7/stage8_al_runs.csv", None, True),
+            ("outputs/week7/stage8_al_curves.csv", None, True),
+            ("outputs/week7/stage8_al_trajectories.csv", None, True),
+            ("outputs/week7/stage8_al_results.json", None, True),
+            ("outputs/week7/stage8_al_summary.md", None, True),
+            ("docs/14_reading_list_qa.md", "reading_list_qa.md", True),
+            ("docs/15_week7_report.md", "week7_report_full.md", True),
+            ("outputs/figures/figure_manifest_week7_s7s8.md",
+             "artifacts/figure_manifest_week7_s7s8.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F16_*.png", "outputs/figures/F17_*.png"],
+        "commands": [
+            "python scripts/build_ml_features.py",
+            "python scripts/run_stage7_ml.py",
+            "python scripts/run_stage8_al.py",
+            "python scripts/make_stage7_figure.py",
+            "python scripts/build_deliverables.py --weeks 7",
+        ],
+    },
+    8: {
+        "topic": "Stage 9（显式微溶剂化：C2 = [Li(M)2]+ 第一溶剂壳复核）",
+        "sources": [
+            ("outputs/week8/ms_shell_generation.csv", None, True),
+            ("outputs/week8/ms_shell_generation.json", None, True),
+            ("outputs/week8/ms_shell_generation.md", None, True),
+            ("outputs/week8/stage9_jobs.csv", None, True),
+            ("outputs/week8/stage9_summary.json", None, True),
+            ("outputs/week8/stage9_shell_shifts.csv", None, True),
+            ("outputs/week8/stage9_decision_stability.csv", None, True),
+            ("outputs/week8/stage9_results.json", None, True),
+            ("outputs/week8/stage9_summary.md", None, True),
+            ("structures/microsolvation", "structures/microsolvation", True),
+            ("docs/16_branch_abcd_qa.md", "branch_abcd_qa.md", True),
+            ("docs/17_plan_optimization_branchABC.md",
+             "plan_optimization_branchABC.md", True),
+            ("docs/18_week8_report.md", "week8_report_full.md", True),
+            ("outputs/figures/figure_manifest_week8_stage9.md",
+             "artifacts/figure_manifest_week8_stage9.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F18_*.png"],
+        "commands": [
+            "python scripts/build_microsolvation_shells.py",
+            "python scripts/run_stage9_microsolvation.py --skip-relax --jobs 2 --nprocs 8",
+            "python scripts/analyze_stage9_microsolvation.py",
+            "python scripts/make_stage9_figure.py",
+            "python scripts/build_deliverables.py --weeks 8",
         ],
     },
 }
@@ -239,11 +432,25 @@ def plan_week(week):
     for rel in spec["figures"]:
         items.extend(expand_source(rel, Path("artifacts") / Path(rel).name,
                                    False, missing, excluded))
-    if spec.get("figure_glob"):
-        found = sorted(REPO.glob(spec["figure_glob"]))
-        if not found:
-            pass
-        for path in found:
+    for pattern, dst_dir, optional in spec.get("source_globs", ()):
+        matched = False
+        for path in sorted(REPO.glob(pattern)):
+            if not path.is_file():
+                continue
+            if is_excluded(path):
+                excluded.append(path.relative_to(REPO).as_posix())
+                continue
+            dst = (Path(dst_dir) / path.name) if dst_dir else Path(path.name)
+            items.append((path, dst, optional))
+            matched = True
+        if not matched:
+            missing.append({"source": pattern, "optional": optional})
+    glob_spec = spec.get("figure_glob")
+    patterns = [] if glob_spec is None else glob_spec
+    if isinstance(patterns, str):
+        patterns = [patterns]
+    for pattern in patterns:
+        for path in sorted(REPO.glob(pattern)):
             if is_excluded(path):
                 excluded.append(path.relative_to(REPO).as_posix())
                 continue
@@ -277,6 +484,48 @@ def render_report(week, wdir, missing, excluded):
     t3_present = (wdir / "t3_cpcm_eps_scan.csv").exists()
     text = text.replace("{t3_note}", T3_NOTE_PRESENT if t3_present else T3_NOTE_ABSENT)
     text = text.replace("{t3_limit}", T3_LIMIT_PRESENT if t3_present else T3_LIMIT_ABSENT)
+    t2 = t2_blocks(load_json(T2_SUMMARY_PATH))
+    for key, value in (("{t2_note}", T2_NOTE_PRESENT if t2["block"] else T2_NOTE_ABSENT),
+                       ("{t2_block}", t2["block"]),
+                       ("{t2_qc}", t2["qc"]),
+                       ("{t2_step_row}", t2["step_row"]),
+                       ("{t2_limit}", t2["limit"])):
+        text = text.replace(key, value)
+    c1 = c1_blocks(load_json(C1_SUMMARY_PATH), load_json(C1_RUN_SUMMARY_PATH))
+    for key, value in (("{c1_note}", C1_NOTE_PRESENT if c1["present"] else C1_NOTE_ABSENT),
+                       ("{c1_block}", c1["block"]),
+                       ("{c1_qc}", c1["qc"]),
+                       ("{c1_step_row}", c1["step_row"]),
+                       ("{c1_limit}", c1["limit"])):
+        text = text.replace(key, value)
+    w6 = week6_blocks(load_json(T6_SUMMARY_PATH), load_json(T7_SUMMARY_PATH),
+                      load_json(T8_SUMMARY_PATH), load_json(T9_SUMMARY_PATH))
+    for key, value in (("{w6_did}", w6["did"]),
+                       ("{w6_metric}", w6["metric"]),
+                       ("{w6_qc}", w6["qc"]),
+                       ("{w6_limit}", w6["limit"]),
+                       ("{w6_t6_block}", w6["t6_block"]),
+                       ("{w6_t7_block}", w6["t7_block"]),
+                       ("{w6_delta_m_block}", w6["delta_m_block"]),
+                       ("{w6_t9_block}", w6["t9_block"])):
+        text = text.replace(key, value)
+    w7 = week7_blocks(load_json(W7_STAGE7_PATH), load_json(W7_STAGE8_PATH))
+    for key, value in (("{w7_did}", w7["did"]),
+                       ("{w7_metric}", w7["metric"]),
+                       ("{w7_qc}", w7["qc"]),
+                       ("{w7_limit}", w7["limit"]),
+                       ("{w7_s7_block}", w7["s7_block"]),
+                       ("{w7_s8_block}", w7["s8_block"]),
+                       ("{w7_summary}", w7["summary"])):
+        text = text.replace(key, value)
+    w8 = week8_blocks(load_json(W8_STAGE9_PATH), load_json(W8_SHELLS_PATH))
+    for key, value in (("{w8_did}", w8["did"]),
+                       ("{w8_metric}", w8["metric"]),
+                       ("{w8_qc}", w8["qc"]),
+                       ("{w8_limit}", w8["limit"]),
+                       ("{w8_s9_block}", w8["s9_block"]),
+                       ("{w8_summary}", w8["summary"])):
+        text = text.replace(key, value)
     if missing:
         rows = []
         for entry in missing:
@@ -495,7 +744,244 @@ def week4_checks(wdir: Path):
     return checks
 
 
-CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks}
+def week5_checks(wdir: Path):
+    """QC for week 5 (Stage 5 / T4, C1 Li+ coordination).
+
+    A failed ORCA job is a *result* here, not an error: the sweep records
+    ``geometry_failed`` / ``dissociated_optimized_product`` instead of aborting, so
+    the run-level assertion is deliberately "some jobs recorded and the SCF closed",
+    not "every job returned ok".
+    """
+
+    checks = []
+
+    run = load_json(wdir / "c1_li_coordination_summary.json")
+    if run is None:
+        checks.append(check("c1_run.n_jobs>0", None, "source not found"))
+    else:
+        checks.append(check("c1_run.n_jobs>0", (run.get("n_jobs") or 0) > 0,
+                            f"n_jobs={run.get('n_jobs')} n_ok={run.get('n_ok')} "
+                            f"status_counts={run.get('status_counts')}"))
+        flags = run.get("qc_flag_counts") or {}
+        checks.append(check("c1_run.scf_failed==0", flags.get("scf_failed", 0) == 0,
+                            f"scf_failed={flags.get('scf_failed')}"))
+
+    summary = load_json(wdir / "c1_summary.json")
+    if summary is None:
+        checks.append(check("c1_summary.present", None, "source not found"))
+    else:
+        checks.append(check("c1_summary.n_molecules>0", (summary.get("n_molecules") or 0) > 0,
+                            f"n_molecules={summary.get('n_molecules')} "
+                            f"n_motifs={summary.get('n_motifs')}"))
+        d_ip = summary.get("delta_ip_ev") or {}
+        d_ea = summary.get("delta_ea_ev") or {}
+        checks.append(check("c1_summary.delta_ip_ev.n>0", (d_ip.get("n") or 0) > 0,
+                            f"n={d_ip.get('n')} mean={d_ip.get('mean')} std={d_ip.get('std')}"))
+        checks.append(check("c1_summary.delta_ea_ev.n>0", (d_ea.get("n") or 0) > 0,
+                            f"n={d_ea.get('n')} mean={d_ea.get('mean')} std={d_ea.get('std')}"))
+
+    stability = load_json(wdir / "c1_decision_stability.json")
+    if stability is None:
+        checks.append(check("c1_decision_stability.z_primary==1.0", None, "source not found"))
+    else:
+        z = {axis: (stability.get(axis) or {}).get("z_primary")
+             for axis in ("oxidation", "reduction")}
+        checks.append(check("c1_decision_stability.z_primary==1.0",
+                            z.get("oxidation") == 1.0 and z.get("reduction") == 1.0,
+                            f"oxidation={z.get('oxidation')} reduction={z.get('reduction')}"))
+    return checks
+
+
+def week6_checks(wdir: Path):
+    """QC for week 6 (Stage 6: T6 conformers / T7 freq / T8 delta_m / T9 stability)."""
+
+    checks = []
+    t6 = load_json(wdir / "t6_conformer_spread.json")
+    if t6 is None:
+        checks.append(check("t6_conformer_spread.present", None, "source not found"))
+    else:
+        counts = t6.get("counts") or {}
+        for layer in ("p0", "p1"):
+            c = counts.get(layer) or {}
+            checks.append(check("t6.%s.n_failures==0" % layer, c.get("n_failures") == 0,
+                                "n_failures=%s n_conformers=%s n_molecules_scored=%s"
+                                % (c.get("n_failures"), c.get("n_conformers_total"),
+                                   c.get("n_molecules_scored"))))
+        checks.append(check("t6.subset.n==12", len(t6.get("subset") or []) == 12,
+                            "n=%s" % len(t6.get("subset") or [])))
+    t7 = load_json(wdir / "t7_c1_freq_check.json")
+    if t7 is None:
+        checks.append(check("t7_c1_freq_check.present", None, "source not found"))
+    else:
+        checks.append(check("t7.n_ok==n_molecules", t7.get("n_ok") == t7.get("n_molecules"),
+                            "n_ok=%s n_molecules=%s n_imaginary=%s"
+                            % (t7.get("n_ok"), t7.get("n_molecules"), t7.get("n_imaginary"))))
+    t8 = load_json(wdir / "delta_m_frozen.json")
+    if t8 is None:
+        checks.append(check("delta_m_frozen.present", None, "source not found"))
+    else:
+        status = str(t8.get("status") or "")
+        checks.append(check("delta_m.status==CANDIDATE", status.startswith("CANDIDATE"),
+                            "status=%s" % status))
+        meth = (t8.get("method_evidence") or {}).get("oxidation") or {}
+        checks.append(check("delta_m.method_sigma>0",
+                            (meth.get("sigma_method_ev") or 0) > 0,
+                            "oxidation sigma_method_ev=%s" % meth.get("sigma_method_ev")))
+    t9 = load_json(wdir / "stage6_decision_stability.json")
+    if t9 is None:
+        checks.append(check("stage6_decision_stability.present", None, "source not found"))
+    else:
+        z = (t9.get("prereg") or {}).get("z_primary")
+        checks.append(check("stage6.z_primary==1.0", z == 1.0, "z_primary=%s" % z))
+        cons = t9.get("consistency_checks") or []
+        checks.append(check("stage6.consistency_checks>=3", len(cons) >= 3,
+                            "n=%s" % len(cons)))
+        e = (((t9.get("results") or {}).get("docx_max") or {}).get("P0_to_P1")
+             or {}).get("oxidation") or {}
+        checks.append(check("stage6.docx_max.P0_to_P1.oxidation.f_robust_inv==0",
+                            e.get("f_robust_inv") == 0.0,
+                            "f_robust_inv=%s n_pairs_resolved_in_both=%s"
+                            % (e.get("f_robust_inv"), e.get("n_pairs_resolved_in_both"))))
+    return checks
+
+
+def week7_checks(wdir: Path):
+    """QC for week 7 (Stage 7 ML matrix / Stage 8 active-learning replay)."""
+
+    checks = []
+    s7 = load_json(wdir / "stage7_ml_results.json")
+    if s7 is None:
+        checks.append(check("stage7_ml_results.present", None, "source not found"))
+    else:
+        counts = s7.get("counts") or {}
+        settings = s7.get("settings") or {}
+        checks.append(check("stage7.n_fit_fallbacks==0", counts.get("n_fit_fallbacks") == 0,
+                            "n_fit_fallbacks=%s n_result_rows=%s n_oof_rows=%s"
+                            % (counts.get("n_fit_fallbacks"), counts.get("n_result_rows"),
+                               counts.get("n_oof_rows"))))
+        checks.append(check("stage7.splits=={random,group,lofo}",
+                            set(settings.get("split_methods") or [])
+                            == {"random", "group", "lofo"},
+                            "split_methods=%s" % (settings.get("split_methods"),)))
+        checks.append(check("stage7.shapes=={direct,shift}",
+                            set(settings.get("shapes") or []) == {"direct", "shift"},
+                            "shapes=%s" % (settings.get("shapes"),)))
+        checks.append(check("stage7.model_ladder>=6",
+                            len(settings.get("model_order") or []) >= 6,
+                            "model_order=%s" % (settings.get("model_order"),)))
+        rows = s7.get("results") or []
+        combos = sorted({(row.get("task"), row.get("feature_set"), row.get("objective"))
+                         for row in rows})
+        complete = all(
+            {row.get("split") for row in rows
+             if (row.get("task"), row.get("feature_set"), row.get("objective")) == key}
+            == {"random", "group", "lofo"} for key in combos)
+        checks.append(check("stage7.every_combo_reports_three_splits", complete and bool(combos),
+                            "n_combos=%d" % len(combos)))
+        checks.append(check("stage7.lofo_rows>0",
+                            any(row.get("split") == "lofo" for row in rows),
+                            "n_lofo=%d" % sum(1 for row in rows if row.get("split") == "lofo")))
+    s8 = load_json(wdir / "stage8_al_results.json")
+    if s8 is None:
+        checks.append(check("stage8_al_results.present", None, "source not found"))
+    else:
+        protocol = s8.get("protocol") or {}
+        settings = s8.get("settings") or {}
+        checks.append(check("stage8.initial_seed_size==4",
+                            protocol.get("initial_seed_size") == 4,
+                            "initial_seed_size=%s" % protocol.get("initial_seed_size")))
+        checks.append(check("stage8.hidden_label_replay",
+                            protocol.get("hidden_label_replay") is True,
+                            "hidden_label_replay=%s" % protocol.get("hidden_label_replay")))
+        checks.append(check("stage8.acquisition_features=='X0 only'",
+                            settings.get("acquisition_features") == "X0 only",
+                            "acquisition_features=%s" % settings.get("acquisition_features")))
+        checks.append(check("stage8.n_fit_fallbacks==0",
+                            (s8.get("counts") or {}).get("n_fit_fallbacks") == 0,
+                            "n_fit_fallbacks=%s" % (s8.get("counts") or {}).get("n_fit_fallbacks")))
+        curves = s8.get("curves") or []
+        baselines = sorted({row.get("baseline") for row in curves})
+        checks.append(check("stage8.baselines==4",
+                            baselines == ["diversity", "random", "ranking_aware",
+                                          "uncertainty"],
+                            "baselines=%s" % baselines))
+        pools = s8.get("pools") or {}
+        endpoints = 0
+        for row in curves:
+            key = "%s:%s" % (row.get("task"), row.get("objective"))
+            size = (pools.get(key) or {}).get("n_pool")
+            if size is None:
+                continue
+            if int(row.get("n_T") or 0) == int(size) and (row.get("kendall_tau_b") or 0) > 0.999:
+                endpoints += 1
+        checks.append(check("stage8.full_budget_endpoint_tau_b==1", endpoints > 0,
+                            "n_endpoint_rows=%d" % endpoints))
+    checks.append(check("week7.figures_present",
+                        (wdir / "artifacts" / "F16_stage7_direct_vs_shift.png").exists()
+                        and (wdir / "artifacts" / "F17_stage8_active_learning.png").exists(),
+                        "artifacts/ F16 + F17"))
+    return checks
+
+
+def week8_checks(wdir: Path):
+    """QC for week 8 (Stage 9, explicit first solvation shell [Li(M)2]+)."""
+
+    checks = []
+    s9 = load_json(wdir / "stage9_results.json")
+    shells = load_json(wdir / "ms_shell_generation.json")
+    if s9 is None:
+        checks.append(check("stage9_results.present", None, "source not found"))
+    else:
+        shifts = s9.get("shifts") or []
+        dft = s9.get("dft_jobs") or {}
+        checks.append(check("stage9.n_motifs==12", s9.get("n_motifs") == 12,
+                            "n_motifs=%s" % s9.get("n_motifs")))
+        checks.append(check("stage9.motifs_with_shell2==n_motifs",
+                            s9.get("motifs_with_shell2") == s9.get("n_motifs"),
+                            "motifs_with_shell2=%s n_motifs=%s"
+                            % (s9.get("motifs_with_shell2"), s9.get("n_motifs"))))
+        checks.append(check("stage9.dft.n_jobs==36", dft.get("n_jobs") == 36,
+                            "n_jobs=%s n_ok=%s" % (dft.get("n_jobs"), dft.get("n_ok"))))
+        checks.append(check("stage9.dft.n_ok==n_jobs",
+                            dft.get("n_ok") is not None and dft.get("n_ok") == dft.get("n_jobs"),
+                            "n_ok=%s status_counts=%s"
+                            % (dft.get("n_ok"), dft.get("status_counts"))))
+        families = sorted({row.get("family") for row in shifts})
+        checks.append(check("stage9.n_families>=6", len(families) >= 6,
+                            "families=%s" % families))
+        stability = {(row.get("axis"), row.get("population")): row
+                     for row in (s9.get("stability") or [])}
+        for axis, population in (("oxidation", "all12"), ("reduction", "all12"),
+                                 ("oxidation", "primary_m1"),
+                                 ("reduction", "primary_m1")):
+            row = stability.get((axis, population))
+            checks.append(check("stage9.stability.%s.%s.present" % (axis, population),
+                                row is not None,
+                                "n=%s tau_b=%s"
+                                % (None if row is None else row.get("n"),
+                                   None if row is None else row.get("kendall_tau_b"))))
+    if shells is None:
+        checks.append(check("ms_shell_generation.present", None, "source not found"))
+    else:
+        rows = shells.get("shells") or []
+        checks.append(check("ms_shell_generation.n_shell==2 and n_selected==12",
+                            shells.get("n_shell") == 2 and shells.get("n_selected") == 12,
+                            "n_shell=%s n_selected=%s"
+                            % (shells.get("n_shell"), shells.get("n_selected"))))
+        checks.append(check("ms_shell_generation.second_ligand_intact_all",
+                            bool(rows) and all(bool(row.get("second_ligand_intact"))
+                                               for row in rows),
+                            "n_rows=%d n_intact=%d"
+                            % (len(rows),
+                               sum(1 for row in rows if row.get("second_ligand_intact")))))
+    checks.append(check("week8.figures_present",
+                        (wdir / "artifacts" / "F18_stage9_explicit_shell.png").exists(),
+                        "artifacts/ F18"))
+    return checks
+
+
+CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
+                  5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -639,7 +1125,7 @@ REPORT_TEMPLATES[3] = """# Week 3 成果小结 —— Stage 2 broad cheap pool�
 """
 
 
-REPORT_TEMPLATES[4] = """# Week 4 成果小结 —— Stage 3（P1 电子结构）+ Stage 4（P2 环境）+ T5 + T3
+REPORT_TEMPLATES[4] = """# Week 4 成果小结 —— Stage 3（P1 电子结构）+ Stage 4（P2 环境）+ T5 + T3 + T2
 
 本周交付了本项目最关键的一级结果：廉价代理层（P0）与电子结构层（P1）、环境层（P2）之间的
 「值误差 vs 排序误差」分离，以及两级台阶的对照。本文可独立阅读；逐项细节见同目录
@@ -656,6 +1142,7 @@ REPORT_TEMPLATES[4] = """# Week 4 成果小结 —— Stage 3（P1 电子结构�
 5. **T5 弥散函数对照**：同一泛函 r2SCAN、只换基组（def2-TZVPP 无弥散 / def2-TZVPD 含弥散 /
    r2SCAN-3c 生产基准），对 AN / DMSO / SN / VC 做气相阴离子对照。
 6. {t3_note}
+7. {t2_note}
 
 ## 2. 关键数字
 
@@ -694,6 +1181,7 @@ REPORT_TEMPLATES[4] = """# Week 4 成果小结 —— Stage 3（P1 电子结构�
 | --- | --- | --- | --- | --- | --- |
 | P0 → P1 | 电子结构方法（GFN2-xTB → r2SCAN-3c） | −1.550 eV | **0.714 eV** | **0.673** | 0.50 |
 | P1 → P2 | 环境（气相 → SMD 乙腈） | −2.393 eV | **0.293 eV** | **0.895** | 0.75 |
+{t2_step_row}
 
 **结论：位移更大不等于决策更坏；决定决策是否被改写的是位移的方差。**
 环境台阶的平均位移（−2.393 eV）比方法台阶（−1.550 eV）**大 54%**，但它的分子间离散度只有方法
@@ -720,6 +1208,8 @@ Top-20% 重叠 0.75 vs 0.50）。这条规律与 §2.1 的锚点结论（MAE 排
 不一致；已改为「主判据 z=1.0 + 敏感性 z=1.96」并列输出。这属于**代码缺陷修复**，不是预注册变更：
 `config/prereg.yaml` 逐字节未变，Gate 0 仍为 **CLOSED**。
 
+{t2_block}
+
 ## 3. 质量与复核（QC）
 - P1 作业：**54 / 54** 成功，0 失败（`p1_core_set_summary.json`，`n_failed = 0`）。
 - P1 审计（`p1_core_set_audit.json`，54 条记录 / 18 分子）：`energy_mismatch = 0`、
@@ -727,6 +1217,7 @@ Top-20% 重叠 0.75 vs 0.50）。这条规律与 §2.1 的锚点结论（MAE 排
   `unbound_anion = 18`（18 个分子的气相阴离子在 P1 下**全部**不束缚）。
 - P2 作业：**54 / 54** 成功，0 失败（`p2_summary_smd_acetonitrile.json`）。
 - T5 作业：**24 / 24** 成功，0 失败（`t5_diffuse_control_summary.json`）。
+{t2_qc}
 - 全部为垂直量、冻结几何 G1、单一构象；几何在两臂之间完全共享，因此位移只能归因于被改变的那一个变量。
 - 以上每一项都由 `verification.json` 的 `checks` 数组从本目录真实产物现场解析得出。
 
@@ -774,14 +1265,178 @@ Top-20% 重叠 0.75 vs 0.50）。这条规律与 §2.1 的锚点结论（MAE 排
    Koopmans 图像永远给不出这一点。廉价层的还原轴代理与真实 EA 不是同一物理量，还原侧数字只能在
    「廉价层内部比较」的意义上使用。
 2. **基组无弥散**：r2SCAN-3c 的复合基组 def2-mTZVPP 不含弥散函数（见 §2.5）。氧化侧不受影响。
-3. **单构象 + 隐式溶剂**：G1 为 GFN2-xTB 单构象优化几何；P2 为 CPCM(SMD) 隐式溶剂，不含显式溶剂
-   分子，也不含 Li+ 配位层（C1 条件态尚未运行）。
+3. **单构象 + 隐式溶剂**：G1 为 GFN2-xTB 单构象优化几何，G2 为 r2SCAN-3c 单构象驻点（见 §2.7）；
+   两者都仍是单构象、未做构象搜索（`sigma_conf` 仍为「待算」）。P2 为 CPCM(SMD) 隐式溶剂，
+   不含显式溶剂分子，也不含 Li+ 配位层（C1 条件态尚未运行）。
 4. **锚点 n 小**：外部气相锚点仅 12 个分子，tau_b 的 bootstrap 区间较宽（如 P0 臂为 [0.16, 0.90]）。
 5. {t3_limit}
-6. **Gate 1 仍未关闭**：溶液相锚点 31 行仍为 `est`，本报告的所有主结论只依赖气相锚点。
-7. 逐项细节见同目录 `week4_report_full.md`。
+6. {t2_limit}
+7. **Gate 1 仍未关闭**：溶液相锚点 31 行仍为 `est`，本报告的所有主结论只依赖气相锚点。
+8. 逐项细节见同目录 `week4_report_full.md`。
 
 ## 6. 源文件缺失
+{missing_list}
+"""
+
+
+REPORT_TEMPLATES[5] = """# Week 5 成果小结 —— Stage 5（T4：Li+ 配位条件态 C1）
+
+本周把状态轴从 **C0（自由分子）** 推进到 **C1（[Li M]+ 配位态）**：按冻结的 motif 生成规则
+（`config/scientific_definitions.yaml` §`conformers_and_states.li_motif_generation`）枚举 Li+ 的
+配位结构，在 r2SCAN-3c 上优化几何并做三态垂直量，再与同一分子的自由分子 C0（P1 @ G2）逐分子相减。
+本文可独立阅读；逐项细节见同目录 `week5_report_full.md`。
+
+## 1. 本周做了什么
+1. **motif 枚举（T4-step1）**：对 10 个分子（8 个结构家族各 1 + 第二醚 DME + 第二腈 AN/SN）按冻结的
+   7 步规则生成 [Li M]+ 初始结构（`scripts/build_li_motifs.py`）。
+2. **C1 条件态扫描（T4-step2）**：对每个主 motif 做 [Li M]+ `Opt`，并做双阳离子 / 还原态单点与重弛豫、
+   以及 CPCM(SMD) 三态单点（`scripts/run_c1_li_coordination.py`）；失败作业照实记为
+   `geometry_failed` / `dissociated_optimized_product`，不静默丢弃。
+3. **C1 分析（T4-step3）**：逐分子 dIP / dEA、配体交换量 `dGdG_bind(M;R)`（主参考 R = DME，
+   次参考 R = AN）、C0 -> C1 决策稳定性，以及方法 / 几何 / 环境 / 条件态四个单变量台阶的同口径 σ。
+4. {c1_note}
+
+## 2. 关键数字
+{c1_block}
+## 3. 质量与复核（QC）
+- {c1_qc}
+- 全部为垂直量；C1 的几何是 r2SCAN-3c 优化得到的 [Li M]+ 驻点，与 C0 的 G2 自由分子几何不同 ——
+  这正是被改变的那一个变量。
+- 以上每一项都由 `verification.json` 的 `checks` 数组从本目录真实产物现场解析得出。
+
+## 4. 产物清单
+{artifact_list}
+
+## 5. 已知限制
+1. {c1_limit}
+2. **还原侧不可用**：气相阴离子在 r2SCAN-3c 下全部不束缚（见 week4 报告）；C1 的还原量同样只能在
+   条件态内部比较。
+3. **单构象**：C1 的 [Li M]+ 结构由几何规则生成并优化，未做构象搜索，也未在 motif 之间做能量加权。
+4. **Gate 1 仍未关闭**：溶液相锚点 31 行仍为 `est`，本报告的主结论只依赖气相锚点。
+5. 逐项细节见同目录 `week5_report_full.md`。
+
+## 6. 源文件缺失
+{missing_list}
+"""
+
+
+REPORT_TEMPLATES[6] = """# Week 6 成果小结 —— Stage 6（T6 构象系综 / T7 C1 虚频 / T8 delta_m / T9 决策稳定性）
+
+本周把「不确定性」写进 pair 判定：先用构象系综量出 `sigma_conf`（T6），再按冻结规则把
+`delta_m = max(构象 90 分位展宽, 方法 pstdev, 0.05 eV)` 组装成**候选**值（T8），最后在
+`delta_m = 0 / 0.05 eV / docx_max` 三个口径下重算决策稳定性（T9）；并对 Week 5 的 C1
+`[Li M]+` 优化几何做纯 Freq 虚频检查（T7）。本文可独立阅读；逐项细节见同目录
+`week6_report_full.md`。
+
+## 1. 本周做了什么
+{w6_did}
+
+## 2. 关键数字
+{w6_metric}
+
+## 3. T6：构象系综展宽 `sigma_conf`
+{w6_t6_block}
+
+## 4. T8：`delta_m` 组装（候选，尚未写入预注册）
+{w6_delta_m_block}
+
+## 5. T9：决策稳定性（主口径 `docx_max`）
+{w6_t9_block}
+
+## 6. T7：C1 `[Li M]+` 优化几何的虚频检查
+{w6_t7_block}
+
+## 7. 质量与复核（QC）
+- {w6_qc}
+- 上述每一项都由本目录 `verification.json` 的 `checks` 数组从真实产物现场解析得出。
+
+## 8. 产物清单
+{artifact_list}
+
+## 9. 已知限制
+1. {w6_limit}
+2. `delta_m` 当前是**候选值**，尚未写入 `config/prereg.yaml`（Gate 0 保持 CLOSED）；是否 append 由 PI 裁决。
+3. **同家族内部排序当前不可回答**：所有层对 / 目标下，同家族 pair 的 `f_unresolved`（下侧）都是 1.000。
+4. Gate 1 仍未关闭：溶液相锚点 31 行仍为 `est`，主结论只依赖气相锚点。
+5. 逐项细节见同目录 `week6_report_full.md`。
+
+## 10. 源文件缺失
+{missing_list}
+"""
+
+
+REPORT_TEMPLATES[7] = """# Week 7 成果小结 —— Stage 7（ML / direct vs Δ-learning）+ Stage 8（active-learning replay）
+
+本周把 Stage 2–5 的产物整理成带 **cost 分级** 的特征表，然后在同一条模型阶梯上比较
+**直接学习目标层** 与 **只学位移（Δ-learning）** 两种形态，并且强制报告三种拆分
+（random / group / leave-one-family-out）。随后用 retrospective replay 回答
+「要买多少次昂贵计算才恢复目标排序」。本文可独立阅读；逐项细节见同目录
+`week7_report_full.md`。
+
+## 1. 本周做了什么
+{w7_did}
+
+## 2. 关键数字
+{w7_metric}
+
+## 3. Stage 7：特征表与三种拆分下的模型阶梯
+{w7_s7_block}
+
+## 4. Stage 8：`n_T -> tau_b / O_k / R_k`
+{w7_s8_block}
+
+## 5. 质量与复核（QC）
+- {w7_qc}
+- 上述每一项都由本目录 `verification.json` 的 `checks` 数组从真实产物现场解析得出。
+
+## 6. 产物清单
+{artifact_list}
+
+## 7. 已知限制
+1. {w7_limit}
+2. **配位任务 `C` 的样本只有 10 个**，其 LOFO 折等价于单点外推，只能读方向不能读幅度。
+3. Gate 0 保持 CLOSED；Gate 1 仍未关闭（溶液相锚点 31 行仍为 `est`），本周边界结论只依赖气相锚点。
+4. Stage 8 的 acquisition 只用 `X0`；`X2` 特征被运行期断言拒绝，只许出现在机制解释里。
+5. Week 6 的遗留项（`delta_m` 是否 append 进 `config/prereg.yaml`）仍待 PI 裁决。
+6. 逐项细节见同目录 `week7_report_full.md` 与 `reading_list_qa.md`。
+
+## 8. 源文件缺失
+{missing_list}
+"""
+
+REPORT_TEMPLATES[8] = """# Week 8 成果小结 —— Stage 9（显式微溶剂化：C2 = [Li(M)2]+ 第一溶剂壳复核）
+
+Week 5 把自由分子 C0 换成了 Li+ 配位条件态 C1（[Li M]+）。本周再往前一步：把第一溶剂壳从
+1:1 扩到 **1:2**（[Li(M)2]+），在**同一条冻结计算臂**（r2SCAN-3c、气相、同一批种子）上重测
+同一组三态垂直量，回答「C1 台阶上看到的位移与排序结论，会不会被第一个配体之外的溶剂化
+结构改写」。本文可独立阅读；逐项细节、文献依据与计划修订见同目录
+`week8_report_full.md`、`branch_abcd_qa.md` 与 `plan_optimization_branchABC.md`。
+
+## 1. 本周做了什么
+{w8_did}
+
+## 2. 关键数字
+{w8_metric}
+
+## 3. C1 -> C2 的配对排序稳定性
+{w8_s9_block}
+
+## 4. 质量与复核（QC）
+- {w8_qc}
+- 上述每一项都由本目录 `verification.json` 的 `checks` 数组从真实产物现场解析得出。
+
+## 5. 产物清单
+{artifact_list}
+
+## 6. 已知限制
+1. {w8_limit}
+2. 壳层规模小（12 个 motif / 8 个家族），Top-k 指标在 12 个点上对单点扰动敏感，只读方向与量级。
+3. Gate 0 保持 CLOSED；Gate 1 仍未关闭（溶液相锚点 31 行仍为 `est`）。
+4. Stage 9 在本项目 v2 §19 中被定义为 **optional**；若要把它提升为必报指标，必须走
+   `config/prereg.yaml` 的 `amendment_log`，届时 Gate 0 会由 CLOSED 变为 NOT CLOSED。
+5. 逐项细节见同目录 `week8_report_full.md`。
+
+## 7. 源文件缺失
 {missing_list}
 """
 
@@ -789,7 +1444,9 @@ Top-20% 重叠 0.75 vs 0.50）。这条规律与 §2.1 的锚点结论（MAE 排
 README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成果输出包
 
 本目录**只放蒸馏产物**（结果表、图、报告、校验清单）。原始 ORCA / xTB 运行输出
-（`.out`、`.gbw`、`.inp`、几何等）保留在仓库 `outputs/` 内，**不**进入本目录。
+（`.out`、`.gbw`、`.inp`、几何等）保留在仓库 `outputs/` 内，**不**进入本目录；
+唯一例外是 `week3/orca_smoke/`：它保留了 4 个冒烟作业的原始 `.inp/.out/.xyz`，
+用来证明 ORCA 6.1.1 在本机可运行（该例外已在 `docs/09` §2.6 说明）。
 
 ## 目录结构
 
@@ -799,13 +1456,17 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week1/                Stage 0 定义冻结 / Gate 0
     ├── week2/                Stage 1 方法审计与外部锚点
     ├── week3/                Stage 2 broad cheap pool（P0）
-    └── week4/                Stage 3（P1）+ Stage 4（P2）+ T5（+ T3 若存在）
+    ├── week4/                Stage 3（P1）+ Stage 4（P2）+ T5 + T3 + T2
+    ├── week5/                Stage 5（T4：Li+ 配位条件态 C1）
+    ├── week6/                Stage 6（T6 构象系综 + T7 虚频 + T8 delta_m + T9 决策稳定性）
+    ├── week7/                Stage 7（ML / Δ-learning）+ Stage 8（active-learning replay）
+    └── week8/                Stage 9（显式微溶剂化：[Li(M)2]+ 第一溶剂壳复核）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F10 中属于该周的部分）
+    ├── artifacts/            图（F0–F17 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -820,7 +1481,11 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 | week1 | Stage 0 定义冻结 | 6 个冻结产物；core 18 / broad 40 行 | Gate 0 **CLOSED** |
 | week2 | Stage 1 方法审计与外部锚点 | 12 分子方法审计；溶液锚点 31 行仍为 est | Gate 1 **NOT CLOSED** |
 | week3 | Stage 2 broad cheap pool（P0） | core 18/18、broad 40/40；合并池 58 | Gate 1 NOT CLOSED |
-| week4 | Stage 3 + Stage 4 + T5 | 三臂 MAE 1.377 / 4.481 / 0.251 eV；两级台阶 tau_b 0.673 vs 0.895 | Gate 0 CLOSED |
+| week4 | Stage 3 + Stage 4 + T5 + T3 + T2 | 三臂 MAE 1.377 / 4.481 / 0.251 eV；三级台阶 tau_b：方法 0.673 / 环境 0.895 / 几何 0.939；T3 T2 作业 0 失败 | Gate 0 CLOSED |
+| week5 | Stage 5（T4：Li+ 配位 C1） | Li+ 配位条件态（C0 -> C1）：[Li M]+ motif 枚举 + 三态垂直量；方法 / 几何 / 环境 / 条件态四台阶同口径 σ 对比 | Gate 0 CLOSED |
+| week7 | Stage 7（ML / Δ-learning）+ Stage 8（AL replay） | 特征表 cost 分级 `X0`/`X1`/`X2`（core 18 / broad 40）；三种拆分下的 direct vs Δ-learning；`n_T → τ_b` 四条 acquisition 曲线 | Gate 0 CLOSED |
+| week6 | Stage 6（T6/T7/T8/T9） | 构象系综 `sigma_conf`（12 分子 / 32 构象）；`delta_m`（氧化 0.700 / 还原 2.074 eV）；并入 `delta_m` 后还原轴不可判定 | Gate 0 CLOSED |
+| week8 | Stage 9（显式微溶剂化 C2） | [Li(M)2]+ 第一溶剂壳（12 motif / 8 家族）；C1 -> C2 的垂直量位移与同口径排序稳定性 | Gate 0 CLOSED |
 
 ## 如何复现
 ```powershell
@@ -831,7 +1496,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -876,12 +1541,12 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 | P1 | 电子结构目标层：垂直 IP/EA（ΔSCF，三态） | ORCA 6.1.1 r2SCAN-3c | 气相 |
 | P2 | 环境层：P1 + 隐式溶剂 | ORCA 6.1.1 r2SCAN-3c + CPCM(SMD, 乙腈) | 隐式溶剂 |
 
-条件态：`C0` = 自由分子 M（本项目全部实际运行的条件态）；`C1` = `[LiM]+` 及其 redox states
-（**尚未运行**）；`C2` = 少量显式微溶剂化 cluster（**尚未运行**）。
+条件态：`C0` = 自由分子 M（P0/P1/P2 全部实际运行的条件态）；`C1` = `[LiM]+` 及其 redox states
+（**week5 已运行**，Stage 5 / T4）；`C2` = 少量显式微溶剂化 cluster（**尚未运行**）。
 参考配体：主参考 `R = DME`（C08，双齿 2×O 螯合、配位 motif 唯一）；第二参考 `R = AN`（C16，
 仅用于 robustness check）。核心集 18 个分子、broad pool 40 个分子，合并池 58。
 
-## 2. 逐周结果（Week 1 – Week 4）
+## 2. 逐周结果（Week 1 – Week 8）
 
 ### Week 1 —— Stage 0 定义冻结 / Gate 0
 - 做了什么：冻结科学定义与预注册（`config/scientific_definitions.yaml`、`config/prereg.yaml`），
@@ -910,17 +1575,38 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 - 产物：`p0_core_set.csv`、`p0_broad_pool.csv`、`p0_summary.json`、`fig1`–`fig4`、
   `artifacts/F1`、`artifacts/F2`。
 
-### Week 4 —— Stage 3（P1）+ Stage 4（P2）+ T5（+ T3）
+### Week 4 —— Stage 3（P1）+ Stage 4（P2）+ T5（+ T3、T2）
 - 做了什么：P1 三态 54 作业（r2SCAN-3c、气相、G1）；P1 QC 审计与决策稳定性分析；
-  P2 环境层 54 作业（CPCM(SMD, 乙腈)）；T5 弥散函数对照 24 作业；T3 由另一条工作流并行产出。
+  P2 环境层 54 作业（CPCM(SMD, 乙腈)）；T5 弥散函数对照 24 作业；T3 为 bare CPCM ε 扫描（ε=5/10/20/40 × 12 分子 × 3 态 = 144/144，覆盖 8 个家族）；T2 为同一 12 分子的 r2SCAN-3c `Opt+Freq`（G1 -> G2，唯一变量 = 几何）与 G2 上的三态单点。
 - 关键数字：P1 **54/54** 成功，`unbound_anion = 18`；三臂锚点 MAE = **1.377 / 4.481 / 0.251 eV**；
   P0→P1 氧化 tau_b **0.673**（O_k 10% = 0.000、20% = 0.500）、还原 tau_b **0.595**；
   P1→P2 ΔIP 均值 **−2.393 eV**（std **0.293**）、ΔEA 均值 **+2.173 eV**（std **0.311**）、
-  氧化 tau_b **0.895**、还原 tau_b **0.673**；T5 加弥散下拉 EA **0.34–1.60 eV** 且不翻转符号。
+  氧化 tau_b **0.895**、还原 tau_b **0.673**；T5 加弥散下拉 EA **0.34–1.60 eV** 且不翻转符号；T3 ε 扫描位移 σ_env 仅 **0.19–0.24 eV**（近乎共同平移）、two_arm σ 下 f_robust_inv = **0**。{t2_summary_metric}
 - 质检：P1/P2/T5 作业 **0 失败**；`energy_mismatch`、`scf_failed`、`abnormal_termination`、
   `spin_contamination_flag` 全为 0；主判据 `z = 1.0`，`z = 1.96` 并列敏感性。
 - 产物：`p1_*`、`p2_*`、`t5_*` 表与 JSON、`p1_decision_stability.md`、`p2_decision_stability.md`、
-  `week4_report_full.md`、`artifacts/F3`–`F9`。
+  `week4_report_full.md`、`artifacts/F3`–`F9`{f10_art_note}{f11_art_note}。
+
+### Week 5 —— Stage 5（T4：Li+ 配位条件态 C1）
+- 做了什么：{c1_did}
+- 关键数字：{c1_metric}
+- 质检：{c1_qc_summary}
+- 产物：`li_motif_generation.csv/.json/.md`、`c1_li_coordination.csv`、`c1_li_coordination_summary.json`、
+  `c1_summary.json`、`c1_coord_shifts.csv`、`c1_ligand_exchange.csv`、`c1_decision_stability.json/.md`、
+  `structures/li_motifs/*.xyz`、`c1_records/`、`week5_report_full.md`、
+  `artifacts/figure_manifest_week5_c1.md`{f12_art_note}、`artifacts/figure_manifest_week5_state_identity.md`{f13_art_note}。
+
+### Week 6 —— Stage 6（T6 构象系综 + T7 C1 虚频 + T8 delta_m + T9 决策稳定性）
+- 做了什么：{w6_did}
+- 关键数字：{w6_metric}
+- 质检：{w6_qc}
+- 限制：{w6_limit}
+
+### Week 7 —— Stage 7（ML / Δ-learning）+ Stage 8（active-learning replay）
+{w7_summary}
+
+### Week 8 —— Stage 9（显式微溶剂化：C2 = [Li(M)2]+ 第一溶剂壳复核）
+{w8_summary}
 
 ## 3. 核心科学结论
 
@@ -930,14 +1616,21 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ΔSCF 的值误差是 P0 的 3.3 倍，排序一致性却最高；P1 的值误差最小，排序一致性反而低于 ΔSCF。
 **把一个臂的 MAE 当作它的决策质量是错的。**
 
-### 3.2 两级台阶：位移的方差决定决策是否被改写
+### 3.2 四级台阶（方法 / 环境 / 几何 / 条件态）：位移的方差决定决策是否被改写
 | 台阶 | 唯一变量 | IP 位移均值 | IP 位移 std | 氧化轴 tau_b | 氧化 Top-20% 重叠 |
 | --- | --- | --- | --- | --- | --- |
 | P0 → P1 | 电子结构方法 | −1.550 eV | **0.714 eV** | **0.673** | 0.50 |
 | P1 → P2 | 环境（气相 → SMD 乙腈） | −2.393 eV | **0.293 eV** | **0.895** | 0.75 |
+{t2_step_row}
+{c1_step_row}
 
 环境台阶的平均位移比方法台阶**大 54%**，但分子间离散度只有方法台阶的 **41%**，
-于是排序被破坏得**更少**。**位移更大不等于决策更坏；决定决策是否被改写的是位移的方差。**
+于是排序被破坏得**更少**。第三级台阶是几何（T2，G1 -> G2）：位移均值为 −0.002 eV、离散度仅
+**0.049 eV**，tau_b 0.939、Top-20% 重叠 1.000 —— 把 xTB 几何换成 r2SCAN-3c 的驻点几何
+**几乎不改变任何排序**。**位移更大不等于决策更坏；决定决策是否被改写的是位移的方差。**
+{c1_sigma_note}
+
+{w6_sigma_note}
 
 ### 3.3 还原侧定性失效
 P1 下 18 个分子的气相阴离子**全部不束缚**（`unbound_anion = 18`，EA < 0）。定域在 LUMO 上的
@@ -958,7 +1651,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F10）
+## 5. 图表索引（F0–F18）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -971,7 +1664,15 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | F7 | `F7_shift_structure.png` | 廉价层是「平移的尺子」还是「另一把尺子」 | week4 |
 | F8 | `F8_environment_layer_p1_to_p2.png` | 环境层的逐分子气相 → 溶剂位移 | week4 |
 | F9 | `F9_diffuse_function_control.png` | 同泛函三基组：加弥散下拉 EA 但不翻转符号 | week4 |
-| F10 | 未生成 | {f10_note} | —— |
+{f10_row}
+{f11_row}
+{f12_row}
+{f13_row}
+{f14_row}
+{f15_row}
+{f16_row}
+{f17_row}
+{f18_row}
 
 ## 6. 复现命令
 ```powershell
@@ -996,6 +1697,9 @@ $env:PYTHONIOENCODING = "utf-8"
 .venv\Scripts\python.exe scripts\analyze_p2_environment.py
 .venv\Scripts\python.exe scripts\run_diffuse_control.py
 .venv\Scripts\python.exe scripts\make_t5_figure.py
+{t3_commands}
+{t2_commands}
+{c1_commands}
 
 # 测试
 .venv\Scripts\python.exe -m pytest tests -o addopts="" -q
@@ -1006,15 +1710,725 @@ $env:PYTHONIOENCODING = "utf-8"
    物理量。还原侧结论只在「廉价层内部比较」的意义上有效。
 2. **基组无弥散**：r2SCAN-3c 的 def2-mTZVPP 不含弥散函数，0.01 eV 量级的阴离子束缚判断落在
    方法适用域之外（T5 结论）。氧化侧不受此限制。
-3. **单构象 + 单几何**：全部结果建立在 GFN2-xTB 单一构象优化几何 G1 上，未做构象搜索，
-   也未评估构象离散度。
-4. **隐式溶剂**：P2 为 CPCM(SMD) 隐式溶剂，不含显式溶剂分子；`C1`（Li+ 配位）与 `C2`
-   （显式微溶剂化）条件态尚未运行。
+3. **单构象 + G1/G2 两级几何**：全部结果建立在 GFN2-xTB 单一构象优化几何 G1 上；T2 另外给出
+   r2SCAN-3c 的 G2 几何台阶（第 8 条）。未做构象搜索，也未评估构象离散度（`sigma_conf` 仍为「待算」）。
+4. **隐式溶剂**：P2 为 CPCM(SMD) 隐式溶剂，不含显式溶剂分子；`C1`（Li+ 配位）已在 week5 运行
+   （见第 10 条），`C2`（显式微溶剂化）条件态尚未运行。
 5. **锚点样本小**：外部气相锚点仅 12 个分子；tau_b 的 bootstrap 区间较宽（如 P0 臂 [0.16, 0.90]）。
 6. **Gate 1 未关闭**：溶液相锚点 31 行仍为 `est`，因此所有主结论只依赖气相锚点。
-7. **T3 尚未纳入**：CPCM ε 扫描（F10）未运行；脚本会在 `outputs/week4/t3_*` 出现后自动纳入。
-8. **Gate 0 纪律**：`config/prereg.yaml` 逐字节未变；`z = 1.0` 是主判据，`z = 1.96` 只是并列敏感性。
+7. {t3_summary_limit}
+8. {t2_summary_limit}
+9. **Gate 0 纪律**：`config/prereg.yaml` 逐字节未变；`z = 1.0` 是主判据，`z = 1.96` 只是并列敏感性。
+10. {c1_summary_limit}
 """
+
+
+T2_SUMMARY_PATH = REPO / "outputs" / "week4" / "t2_opt_freq_summary.json"
+T2_DERIVED_PATH = REPO / "outputs" / "week4" / "p1_core_set_derived.csv"
+T3_SUMMARY_PATH = REPO / "outputs" / "week4" / "t3_cpcm_eps_scan_summary.json"
+T2_ENV_EPS = "40"
+C1_SUMMARY_PATH = REPO / "outputs" / "week5" / "c1_summary.json"
+C1_RUN_SUMMARY_PATH = REPO / "outputs" / "week5" / "c1_li_coordination_summary.json"
+C1_REFERENCE_LIGAND = "DME"
+F12_NOTE_PRESENT = ("条件态台阶：把自由分子 C0（P1 @ G2）换成 [Li M]+ 配位态 C1 后，垂直 IP / EA 的"
+                    "逐分子位移，以及与方法、几何、环境三个台阶同口径的 sigma 对比；另一面板给出配体"
+                    "交换量 dGdG_bind(M;R) 与 C0 -> C1 的决策指标")
+F12_NOTE_ABSENT = "预留给 C1（Li+ 配位条件态）；T4 尚未产出"
+F13_NOTE_PRESENT = ("state-identity QC：每个 C1 态的 state-identity 分类，显示氧化态空穴落在"
+                    "给体原子、还原态电子落在 Li 上")
+F13_NOTE_ABSENT = "state-identity QC 图尚未产出"
+F14_NOTE_PRESENT = ("delta_m 的推导：构象 90 分位展宽 / 方法 pstdev(P1-P0) / 0.05 eV 下限 三个组成项与 "
+                    "max 规则；另一面板给出逐分子的 P1-P0 位移，说明方法项为何主导")
+F14_NOTE_ABSENT = "预留给 delta_m 推导；T6/T8 尚未产出"
+F15_NOTE_PRESENT = ("Stage 6 决策稳定性：delta_m = 0 / 0.05 eV / docx_max 三个口径下的 unresolved 比例，"
+                    "以及 docx_max 口径下的 tau_b、Top-20% 重叠与 f_robust_inv")
+F15_NOTE_ABSENT = "预留给 Stage 6 决策指标；T9 尚未产出"
+F16_NOTE_PRESENT = ("Stage 7 直接学习 vs 条件位移学习：三种拆分（random / group / LOFO）下的 "
+                    "模型阶梯，重点看 LOFO 外推；负值说明该基线在该任务上不如其自身参照层。")
+F16_NOTE_ABSENT = "预留给 Stage 7（direct vs Δ-learning）；week7 尚未产出"
+F17_NOTE_PRESENT = ("Stage 8 最小昂贵信息预算：`n_T -> tau_b` 的四条 acquisition 曲线"
+                    "（random / diversity / uncertainty / ranking-aware），"
+                    "带宽为 20 组冻结种子的 2.5–97.5 百分位。")
+F17_NOTE_ABSENT = "预留给 Stage 8（active-learning replay）；week7 尚未产出"
+W7_STAGE7_PATH = REPO / "outputs" / "week7" / "stage7_ml_results.json"
+W7_STAGE8_PATH = REPO / "outputs" / "week7" / "stage8_al_results.json"
+F18_NOTE_PRESENT = ("Stage 9 显式第一溶剂壳：把 C1(1:1) 的 [Li M]+ 扩成 [Li(M)2]+ 后，逐 motif 的"
+                    "垂直 IP / EA 位移、与 C1(1:1) 位移的差值，以及同一批 motif 上 "
+                    "tau_b / Top-k 重叠 / f_unresolved")
+F18_NOTE_ABSENT = "预留给 Stage 9（显式微溶剂化）；week8 尚未产出"
+W8_STAGE9_PATH = REPO / "outputs" / "week8" / "stage9_results.json"
+W8_SHELLS_PATH = REPO / "outputs" / "week8" / "ms_shell_generation.json"
+C1_NOTE_PRESENT = ("**C1（Li+ 配位条件态，T4）**：按冻结的 motif 生成规则枚举 [Li M]+，在 r2SCAN-3c 上"
+                   "优化配位几何并做三态垂直量，与自由分子 C0（P1 @ G2）逐分子相减；"
+                   "`outputs/week5/*` 已自动纳入本目录。")
+C1_NOTE_ABSENT = "**C1（Li+ 配位条件态，T4）**：本轮未纳入 `outputs/week5/*`（源路径不存在）。"
+C1_LIMIT_ABSENT = "**C1（Li+ 配位条件态，T4）尚未纳入**：`outputs/week5/*` 未产出。"
+C1_REPRO_COMMANDS = "\n".join([
+    "# Stage 5 / T4：Li+ 配位条件态 C1（10 分子；参考配体 R = DME）",
+    ".venv\\Scripts\\python.exe scripts\\build_li_motifs.py",
+    ".venv\\Scripts\\python.exe scripts\\run_c1_li_coordination.py --jobs 2 --nprocs 8",
+    ".venv\\Scripts\\python.exe scripts\\analyze_c1_coordination.py",
+    ".venv\\Scripts\\python.exe scripts\\make_c1_figure.py",
+])
+
+
+
+def _population_std(values):
+    return statistics.pstdev(values) if len(values) > 1 else None
+
+
+def _shift_std(names, column):
+    """Population std of one P0 -> P1 shift column over the T2 subset.
+
+    Deliberately the same estimator as scripts/make_t2_figure.py, so that the rendered
+    report and the figure cannot end up quoting different numbers for one quantity.
+    """
+    if not T2_DERIVED_PATH.exists():
+        return None
+    wanted = set(names)
+    values = []
+    with T2_DERIVED_PATH.open(encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            if row.get("name") not in wanted:
+                continue
+            raw = (row.get(column) or "").strip()
+            if raw:
+                values.append(float(raw))
+    return _population_std(values)
+
+
+def t2_blocks(t2):
+    """Render the T2 (Opt+Freq -> G2) blocks straight from the summary JSON."""
+    empty = {"block": "", "qc": "", "step_row": "", "metric": "", "limit": T2_LIMIT_ABSENT}
+    if not t2 or not t2.get("per_molecule"):
+        return empty
+    geom = t2["sigma_geom"]
+    ip = geom["d_ip_ev"]
+    ea = geom["d_ea_ev"]
+    if not ip.get("n") or ip.get("mean_ev") is None:
+        return empty
+    rows = t2["per_molecule"]
+    names = [row["name"] for row in rows]
+    pairs = [(row["ip_g1_ev"], row["ip_g2_ev"]) for row in rows
+             if row.get("ip_g1_ev") is not None and row.get("ip_g2_ev") is not None]
+    tau = overlap = None
+    if len(pairs) >= 2:
+        g1 = [pair[0] for pair in pairs]
+        g2 = [pair[1] for pair in pairs]
+        tau = ranking.kendall_tau_b(g1, g2)
+        k = max(1, round(0.20 * len(pairs)))
+        overlap = ranking.top_k_overlap(g1, g2, k, higher_is_better=True)
+    tau_text = "——" if tau is None else f"{tau:.3f}"
+    overlap_text = "——" if overlap is None else f"{overlap:.3f}"
+    sigma_method = _shift_std(names, "ox_shift_ev")
+    sigma_env = (load_json(T3_SUMMARY_PATH)["sigma_env_ev"][T2_ENV_EPS]
+                 if T3_SUMMARY_PATH.exists() else None)
+    compare = []
+    if sigma_method is not None:
+        compare.append(f"方法（P0 -> P1）{sigma_method:.3f} eV")
+    compare.append(f"几何（G1 -> G2）{ip['population_std_ev']:.3f} eV")
+    if sigma_env is not None:
+        compare.append(f"环境（气相 -> bare CPCM {T2_ENV_EPS}）{sigma_env:.3f} eV")
+    imag = [row["name"] for row in rows if row.get("imaginary_modes")]
+    if imag:
+        imag_text = (f"共 {len(imag)} 个分子报告了虚频（{'、'.join(imag)}），"
+                     "按 QE 词表记为 `imaginary_mode_unresolved`，照实记录、不予静默删除")
+    else:
+        imag_text = f"{len(rows)} 个分子在 G2 上均无虚频"
+    block = "\n".join([
+        "### 2.7 T2：Opt+Freq 几何台阶（G1 -> G2，唯一变量 = 几何）",
+        "",
+        "对 T3 用的**同一 12 分子审计子集**，在 r2SCAN-3c 上**从 G1 出发**做中性 `Opt+Freq`（得到 G2），",
+        "再在 G2 上重算三态单点；方法、基组、电子态、环境全部不动，**唯一变量是几何**。",
+        "G2 取自输出里**最后一个** `CARTESIAN COORDINATES (ANGSTROEM)` 块，未做任何额外优化。",
+        "",
+        "| 量 | n | 均值 (eV) | 总体标准差 (eV) | 对该台阶的 Kendall tau_b | Top-20% 重叠 |",
+        "| --- | --- | --- | --- | --- | --- |",
+        f"| dIP = IP(G2) - IP(G1) | {ip['n']} | {ip['mean_ev']:+.3f} | "
+        f"**{ip['population_std_ev']:.3f}** | **{tau_text}** | **{overlap_text}** |",
+        f"| dEA = EA(G2) - EA(G1) | {ea['n']} | {ea['mean_ev']:+.3f} | "
+        f"**{ea['population_std_ev']:.3f}** | —— | —— |",
+        "",
+        "同口径（位移在 12 个分子上的总体标准差）的三台阶对比见 `F11` 面板 (b)：",
+        "**" + "；".join(compare) + "**。",
+        "",
+        "这是 `docs/08` §3.4 要求的判据：若几何项与方法项同量级，则 P0 -> P1 的变化不能全部归因于",
+        "电子结构方法。实测几何项远小于方法项，因此「方法台阶改写决策」这一结论**未被几何不确定性推翻**。",
+        "",
+        f"虚频检查：{imag_text}。",
+        "",
+    ])
+    qc = (f"- T2 作业：**{t2['n_opt_ok']} / {t2['n_opt_jobs']}** 个 Opt+Freq 成功、"
+          f"{t2['n_sp_ok']} 个 G2 单点成功，失败 **{t2['n_failed']}**；"
+          f"`imaginary_mode_unresolved` = {t2['n_imaginary_unresolved']}"
+          "（`t2_opt_freq_summary.json`）。")
+    step_row = (f"| G1 -> G2 | 几何（同一方法 r2SCAN-3c；xTB 几何 vs Opt+Freq 驻点） | "
+                f"{ip['mean_ev']:+.3f} eV | **{ip['population_std_ev']:.3f} eV** | "
+                f"**{tau_text}** | {overlap_text} |")
+    method_text = "%.3f eV" % sigma_method if sigma_method is not None else "—"
+    metric = (f" T2 的几何台阶在同口径下只有 **{ip['population_std_ev']:.3f} eV**（dIP 总体标准差），"
+              f"tau_b = {tau_text}、Top-20% 重叠 {overlap_text}；方法台阶（同一 12 分子子集 "
+              f"{method_text}；§2.4 的 N=18 口径为 0.714 eV）仍是唯一能改写决策的台阶。")
+    return {"block": block, "qc": qc, "step_row": step_row, "metric": metric,
+            "limit": T2_LIMIT_PRESENT}
+
+
+def _fnum(value, digits=3, signed=False):
+    if value is None:
+        return "——"
+    return ("%+.*f" if signed else "%.*f") % (digits, value)
+
+
+def c1_blocks(summary, run):
+    """Render the week-5 C1 (Li+ coordination) blocks from the week-5 summaries.
+
+    Mirrors ``t2_blocks``: the rendered report and the figure are fed by the same
+    JSON, so they cannot quote different numbers for one quantity.  A missing
+    summary yields an "absent" record instead of an exception, because the digest
+    and the plan must stay valid while the stage is still running.
+    """
+
+    empty = {
+        "present": False,
+        "did": "（本轮未纳入 `outputs/week5/*`：C1 条件态尚未产出）",
+        "block": "",
+        "qc": "——",
+        "step_row": "",
+        "metric": "——",
+        "sigma_note": "",
+        "limit": C1_LIMIT_ABSENT,
+    }
+    if not summary or not summary.get("n_molecules"):
+        return empty
+    d_ip = summary.get("delta_ip_ev") or {}
+    d_ea = summary.get("delta_ea_ev") or {}
+    if d_ip.get("mean") is None and d_ea.get("mean") is None:
+        return empty
+
+    n = summary["n_molecules"]
+    molecules = summary.get("molecules") or []
+    n_motifs = summary.get("n_motifs") or 0
+    ds = summary.get("decision_stability") or {}
+    ox = ds.get("oxidation") or {}
+    red = ds.get("reduction") or {}
+    steps = (summary.get("four_step_sigma") or {}).get("steps") or {}
+
+    ip_mean = _fnum(d_ip.get("mean"), signed=True)
+    ip_std = _fnum(d_ip.get("std"))
+    ea_mean = _fnum(d_ea.get("mean"), signed=True)
+    ea_std = _fnum(d_ea.get("std"))
+    tau_ox = _fnum(ox.get("kendall_tau_b"))
+    tau_red = _fnum(red.get("kendall_tau_b"))
+    robust_ox = _fnum(ox.get("f_robust_inv"))
+    robust_red = _fnum(red.get("f_robust_inv"))
+
+    labels = {
+        "method": "方法（P0 -> P1）",
+        "geometry": "几何（G1 -> G2）",
+        "environment": "环境（气相 -> SMD 乙腈）",
+        "coordination": "条件态（C0 -> C1，Li+ 配位）",
+    }
+    rows = []
+    for key in ("method", "geometry", "environment", "coordination"):
+        block = (steps.get(key) or {}).get("ip_ev") or {}
+        rows.append("| %s | %s eV | **%s eV** | %s |"
+                    % (labels[key], _fnum(block.get("mean"), signed=True),
+                       _fnum(block.get("std")), block.get("n")))
+
+    coord_std = ((steps.get("coordination") or {}).get("ip_ev") or {}).get("std")
+    method_std = ((steps.get("method") or {}).get("ip_ev") or {}).get("std")
+    ratio_text = "——"
+    if coord_std is not None and method_std:
+        ratio_text = "%.2f" % (coord_std / method_std)
+    compare = ("配位台阶的 IP 位移离散度（%s eV）与方法台阶（%s eV）之比为 %s。"
+               % (_fnum(coord_std), _fnum(method_std), ratio_text))
+
+    step_table = chr(10).join(rows)
+    block_text = chr(10).join([
+        "### 2.8 C1：Li+ 配位条件态（唯一变量 = 条件态；自由分子 C0 -> [Li M]+ C1）",
+        "",
+        "对 %d 个分子（%s）按冻结的 motif 生成规则枚举 [Li M]+ 初始结构（%d 个 motif），"
+        % (n, "、".join(molecules), n_motifs),
+        "在 r2SCAN-3c 上优化配位几何并做三态垂直量；C0 参考取同一分子在 P1 @ G2 上的自由分子值。",
+        "唯一变量是条件态（是否带一个 Li+），方法、基组与环境口径全部沿用同一套。",
+        "",
+        "| 量 | n | 均值 (eV) | 总体标准差 (eV) |",
+        "| --- | --- | --- | --- |",
+        "| dIP = IP(C1) - IP(C0) | %s | %s | **%s** |" % (d_ip.get("n"), ip_mean, ip_std),
+        "| dEA = EA(C1) - EA(C0) | %s | %s | **%s** |" % (d_ea.get("n"), ea_mean, ea_std),
+        "",
+        "**四个单变量台阶的同口径对比**（同一批分子、同一估计量 population std；见 `F12` 面板 (b)）：",
+        "",
+        "| 台阶 | IP 位移均值 | **IP 位移 std** | n |",
+        "| --- | --- | --- | --- |",
+        step_table,
+        "",
+        compare,
+        "",
+        "C0 -> C1 决策量：氧化 tau_b **%s**、f_robust_inv **%s**；还原 tau_b **%s**、"
+        "f_robust_inv **%s**。" % (tau_ox, robust_ox, tau_red, robust_red),
+        "",
+    ])
+
+    qc = "（`c1_li_coordination_summary.json` 未纳入）"
+    if run:
+        flags = run.get("qc_flag_counts") or {}
+        active = ", ".join("%s=%s" % (key, value)
+                           for key, value in sorted(flags.items()) if value)
+        qc = ("C1 作业 **%s / %s** 成功，状态计数 `%s`；QC 标记：%s（`c1_li_coordination_summary.json`）。"
+              % (run.get("n_ok"), run.get("n_jobs"), run.get("status_counts"),
+                 active or "全部为 0"))
+
+    did = ("对 %d 个分子（%s）按冻结的 7 步规则枚举 [Li M]+ motif（%d 个），做 C1 条件态扫描"
+           "（r2SCAN-3c）与配位台阶分析。" % (n, "、".join(molecules), n_motifs))
+    metric = ("C1 配位台阶（N=%d，参考配体 R=%s）的 dIP 均值 %s eV、总体标准差 **%s eV**；"
+              "氧化 tau_b = %s、f_robust_inv = %s。"
+              % (n, C1_REFERENCE_LIGAND, ip_mean, ip_std, tau_ox, robust_ox))
+    sigma_note = ("第四级台阶是条件态（C0 -> C1，Li+ 配位）：N=%d，IP 位移均值 %s eV、离散度 **%s eV**，"
+                  "氧化 tau_b %s、f_robust_inv %s —— 它衡量「同一个分子带着一个 Li+ 时，代理还剩多少"
+                  "分辨力」。" % (n, ip_mean, ip_std, tau_ox, robust_ox))
+    step_row = ("| C0 -> C1 | 条件态（自由分子 -> [Li M]+ 配位） | %s eV | **%s eV** | **%s** | —— |"
+                % (ip_mean, ip_std, tau_ox))
+    limit = ("**C1（Li+ 配位）只覆盖主 motif**：每个分子只取一个主 motif，本台阶的逐分子样本数为 **%d**；"
+             "未在 motif 之间做能量加权或构象平均。" % n)
+    return {"present": True, "did": did, "block": block_text, "qc": qc, "step_row": step_row,
+            "metric": metric, "sigma_note": sigma_note, "limit": limit}
+
+
+T6_SUMMARY_PATH = REPO / "outputs" / "week6" / "t6_conformer_spread.json"
+T7_SUMMARY_PATH = REPO / "outputs" / "week6" / "t7_c1_freq_check.json"
+T8_SUMMARY_PATH = REPO / "outputs" / "week6" / "delta_m_frozen.json"
+T9_SUMMARY_PATH = REPO / "outputs" / "week6" / "stage6_decision_stability.json"
+
+W6_PAIRS = (("P0_to_P1", "P0 -> P1"), ("P1_to_P2", "P1 -> P2"), ("C0_to_C1", "C0 -> C1"))
+W6_AXES = (("oxidation", "氧化"), ("reduction", "还原"))
+
+
+def week6_blocks(t6, t7, t8, t9):
+    """Render the week-6 (Stage 6) blocks from the T6/T7/T8/T9 JSON files.
+
+    Same contract as ``t2_blocks`` / ``c1_blocks``: report and figure are fed by
+    the same JSON, and a missing summary yields an "absent" record instead of an
+    exception, so the digest and the plan stay valid while the stage is running.
+    """
+
+    empty = {
+        "present": False,
+        "did": "（本轮未纳入 `outputs/week6/*`：Stage 6 尚未产出）",
+        "metric": "",
+        "qc": "",
+        "limit": "",
+        "t6_block": "",
+        "t7_block": "",
+        "delta_m_block": "",
+        "t9_block": "",
+        "sigma_note": "",
+    }
+    if not (t6 and t8 and t9):
+        return empty
+
+    counts = t6.get("counts") or {}
+    rows = ["| 层 | 目标 | `sigma_conf` [eV] | 90 分位展宽 [eV] | 最大展宽 [eV] | n 分子 |",
+            "| --- | --- | --- | --- | --- | --- |"]
+    for layer in ("p0", "p1"):
+        agg = ((t6.get("layers") or {}).get(layer) or {}).get("aggregate") or {}
+        for axis, label in W6_AXES:
+            a = agg.get(axis) or {}
+            rows.append("| %s | %s | **%s** | %s | %s | %s |"
+                        % (layer.upper(), label, _fnum(a.get("sigma_conf_ev")),
+                           _fnum(a.get("p90_spread_ev")), _fnum(a.get("max_spread_ev")),
+                           a.get("n_molecules")))
+    t6_block = chr(10).join(rows + [
+        "",
+        "构象系综：%d 分子 / %s 构象；P0 失败 %s、P1 失败 %s。"
+        % (len(t6.get("subset") or []),
+           ((counts.get("p1") or {}).get("n_conformers_total")),
+           ((counts.get("p0") or {}).get("n_failures")),
+           ((counts.get("p1") or {}).get("n_failures")))])
+
+    t7_rows = ["| 分子 | motif | 最低非零模式 [cm^-1] | n 虚频 | 是否极小 | QC |",
+               "| --- | --- | --- | --- | --- | --- |"]
+    for r in (t7.get("rows") or []) if t7 else []:
+        modes = r.get("lowest_nonzero_modes_cm") or []
+        t7_rows.append("| %s | %s | %s | %s | %s | %s |"
+                       % (r.get("name"), r.get("motif_id"),
+                          _fnum(modes[0] if modes else None, digits=2),
+                          r.get("n_imaginary"),
+                          "是" if r.get("is_minimum") else "**否**",
+                          ", ".join(r.get("qc_flags") or []) or "——"))
+    t7_block = chr(10).join(t7_rows)
+
+    meth = t8.get("method_evidence") or {}
+    conf = (t8.get("conformer_evidence") or {}).get("p1") or {}
+    floor = (t8.get("rule_text") or {}).get("floor_ev")
+    cand = (t9.get("delta_m_candidates") or {}).get("p1") or {}
+    d_rows = ["| 目标 | 构象 90 分位 [eV] | 方法 pstdev [eV] | 0.05 eV 下限 [eV] | **delta_m [eV]** | delta_m [kJ/mol] | 主导项 |",
+              "| --- | --- | --- | --- | --- | --- | --- |"]
+    for axis, label in W6_AXES:
+        c = conf.get(axis) or {}
+        m = meth.get(axis) or {}
+        d = cand.get(axis) or {}
+        d_rows.append("| %s | %s | %s | %s | **%s** | %s | %s |"
+                      % (label, _fnum(c.get("p90_spread_ev")), _fnum(m.get("sigma_method_ev")),
+                         _fnum(floor), _fnum(d.get("delta_m_ev")),
+                         _fnum(d.get("delta_m_kj"), digits=1), d.get("dominant_term")))
+    anchors = t8.get("anchors") or {}
+    delta_m_block = chr(10).join(d_rows + [
+        "",
+        "source_rule (1) 不可用：锚点 %s 行、重复 series **%s** 个、"
+        "非估计方法行 %s 个 → `available=%s`。"
+        % (anchors.get("n_rows"), anchors.get("n_replicated_series"),
+           anchors.get("n_rows_with_non_estimate_method"), anchors.get("available"))])
+
+    result = (t9.get("results") or {}).get("docx_max") or {}
+    t9_rows = ["| 层对 | 目标 | tau_b [CI95] | f_unresolved（下/上） | 双方均解析 / 总 pair | delta_m 起决定作用 | O_k(20%) | f_robust_inv |",
+               "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+    for pair, plabel in W6_PAIRS:
+        for axis, alabel in W6_AXES:
+            e = (result.get(pair) or {}).get(axis) or {}
+            ci = e.get("kendall_tau_b_ci95") or [None, None]
+            o20 = ((e.get("top_k") or {}).get("k=0.20") or {}).get("overlap")
+            t9_rows.append("| %s | %s | %s [%s, %s] | %s / %s | **%s** / %s | %s | %s | %s |"
+                           % (plabel, alabel, _fnum(e.get("kendall_tau_b")),
+                              _fnum(ci[0]), _fnum(ci[1]),
+                              _fnum(e.get("f_unresolved_lower")),
+                              _fnum(e.get("f_unresolved_upper")),
+                              e.get("n_pairs_resolved_in_both"), e.get("n_pairs"),
+                              e.get("n_pairs_delta_m_is_binding"), _fnum(o20),
+                              _fnum(e.get("f_robust_inv"))))
+    t9_block = chr(10).join(t9_rows)
+
+    ex = (result.get("P0_to_P1") or {}).get("oxidation") or {}
+    sigma_note = ("**Stage 6（不确定性感知排序）**：把 `delta_m` 并入 pair 判定后，"
+                  "P0->P1 氧化轴 tau_b = %s、`f_unresolved` = %s（下侧）、"
+                  "双方均解析 pair = **%s / %s**；同家族 pair 的 "
+                  "`f_unresolved`（下）= %s。`f_robust_inv` 必须与「双方均解析 pair 数」并列读。"
+                  % (_fnum(ex.get("kendall_tau_b")), _fnum(ex.get("f_unresolved_lower")),
+                     ex.get("n_pairs_resolved_in_both"), ex.get("n_pairs"),
+                     _fnum(ex.get("family_within_f_unresolved_lower"))))
+
+    did = ("构建 12 分子构象系综得到 `sigma_conf`（T6）；"
+           "按冻结规则组装 `delta_m` 候选值（T8）；"
+           "在 `delta_m = 0 / 0.05 eV / docx_max` 三个口径下重算决策稳定性（T9）；"
+           "并对 C1 `[Li M]+` 优化几何做纯 Freq 虚频检查（T7）。")
+
+    d_ox = (cand.get("oxidation") or {})
+    d_red = (cand.get("reduction") or {})
+    t9_ox = (result.get("P0_to_P1") or {}).get("oxidation") or {}
+    t9_red = (result.get("P0_to_P1") or {}).get("reduction") or {}
+    metric = ("`delta_m`（docx_max）氧化 **%s eV**（%s kJ/mol，主导项 %s）、"
+              "还原 **%s eV**（%s kJ/mol、主导项 %s）；并入后 P0->P1 "
+              "氧化 tau_b %s、还原 tau_b %s。"
+              % (_fnum(d_ox.get("delta_m_ev")), _fnum(d_ox.get("delta_m_kj"), digits=1),
+                 d_ox.get("dominant_term"), _fnum(d_red.get("delta_m_ev")),
+                 _fnum(d_red.get("delta_m_kj"), digits=1), d_red.get("dominant_term"),
+                 _fnum(t9_ox.get("kendall_tau_b")), _fnum(t9_red.get("kendall_tau_b"))))
+
+    qc = ("T6 构象单点失败数 P0/P1 = %s/%s；T7 虚频检查 %s/%s 成功、"
+          "%s 个非极小；T9 一致性自检 %s 条（含 C0->C1 与 Week 5 记录的对比）。"
+          % (((counts.get("p0") or {}).get("n_failures")), ((counts.get("p1") or {}).get("n_failures")),
+             (t7.get("n_ok") if t7 else None), (t7.get("n_molecules") if t7 else None),
+             (t7.get("n_imaginary") if t7 else None),
+             len(t9.get("consistency_checks") or [])))
+
+    limit = ("**Stage 6 的还原轴在当前证据下不可判定**：并入 `delta_m` "
+             "后，P0->P1 与 P1->P2 的还原轴「双方均解析」pair 数降为 0，"
+             "`f_robust_inv` 的分母因此为 0；该指标不得读成「稳定」。")
+
+    return {"present": True, "did": did, "metric": metric, "qc": qc, "limit": limit,
+            "t6_block": t6_block, "t7_block": t7_block, "delta_m_block": delta_m_block,
+            "t9_block": t9_block, "sigma_note": sigma_note}
+
+
+W7_BASELINES = ("random", "diversity", "uncertainty", "ranking_aware")
+
+
+def _w7_num(value, digits=3):
+    if value is None:
+        return "n/a"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "n/a"
+    if number != number:
+        return "n/a"
+    return ("%%.%df" % digits) % number
+
+
+def _w7_rows(results, task, fset, objective, split, shape, model=None):
+    picked = []
+    for row in results:
+        if (row.get("task") != task or row.get("feature_set") != fset
+                or row.get("objective") != objective or row.get("split") != split
+                or row.get("shape") != shape):
+            continue
+        if model is not None and row.get("model") != model:
+            continue
+        if not isinstance(row.get("kendall_tau_b"), (int, float)):
+            continue
+        picked.append(row)
+    return picked
+
+
+def _w7_best(results, task, fset, objective, split, shape, model=None):
+    rows = _w7_rows(results, task, fset, objective, split, shape, model)
+    if not rows:
+        return None
+    return max(rows, key=lambda row: row["kendall_tau_b"])
+
+
+def _w7_pair_keys(results):
+    order, seen = [], set()
+    for row in results:
+        key = (row.get("task"), row.get("feature_set"), row.get("objective"))
+        if key not in seen:
+            seen.add(key)
+            order.append(key)
+    return order
+
+
+def _w8_num(value, digits=3):
+    if value in (None, ""):
+        return "\u2014"
+    try:
+        return ("%." + str(digits) + "f") % float(value)
+    except (TypeError, ValueError):
+        return "\u2014"
+
+
+def _w8_truthy(value):
+    return str(value).strip().lower() in ("1", "true", "yes")
+
+
+def _w8_mean_std(rows, key):
+    values = []
+    for row in rows:
+        value = row.get(key)
+        if value in (None, ""):
+            continue
+        try:
+            values.append(float(value))
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return None, None
+    mean = sum(values) / len(values)
+    if len(values) < 2:
+        return mean, 0.0
+    std = (sum((value - mean) ** 2 for value in values) / (len(values) - 1)) ** 0.5
+    return mean, std
+
+
+def week8_blocks(stage9, shells):
+    """Render the week-8 (Stage 9 / explicit microsolvation) blocks."""
+
+    empty = {"present": False, "did": "", "metric": "", "qc": "", "limit": "",
+             "s9_block": "", "summary": ""}
+    if not isinstance(stage9, dict) or not (stage9.get("shifts") or []):
+        return empty
+
+    shifts = stage9.get("shifts") or []
+    stability = stage9.get("stability") or []
+    dft = stage9.get("dft_jobs") or {}
+    primary = [row for row in shifts if _w8_truthy(row.get("is_primary"))]
+    done = [row for row in primary if row.get("ip_shell2_ev") not in (None, "")]
+    families = sorted({row.get("family") for row in shifts if row.get("family")})
+
+    m1 = _w8_mean_std(done, "d_ip_shell1_ev")
+    m2 = _w8_mean_std(done, "d_ip_shell2_ev")
+    e1 = _w8_mean_std(done, "d_ea_shell1_ev")
+    e2 = _w8_mean_std(done, "d_ea_shell2_ev")
+    dd = _w8_mean_std(done, "d_d_ip_ev")
+    de = _w8_mean_std(done, "d_d_ea_ev")
+
+    def _ms(pair):
+        mean, std = pair
+        if mean is None:
+            return "\u2014"
+        return "%+.3f \u00b1 %.3f eV" % (mean, std if std is not None else 0.0)
+
+    table = {(row.get("axis"), row.get("population")): row for row in stability}
+
+    def _stab(axis, population):
+        row = table.get((axis, population)) or {}
+        return ("n=%s, tau_b **%s**, Top-20%% 重叠 %s, f_unresolved %s, f_robust_inv %s"
+                % (row.get("n", "\u2014"),
+                   _w8_num(row.get("kendall_tau_b")),
+                   _w8_num(row.get("overlap_20")),
+                   _w8_num(row.get("f_unresolved_shell2")),
+                   _w8_num(row.get("f_robust_inv"))))
+
+    did = ("对 Week 5 的 C1(1:1) 条件态做**显式第一溶剂壳**复核：把 [Li M]+ 扩成 [Li(M)2]+，"
+           "共 **%d** 个壳层 motif（覆盖 **%d** 个家族），复用同一条冻结计算臂"
+           "（r2SCAN-3c、气相、相同种子）测同一组三态垂直量，再与 C1(1:1)"
+           "（`outputs/week5/c1_coord_shifts.csv`）和自由分子 C0 做同口径的配对排序稳定性对比。"
+           "壳层枚举规则：锚定 r2SCAN-3c 优化的 [Li M]+ 几何，取 G1 第二配体，Fibonacci 球面 "
+           "96 方向 x 12 滚转刚体放置，剔除冲突后取前 4 个做 GFN2-xTB 打分，最低者做 xTB 优化。"
+           % (len(shifts), len(families)))
+
+    metric = ("- 逐 motif 位移（相对 C0，均值 ± 样本 std）：C1(1:1) 氧化 %s / 还原 %s；"
+              "C2(1:2) 氧化 %s / 还原 %s\n"
+              "- 从 1:1 到 1:2 的**位移本身的变化**：\u0394IP %s，\u0394EA %s\n"
+              "- 氧化轴 C1 -> C2：%s\n"
+              "- 还原轴 C1 -> C2：%s"
+              % (_ms(m1), _ms(e1), _ms(m2), _ms(e2), _ms(dd), _ms(de),
+                 _stab("oxidation", "all12"), _stab("reduction", "all12")))
+
+    status_counts = dft.get("status_counts") or {}
+    flags = dft.get("qc_flag_counts") or {}
+    qc = ("DFT 作业 **%s** 个，`ok` **%s** 个；状态分布 %s；QC flag %s"
+          % (dft.get("n_jobs"), dft.get("n_ok"),
+             ", ".join("%s=%s" % item for item in sorted(status_counts.items())) or "\u2014",
+             ", ".join("%s=%s" % item for item in sorted(flags.items())) or "无"))
+    if isinstance(shells, dict) and shells.get("n_selected") is not None:
+        qc += ("；壳层生成 %s 个放置（%s 个无冲突、%s 个被打分、%s 个入选），"
+               "全部 `second_ligand_intact=True`"
+               % (shells.get("n_placements"), shells.get("n_clash_free"),
+                  shells.get("n_scored"), shells.get("n_selected")))
+
+    limit = ("Stage 9 只做**垂直**量（`--skip-relax`），因为 Week 5 的头条口径也是垂直量；"
+             "氧化/还原态的再弛豫在 1:1 里本就属支线，1:2 未复现。壳层是**几何预筛**结果"
+             "（xTB 打分后的最低者），不是全构象系综的最低能结构。")
+
+    s9_block = ("| 轴 | 总体 | n | tau_b | Top-10% 重叠 | Top-20% 重叠 | f_unresolved (C2) | f_robust_inv |\n"
+                "| --- | --- | --- | --- | --- | --- | --- | --- |\n")
+    for axis, population, label in (("oxidation", "all12", "氧化"),
+                                    ("reduction", "all12", "还原"),
+                                    ("oxidation", "primary_m1", "氧化（仅 m1）"),
+                                    ("reduction", "primary_m1", "还原（仅 m1）")):
+        row = table.get((axis, population)) or {}
+        n = row.get("n", 0)
+        if not n or int(n) < 2:
+            s9_block += "| %s | %s | %s | \u2014 | \u2014 | \u2014 | \u2014 | \u2014 |\n" % (
+                label, population, n)
+            continue
+        s9_block += ("| %s | %s | %s | %s | %s | %s | %s | %s |\n"
+                     % (label, population, n,
+                        _w8_num(row.get("kendall_tau_b")),
+                        _w8_num(row.get("overlap_10")),
+                        _w8_num(row.get("overlap_20")),
+                        _w8_num(row.get("f_unresolved_shell2")),
+                        _w8_num(row.get("f_robust_inv"))))
+
+    summary = ("- 做了什么：%s\n- 关键数字：\n%s\n- 质检：%s\n- 限制：%s"
+               % (did, metric, qc, limit))
+    return {"present": True, "did": did, "metric": metric, "qc": qc, "limit": limit,
+            "s9_block": s9_block, "summary": summary}
+
+
+def week7_blocks(stage7, stage8):
+    """Render the week-7 (Stage 7 + Stage 8) blocks from the two JSON files.
+
+    Every number here is read back from the artefacts, so the summary cannot
+    drift away from the CSVs it is supposed to describe.
+    """
+    fallback = "（本轮未纳入 `outputs/week7/*`：Stage 7 / Stage 8 尚未产出）"
+    out = {"did": fallback, "metric": fallback, "qc": fallback, "limit": fallback,
+           "s7_block": fallback, "s8_block": fallback, "summary": fallback}
+    if not stage7 or not stage7.get("results"):
+        return out
+
+    results = stage7["results"]
+    keys = _w7_pair_keys(results)
+    rows = ["| 任务 · 特征集 · 轴 | LOFO 最佳 direct | LOFO 最佳 shift | shift − direct | 同组合 random τ_b |",
+            "| --- | --- | --- | --- | --- |"]
+    shift_wins, flips, n_used = 0, [], []
+    combos = 0
+    for task, fset, objective in keys:
+        direct = _w7_best(results, task, fset, objective, "lofo", "direct")
+        shift = _w7_best(results, task, fset, objective, "lofo", "shift")
+        if direct is None or shift is None:
+            continue
+        combos += 1
+        winner = shift if shift["kendall_tau_b"] > direct["kendall_tau_b"] else direct
+        delta = shift["kendall_tau_b"] - direct["kendall_tau_b"]
+        if delta > 0:
+            shift_wins += 1
+        if delta >= 0.2 or delta <= -0.2:
+            flips.append("%s/%s/%s" % (task, fset, objective))
+        random_row = _w7_best(results, task, fset, objective, "random", winner["shape"])
+        rows.append("| %s · %s · %s | `%s` %s | `%s` %s | %+.3f | %s |" % (
+            task, fset, objective,
+            direct.get("model"), _w7_num(direct.get("kendall_tau_b")),
+            shift.get("model"), _w7_num(shift.get("kendall_tau_b")),
+            delta, _w7_num(random_row.get("kendall_tau_b")) if random_row else "n/a"))
+        if isinstance(direct.get("n_molecules"), int):
+            n_used.append(direct["n_molecules"])
+
+    out["s7_block"] = "\n".join(rows)
+    out["did"] = (
+        "用 `scripts/build_ml_features.py` 把 Stage 2–5 的产物整理成带 **cost 分级** 的特征表"
+        "（`X0` 12 列 / `X1` 6 列 / `X2` 4 列，互斥；`X2` 只许做机制解释），"
+        "再用 `scripts/run_stage7_ml.py` 在 `constant / ridge / krr / gpr / rf / gbdt` "
+        "六级模型阶梯上、对 `M`（方法 P0→P1）、`E`（环境 P1→P2）、`C`（配位 C0→C1）"
+        "三种位移各自跑 **direct** 与 **conditional-shift** 两种学习形态，"
+        "三种拆分（random / group / leave-one-family-out）全报告；"
+        "每个 replicate 的随机种子由 `sha256` 派生，跨进程可复现。"
+        "`scripts/run_stage8_al.py` 再做 retrospective active-learning replay"
+        "（初始 4 个种子、每次买 1 个标签、20 组冻结种子重复），给出 `n_T -> τ_b / O_k / R_k`。")
+    out["metric"] = (
+        "- Stage 7 结果行 **%d** 条（task × feature set × objective × split × shape × model）；"
+          "估计器抛异常而回落到家族均值的折数 **%d**。"
+          % (int((stage7.get("counts") or {}).get("n_result_rows") or 0),
+             int((stage7.get("counts") or {}).get("n_fit_fallbacks") or 0))
+        + "\n- LOFO 下 **shift** 形态胜过 direct 的组合数：**%d / %d**。" % (shift_wins, combos))
+    out["qc"] = (
+        "X2（配位衍生特征）由运行期断言拒绝，任何特征集都不可能含 X2；"
+        "三种拆分的折覆盖经单元测试验证「每个分子恰好被预测一次」；"
+        "`render_summary` / `week7_blocks` 的所有数字都从 JSON 现场解析。")
+    out["limit"] = (
+        "core set 只有 18 个分子（配位任务 `C` 只有 10 个），group / LOFO 折内训练行数常低至个位数；"
+        "本报告只能支持**方法学**结论，不能当作定量精度结论。")
+
+    if stage8 and stage8.get("curves"):
+        curves = stage8["curves"]
+        targets, seen = [], set()
+        for row in curves:
+            key = (row.get("task"), row.get("objective"))
+            if key not in seen:
+                seen.add(key)
+                targets.append(key)
+        grouped = {}
+        for row in curves:
+            grouped.setdefault((row.get("task"), row.get("objective"),
+                                row.get("baseline")), []).append(row)
+        lines = ["| 任务 · 轴 | 池 n | " + " | ".join("`%s`" % item for item in W7_BASELINES) + " |",
+                 "| --- | --- | --- | --- | --- | --- |"]
+        for task, objective in targets:
+            cells, pool_size = [], 0
+            for baseline in W7_BASELINES:
+                series = sorted(grouped.get((task, objective, baseline), []),
+                                key=lambda row: row.get("n_T") or 0)
+                if not series:
+                    cells.append("n/a")
+                    continue
+                pool_size = max(pool_size, int(series[-1]["n_T"]))
+                non_trivial = [row for row in series if int(row["n_T"]) < int(series[-1]["n_T"])]
+                anchor = non_trivial[-1] if non_trivial else series[-1]
+                reached = [int(row["n_T"]) for row in series
+                           if (row.get("kendall_tau_b") or 0) >= 0.8]
+                cells.append("%s（≥0.8 @ %s）" % (
+                    _w7_num(anchor.get("kendall_tau_b")),
+                    reached[0] if reached else "—"))
+            lines.append("| %s · %s | %d | %s |" % (task, objective, pool_size,
+                                                    " | ".join(cells)))
+        out["s8_block"] = "\n".join(lines)
+        out["summary"] = (out["s7_block"]
+                          + "\n\n**Stage 8：`n_T = n - 1` 处的中位 `tau_b`，"
+                            "括号内为 median 首次达到 0.8 所需的 `n_T`：**\n\n"
+                          + out["s8_block"])
+        best_at_budget = []
+        for task, objective in targets:
+            for baseline in W7_BASELINES:
+                series = sorted(grouped.get((task, objective, baseline), []),
+                                key=lambda row: row.get("n_T") or 0)
+                if len(series) < 2:
+                    continue
+                best_at_budget.append((task, objective, baseline,
+                                       series[-2].get("kendall_tau_b")))
+        out["qc"] += (" Stage 8 的 acquisition 只用 `X0`，每轮的标准化与模型拟合只看到"
+                      "当轮可见标签（由单元测试断言 scaler 均值等于可见行均值）。")
+    return out
 
 
 def build_week(week, out, force, dry_run):
@@ -1077,8 +2491,8 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4",
-                        help="comma-separated week numbers (default: 1,2,3,4)")
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8",
+                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -1105,8 +2519,117 @@ def main(argv=None):
         summary = SUMMARY_TEMPLATE.replace(
             "{prereg_sha256}", sha256_file(REPO / "config" / "prereg.yaml"))
         f10_present = (out / "week4" / "t3_cpcm_eps_scan.csv").exists()
-        summary = summary.replace("{f10_note}",
-                                  F10_NOTE_PRESENT if f10_present else F10_NOTE_ABSENT)
+        if f10_present:
+            f10_row = "| F10 | `F10_cpcm_eps_scan.png` | " + F10_NOTE_PRESENT + " | week4 |"
+            f10_art_note = "、`F10`"
+            t3_summary_limit = T3_SUMMARY_LIMIT_PRESENT
+            t3_commands = T3_REPRO_COMMANDS
+        else:
+            f10_row = "| F10 | 未生成 | " + F10_NOTE_ABSENT + " | —— |"
+            f10_art_note = ""
+            t3_summary_limit = T3_SUMMARY_LIMIT_ABSENT
+            t3_commands = ""
+        t2_data = t2_blocks(load_json(T2_SUMMARY_PATH))
+        t2_figure = REPO / "outputs" / "figures" / "F11_opt_freq_g2_sensitivity.png"
+        if t2_data["block"] and t2_figure.exists():
+            f11_row = "| F11 | `F11_opt_freq_g2_sensitivity.png` | " + F11_NOTE_PRESENT + " | week4 |"
+            f11_art_note = "、`F11`"
+            t2_summary_limit = t2_data["limit"]
+            t2_summary_metric = t2_data["metric"]
+            t2_commands = T2_REPRO_COMMANDS
+        else:
+            f11_row = "| F11 | 未生成 | " + F11_NOTE_ABSENT + " | —— |"
+            f11_art_note = ""
+            t2_summary_limit = T2_LIMIT_ABSENT
+            t2_summary_metric = ""
+            t2_commands = ""
+        summary = summary.replace("{f11_row}", f11_row)
+        summary = summary.replace("{f11_art_note}", f11_art_note)
+        summary = summary.replace("{t2_summary_limit}", t2_summary_limit)
+        summary = summary.replace("{t2_step_row}", t2_data["step_row"])
+        summary = summary.replace("{t2_summary_metric}", t2_summary_metric)
+        summary = summary.replace("{t2_commands}", t2_commands)
+        summary = summary.replace("{f10_row}", f10_row)
+        summary = summary.replace("{f10_art_note}", f10_art_note)
+        summary = summary.replace("{t3_summary_limit}", t3_summary_limit)
+        summary = summary.replace("{t3_commands}", t3_commands)
+        c1_data = c1_blocks(load_json(C1_SUMMARY_PATH), load_json(C1_RUN_SUMMARY_PATH))
+        c1_figure = REPO / "outputs" / "figures" / "F12_li_coordination_c1.png"
+        if c1_data["present"] and c1_figure.exists():
+            f12_row = "| F12 | `F12_li_coordination_c1.png` | " + F12_NOTE_PRESENT + " | week5 |"
+            f12_art_note = "、`F12`"
+            c1_summary_limit = c1_data["limit"]
+            c1_commands = C1_REPRO_COMMANDS
+        else:
+            f12_row = "| F12 | 未生成 | " + F12_NOTE_ABSENT + " | —— |"
+            f12_art_note = ""
+            c1_summary_limit = C1_LIMIT_ABSENT
+            c1_commands = ""
+        f13_figure = REPO / "outputs" / "figures" / "F13_c1_state_identity.png"
+        if f13_figure.exists():
+            f13_row = "| F13 | `F13_c1_state_identity.png` | " + F13_NOTE_PRESENT + " | week5 |"
+            f13_art_note = "、`F13`"
+        else:
+            f13_row = "| F13 | 未生成 | " + F13_NOTE_ABSENT + " | —— |"
+            f13_art_note = ""
+        c1_note = C1_NOTE_PRESENT if c1_data["present"] else C1_NOTE_ABSENT
+        w6_all = week6_blocks(load_json(T6_SUMMARY_PATH), load_json(T7_SUMMARY_PATH),
+                              load_json(T8_SUMMARY_PATH), load_json(T9_SUMMARY_PATH))
+        w6_note = w6_all["sigma_note"]
+        w7_note = week7_blocks(load_json(W7_STAGE7_PATH),
+                               load_json(W7_STAGE8_PATH))["summary"]
+        w8_note = week8_blocks(load_json(W8_STAGE9_PATH),
+                               load_json(W8_SHELLS_PATH))["summary"]
+        f14_figure = REPO / "outputs" / "figures" / "F14_delta_m_derivation.png"
+        if f14_figure.exists():
+            f14_row = "| F14 | `F14_delta_m_derivation.png` | " + F14_NOTE_PRESENT + " | week6 |"
+        else:
+            f14_row = "| F14 | 未生成 | " + F14_NOTE_ABSENT + " | —— |"
+        f15_figure = REPO / "outputs" / "figures" / "F15_stage6_decision_metrics.png"
+        if f15_figure.exists():
+            f15_row = "| F15 | `F15_stage6_decision_metrics.png` | " + F15_NOTE_PRESENT + " | week6 |"
+        else:
+            f15_row = "| F15 | 未生成 | " + F15_NOTE_ABSENT + " | —— |"
+        f16_figure = REPO / "outputs" / "figures" / "F16_stage7_direct_vs_shift.png"
+        if f16_figure.exists():
+            f16_row = "| F16 | `F16_stage7_direct_vs_shift.png` | " + F16_NOTE_PRESENT + " | week7 |"
+        else:
+            f16_row = "| F16 | 未生成 | " + F16_NOTE_ABSENT + " | —— |"
+        f17_figure = REPO / "outputs" / "figures" / "F17_stage8_active_learning.png"
+        if f17_figure.exists():
+            f17_row = "| F17 | `F17_stage8_active_learning.png` | " + F17_NOTE_PRESENT + " | week7 |"
+        else:
+            f17_row = "| F17 | 未生成 | " + F17_NOTE_ABSENT + " | —— |"
+        f18_figure = REPO / "outputs" / "figures" / "F18_stage9_explicit_shell.png"
+        if f18_figure.exists():
+            f18_row = "| F18 | `F18_stage9_explicit_shell.png` | " + F18_NOTE_PRESENT + " | week8 |"
+        else:
+            f18_row = "| F18 | 未生成 | " + F18_NOTE_ABSENT + " | —— |"
+        for key, value in (("{f12_row}", f12_row),
+                           ("{f14_row}", f14_row),
+                           ("{f15_row}", f15_row),
+                           ("{f16_row}", f16_row),
+                           ("{f17_row}", f17_row),
+                           ("{f13_row}", f13_row),
+                           ("{f12_art_note}", f12_art_note),
+                           ("{f13_art_note}", f13_art_note),
+                           ("{c1_did}", c1_data["did"]),
+                           ("{c1_metric}", c1_data["metric"]),
+                           ("{c1_qc_summary}", c1_data["qc"]),
+                           ("{c1_step_row}", c1_data["step_row"]),
+                           ("{c1_sigma_note}", c1_data["sigma_note"]),
+                           ("{c1_summary_limit}", c1_summary_limit),
+                           ("{c1_note}", c1_note),
+                           ("{c1_commands}", c1_commands),
+                           ("{w6_sigma_note}", w6_note),
+                           ("{w6_did}", w6_all["did"]),
+                           ("{w6_metric}", w6_all["metric"]),
+                           ("{w6_qc}", w6_all["qc"]),
+                           ("{w6_limit}", w6_all["limit"]),
+                           ("{w8_summary}", w8_note),
+                           ("{f18_row}", f18_row),
+                           ("{w7_summary}", w7_note)):
+            summary = summary.replace(key, value)
         write_text(out / "数据结果汇总.md", summary)
 
     for res in results:

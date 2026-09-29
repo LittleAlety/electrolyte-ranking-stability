@@ -88,6 +88,23 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "tests/test_audit_p1_core_set.py",
     "tests/test_analysis_z_bands.py",
     "tests/test_run_diffuse_control.py",
+    "scripts/analyze_cpcm_eps_scan.py",
+    "scripts/make_eps_scan_figure.py",
+    "tests/test_cpcm_eps_scan.py",
+    "scripts/run_t2_opt_freq.py",
+    "scripts/make_t2_figure.py",
+    "tests/test_run_t2_opt_freq.py",
+    # Stage 5 / T4 (Week 5): Li+ coordination state C1 -- motif enumeration,
+    # the [Li M]+ sweep, its analysis and figure, the tests, and the report.
+    "scripts/build_li_motifs.py",
+    "scripts/run_c1_li_coordination.py",
+    "scripts/analyze_c1_coordination.py",
+    "scripts/make_c1_figure.py",
+    "scripts/analyze_c1_state_identity.py",
+    "scripts/make_c1_state_identity_figure.py",
+    "tests/test_c1_li_coordination.py",
+    "tests/test_c1_state_identity.py",
+    "docs/12_*.md",
     "docs/05_*.md",
     "docs/08_*.md",
     "docs/09_*.md",
@@ -97,6 +114,48 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "outputs/figures/**/*",
     "outputs/week3/**/*",
     "outputs/week4/**/*",
+    "outputs/week5/**/*",
+    "structures/li_motifs/**/*",
+    # Stage 6 / T6-T9 (Week 6): the conformer ensemble, the delta_m assembly and
+    # the uncertainty-aware ranking analysis, with their figures, tests and report.
+    "scripts/build_conformers.py",
+    "scripts/run_t6_conformer_spread.py",
+    "scripts/analyze_delta_m.py",
+    "scripts/analyze_stage6.py",
+    "scripts/make_stage6_figure.py",
+    "tests/test_t6_conformer_spread.py",
+    "tests/test_delta_m.py",
+    "tests/test_stage6.py",
+    "docs/13_*.md",
+    "outputs/week6/**/*",
+    "structures/conformers/**/*",
+    # Stage 7 / Stage 8 (Week 7): the cost-tiered feature tables, the
+    # direct-vs-shift ML matrix, the active-learning replay, their figures,
+    # tests, the reading-list answer document and the week-7 report.
+    "scripts/build_ml_features.py",
+    "scripts/run_stage7_ml.py",
+    "scripts/run_stage8_al.py",
+    "scripts/make_stage7_figure.py",
+    "tests/test_build_ml_features.py",
+    "tests/test_stage7_ml.py",
+    "tests/test_stage8_al.py",
+    "docs/14_*.md",
+    "docs/15_*.md",
+    "outputs/week7/**/*",
+    # Stage 9 (Week 8): explicit microsolvation validation of the C1 state --
+    # shell enumeration, the r2SCAN-3c [Li(M)2]+ sweep, its analysis, the
+    # figure, the tests, the branch A-D literature answer document, the plan
+    # optimization note and the week-8 report.
+    "scripts/build_microsolvation_shells.py",
+    "scripts/run_stage9_microsolvation.py",
+    "scripts/analyze_stage9_microsolvation.py",
+    "scripts/make_stage9_figure.py",
+    "tests/test_stage9_microsolvation.py",
+    "docs/16_*.md",
+    "docs/17_*.md",
+    "docs/18_*.md",
+    "outputs/week8/**/*",
+    "structures/microsolvation/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large

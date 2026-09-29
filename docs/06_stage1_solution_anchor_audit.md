@@ -73,7 +73,7 @@ CAPTCHA 拦截；`www.osti.gov`、`www.ncbi.nlm.nih.gov` TLS 连接失败；`www
 
 ### 4.3 核验暴露的两处引用问题（重要）
 
-1. **sulfolane（SL）两行引用错配**：`source_note` 指向 Ue et al., JES 1998, `doi:10.1149/1.1838419`，但该文
+1. **sulfolane（SL）两行引用错配**：`source_note` 指向 Xu & Angell, JES 1998, `doi:10.1149/1.1838419`，但该文
    研究的是**非环状不对称脂肪族砜**（乙基甲基砜），并非环状砜 sulfolane；且其报的是 5.8 V 阳极极限，
    与 SL 行的 4.9 V 也对不上。引用**不支持**该行。
 2. **EC 还原 0.9 V 与所引文献冲突**：所引 Zhang & Kostecki 2001, `doi:10.1149/1.1415547` 摘要明确称五种

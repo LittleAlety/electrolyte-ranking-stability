@@ -36,7 +36,7 @@
 
 | 项 | 冻结值 | 现状 |
 | --- | --- | --- |
-| xTB | `xtb 6.7.1`（官方 Windows x86-64 构建，SHA256 已校验） | 已装并跑通 |
+| xTB | `xtb 6.7.1`（官方 Windows x86-64 构建，SHA256 已校验；**二进制自报版本串为 `6.7.1pre`**，产物里记录的是后者） | 已装并跑通 |
 | xTB 方法 | `GFN2-xTB`，默认参数；不额外加 `--gfnff` / `--alpb` | 已冻结 |
 | ORCA | 已装 **6.1.1**（Windows AVX2 **msmpi** 构建，administrative install 到 `E:\ORCA\orca_6_1_1`，经 `.toolchain\orca\orca_6_1_1` junction 使用） | 已装并跑通 |
 | ORCA 方法 | `! r2SCAN-3c`（composite：r2SCAN + D4 + def2-mTZVPP + RIJCOSX/def2-J） | 已跑通（见 `outputs/week3/orca_smoke/`） |
@@ -78,6 +78,10 @@
 - 与 **P1@G1** 相减得到 sigma_geom（几何诱导的数值/排序变化）；
 - 若 sigma_geom 与 sigma_method 同量级，则所有结论必须显式说明
   「P0 -> P1 的变化不能全部归因于电子结构方法」。
+- **实测（2026-09-29，T2 已完成）**：12 分子审计子集上 **sigma_geom(dIP) = 0.049 eV**、
+  **sigma_geom(dEA) = 0.076 eV**；同子集的方法台阶为 0.700 eV —— **判据未触发**。
+  EC（−118.16 cm⁻¹）与 DOL（−68.69 cm⁻¹）各报 1 个虚频，按 QE 词表记 `imaginary_mode_unresolved`。
+  产物 `outputs/week4/t2_opt_freq.{csv,json}`、图 `F11`、`docs/10` §2.10。
 
 ### 3.5 构象（只对柔性分子）
 - 对 `rotatable_bonds >= 5` 或 tags 含 `flexible` 的 core set 分子，抽 <= 5 个构象；
@@ -108,11 +112,17 @@
 
 | 符号 | 来源 | 当前状态 |
 | --- | --- | --- |
-| sigma_method | method audit 中不同方法/泛函的同一可观测量离散度 | xTB 臂已有实测（`docs/04_stage1_xtb_audit_result.md`）；r2SCAN-3c 臂待 ORCA |
+| sigma_method | method audit 中不同方法/泛函的同一可观测量离散度 | xTB 臂已有实测（`docs/04_stage1_xtb_audit_result.md`）；r2SCAN-3c 臂**已实测**（同子集 P0 -> P1 位移 std = 0.700 eV，dIP；T5 同泛函换基组对照见 `docs/10` §2.6） |
 | sigma_conf | 构象集合 spread | 待算（审计子集） |
-| sigma_geom | P1@G1 vs P1@G2 | 待算 |
-| sigma_env | CPCM eps = 5,10,20,40 的离散度 | 待算 |
+| sigma_geom | P1@G1 vs P1@G2 | **已实测**：dIP 0.049 eV、dEA 0.076 eV（12 分子子集，T2） |
+| sigma_env | CPCM eps = 5,10,20,40 的离散度 | **已实测**：dIP 0.191–0.229 eV、dEA 0.197–0.234 eV（T3） |
 | sigma_boot | bootstrap 重采样（prereg 冻结的 20 seeds x 2000 次） | 库已就绪 |
+
+**四个台阶在同一组分子上重算（2026-09-29，C1）**：`outputs/week5/c1_summary.json` 的
+`four_step_sigma` 把 method / geometry / environment / coordination 四个单变量台阶都在 **C1 的同一
+10 个分子**上、用同一估计量（population std）算出，因此这四个数与本表 §3.4/§5 的 **12 分子子集**值
+（如 sigma_geom dIP 0.049 eV）**不可直接并列**；其中 **environment 台阶是 SMD 位移**
+（`IP(P2 SMD) - IP(P1@G1)`），**不是**本表的 `sigma_env`（bare CPCM `eps = 5/10/20/40` 的离散度）。
 
 **delta_m 冻结时点**（prereg §2 的 source_rule）：优先用外部锚点的实验离散度 (1)，
 否则用 method audit 离散度 (2)，再否则用默认 2.0 kJ/mol (3)。
@@ -140,9 +150,26 @@ Koopmans 约 0.67 eV ≈ 64 kJ/mol）—— 这说明**代理量层面的 pair �
 | --- | --- | --- | --- | --- | --- |
 | **T1（必须）** | core set 18 x {M, M.+, M.-} 的 r2SCAN-3c **单点** @ G1 | 18 x 3 = 54 | 54 | 2–10 min | **2–6 h** |
 | **T2（必须）** | 审计子集 12 的 `Opt` + `Freq`（几何敏感性 + 虚频检查） | 12 x 1–3 | ~20 | 10–40 min | **4–12 h** |
-| **T3（必须）** | CPCM eps 扫描（12 分子 x 4 个 eps） | 12 x 4 | 48 | 2–10 min | **2–8 h** |
+| **T3（必须）** | CPCM eps 扫描（12 分子 x 4 个 eps x 3 态） | 12 x 4 x 3 = 144 | 144 | 2–10 min | **5–24 h** |
 | **T4（重要）** | Li+ 配位 C1（core set 的 8–10 个代表分子） | 8–10 x 1–2 | ~15 | 5–20 min | **2–5 h** |
 | **T5（可选）** | 泛函敏感性 `wB97X-D4`、diffuse 对照 `def2-TZVPD` | 审计子集 | ~20 | 10–40 min | 4–12 h |
+
+> **T3 作业数修正（2026-09-29）**：本表原先写作 **48**，漏乘了 3 个电子态（中性 / 阳离子 / 阴离子）。
+> 实际按 12 分子 × 4 个 eps × 3 态 = **144** 作业提交（子集含补跑的 SL、TMP，覆盖 core set 全部 **8** 个结构家族），
+> 实测 **144/144 全部成功、0 失败、0 缺失**（见 `docs/10` §2.9 与 `outputs/week4/t3_cpcm_eps_scan_summary.json`）。
+>
+> **T4 作业数修正（2026-09-29）**：本表原先写作 **~15**。实际实现（`scripts/run_c1_li_coordination.py`
+> 的 `planned_jobs`）在 10 分子 / 12 motif 上是 **92** 个作业 = 10 个主 motif × (1 个 `[Li M]+ Opt` +
+> 2 个 redox 单点 + 2 个 redox `Opt` + 3 个 SMD 单点) + 2 个次 motif（DMC m2、TMP m2）× (1 + 2 + 0 + 3)，
+> 即 `opt|gas 32` / `sp|gas 24` / `sp|smd 36`。慢的是 redox `Opt`：EC 的 `[Li M]2+ Opt` 走了 13 个
+> 几何步、10 min 23 s 正常终止；AN 的 `[Li M]2+ Opt` SCF 3 步后不收敛、异常终止，按「失败也是结果」
+> 记为 `geometry_failed`（垂直量不依赖该 Opt，所以 dIP/dEA 仍完整）。单作业上限因此设为 `--timeout 1800 s`。
+>
+> **T4 实现参数（须随报告给出；窗口值直接决定 motif 数）**：motif 能量窗口 **25 kJ/mol**
+> （`--energy-window-kj 25`；脚本默认值已同步为 25）、每分子 motif 上限 **2**、ESP 补充最多 **3** 个位点；
+> 冻结规则第 8 步的 redox 态重弛豫**只对每个分子的 m1 执行**，DMC m2 与 TMP m2 只取垂直单点 ——
+> 这一 cap 必须在报告中显式说明。作业数、参数与运行命令逐字记在
+> `outputs/week5/c1_li_coordination_summary.json` 与 `outputs/week5/li_motif_generation.json`。
 
 **实测标定（2026-09-29，ORCA 6.1.1 msmpi，`nprocs 8`，EC 10 原子单点）：**
 
@@ -175,6 +202,9 @@ Koopmans 约 0.67 eV ≈ 64 kJ/mol）—— 这说明**代理量层面的 pair �
 | F5 | pair 差值 dP_ij 与不确定度带（± z*sigma）森林图 | `uncertainty.py` 输出 | 待生成 |
 | F6 | f_unresolved 与 f_robust_inv 随方法层的柱状/折线 | 三层结果 | 待生成 |
 | F7 | eps 扫描下目标量的连续变化曲线 | T3 | 待生成 |
+| F10 | bare CPCM eps 扫描（ΔIP/ΔEA 饱和曲线 + sigma_env 与 tau_b） | T3 | `outputs/figures/F10_cpcm_eps_scan.png` |
+| F11 | G1 -> G2 几何台阶（逐分子位移 + 方法/几何/环境三台阶同口径对比） | T2 | `outputs/figures/F11_opt_freq_g2_sensitivity.png` |
+| F12 | **Li+ 配位条件态 C1**（逐分子 dIP/dEA + 四台阶 σ 对比 + 配体交换 + 决策量） | T4 | `outputs/figures/F12_li_coordination_c1.png` |
 | F8 | 预算曲线（Top-k 命中率 vs 计算成本） | active-learning replay | 待生成 |
 
 图表规范：图内标签使用 ASCII/英文（避免中文字体缺失导致方框）；每张图必须能由仓库内脚本
@@ -210,6 +240,9 @@ Koopmans 约 0.67 eV ≈ 64 kJ/mol）—— 这说明**代理量层面的 pair �
 | --- | --- | --- | --- |
 | 2026-09-29 | 初版：冻结三层臂、几何协议 G0/G1/G2、状态与参考态、sigma 来源、预算优先级、图表清单 | Stage 2 开工前的预注册 | v2 §7.1/§8/§19；`config/prereg.yaml` |
 | 2026-09-29 | 回填 ORCA 6.1.1（msmpi）小版本号与 EC 冒烟实测：§2 现状更新、§7 增加「实测标定」、§10 blocker 更新 | ORCA 已到位并完成运行参数标定（科学定义未改动） | `outputs/week3/orca_pilot_summary.json`；`docs/07_orca_setup_and_runner.md` |
+| 2026-09-29 | §3.4 与 §5 回填实测 sigma_geom / sigma_env / r2SCAN-3c 臂 sigma_method；§8 图表清单补 F10、F11 | T2、T3 已产出实测数值；仅更新状态字段，科学定义与几何协议未改动 | `outputs/week4/t2_opt_freq_summary.json`、`docs/10` §2.9–§2.10 |
+| 2026-09-29 | §7 补「T4 作业数修正」（~15 -> 92）与 T4 实现参数（能量窗口 25 kJ/mol、motif 上限 2、m1-only redox 重弛豫）；§5 补「四个台阶在 C1 的同一 10 分子上重算」与 environment != sigma_env 的口径说明；§8 图表清单补 F12 | C1（Stage 5 / T4）实跑；避免声明与实跑不符（T3 已有同类修正先例）。`config/scientific_definitions.yaml` 与 `config/prereg.yaml` **未改动** | `outputs/week5/c1_li_coordination_summary.json`、`outputs/week5/c1_summary.json`、`outputs/_agent_audit_c1_math.md`（F2/F3/F4/F13） |
+| 2026-09-29 | **T4/C1 收口**：Stage 5 条件 Li+ 配位态（C1）由「未开始」回填为「已完成」——Li motif 生成（12 个 motif）、C1 优化/单点、state-identity QC 与决策量分析（图 `F12`）全部产出；`ΔΔG_coord` 表冻结随 `outputs/week5/c1_summary.json` 在本次收尾中完成 | C1（Stage 5 / T4）收尾；仅回填状态与证据，科学定义与预注册语义未改动 | `scripts/build_li_motifs.py`、`scripts/run_c1_li_coordination.py`、`scripts/analyze_c1_coordination.py`、`scripts/make_c1_figure.py`、`outputs/week5/li_motif_generation.{csv,json,md}`、`outputs/week5/c1_*`、`structures/li_motifs/*.xyz`、图 `F12`、`tests/test_c1_li_coordination.py` |
 
 > 待办（ORCA 到位后回填）：ORCA 具体小版本号（**已填：6.1.1**）；T1–T4 的实测单作业时长
-> （**已实测标定，见 §7**）；sigma_method / sigma_geom / sigma_env 的实测数值；delta_m 的最终冻结值。
+> （**已实测标定，见 §7**）；sigma_method / sigma_geom / sigma_env 的实测数值（**已回填，见 §3.4 与 §5**）；delta_m 的最终冻结值（**仍未冻结**，sigma_conf 亦仍为「待算」）。

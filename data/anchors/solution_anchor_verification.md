@@ -80,7 +80,7 @@
 | `10.1016/j.jpowsour.2006.07.074` | Zhang, J. Power Sources 2006 | 是 | additives / AN | 否 | Secondary review of additives; no condition-controlled per-solvent potential table. |
 | `10.1016/j.coelec.2018.10.015` | Borodin, Curr. Opin. Electrochem. 2019 | 是 | solvents | 否 | Discussion/review of the pitfalls of predicting stability windows; gives trends rather than a single quotable per-solvent value. |
 | `10.1038/s41467-019-11317-3` | Fadel et al., Nat. Commun. 2019 | 是 | solvent-anion complexes | 否 | Shows electrolyte oxidation is a solvent-anion charge-transfer process; the oxidation potential of the ISOLATED solvent is only an upper-bound-like guideline, not a directly measured quantity. |
-| `10.1149/1.1838419` | Ue et al., J. Electrochem. Soc. 1998 | 是 | ethyl methyl sulfone (unsymmetric noncyclic sulfone) | 否 | Concerns an UNSYMMETRIC NONCYCLIC aliphatic sulfone, not the cyclic sulfone sulfolane; reports a 5.8 V anodic limit for that other solvent, so it does not support a sulfolane reduction or oxidation value. |
+| `10.1149/1.1838419` | Xu & Angell, J. Electrochem. Soc. 1998 | 是 | ethyl methyl sulfone (unsymmetric noncyclic sulfone) | 否 | Concerns an UNSYMMETRIC NONCYCLIC aliphatic sulfone, not the cyclic sulfone sulfolane; reports a 5.8 V anodic limit for that other solvent, so it does not support a sulfolane reduction or oxidation value. |
 
 ## 4. 不确定度放大规则
 
@@ -110,3 +110,54 @@
   逐字回溯；相反，核验暴露了两处引用问题（sulfolane 的引用对象错配；EC 还原 0.9 V 与所引
   文献“>1 V”的表述冲突），这些都记录在对应行的 `source_note` 中。
 
+
+
+## 6. 第二次核验（2026-09-29，网络可达条件下的复核）
+
+第一次核验（§1–§5）记录了当时出版商反爬导致的「数值不可得」。本次在**网络可达**环境下对同一批
+引用重做了一遍抓取，逐条证据（每个 URL 的 HTTP 状态 + 逐字原文）记录在
+`outputs/_anchor_retrieval_raw.md`，原始下载件在 `outputs/_anchor_retrieval/`。
+
+### 6.1 本次实测的站点可达性
+
+| 站点 | 结果 |
+| --- | --- |
+| `api.crossref.org` / `api.openalex.org` / `api.unpaywall.org` | 可达 |
+| `iopscience.iop.org`（DOI 1 / 2 / 4） | **仍被 Radware Bot Manager 拦截**：urllib 取回的是 14,375 B 的验证页，三篇内容完全相同；内置浏览器对 DOI 2 / 4 触发**交互式勾选 CAPTCHA**（Incident ID `347be535-…`、`8beb1987-…`）。**未**尝试绕过该验证 |
+| `www.osti.gov` | 仍失败（SSL EOF / 明文 503） |
+| `www.ncbi.nlm.nih.gov` / Europe PMC | **已恢复可达** |
+| Cambridge Apollo 仓储（DOI 3） | 可达，取到 13 页 accepted manuscript PDF |
+
+### 6.2 唯一新取到的「逐溶剂 V vs Li/Li+ 数值」
+
+`10.1016/j.coelec.2018.10.015`（Borodin, *Curr. Opin. Electrochem.* 2019）本次取到 ScienceDirect
+全文 HTML（38,178 字符）。其中出现的逐物种数值（逐字引用见 `_anchor_retrieval_raw.md`）包括：
+
+- EC：孤立溶剂预测氧化电位 **≈7 V vs. Li/Li+**；EC(PF6−) / EC2 二聚体 **5–6 V**，EC2 二聚体进一步降到 **≈4.3 V**；
+- VC：VC(PF6−)2 氧化 **≈5 V**；
+- 环丁砜：SL–FSI 氧化预测 **4.65 V**（1 m LiFSI-SL），SL–LiFSI 络合物再高约 0.9 V（3 m LiFSI-SL）；
+- 还原侧：线性碳酸酯还原的实验区间约 **1.4–1.5 V**；Li+(DMC)Li+ 还原 **1.4 V**，早于 Li+EC 络合物的 **≈0.6 V**；
+- 实验侧（混合碳酸酯 + 1 M LiClO4 / LiPF6）氧化稳定性 **3.9–4.4 V vs. Li/Li+**。
+
+### 6.3 为什么仍然没有把任何一行改成 exp / calc
+
+1. **来源类型不符**：上述逐溶剂数字出自**综述**（§1 已把 `review_trend_only` 判为不可回溯到原始测量），
+   且多数是**该文作者自己的 DFT 预测**，不是统一实验条件下的独立测量。
+2. **物理量错配**：EC 的「孤立溶剂 ≈7 V」超出本表对 Li/Li+ 氧化行的合理性窗口
+   （`scripts/validate_anchors.py`：2.50–6.50 V）。这正是核心文件 M2（Peljo & Girault，
+   `10.1039/C8EE01286E`）的论点——**孤立分子预测的氧化电位 ≠ 电解液的实际氧化窗口**；
+   硬填进 `value_V` 会同时违反校验器与物理意义。
+3. **实验侧只有聚合表述**：「混合碳酸酯 3.9–4.4 V」既不逐溶剂、也没有单一行内条件，
+   仍属 §1 记录的 `condition_mismatch` 类。
+4. 因此 31 行**继续保持 `est`**，`doi` 列**继续为空**（本仓库约定：`doi` 非空 = 该数值可回溯）。
+
+### 6.4 要让这一关翻红，唯一不造假的路径（留待 PI 决策）
+
+把**部分**行改成 `calc`，同时把 `value_V` 换成某篇文献里**逐字可引用、条件明确**的预测值
+（例如 SL 的 4.65 V vs. Li/Li+，`doi=10.1016/j.coelec.2018.10.015`，`source_note` 记录原文句子与
+「1 m LiFSI-SL」条件）。这会**改变锚点数值本身与来源标准**，属于方法学口径变更，
+按本项目纪律应当**先记录决策再执行**，因此本次**没有擅自执行**。
+
+> 本次核验的净结果：**31 / 31 行维持 `est`**，Gate 1 保持 NOT CLOSED；
+> 相比第一次核验，新增的是「网络可达条件下仍不可回溯」的直接证据，以及 §6.2 那组
+> 有原文可查、但物理量/来源类型不满足行级判定的数值。
