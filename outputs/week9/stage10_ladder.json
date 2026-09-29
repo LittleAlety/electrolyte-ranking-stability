@@ -684,7 +684,7 @@
       "definition": "P2 与 P1 之差整体大，但 robust inversion fraction 低 => 环境主要引入 common/family offset",
       "verdict": "SUPPORTED",
       "evidence": "P1 -> P2 氧化轴位移均值 -2.393 eV、位移 std 0.302 eV，而 tau_b = 0.895、O_20% = 0.750、f_robust_inv = 0.000",
-      "reading": "环境台阶是「大位移 + 小离散」的典型：位移被排序保留下来。"
+      "reading": "环境台阶是「大位移 + 小离散」的典型：位移被排序保留下来。按 v2 §22.2，下一步可直接测试族依赖修正 `P2 = P1 + b_f`（family-dependent correction）是否已够，而不必逐分子重算 P2。"
     },
     "C_structured_robust_inversion": {
       "short": "C：结构集中的 robust inversion",
@@ -712,14 +712,14 @@
       "definition": "Δ 无法由 cheap features 学出 => representation 缺关键物理信息",
       "verdict": "NOT SUPPORTED（Δ 在 6/8 个分组上可从廉价特征学出）；例外：C/reduction/X0、C/reduction/X0+X1（与情形 D 同一根还原轴）",
       "evidence": "LOFO 拆分下、每个 (任务, 轴, 特征档) 上取模型阶梯最优的 kendall_tau_b（预测排序对真值的保真度）：C/oxidation/X0 direct 0.111 (krr) -> shift 0.644 (krr), +0.533；C/oxidation/X0+X1 direct 0.244 (ridge) -> shift 0.644 (rf), +0.400；C/reduction/X0 direct 0.422 (gbdt) -> shift 0.022 (krr), -0.400；C/reduction/X0+X1 direct 0.289 (gbdt) -> shift 0.200 (ridge), -0.089；E/oxidation/X0+P1 direct 0.843 (ridge) -> shift 0.922 (rf), +0.078；E/reduction/X0+P1 direct 0.686 (rf) -> shift 0.739 (krr), +0.052；M/oxidation/X0 direct 0.294 (krr) -> shift 0.595 (constant), +0.301；M/reduction/X0 direct 0.359 (rf) -> shift 0.556 (constant), +0.196。对照：参考层自身的 kendall_tau_b_vs_reference = C/oxidation = 0.689、C/oxidation = 0.689、C/reduction = -0.467、C/reduction = -0.467、E/oxidation = 0.895、E/reduction = 0.673、M/oxidation = 0.673、M/reduction = 0.595。",
-      "reading": "**不成立（Δ 是可学的）**：廉价特征加 Δ 形态在 6/8 个分组上达到或超过 direct。真正学不动的只有 C0 -> C1 还原轴，与情形 D 一致——缺的不是模型容量，而是「Li 中心还原」这一不同物理过程的表示（配位几何 / 局部 ESP / 供体对几何）。"
+      "reading": "**不成立（Δ 是可学的）**：廉价特征加 Δ 形态在 6/8 个分组上达到或超过 direct。真正学不动的只有 C0 -> C1 还原轴，与情形 D 一致。按 v2 §22.6，这说明现有 representation 缺的是物理信息而不是模型容量，下一步应优先加入四项：`cheap coordination geometry proxy`（对应本项目的 Li 配位几何）、`conformational flexibility`（构象柔性）、`local ESP topology`（局部 ESP）、`donor-pair geometry`（供体对几何）；而不是直接更换更大的 neural network。"
     },
     "G_most_pairs_unresolved": {
       "short": "G：大部分 pair 不可判定",
       "definition": "大部分 pair 都 unresolved => 输出应是 equivalence classes / tiered sets，而不是强行排名",
       "verdict": "PARTIALLY SUPPORTED (还原轴 C0 -> C1)",
       "evidence": "C0 -> C1 还原轴：tau_b = -0.467，f_unresolved(after) = 0.800，O_10% = 0.000；同一级的氧化轴作对照：tau_b = 0.689、f_unresolved(after) = 0.200；P0 -> P1 还原轴 f_unresolved(after) = 0.733",
-      "reading": "还原轴在配位台阶上整体不可判定；氧化轴仍然可判定。这就是为什么 `f_robust_inv = 0` 必须与 `f_unresolved` 一起读。"
+      "reading": "还原轴在配位台阶上整体不可判定；氧化轴仍然可判定。这就是为什么 `f_robust_inv = 0` 必须与 `f_unresolved` 一起读。按 v2 §22.7，此时最合理的输出不是强行排名，而是候选分子的 **equivalence classes / tiered sets**。"
     },
     "_hypothesis_test": {
       "n_points": 10,

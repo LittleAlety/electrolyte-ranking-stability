@@ -367,7 +367,11 @@ def scenario_verdicts(ladder_rows_all, hypothesis, extra) -> dict:
                         p1p2_ox.get("kendall_tau_b") or 0.0,
                         p1p2_ox.get("overlap_20") or 0.0,
                         p1p2_ox.get("f_robust_inv") or 0.0)),
-        "reading": "环境台阶是「大位移 + 小离散」的典型：位移被排序保留下来。",
+        "reading": (
+            "环境台阶是「大位移 + 小离散」的典型：位移被排序保留下来。"
+            "按 v2 §22.2，下一步可直接测试族依赖修正 "
+            "`P2 = P1 + b_f`（family-dependent correction）是否已够，"
+            "而不必逐分子重算 P2。"),
     }
     verdicts["C_structured_robust_inversion"] = {
         "short": "C：结构集中的 robust inversion",
@@ -412,8 +416,12 @@ def scenario_verdicts(ladder_rows_all, hypothesis, extra) -> dict:
         "evidence": extra["stage7_f_evidence"],
         "reading": (
             "**不成立（Δ 是可学的）**：廉价特征加 Δ 形态在 6/8 个分组上达到或超过 direct。"
-            "真正学不动的只有 C0 -> C1 还原轴，与情形 D 一致——缺的不是模型容量，"
-            "而是「Li 中心还原」这一不同物理过程的表示（配位几何 / 局部 ESP / 供体对几何）。"),
+            "真正学不动的只有 C0 -> C1 还原轴，与情形 D 一致。"
+            "按 v2 §22.6，这说明现有 representation 缺的是物理信息而不是模型容量，"
+            "下一步应优先加入四项：`cheap coordination geometry proxy`"
+            "（对应本项目的 Li 配位几何）、`conformational flexibility`（构象柔性）、"
+            "`local ESP topology`（局部 ESP）、`donor-pair geometry`（供体对几何）；"
+            "而不是直接更换更大的 neural network。"),
     }
     verdicts["G_most_pairs_unresolved"] = {
         "short": "G：大部分 pair 不可判定",
@@ -429,7 +437,9 @@ def scenario_verdicts(ladder_rows_all, hypothesis, extra) -> dict:
                         c0c1_ox.get("f_unresolved_after") or 0.0,
                         find("common10", "P0_to_P1", "reduction").get("f_unresolved_after") or 0.0)),
         "reading": ("还原轴在配位台阶上整体不可判定；氧化轴仍然可判定。"
-                    "这就是为什么 `f_robust_inv = 0` 必须与 `f_unresolved` 一起读。"),
+                    "这就是为什么 `f_robust_inv = 0` 必须与 `f_unresolved` 一起读。"
+                    "按 v2 §22.7，此时最合理的输出不是强行排名，"
+                    "而是候选分子的 **equivalence classes / tiered sets**。"),
     }
     verdicts["_hypothesis_test"] = hypothesis
     verdicts["_key_numbers"] = {
