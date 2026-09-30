@@ -227,12 +227,79 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "scripts/run_orca_job.py",
     "docs/24_*.md",
     "outputs/week14/**/*",
+    # Stage 16 (Week 15): the two-guess catalogue over the whole core set and the
+    # a-priori warning rule built from the gas-phase descriptors (zero new jobs).
+    "scripts/run_stage16_catalogue.py",
+    "scripts/analyze_stage16_catalogue.py",
+    "scripts/build_stage16_predictor.py",
+    "scripts/make_stage16_figure.py",
+    "tests/test_stage16_catalogue.py",
+    "docs/25_*.md",
+    "outputs/week15/**/*",
+    # Stage 17 (Week 16): the contamination ceiling of the metastable solution on
+    # the published ladder, the SMD(!) re-measurement of the moread arm, and the
+    # electronic-structure identity of the two SCF solutions.
+    "scripts/run_stage17_smd_moread.py",
+    "scripts/analyze_stage17_contamination.py",
+    "scripts/analyze_stage17_solution_identity.py",
+    "scripts/make_stage17_figure.py",
+    "tests/test_stage17_contamination.py",
+    "tests/test_stage17_solution_identity.py",
+    "docs/26_*.md",
+    "outputs/week16/**/*",
+    # Stage 18 (Week 17): the electronic-identity census over the whole 414-cell
+    # directory, and the zero-cost self-diagnosis built on top of it.
+    "scripts/analyze_stage18_identity_census.py",
+    "scripts/build_stage18_selfdiagnosis.py",
+    "scripts/make_stage18_figure.py",
+    "tests/test_stage18_identity_census.py",
+    "docs/27_*.md",
+    "outputs/week17/**/*",
+    # Stage 19 (Week 18): the relaxation audit -- 37 moread_lower cells, both arms
+    # re-optimised with r2SCAN-3c from the frozen G1 geometry.
+    "scripts/run_stage19_relax.py",
+    "scripts/analyze_stage19_relax.py",
+    "scripts/make_stage19_figure.py",
+    "scripts/gen_week18_report.py",
+    "tests/test_stage19_relax.py",
+    "docs/28_*.md",
+    "outputs/week18/**/*",
+    # Stage 20 (Week 19): the sixth rung (single point -> relaxed) placed on the
+    # Stage-10 ruler, and the GFN2-xTB re-run of the two-arm experiment on the 74
+    # r2SCAN-3c relaxed geometries.
+    "scripts/analyze_stage20_relax_rung.py",
+    "scripts/run_stage20_xtb_arms.py",
+    "scripts/analyze_stage20_xtb_arms.py",
+    "scripts/make_stage20_figure.py",
+    "scripts/gen_week19_report.py",
+    "tests/test_stage20_relax_rung.py",
+    "tests/test_stage20_xtb_arms.py",
+    "docs/29_*.md",
+    "outputs/week19/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large
 #: and not human-auditable, so they are excluded from the digest list.  Every text
 #: artefact (input, raw output, xyz, JSON) is still frozen.
 STAGE2_EXCLUDED_SUFFIXES: tuple[str, ...] = (".gbw", ".bas", ".tmp", ".wfn", ".densities", ".pot")
+
+#: xTB/CREST write these next to the input as scratch.  Some of them (``sp.out``
+#: and ``opt.out`` are *not* on this list) are the raw provenance and stay in the
+#: digest; the rest are recreated by every run and are excluded both here and in
+#: ``.gitignore`` so the manifest stays reproducible from a clean checkout.
+STAGE2_EXCLUDED_NAMES: tuple[str, ...] = (
+    "xtbrestart",
+    "xtbtraj",
+    "xtbopt.xyz",
+    "xtbopt.log",
+    "xtbtopo.mol",
+    ".xtboptok",
+    "wbo",
+    "charges",
+    "crest_conformers.xyz",
+    "crest_best.xyz",
+    "crest.log",
+)
 
 
 
@@ -484,6 +551,8 @@ def stage2_artefacts(root: Path = REPO_ROOT) -> list[str]:
             if not path.is_file():
                 continue
             if path.suffix.lower() in STAGE2_EXCLUDED_SUFFIXES:
+                continue
+            if path.name in STAGE2_EXCLUDED_NAMES:
                 continue
             relative = path.relative_to(root).as_posix()
             if relative.endswith("SHA256SUMS"):

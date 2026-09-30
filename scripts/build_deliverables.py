@@ -704,6 +704,39 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 18",
         ],
     },
+    19: {
+        "topic": "Stage 20（第六级台阶与第二解的跨方法存亡）",
+        "sources": [
+            ("outputs/week19/stage20_relax_rung.json", None, True),
+            ("outputs/week19/stage20_relax_rung_cells.csv", None, True),
+            ("outputs/week19/stage20_relax_rung_epsilon.csv", None, True),
+            ("outputs/week19/stage20_relax_rung_ladder.csv", None, True),
+            ("outputs/week19/stage20_relax_rung_summary.md", None, True),
+            ("outputs/week19/stage20_xtb_arms.json", None, True),
+            ("outputs/week19/stage20_xtb_arms_plan.json", None, True),
+            ("outputs/week19/stage20_xtb_arms_cells.csv", None, True),
+            ("outputs/week19/stage20_xtb_arms_cells_analysis.csv", None, True),
+            ("outputs/week19/stage20_xtb_arms_analysis.json", None, True),
+            ("outputs/week19/stage20_xtb_arms_by_state.csv", None, True),
+            ("outputs/week19/stage20_xtb_arms_by_molecule.csv", None, True),
+            ("outputs/week19/stage20_xtb_arms_by_epsilon.csv", None, True),
+            ("outputs/week19/stage20_xtb_arms_by_arm_set.csv", None, True),
+            ("outputs/week19/stage20_xtb_arms_summary.md", None, True),
+            ("docs/29_week19_report.md", "week19_report_full.md", True),
+            ("outputs/figures/figure_manifest_week19_stage20.md",
+             "artifacts/figure_manifest_week19_stage20.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F38_*.png", "outputs/figures/F39_*.png"],
+        "commands": [
+            "python scripts/analyze_stage20_relax_rung.py",
+            "python scripts/run_stage20_xtb_arms.py --jobs 8",
+            "python scripts/analyze_stage20_xtb_arms.py",
+            "python scripts/make_stage20_figure.py",
+            "python scripts/gen_week19_report.py",
+            "python scripts/build_deliverables.py --weeks 19",
+        ],
+    },
 }
 
 
@@ -969,6 +1002,17 @@ def render_report(week, wdir, missing, excluded):
                        ("{w18_verdict_block}", w18["verdict_block"]),
                        ("{w18_geometry_block}", w18["geometry_block"]),
                        ("{w18_table_block}", w18["table_block"])):
+        text = text.replace(key, value)
+    w19 = week19_blocks(load_json(W19_RUNG_PATH), load_json(W19_ARMS_PATH),
+                        load_json(W19_ARMS_ANALYSIS_PATH))
+    for key, value in (("{w19_did}", w19["did"]),
+                       ("{w19_metric}", w19["metric"]),
+                       ("{w19_qc}", w19["qc"]),
+                       ("{w19_limit}", w19["limit"]),
+                       ("{w19_protocol_block}", w19["protocol_block"]),
+                       ("{w19_rung_block}", w19["rung_block"]),
+                       ("{w19_xtb_block}", w19["xtb_block"]),
+                       ("{w19_table_block}", w19["table_block"])):
         text = text.replace(key, value)
 
     if missing:
@@ -2923,11 +2967,182 @@ def week18_checks(wdir: Path):
     return checks
 
 
+def week19_checks(wdir: Path):
+    """QC for week 19 (Stage 20: the sixth rung + the cross-method fate of the second solution).
+
+    Every number is read back out of ``stage20_relax_rung.json``,
+    ``stage20_xtb_arms.json`` and ``stage20_xtb_arms_analysis.json``, so the
+    distilled report cannot drift away from the artifacts it summarises.
+    """
+
+    checks = []
+    rung = load_json(wdir / "stage20_relax_rung.json")
+    ledger = load_json(wdir / "stage20_xtb_arms.json")
+    analysis = load_json(wdir / "stage20_xtb_arms_analysis.json")
+    for name, data in (("stage20_relax_rung", rung),
+                       ("stage20_xtb_arms", ledger),
+                       ("stage20_xtb_arms_analysis", analysis)):
+        if data is None:
+            checks.append(check(name + ".present", None, "source not found"))
+            return checks
+        checks.append(check(name + ".present", True, name + ".json present"))
+
+    def near(value, expected, tol):
+        return value is not None and abs(float(value) - expected) < tol
+
+    # ------------------------------------------------------------------ Part 1
+    checks.append(check("week19.rung_shape",
+                        rung.get("n_cells") == 37
+                        and rung.get("n_eps_values") == 10
+                        and rung.get("n_molecules_total") == 7
+                        and (rung.get("n_molecules_by_state") or {}) == {"anion": 4, "cation": 3},
+                        "n_cells=%s n_eps_values=%s n_molecules_total=%s n_by_state=%s"
+                        % (rung.get("n_cells"), rung.get("n_eps_values"),
+                           rung.get("n_molecules_total"), rung.get("n_molecules_by_state"))))
+
+    by_state = (rung.get("aggregates") or {}).get("by_state") or {}
+    anion = by_state.get("anion") or {}
+    cation = by_state.get("cation") or {}
+    checks.append(check("week19.rung_by_state_two_branches",
+                        anion.get("n_cells") == 21 and cation.get("n_cells") == 16
+                        and near(anion.get("shift_mean_ev"), -1.953, 2e-3)
+                        and near(anion.get("shift_std_ev"), 0.160, 2e-3)
+                        and near(anion.get("relative_dispersion"), 0.08, 5e-3)
+                        and near(cation.get("shift_mean_ev"), -0.610, 2e-3)
+                        and near(cation.get("shift_std_ev"), 0.315, 2e-3)
+                        and near(cation.get("relative_dispersion"), 0.52, 5e-3),
+                        "anion mean=%s std=%s rel=%s (n=%s); cation mean=%s std=%s rel=%s (n=%s)"
+                        % (anion.get("shift_mean_ev"), anion.get("shift_std_ev"),
+                           anion.get("relative_dispersion"), anion.get("n_cells"),
+                           cation.get("shift_mean_ev"), cation.get("shift_std_ev"),
+                           cation.get("relative_dispersion"), cation.get("n_cells"))))
+
+    ranges = sorted(float(row.get("delta_range_ev") or 0.0)
+                    for row in (rung.get("epsilon_rows") or []))
+    mid = ranges[len(ranges) // 2] if ranges else None
+    checks.append(check("week19.rung_shift_is_flat_in_epsilon",
+                        len(ranges) == 7 and near(mid, 0.0263, 2e-4)
+                        and near(ranges[-1], 0.215, 2e-3),
+                        "per-molecule eps range: n=%s median=%s max=%s"
+                        % (len(ranges), mid, ranges[-1] if ranges else None)))
+
+    ladder = rung.get("ladder_rows") or []
+    omitted = [str(row.get("rank_metrics") or "") for row in ladder]
+    n_frozen = sum(1 for row in ladder if row.get("rung") != "P2sp_to_P2relax")
+    n_new = sum(1 for row in ladder if row.get("rung") == "P2sp_to_P2relax")
+    checks.append(check("week19.rung_rank_metrics_structurally_omitted",
+                        len(ladder) == 30 and n_new == 6 and n_frozen == 24
+                        and all(text.startswith("omitted:") for text in omitted),
+                        "ladder rows=%s (frozen %s / new %s); every rank_metrics starts "
+                        "with 'omitted:' = %s"
+                        % (len(ladder), n_frozen, n_new,
+                           all(text.startswith("omitted:") for text in omitted))))
+
+    def rung_row(population, kind):
+        for row in ladder:
+            if row.get("population") == population and row.get("rung") == kind:
+                return row
+        return {}
+
+    ox_new = rung_row("ox_dmc_ec_tmp_eps5", "P2sp_to_P2relax")
+    ox_env = rung_row("ox_dmc_ec_tmp_eps5", "P1_to_P2")
+    red_new = rung_row("red_dec_emc_pc_tegdme_eps20", "P2sp_to_P2relax")
+    red_env = rung_row("red_dec_emc_pc_tegdme_eps20", "P1_to_P2")
+    checks.append(check("week19.rung_new_vs_frozen_dispersion",
+                        near(ox_new.get("relative_dispersion"), 0.74, 5e-3)
+                        and near(ox_env.get("relative_dispersion"), 0.17, 5e-3)
+                        and near(red_new.get("relative_dispersion"), 0.13, 5e-3)
+                        and near(red_env.get("relative_dispersion"), 0.26, 5e-3),
+                        "ox eps=5 new %s vs P1->P2 %s; red eps=20 new %s vs P1->P2 %s"
+                        % (ox_new.get("relative_dispersion"), ox_env.get("relative_dispersion"),
+                           red_new.get("relative_dispersion"),
+                           red_env.get("relative_dispersion"))))
+
+    # ------------------------------------------------------------------ Part 2
+    summary = ledger.get("summary") or {}
+    checks.append(check("week19.xtb_ledger_is_complete",
+                        ledger.get("n_target_cells") == 37
+                        and summary.get("n_jobs") == 74
+                        and summary.get("n_ok") == 74
+                        and summary.get("n_failed") == 0,
+                        "target cells=%s; jobs=%s ok=%s failed=%s (reused %s, computed %s)"
+                        % (ledger.get("n_target_cells"), summary.get("n_jobs"),
+                           summary.get("n_ok"), summary.get("n_failed"),
+                           summary.get("n_reused"), summary.get("n_computed"))))
+
+    all_block = ((analysis.get("aggregates") or {}).get("all") or {}).get("all") or {}
+    outcomes = all_block.get("outcomes") or {}
+    checks.append(check("week19.xtb_verdict_over_37_cells",
+                        analysis.get("n_cells") == 37
+                        and all_block.get("n_cells") == 37
+                        and all_block.get("n_complete") == 37
+                        and outcomes.get("distinct_lower") == 15
+                        and outcomes.get("distinct_higher") == 16
+                        and outcomes.get("same_lower") == 0
+                        and outcomes.get("same_higher") == 6
+                        and outcomes.get("incomplete") == 0,
+                        "n_cells=%s complete=%s; distinct_lower %s / distinct_higher %s / "
+                        "same_lower %s / same_higher %s / incomplete %s"
+                        % (analysis.get("n_cells"), all_block.get("n_complete"),
+                           outcomes.get("distinct_lower"), outcomes.get("distinct_higher"),
+                           outcomes.get("same_lower"), outcomes.get("same_higher"),
+                           outcomes.get("incomplete"))))
+    checks.append(check("week19.xtb_headline_counts",
+                        all_block.get("n_xtb_same_minimum") == 6
+                        and all_block.get("n_xtb_still_lower") == 15
+                        and all_block.get("n_xtb_preference_flipped") == 6
+                        and all_block.get("n_agree_with_stage19") == 17
+                        and all_block.get("n_xtb_sp_matches_stage19_relax") == 33,
+                        "same_minimum %s, still_lower %s, preference_flipped %s, "
+                        "agree_with_stage19 %s/37, same-geometry method agreement %s/37"
+                        % (all_block.get("n_xtb_same_minimum"),
+                           all_block.get("n_xtb_still_lower"),
+                           all_block.get("n_xtb_preference_flipped"),
+                           all_block.get("n_agree_with_stage19"),
+                           all_block.get("n_xtb_sp_matches_stage19_relax"))))
+
+    p50 = (all_block.get("abs_xtb_relax_delta_ev") or {}).get("p50")
+    cheap = (all_block.get("abs_xtb_sp_delta_ev") or {}).get("p50")
+    checks.append(check("week19.xtb_relaxation_compresses_the_gap",
+                        near(p50, 2.13e-4, 1e-5) and near(cheap, 7.17e-3, 1e-4),
+                        "|xTB single point Delta| p50=%s eV -> |xTB relaxed Delta| p50=%s eV "
+                        "(compressed %.1fx)"
+                        % (cheap, p50, (float(cheap) / float(p50)) if p50 else 0.0)))
+
+    cross = analysis.get("crosstab_stage19_by_stage20") or {}
+    checks.append(check("week19.xtb_crosstab_matches_the_verdicts",
+                        (cross.get("distinct_lower") or {}).get("distinct_lower") == 1
+                        and (cross.get("distinct_lower") or {}).get("distinct_higher") == 4
+                        and (cross.get("distinct_higher") or {}).get("distinct_lower") == 14
+                        and (cross.get("distinct_higher") or {}).get("distinct_higher") == 10
+                        and (cross.get("same_higher") or {}).get("same_higher") == 6,
+                        "Stage19 distinct_lower -> {Stage20 distinct_lower %s, distinct_higher %s}; "
+                        "distinct_higher -> {distinct_lower %s, distinct_higher %s}; "
+                        "same_higher -> same_higher %s"
+                        % ((cross.get("distinct_lower") or {}).get("distinct_lower"),
+                           (cross.get("distinct_lower") or {}).get("distinct_higher"),
+                           (cross.get("distinct_higher") or {}).get("distinct_lower"),
+                           (cross.get("distinct_higher") or {}).get("distinct_higher"),
+                           (cross.get("same_higher") or {}).get("same_higher"))))
+
+    # -------------------------------------------------------------- artifacts
+    figure_names = ("F38_stage20_relax_rung.png", "F39_stage20_xtb_arms.png")
+    detail = ", ".join("%s=%s" % (name, (wdir / "artifacts" / name).exists())
+                       for name in figure_names)
+    checks.append(check("week19.figures_present",
+                        all((wdir / "artifacts" / name).exists() for name in figure_names),
+                        detail))
+    report_present = (wdir / "week19_report_full.md").exists()
+    checks.append(check("week19.report_present", report_present,
+                        "week19_report_full.md present=%s" % report_present))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
                   9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks,
                   13: week13_checks, 14: week14_checks, 15: week15_checks,
-                  16: week16_checks, 17: week17_checks, 18: week18_checks}
+                  16: week16_checks, 17: week17_checks, 18: week18_checks, 19: week19_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -3630,13 +3845,14 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week15/               Stage 16（全核心集双初猜目录与事前预警规则）
     ├── week16/               Stage 17（亚稳态污染上限与两个 SCF 解的电子结构身份）
     ├── week17/               Stage 18（全目录电子身份普查与零成本自诊断）
-    └── week18/               Stage 19（几何弛豫检验：第二个 SCF 解能不能扛住弛豫）
+    ├── week18/               Stage 19（几何弛豫检验：第二个 SCF 解能不能扛住弛豫）
+    └── week19/               Stage 20（第六级台阶与第二解的跨方法存亡）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F37 中属于该周的部分）
+    ├── artifacts/            图（F0–F39 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -3666,6 +3882,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 {w16_row}
 {w17_row}
 {w18_row}
+{w19_row}
 
 ## 如何复现
 ```powershell
@@ -3676,7 +3893,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -3726,7 +3943,7 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 参考配体：主参考 `R = DME`（C08，双齿 2×O 螯合、配位 motif 唯一）；第二参考 `R = AN`（C16，
 仅用于 robustness check）。核心集 18 个分子、broad pool 40 个分子，合并池 58。
 
-## 2. 逐周结果（Week 1 – Week 18）
+## 2. 逐周结果（Week 1 – Week 19）
 
 ### Week 1 —— Stage 0 定义冻结 / Gate 0
 - 做了什么：冻结科学定义与预注册（`config/scientific_definitions.yaml`、`config/prereg.yaml`），
@@ -3818,6 +4035,9 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 18 —— Stage 19（几何弛豫检验：第二个 SCF 解能不能扛住弛豫）
 {w18_summary}
 
+### Week 19 —— Stage 20（第六级台阶与第二解的跨方法存亡）
+{w19_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -3869,7 +4089,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F37）
+## 5. 图表索引（F0–F39）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -3910,6 +4130,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f35_row}
 {f36_row}
 {f37_row}
+{f38_row}
+{f39_row}
 
 ## 6. 复现命令
 ```powershell
@@ -3965,6 +4187,7 @@ $env:PYTHONIOENCODING = "utf-8"
 16. {w16_summary_limit}
 17. {w17_summary_limit}
 18. {w18_summary_limit}
+19. {w19_summary_limit}
 """
 
 
@@ -5337,6 +5560,42 @@ W18_TABLE_ROWS = (
     ("`stage19_relax_by_state.csv` / `_by_molecule.csv` / `_by_epsilon.csv` / `_by_arm_set.csv`",
      "四张分组汇总表"),
     ("`stage19_relax_summary.md`", "本周中文小结"),
+)
+
+#: Stage 20 (Week 19): two independent parts.  Part 1 is a zero-new-calculation
+#: back-fill of the relaxation correction onto the Stage 10 five-rung ladder;
+#: Part 2 is 74 frozen GFN2-xTB jobs (37 cells x 2 arms) asking whether the
+#: second SCF solution survives a cheap relaxation.
+W19_RUNG_PATH = REPO / "outputs" / "week19" / "stage20_relax_rung.json"
+W19_ARMS_PATH = REPO / "outputs" / "week19" / "stage20_xtb_arms.json"
+W19_ARMS_ANALYSIS_PATH = REPO / "outputs" / "week19" / "stage20_xtb_arms_analysis.json"
+F38_NOTE_PRESENT = (
+    "Stage 20 Part 1 第六级台阶：(a) 37 个格子的弛豫位移 Delta = -能量降（eV）对 eps"
+    "（对数轴，按态着色；逐分子 eps 极差中位 0.0263 eV、最大 0.215 eV（DEC））；"
+    "(b) 同一把尺子：4 个可比 population 上 5 个冻结台阶与第六级台阶的相对散布 std/|mean|；"
+    "(c) (|mean|, std) 平面（6 台阶 x 6 population = 30 行）；"
+    "(d) 7 个分子的 Delta 均值与跨 eps 极差（还原支 -1.953/0.160/0.08，氧化支 -0.610/0.315/0.52）")
+F38_NOTE_ABSENT = "预留给 Stage 20 Part 1（第六级台阶）；week19 尚未产出"
+F39_NOTE_PRESENT = (
+    "Stage 20 Part 2 跨方法检验：(a) 两臂起点 RMSD 对 xTB 弛豫后 RMSD"
+    "（0.4716 -> 0.8078 A，6/37 格两臂合并）；(b) 同一几何上 xTB 单点 Delta 对 ORCA r2SCAN-3c"
+    " 弛豫 Delta（偏好方向一致 33/37 = 89%）；(c) 两臂能量差的四个读数"
+    "（中位 1.198e-01 / 1.960e-03 / 7.171e-03 / 2.133e-04 eV，xTB 弛豫压掉约 33.6 倍）；"
+    "(d) 单臂漂移对起点双解 RMSD（两臂漂移中位 0.651 / 0.657 A）")
+F39_NOTE_ABSENT = "预留给 Stage 20 Part 2（跨方法存亡）；week19 尚未产出"
+W19_TABLE_ROWS = (
+    ("`stage20_relax_rung.json` / `_cells.csv` / `_epsilon.csv` / `_ladder.csv`",
+     "Part 1 全部内容（37 格的弛豫位移、逐分子跨 eps 极差、30 行台阶表、按态 / 按分子 / "
+     "按臂 / 按 eps 聚合）；ladder 每一行的 `rank_metrics` 都写明 `omitted:` 原因"),
+    ("`stage20_relax_rung_summary.md`", "Part 1 的中文小结"),
+    ("`stage20_xtb_arms.json` / `stage20_xtb_arms_plan.json`",
+     "Part 2 作业台账（37 格 x 2 臂 = 74 个 GFN2-xTB 作业；起始几何来自 Stage 19 的弛豫终点）"),
+    ("`stage20_xtb_arms_cells.csv`", "Part 2 逐格逐臂原始读数（74 行）"),
+    ("`stage20_xtb_arms_analysis.json`",
+     "Part 2 主结论（cross-tab、同几何方法对照、aggregates: all + by_state + by_molecule + "
+     "by_epsilon + by_arm_set）"),
+    ("`stage20_xtb_arms_cells_analysis.csv` / `_by_*.csv`", "Part 2 逐格裁决表与四张分组汇总表"),
+    ("`stage20_xtb_arms_summary.md`", "Part 2 的中文小结"),
 )
 
 
@@ -7326,6 +7585,338 @@ REPORT_TEMPLATES[18] = """# Week 18 成果小结 —— Stage 19（几何弛豫�
 """
 
 
+def _w19_engine(ledger):
+    """The xTB version string, whichever of the two JSON shapes the ledger uses."""
+    value = (ledger or {}).get("engine_version")
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(item) for item in value) or "n/a"
+    return str(value) if value else "n/a"
+
+
+def week19_blocks(rung, ledger, analysis):
+    """Week 19 / Stage 20 narrative blocks.
+
+    Every number is read back out of ``stage20_relax_rung.json``,
+    ``stage20_xtb_arms.json`` and ``stage20_xtb_arms_analysis.json``, so the
+    distilled report cannot drift away from the artifacts it summarises.
+    """
+
+    keys = ("did", "metric", "qc", "limit", "summary", "protocol_block",
+            "rung_block", "xtb_block", "table_block")
+    if rung is None or analysis is None:
+        text = "（`stage20_relax_rung.json` 或 `stage20_xtb_arms_analysis.json` 不存在）"
+        return {key: text for key in keys}
+
+    ledger = ledger or {}
+    summary = ledger.get("summary") or {}
+    aggregates = rung.get("aggregates") or {}
+    by_state = aggregates.get("by_state") or {}
+    by_molecule = aggregates.get("by_molecule") or {}
+    by_arm = aggregates.get("by_arm_set") or {}
+    ladder = rung.get("ladder_rows") or []
+    epsilon_rows = rung.get("epsilon_rows") or []
+
+    arms_all = ((analysis.get("aggregates") or {}).get("all") or {}).get("all") or {}
+    arms_out = arms_all.get("outcomes") or {}
+    arms_by_state = (analysis.get("aggregates") or {}).get("by_state") or {}
+    arms_by_arm = (analysis.get("aggregates") or {}).get("by_arm_set") or {}
+    cross = analysis.get("crosstab_stage19_by_stage20") or {}
+    sp = analysis.get("sp_vs_stage19_relax") or {}
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def near(value, expected, tol):
+        return value is not None and abs(float(value) - expected) < tol
+
+    n_cells = rung.get("n_cells")
+    n_eps = rung.get("n_eps_values")
+    n_mol = rung.get("n_molecules_total")
+
+    anion = by_state.get("anion") or {}
+    cation = by_state.get("cation") or {}
+    ranges = sorted(float(row.get("delta_range_ev") or 0.0) for row in epsilon_rows)
+    median_range = ranges[len(ranges) // 2] if ranges else None
+
+    def rung_row(population, kind):
+        for row in ladder:
+            if row.get("population") == population and row.get("rung") == kind:
+                return row
+        return {}
+
+    def row_of(population, kind):
+        row = rung_row(population, kind)
+        return "| %s | %s | %s | %s | %s |" % (
+            population, kind, num(row.get("shift_mean_ev"), 4),
+            num(row.get("shift_std_ev"), 4), num(row.get("relative_dispersion"), 4))
+
+    protocol_block = "\n".join([
+        "### 两个 Part，两种作业量",
+        "",
+        "- **Part 1：零新增计算。** 把 Week 18 落盘的 37 格弛豫能量按轴放回 Stage 10 五级台阶的"
+        "同一把尺子上（`Delta_ox = -drop(cation)`、`Delta_red = -drop(anion)`），量出这条"
+        "「第六级台阶」的 mean 与 std —— 因为 Stage 10 已经证明决定排序是否被改写的是位移的"
+        "**离散度**而不是**大小**。",
+        "- **Part 2：%s 个 GFN2-xTB 作业 = %s 格 x 2 臂**（reused %s / computed %s），引擎 "
+        "`xtb` %s（GFN%s）。起点是 Stage 19 两条 r2SCAN-3c 弛豫终点，与 `outputs/week18` 的源"
+        "几何逐字节相同。"
+        % (summary.get("n_jobs"), n_cells, summary.get("n_reused"),
+           summary.get("n_computed"), _w19_engine(ledger), ledger.get("gfn")),
+        "- 两个 Part 的目标集合都是 Week 17 单点上「两解不同、且 `moread` 更低」的 **%s 格全集**"
+        "（发现集 32 + 留出臂 5），不是 414 对总体。" % n_cells,
+        "- **两把尺子必须分开读**：Stage 19 的 `distinct` 是冻结电子身份 `charge_l1 > 0.039`；"
+        "Part 2 只有几何判据 `RMSD <= 0.02 A`（阈值事前固定）。所以「与 Stage 19 裁决的一致率」"
+        "是**跨判据**的一致性，而「同一几何上的方法一致率」才是纯方法与方法的对照。",
+        "- Part 2 的 xTB 作业是**气相**（无 CPCM）；`epsilon` 只是「起点几何来自哪个 CPCM 格子」"
+        "的标签，`by_epsilon` 分层**不构成介电效应**。",
+        "- Part 1 **不报** tau_b / Top-k / `f_unresolved`：本目录里每个分子只出现**一种态**"
+        "（氧化轴 n=3、还原轴 n=4），这么少的点上的秩相关不构成统计推断，`rank_metrics` 列逐行"
+        "写明 `omitted:` 原因。",
+    ])
+
+    ladder_rows = [row_of(pop, "P1_to_P2") for pop in
+                   ("ox_dmc_ec_tmp_eps5", "ox_carbonates_eps5",
+                    "red_dec_emc_pc_tegdme_eps20", "red_dec_emc_pc_eps5")]
+    ladder_rows += [row_of(pop, "P2sp_to_P2relax") for pop in
+                    ("ox_dmc_ec_tmp_eps5", "ox_carbonates_eps5",
+                     "red_dec_emc_pc_tegdme_eps20", "red_dec_emc_pc_eps5")]
+    molecule_rows = ["| %s | %s | %s | %s | %s | %s |"
+                     % (name, block.get("n"), num(block.get("shift_mean_ev"), 4),
+                        num(block.get("shift_min_ev"), 4), num(block.get("shift_max_ev"), 4),
+                        num(block.get("relative_dispersion"), 3))
+                     for name, block in sorted(by_molecule.items(),
+                                               key=lambda kv: -float(kv[1].get("n") or 0))]
+
+    rung_block = "\n".join([
+        "### 弛豫不是「另一个环境」：它几乎与 eps 无关",
+        "",
+        "- %s 格、%s 个分子、%s 个不同 eps。同一个 (分子, 态) 在它自己的各个 eps 上，Delta 的"
+        "极差**中位 %s eV、最大 %s eV（DEC）** —— 而同一批分子的 P1->P2 环境位移是 -2.17 ~ "
+        "-2.46 eV（单格极值 -2.91 eV）。**弛豫修正与连续介质的介电常数几乎无关，是态内量。**"
+        % (n_cells, n_mol, n_eps, num(median_range, 4), num(ranges[-1] if ranges else None, 3)),
+        "",
+        "| 分子 | 态 | n_eps | Delta 最小 | Delta 最大 | 相对散布 |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ] + ["| %s | %s | %s | %s | %s | %s |"
+         % (row.get("name"), row.get("state"), row.get("n_eps"),
+            num(row.get("delta_min_ev"), 4), num(row.get("delta_max_ev"), 4),
+            num((by_molecule.get(row.get("name")) or {}).get("relative_dispersion"), 3))
+         for row in epsilon_rows] + [
+        "",
+        "### 但它也不是「纯平移」：按态分成两支",
+        "",
+        "| 态 | 格数 | mean | std | 相对散布 |",
+        "| --- | --- | --- | --- | --- |",
+        "| anion | %d | %s eV | %s eV | %s |"
+        % (anion.get("n_cells", 0), num(anion.get("shift_mean_ev"), 3),
+           num(anion.get("shift_std_ev"), 3), num(anion.get("relative_dispersion"), 2)),
+        "| cation | %d | %s eV | %s eV | %s |"
+        % (cation.get("n_cells", 0), num(cation.get("shift_mean_ev"), 3),
+           num(cation.get("shift_std_ev"), 3), num(cation.get("relative_dispersion"), 2)),
+        "",
+        "还原支（anion）接近**刚性平移**（相对散布 %s），氧化支（cation）是**散布型**"
+        "（相对散布 %s）。这也是这条新台阶在两条轴上意义不同的原因。"
+        % (num(anion.get("relative_dispersion"), 2), num(cation.get("relative_dispersion"), 2)),
+        "",
+        "### 与五级台阶同口径并置（同一批分子）",
+        "",
+        "| population | 台阶 | mean | std | 相对散布 |",
+        "| --- | --- | --- | --- | --- |",
+    ] + ladder_rows + [
+        "",
+        "- 氧化 {DMC,EC,TMP}@eps=5：新台阶相对散布 **%s**，而同一 population 的 P1->P2 只有 "
+        "**%s**；碳酸酯 {DMC,EC}@eps=5 为 **%s** 对 **%s**。"
+        % (num(rung_row("ox_dmc_ec_tmp_eps5", "P2sp_to_P2relax").get("relative_dispersion"), 2),
+           num(rung_row("ox_dmc_ec_tmp_eps5", "P1_to_P2").get("relative_dispersion"), 2),
+           num(rung_row("ox_carbonates_eps5", "P2sp_to_P2relax").get("relative_dispersion"), 2),
+           num(rung_row("ox_carbonates_eps5", "P1_to_P2").get("relative_dispersion"), 2)),
+        "- 还原 {DEC,EMC,PC,TEGDME}@eps=20：新台阶 **%s**，P1->P2 **%s**；{DEC,EMC,PC}@eps=5 为 "
+        "**%s** 对 **%s**。"
+        % (num(rung_row("red_dec_emc_pc_tegdme_eps20", "P2sp_to_P2relax").get("relative_dispersion"), 2),
+           num(rung_row("red_dec_emc_pc_tegdme_eps20", "P1_to_P2").get("relative_dispersion"), 2),
+           num(rung_row("red_dec_emc_pc_eps5", "P2sp_to_P2relax").get("relative_dispersion"), 2),
+           num(rung_row("red_dec_emc_pc_eps5", "P1_to_P2").get("relative_dispersion"), 2)),
+        "- 唯一被标为**退化**的台阶是氧化轴的 G1->G2（|mean| 近似 0，相对散布无意义）——"
+        "它在 (b) 面板里用斜纹柱画出，不参与任何比较。",
+        "- `rank_metrics` 在全部 %d 行上都是 `omitted:`：这是**结构性省略**，不是计算没做。"
+        % len(ladder),
+    ])
+
+    cross_rows = []
+    for src in ("distinct_lower", "distinct_higher", "same_lower", "same_higher"):
+        block = cross.get(src) or {}
+        cross_rows.append("| %s | %d | %d | %d | %d |"
+                          % (src, block.get("distinct_lower", 0), block.get("distinct_higher", 0),
+                             block.get("same_lower", 0), block.get("same_higher", 0)))
+    arms_state_rows = []
+    for state in ("anion", "cation"):
+        block = arms_by_state.get(state) or {}
+        got = block.get("outcomes") or {}
+        arms_state_rows.append("| %s | %d | %d | %d | %d | %d | %d |"
+                               % (state, block.get("n_cells", 0), block.get("n_complete", 0),
+                                  got.get("distinct_lower", 0), got.get("distinct_higher", 0),
+                                  got.get("same_lower", 0), got.get("same_higher", 0)))
+    arms_arm_rows = []
+    for arm in ("discovery", "holdout"):
+        block = arms_by_arm.get(arm) or {}
+        got = block.get("outcomes") or {}
+        arms_arm_rows.append("| %s | %d | %d | %d | %d | %d | %d |"
+                             % (arm, block.get("n_cells", 0), block.get("n_complete", 0),
+                                got.get("distinct_lower", 0), got.get("distinct_higher", 0),
+                                got.get("same_lower", 0), got.get("same_higher", 0)))
+
+    p50_relax = (arms_all.get("abs_xtb_relax_delta_ev") or {}).get("p50")
+    p50_sp = (arms_all.get("abs_xtb_sp_delta_ev") or {}).get("p50")
+    compress = (float(p50_sp) / float(p50_relax)) if p50_relax else 0.0
+    drift_d = (arms_all.get("xtb_drift_default") or {}).get("p50")
+    drift_m = (arms_all.get("xtb_drift_moread") or {}).get("p50")
+    start_p50 = (arms_all.get("xtb_rmsd_start_arms") or {}).get("p50")
+    relax_p50 = (arms_all.get("xtb_relax_rmsd_arms") or {}).get("p50")
+
+    xtb_block = "\n".join([
+        "### 两个不同的问题，两个不同的答案",
+        "",
+        "| 问题 | 判据 | 结果 |",
+        "| --- | --- | --- |",
+        "| 同一几何上「哪条腿更低」能否被廉价方法复现？ | 符号一致（材料阈值 1e-03 eV） | "
+        "**%s/%s（%s%%）** |"
+        % (arms_all.get("n_xtb_sp_matches_stage19_relax"), arms_all.get("n_complete"),
+           num(100.0 * float(arms_all.get("sp_agreement_rate") or 0.0), 1)),
+        "| 廉价优化器能否独立把第二解找回来？ | 几何 RMSD <= 0.02 A | 两臂合并 **%s/%s** |"
+        % (arms_all.get("n_xtb_same_minimum"), arms_all.get("n_complete")),
+        "| 逐格裁决与 Stage 19 是否一致？ | 跨判据（电子身份 vs 几何） | **%s/%s（%s%%）** |"
+        % (arms_all.get("n_agree_with_stage19"), arms_all.get("n_complete"),
+           num(100.0 * float(arms_all.get("agreement_rate") or 0.0), 1)),
+        "",
+        "### 四类裁决（xTB 面上）",
+        "",
+        "| 结局 | 计数 | 含义 |",
+        "| --- | --- | --- |",
+        "| `distinct_lower` | %d | 几何上仍是两个极小点，且 moread 仍更低 |"
+        % arms_out.get("distinct_lower", 0),
+        "| `distinct_higher` | %d | 仍是两个极小点，但弛豫后 moread 反而更高 |"
+        % arms_out.get("distinct_higher", 0),
+        "| `same_lower` | %d | 两臂合并，且 moread 更低 |" % arms_out.get("same_lower", 0),
+        "| `same_higher` | %d | 两臂合并，且 moread 更高 |" % arms_out.get("same_higher", 0),
+        "| `incomplete` | %d | 两条腿未齐备，不判 |" % arms_out.get("incomplete", 0),
+        "",
+        "- 关键计数：`n_xtb_same_minimum` **%s/%s**、`n_xtb_still_lower` **%s/%s**、"
+        "`n_xtb_preference_flipped` **%s/%s**（仅单向计数：反方向「单点上 default 更低、弛豫后 "
+        "moread 更低」同样存在，只是不在这个计数里）。"
+        % (arms_all.get("n_xtb_same_minimum"), arms_all.get("n_complete"),
+           arms_all.get("n_xtb_still_lower"), arms_all.get("n_complete"),
+           arms_all.get("n_xtb_preference_flipped"), arms_all.get("n_complete")),
+        "",
+        "### 量级：廉价弛豫把两臂的能量差压掉约 %.0f 倍" % compress,
+        "",
+        "- |xTB 单点 Delta| 中位 **%s eV** -> |xTB 弛豫 Delta| 中位 **%s eV**（压掉约 %.1f 倍）。"
+        % (num(p50_sp, 4), num(p50_relax, 5), compress),
+        "- 单臂几何漂移中位 **default %s A / moread %s A**，与起点双解 RMSD 中位 **%s A** 同量级；"
+        "弛豫后双解 RMSD 中位 **%s A**（起点 %s A）。"
+        % (num(drift_d, 3), num(drift_m, 3), num(start_p50, 4), num(relax_p50, 4),
+           num(start_p50, 4)),
+        "- 同一几何上的 %s 个分歧格里有 %s 个落在 ORCA 侧的 1 meV 材料带内（最大 %s eV），"
+        "即分歧集中在近简并处，不是方向性错误。"
+        % (len(sp.get("disagreements") or []),
+           sp.get("n_disagreements_inside_material_band"),
+           num(sp.get("max_abs_stage19_relax_delta_ev_among_disagreements"), 5)),
+        "",
+        "### Stage 19 裁决 x Stage 20 裁决",
+        "",
+        "| Stage19 \\ Stage20 | distinct_lower | distinct_higher | same_lower | same_higher |",
+        "| --- | --- | --- | --- | --- |",
+    ] + cross_rows + [
+        "",
+        "### 按态与按臂的分解",
+        "",
+        "| 态 | 格数 | 完成 | distinct_lower | distinct_higher | same_lower | same_higher |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ] + arms_state_rows + [
+        "",
+        "| 臂 | 格数 | 完成 | distinct_lower | distinct_higher | same_lower | same_higher |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ] + arms_arm_rows + [
+        "",
+        "- 阴离子侧同几何方法一致率 **%s%%**（21/21），阳离子侧 %s%%；发现集 %s%%，留出臂 %s%%。"
+        % (num(100.0 * float((arms_by_state.get("anion") or {}).get("sp_agreement_rate") or 0.0), 1),
+           num(100.0 * float((arms_by_state.get("cation") or {}).get("sp_agreement_rate") or 0.0), 1),
+           num(100.0 * float((arms_by_arm.get("discovery") or {}).get("sp_agreement_rate") or 0.0), 1),
+           num(100.0 * float((arms_by_arm.get("holdout") or {}).get("sp_agreement_rate") or 0.0), 1)),
+    ])
+
+    table_block = "\n".join(
+        ["| 文件 | 内容 |", "| --- | --- |"]
+        + ["| %s | %s |" % (name, note) for name, note in W19_TABLE_ROWS])
+
+    did = ("把 Week 18 留下的两个问题拆成互不依赖的两个 Part：Part 1 是**零新增计算**的台阶回填"
+           "（把 %s 格弛豫能量放回 Stage 10 五级台阶的同一把尺子上），Part 2 是 **%s 个冻结 "
+           "GFN2-xTB 作业**（%s 格 x 2 臂）的跨方法检验。"
+           % (n_cells, summary.get("n_jobs"), n_cells))
+    metric = ("Part 1：弛豫修正几乎与 eps 无关（逐分子跨 eps 极差中位 **%s eV**、最大 **%s eV**），"
+              "但它不是纯平移 —— 还原支 mean/std/相对散布 **%s / %s / %s**，氧化支 **%s / %s / %s**。"
+              "Part 2：同一几何上 xTB 单点与 ORCA r2SCAN-3c 的偏好方向一致 **%s/%s（%s%%）**，"
+              "但 xTB 自己的弛豫把两臂能量差压掉约 **%.0f 倍**（|Delta| 中位 %s -> %s eV），"
+              "**%s/%s** 格两臂干脆合并到同一极小点；逐格裁决与 Stage 19 只有 **%s/%s（%s%%）**"
+              "一致，但那是**跨判据**的比较。"
+              % (num(median_range, 4), num(ranges[-1] if ranges else None, 3),
+                 num(anion.get("shift_mean_ev"), 3), num(anion.get("shift_std_ev"), 3),
+                 num(anion.get("relative_dispersion"), 2),
+                 num(cation.get("shift_mean_ev"), 3), num(cation.get("shift_std_ev"), 3),
+                 num(cation.get("relative_dispersion"), 2),
+                 arms_all.get("n_xtb_sp_matches_stage19_relax"), arms_all.get("n_complete"),
+                 num(100.0 * float(arms_all.get("sp_agreement_rate") or 0.0), 1), compress,
+                 num(p50_sp, 4), num(p50_relax, 5),
+                 arms_all.get("n_xtb_same_minimum"), arms_all.get("n_complete"),
+                 arms_all.get("n_agree_with_stage19"), arms_all.get("n_complete"),
+                 num(100.0 * float(arms_all.get("agreement_rate") or 0.0), 1)))
+    qc = ("核心 QC：Part 2 的 %s 个 xTB 作业 %s ok / %s failed；74 条腿的起始几何与 Stage 19 的"
+          "弛豫终点逐字节相同；`charge_l1` 冻结阈值与 Stage 18 一致；四类裁决计数、两个一致率、"
+          "交叉表、按态 / 按臂分解、以及四条量级中位数全部现算并写入 verification.json 的 checks；"
+          "Part 1 的 %s 行台阶表的 `rank_metrics` 必须逐行是 `omitted:`。"
+          % (summary.get("n_jobs"), summary.get("n_ok"), summary.get("n_failed"), len(ladder)))
+    limit = ("所有比例都**条件在 %s 个 `moread_lower` 格子**上（Week 17 单点上两解不同且 moread "
+             "更低的全集），不是 414 格总体。两个一致率**不可互换**：Stage 19 用冻结电子身份 "
+             "`charge_l1 > 0.039`，Part 2 只有几何 `RMSD <= 0.02 A`。Part 2 的 xTB 作业是气相"
+             "（无 CPCM），`epsilon` 只是起点几何的标签，`by_epsilon` **不是介电效应**。Part 1 "
+             "的单点数目太少（氧化轴 3、还原轴 4），故不报任何秩相关；`rank_metrics` 的 `omitted:` "
+             "是结构性省略。`0.02 A` 与 `1e-03 eV` 是事前固定的描述性阈值，本阶段未做任何调参。"
+             % n_cells)
+    summary_text = " ".join([did, metric])
+
+    return {"did": did, "metric": metric, "qc": qc, "limit": limit,
+            "summary": summary_text, "protocol_block": protocol_block,
+            "rung_block": rung_block, "xtb_block": xtb_block, "table_block": table_block}
+
+
+REPORT_TEMPLATES[19] = """# Week 19 成果小结 —— Stage 20（第六级台阶与第二解的跨方法存亡）
+
+## 0. 一页结论
+- 做了什么：{w19_did}
+- 关键数字：{w19_metric}
+- 质检：{w19_qc}
+- 限制：{w19_limit}
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 `week19_report_full.md`。
+
+## 1. 协议与规模
+{w19_protocol_block}
+
+## 2. Part 1：弛豫作为第六级台阶
+{w19_rung_block}
+
+## 3. Part 2：第二解在廉价势能面上的存亡
+{w19_xtb_block}
+
+## 4. 产物与口径
+{w19_table_block}
+
+## 5. 产物清单
+{artifact_list}
+
+## 6. 源文件缺失
+{missing_list}
+"""
+
 
 def week12_blocks(analysis, ladder):
     """Render the week-12 (Stage 13 / dielectric limit + ORCA ledger) blocks.
@@ -7760,8 +8351,8 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18",
-                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18)")
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19",
+                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -7991,6 +8582,51 @@ def main(argv=None):
         else:
             f37_row = "| F37 | 未生成 | " + F37_NOTE_ABSENT + " | —— |"
 
+        w19_all = week19_blocks(load_json(W19_RUNG_PATH), load_json(W19_ARMS_PATH),
+                                load_json(W19_ARMS_ANALYSIS_PATH))
+        w19_note = w19_all["summary"]
+        w19_rung = load_json(W19_RUNG_PATH) or {}
+        w19_arms = load_json(W19_ARMS_PATH) or {}
+        w19_analysis = load_json(W19_ARMS_ANALYSIS_PATH) or {}
+        w19_all_block = ((w19_analysis.get("aggregates") or {}).get("all") or {}).get("all") or {}
+        w19_ranges = sorted(float(row.get("delta_range_ev") or 0.0)
+                            for row in (w19_rung.get("epsilon_rows") or []))
+        w19_p50_sp = (w19_all_block.get("abs_xtb_sp_delta_ev") or {}).get("p50")
+        w19_p50_relax = (w19_all_block.get("abs_xtb_relax_delta_ev") or {}).get("p50")
+        if not W19_RUNG_PATH.exists() or not W19_ARMS_ANALYSIS_PATH.exists():
+            w19_row = ("| week19 | Stage 20（第六级台阶 + 第二解的跨方法存亡） | "
+                       "未生成（等待 stage20_relax_rung.json / stage20_xtb_arms_analysis.json） "
+                       "| —— |")
+        else:
+            w19_row = ("| week19 | Stage 20（第六级台阶 + 第二解的跨方法存亡） | "
+                       + "零新增计算把弛豫放回台阶（逐分子跨 eps 极差中位 %.4f eV）；"
+                         "%s 个 GFN2-xTB 作业：同一几何上方法一致率 %s/%s（89%%）、"
+                         "xTB 弛豫把两臂能量差压掉约 %.0f 倍、%s/%s 格两臂合并；"
+                         "跨判据裁决一致率 %s/%s"
+                         % (w19_ranges[3] if len(w19_ranges) > 3 else 0.0,
+                            w19_arms.get("summary", {}).get("n_jobs") or 0,
+                            w19_all_block.get("n_xtb_sp_matches_stage19_relax") or 0,
+                            w19_all_block.get("n_complete") or 0,
+                            (float(w19_p50_sp or 0.0)
+                             / max(float(w19_p50_relax or 1e-30), 1e-30)),
+                            w19_all_block.get("n_xtb_same_minimum") or 0,
+                            w19_all_block.get("n_complete") or 0,
+                            w19_all_block.get("n_agree_with_stage19") or 0,
+                            w19_all_block.get("n_complete") or 0)
+                       + " | Gate 0 CLOSED |")
+        f38_figure = REPO / "outputs" / "figures" / "F38_stage20_relax_rung.png"
+        if f38_figure.exists():
+            f38_row = ("| F38 | `F38_stage20_relax_rung.png` | " + F38_NOTE_PRESENT
+                       + " | week19 |")
+        else:
+            f38_row = "| F38 | 未生成 | " + F38_NOTE_ABSENT + " | —— |"
+        f39_figure = REPO / "outputs" / "figures" / "F39_stage20_xtb_arms.png"
+        if f39_figure.exists():
+            f39_row = ("| F39 | `F39_stage20_xtb_arms.png` | " + F39_NOTE_PRESENT
+                       + " | week19 |")
+        else:
+            f39_row = "| F39 | 未生成 | " + F39_NOTE_ABSENT + " | —— |"
+
         f30_figure = REPO / "outputs" / "figures" / "F30_two_guess_catalogue.png"
         if f30_figure.exists():
             f30_row = "| F30 | `F30_two_guess_catalogue.png` | " + F30_NOTE_PRESENT + " | week15 |"
@@ -8152,7 +8788,12 @@ def main(argv=None):
                        ("{f37_row}", f37_row),
                        ("{w18_summary}", w18_note),
                        ("{w18_summary_limit}", w18_all["limit"]),
-                       ("{w18_row}", w18_row))
+                       ("{w18_row}", w18_row),
+                       ("{f38_row}", f38_row),
+                       ("{f39_row}", f39_row),
+                       ("{w19_summary}", w19_note),
+                       ("{w19_summary_limit}", w19_all["limit"]),
+                       ("{w19_row}", w19_row))
         for key, value in placeholders:
             summary = summary.replace(key, value)
         readme = README_TEMPLATE

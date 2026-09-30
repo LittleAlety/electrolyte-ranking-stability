@@ -522,7 +522,7 @@ def missing_cells(cells):
             for c in cells if not c.get("both_arms_ok")]
 
 
-def write_manifest(outdir, data_dir, figure_paths, inputs, payload):
+def _build_manifest_head(outdir, data_dir, figure_paths, inputs, payload):
     cells = payload["cells"]
     aggregates = payload["aggregates"]
     overall = aggregates["all"]["all"]
@@ -643,11 +643,8 @@ def write_manifest(outdir, data_dir, figure_paths, inputs, payload):
                     or "none"))
     lines.append("")
     return lines
-# The head builder above stops after F36; this wrapper appends the F37 section
-# (defined below, next to the other rendering helpers) and writes the file.
-
-_build_manifest_head = write_manifest
-
+# This wrapper appends the F37 section (defined below, next to the other
+# rendering helpers) to the F36 head built above, then writes the file.
 
 def write_manifest(outdir, data_dir, figure_paths, inputs, payload, caption37):
     lines = _build_manifest_head(outdir, data_dir, figure_paths, inputs, payload)

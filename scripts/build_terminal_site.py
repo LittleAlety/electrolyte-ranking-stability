@@ -77,6 +77,8 @@ FIGURES = [
     ("F35", "F35_stage18_selfdiagnosis.png", 17, "(e) 单变量筛查前 8 名 |AUC-0.5| 与 LOO 裁决（gap_warn_value 第一、LOO 胜基线但留出臂输）；(f) gap_warn_value 正负例分布与冻结阈值 -0.0395；(g) 留出臂 54 格按冻结规则逐行打分（TP=0）；(h) 单边筛查：presence 规则放行 140/414、敏感度 1.000、特异度 0.371"),
     ("F36", "F36_stage19_relax_outcomes.png", 18, "(a) 单点 Δ 对弛豫后 Δ（按结局着色，y=x 与 ±1 meV 带；|Δ| 中位数 0.1198 → 0.00196 eV，缩小 61 倍）；(b) 37 个 moread_lower 格子的裁决：distinct_lower 5 / distinct_higher 24 / same_lower 0 / same_higher 8（已完成 37）；(c) 按 ε 的结局堆叠；(d) 按态与分子的分解"),
     ("F37", "F37_stage19_identity_geometry.png", 18, "(e) 弛豫前后 charge_l1 对数散点、冻结阈值 0.039 与 ±20% 贴阈值带（弛豫前后都在阈值以上 29/37，贴阈值 0 格）；(f) 双解几何 RMSD 对 Δ 漂移（0.02 Å 同极小点参考线，下方 6/37 格）；(g) 两臂弛豫能量降配对（默认解中位降 1.876 eV vs moread 1.666 eV）；(h) 自旋中心迁移矩阵（argmax 仅作描述，不作判据）"),
+    ("F38", "F38_stage20_relax_rung.png", 19, "(a) 37 个格子的弛豫位移 Δ = −能量降（eV）对 ε（对数轴，按态着色、逐分子连线；逐分子 ε 极差中位 0.0263 eV、最大 0.215 eV（DEC），即弛豫修正几乎与介电常数无关）；(b) 同一把尺子：4 个可比 population 上 5 个冻结台阶与第六级台阶（弛豫）的相对散布 std/|mean|（对数轴；斜纹柱 = 氧化轴 G1→G2 的 |mean|≈0，相对散布无意义）；(c) (|mean|, std) 平面：6 个台阶 × population 共 30 行，实心大点 = 新台阶；(d) 7 个分子的 Δ 均值，误差棒 = 跨 ε 极差——还原支近乎刚性平移（均值 -1.953 eV、std 0.160 eV、相对散布 0.08），氧化支为散布型（均值 -0.610 eV、std 0.315 eV、相对散布 0.52）"),
+    ("F39", "F39_stage20_xtb_arms.png", 19, "(a) 两臂起点 RMSD 对 xTB 弛豫后 RMSD（Å，对数轴，按 4 类结局着色，虚线 = 0.02 Å 同极小点阈值；起点中位 0.4716 → 弛豫后中位 0.8078 Å，6/37 格两臂合并）；(b) 同一几何上 xTB 单点 Δ 对 ORCA r2SCAN-3c 弛豫 Δ（eV，y=x 与 ±1 meV 带；偏好方向一致 33/37 = 89%，4 个分歧已圈出）；(c) 两臂能量差的四个读数（ORCA 单点 / ORCA 弛豫 / xTB 单点 / xTB 弛豫，对数轴，中位 1.198e-01 / 1.960e-03 / 7.171e-03 / 2.133e-04 eV）——xTB 弛豫把差异压掉约 33.6 倍；(d) 单臂漂移对起点双解 RMSD（Å，y=x，对数轴；两臂漂移中位 0.651 / 0.657 Å 与起点差异中位 0.4716 Å 同量级，故几何 distinct 部分继承自起点）。分母：Stage 19 单点两解不同且 moread 更低的 37 格，不是 414 格总体的发生率"),
 ]
 
 # ---------------------------------------------------------------- week table
@@ -101,6 +103,7 @@ WEEKS = [
     (16, "26_week16_report.md", "Stage 17", "P2 腿换 moread 初猜重算 54 格，无任何已发布结论被改写；32 个漏解格两解皆自旋纯双重态，差异主轴是电荷重组"),
     (17, "27_week17_report.md", "Stage 18", "零新增作业：全目录 414 对身份普查闭合（可测 276 对 AUC 1.000、规则不一致 0 对）；零成本自诊断的冻结规则在留出臂输给多数类（TP 0），唯一站得住的正面结论是单边筛查「无警告 ⇒ 安全」"),
     (18, "28_week18_report.md", "Stage 19", "37 个 moread_lower 格各让两条 SCF 解做几何弛豫（74 个 Opt 作业）：5/37 仍保持 moread 更低、8/37 在终点合并为同一电子态、32 格单点偏好被几何反转；|Delta| 中位 0.11983 -> 0.00196 eV"),
+    (19, "29_week19_report.md", "Stage 20", "所以「第二解」不是一个「廉价方法也能独立复现」的概念，而是一个必须由昂贵方法定义、廉价方法只能在给定几何上读出的概念。"),
 ]
 
 PIPELINE = [
@@ -276,7 +279,7 @@ def counts():
         # Recorded, not measured: pytest cannot be run from the generator.  Bump
         # it in the same commit that adds or removes a test, otherwise the page
         # will advertise a number the suite no longer produces.
-        "tests_passed": 920,
+        "tests_passed": 970,
     }
 
 

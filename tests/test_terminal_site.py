@@ -97,9 +97,9 @@ def test_data_js_is_a_json_payload_with_the_expected_shape():
     payload = _payload()
     for key in ("repo", "counts", "pipeline", "gates", "weeks", "figures"):
         assert key in payload, "payload misses " + key
-    assert len(payload["weeks"]) == 18
+    assert len(payload["weeks"]) == 19
     assert len(payload["pipeline"]) == 5
-    assert payload["counts"]["weeks"] == 18
+    assert payload["counts"]["weeks"] == 19
 
 
 def test_figure_payload_covers_exactly_the_repository_figures():
@@ -107,7 +107,7 @@ def test_figure_payload_covers_exactly_the_repository_figures():
     on_disk = sorted(p.name for p in REPO_FIGURES.glob("*.png"))
     listed = sorted(row["file"] for row in payload["figures"])
     assert listed == on_disk, "the site and outputs/figures/ disagree on the figure set"
-    assert len(listed) == 38
+    assert len(listed) == 40
 
 
 def test_every_figure_has_a_caption_and_a_hash():
@@ -131,9 +131,24 @@ def test_every_week_points_at_a_report_that_exists():
         assert week["stage"].strip() and week["title"].strip()
 
 
-def test_week_numbers_are_one_to_eighteen():
+def test_week_numbers_are_one_to_nineteen():
     numbers = [w["n"] for w in _payload()["weeks"]]
-    assert numbers == list(range(1, 19))
+    assert numbers == list(range(1, 20))
+
+
+def test_latest_week_tag_is_verbatim_from_its_own_report():
+    """The latest week's one-liner must be a literal slice of section 0.
+
+    Only the emphasis markers (``**``) and the inline code ticks are removed;
+    the site may not paraphrase a headline, and it may not invent a number.
+    """
+    week = _payload()["weeks"][-1]
+    assert week["n"] == 19 and week["doc"] == "docs/29_week19_report.md"
+    lines = (REPO_ROOT / week["doc"]).read_text(encoding="utf-8").splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith("## 0."))
+    end = next(i for i, line in enumerate(lines) if i > start and line.startswith("## "))
+    plain = "\n".join(lines[start + 1:end]).replace("**", "").replace("`", "")
+    assert week["tag"] in plain, "the week-19 tag is not verbatim from the report"
 
 
 def test_gate_payload_matches_the_frozen_gate_records():
