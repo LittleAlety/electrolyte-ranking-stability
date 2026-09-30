@@ -151,7 +151,9 @@
       ["cat <week>", "打印某一周的结论（如 cat " + LAST_WEEK.n + "）"],
       ["read <week>", "在新标签页打开该周完整报告 (.md)"],
       ["figures", FIGS.length + " 张图的总目录"],
+      ["gallery [week]", "图库网格：缩略图预览，点击/回车看大图"],
       ["open <F-id>", "在终端里内联看图（如 open " + LAST_FIG.id + "）"],
+      ["search <关键词>", "在周报标题/标签/结论与图注、图号里搜关键词"],
       ["theme [name]", "切换荧光色: green / amber / ice / bone"],
       ["repo", "源码与完整报告的入口"],
       ["clear", "清屏 (Ctrl+L)"],
@@ -237,6 +239,7 @@
       blank();
     }
     emit("完整报告: " + w.doc + "   (read " + w.n + " 在新标签页打开)", "dim2");
+    syncUrl("w", w.n);
   };
 
   CMDS.read = function (args) {
@@ -261,6 +264,27 @@
     emit("用 open <id> 在终端里看图（例如 open " + LAST_FIG.id + "）。", "dim2");
   };
 
+  CMDS.gallery = function (args) {
+    var only = args.length ? normWeek(args[0]) : null;
+    var rows = FIGS.filter(function (f) { return only === null || f.week === only; });
+    if (!rows.length) { emit("没有匹配的图。用法: gallery [week]", "warn"); return; }
+    emit("图库" + (only ? "（week " + only + "）" : "（全部 " + FIGS.length + " 张）")
+      + " — 点击缩略图或按回车看大图", "acc");
+    var cells = rows.map(function (f) {
+      var dim = f.w && f.h ? ' width="' + f.w + '" height="' + f.h + '"'
+        : ' width="320" height="213"';
+      return '<button type="button" class="gcell" data-fig="' + esc(f.id) +
+        '" aria-label="' + esc("open " + f.id + " — " + f.caption) + '">' +
+        '<img src="assets/figures/' + esc(f.file) + '" loading="lazy" decoding="async"' +
+        dim + ' alt="' + esc(f.id + " " + f.caption) + '">' +
+        '<span class="gcell-meta"><b>' + esc(f.id) + "</b><small>wk " +
+        esc(String(f.week)) + "</small></span>" +
+        '<span class="gcell-cap">' + esc(f.caption) + "</span></button>";
+    });
+    emit('<div class="gallery">' + cells.join("") + "</div>", "out", { raw: true });
+    emit("显示 " + rows.length + " 张。open <id> 看大图，figures 看文本目录。", "dim2");
+  };
+
   CMDS.open = function (args) {
     var id = normFig(args[0]);
     if (!id) { emit("用法: open <F-id>   （例如 open " + LAST_FIG.id + "；先用 figures 列表）", "warn"); return; }
@@ -268,12 +292,43 @@
     if (!f) { emit("没有 " + id + " 这张图。先用 figures 列表。", "warn"); return; }
     emit("opening " + f.file + "  (" + (f.bytes / 1024).toFixed(0) + " KB)", "acc");
     emit("week " + f.week + " \u00b7 sha256 " + f.sha.slice(0, 16) + "\u2026 \u00b7 " + f.caption, "dim");
+    var dim = f.w && f.h ? ' width="' + f.w + '" height="' + f.h + '"' : "";
     var html = '<figure class="fig"><img src="assets/figures/' + esc(f.file) +
-      '" alt="' + esc(f.id + " " + f.caption) + '" loading="lazy">' +
+      '" alt="' + esc(f.id + " " + f.caption) + '" loading="lazy"' + dim + ">" +
       "<figcaption>" + esc(f.id + " \u2014 " + f.caption) +
       '<span class="meta">' + esc("source: outputs/figures/" + f.file +
         "  \u00b7  sha256 " + f.sha) + "</span></figcaption></figure>";
     emit(html, "out", { raw: true });
+    syncUrl("fig", f.id);
+  };
+
+  CMDS.search = function (args) {
+    var q = args.join(" ").trim().toLowerCase();
+    if (!q) {
+      emit("用法: search <关键词>   （在周报标题/标签/结论与图注、图号上做不区分大小写子串过滤）", "warn");
+      return;
+    }
+    var weeks = WEEKS.filter(function (w) {
+      return (w.title + " " + w.tag + " " + w.summary).toLowerCase().indexOf(q) >= 0;
+    });
+    var figs = FIGS.filter(function (f) {
+      return (f.id + " " + f.caption).toLowerCase().indexOf(q) >= 0;
+    });
+    emit('search "' + q + '" — ' + weeks.length + " 周 · " + figs.length + " 图", "acc");
+    if (weeks.length) {
+      emit("周报", "acc");
+      emitTbl(table(["wk", "stage", "conclusion"], weeks.map(function (w) {
+        return [padL(String(w.n), 2), w.stage, w.tag];
+      })), "out");
+    }
+    if (figs.length) {
+      emit("图表", "acc");
+      emitTbl(table(["id", "wk", "caption"], figs.map(function (f) {
+        return [f.id, String(f.week), f.caption];
+      })), "out");
+    }
+    if (!weeks.length && !figs.length) emit("没有命中。", "dim2");
+    else emit("cat <week> 看结论，open <id> 看大图。", "dim2");
   };
 
   CMDS.theme = function (args) {
@@ -331,7 +386,9 @@
     "gate": "status", "gates": "status", "st": "status", "info": "about",
     "contact": "contacts", "git": "repo", "gh": "repo", "pages": "repo",
     "figure": "figures", "fig": "figures", "show": "open", "view": "open",
-    "cat": "cat", "more": "cat", "type": "cat", "colour": "theme", "color": "theme"
+    "grid": "gallery", "find": "search", "grep": "search",
+    "cat": "cat", "more": "cat", "type": "cat", "week": "cat", "wk": "cat",
+    "colour": "theme", "color": "theme"
   };
   function resolve(name) {
     name = String(name || "").toLowerCase();
@@ -372,6 +429,42 @@
       return;
     }
     CMDS[cmd](args);
+  }
+
+  /* ------------------------------------------------------------ deep links */
+  /* ?fig=F30 / #F30 open a figure, ?w=15 / #week15 print a week.  `open` and
+     `cat` write the address bar back with replaceState, and every history
+     move re-routes, so back/forward, shared links and pasted URLs agree with
+     what the terminal is actually showing. */
+  function urlTarget() {
+    var m = /[?&]fig=([^&#]+)/i.exec(location.search || "");
+    if (m) return "open " + decodeURIComponent(m[1]);
+    m = /[?&]w=([^&#]+)/i.exec(location.search || "");
+    if (m) return "cat " + decodeURIComponent(m[1]);
+    var h = (location.hash || "").replace(/^#/, "");
+    try { h = decodeURIComponent(h); } catch (e) { }
+    h = h.trim();
+    if (!h) return null;
+    if (/^f\s*\d+$/i.test(h)) return "open " + h;
+    if (/^(week|w)\s*\d+$/i.test(h)) return "cat " + h.replace(/^(week|w)/i, "");
+    if (document.getElementById(h)) return null;   /* a real in-page anchor */
+    return h;                                      /* chips: #status, #figures, "#cat 15" */
+  }
+
+  function syncUrl(key, value) {
+    try {
+      window.history.replaceState(null, "", "?" + key + "=" + encodeURIComponent(value));
+    } catch (e) { }
+  }
+
+  var lastTarget = null, lastRoutedAt = 0;
+  function route() {
+    var target = urlTarget();
+    if (!target) return;
+    var now = Date.now();
+    if (target === lastTarget && now - lastRoutedAt < 500) return;
+    lastTarget = target; lastRoutedAt = now;
+    run(target);
   }
 
   /* ----------------------------------------------------------- completion */
@@ -449,6 +542,13 @@
     }
     var rep = document.getElementById("chip-report-latest");
     if (rep && last.doc) rep.setAttribute("href", String(last.doc).replace(/^docs\//, ""));
+    [0, 1].forEach(function (i) {
+      var chip = document.getElementById("chip-gate" + i), g = GATES[i];
+      if (!chip || !g) return;
+      chip.textContent = "Gate " + i + " " + g.status;
+      chip.classList.toggle("ok", g.status === "CLOSED");
+      chip.classList.toggle("warn", g.status !== "CLOSED");
+    });
     var meta = document.querySelector('meta[name="description"]');
     if (meta) {
       meta.setAttribute("content", meta.getAttribute("content")
@@ -541,6 +641,12 @@
   });
 
   scroll.addEventListener("click", function (e) {
+    var cell = e.target.closest ? e.target.closest(".gcell") : null;
+    if (cell) {
+      run("open " + cell.getAttribute("data-fig"));
+      input.focus({ preventScroll: true });
+      return;
+    }
     if (e.target.closest("a, img, figure")) return;
     if (window.getSelection && String(window.getSelection()).length) return;
     input.focus();
@@ -555,16 +661,9 @@
   buildHints();
   boot();
 
-  var hash = (location.hash || "").replace(/^#/, "").trim();
-  var hashText = hash ? decodeURIComponent(hash) : "";
-  if (hashText && !document.getElementById(hashText)) {
-    setTimeout(function () { run(hashText.replace(/^week(\d)/i, "cat $1")); }, 260);
-  }
+  if (urlTarget()) setTimeout(route, 260);
   input.focus({ preventScroll: true });
 
-
-  window.addEventListener("hashchange", function () {
-    var h = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
-    if (h && !document.getElementById(h)) run(h.replace(/^week(\d)/i, "cat $1"));
-  });
+  window.addEventListener("popstate", route);
+  window.addEventListener("hashchange", route);
 })();

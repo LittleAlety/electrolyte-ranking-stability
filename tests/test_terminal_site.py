@@ -176,9 +176,12 @@ def test_terminal_js_derives_the_week_and_figure_counts():
 
     # index.html is a hand-maintained asset too, so its prose must not name a
     # week that has since been superseded -- the numbers it shows are spans that
-    # ``fillDynamic()`` overwrites from the payload at boot.
-    for stale in ("Week 12 / Stage 13", "22_week12_report.md", "cat 12",
-                  "Week 14 / Stage 15", "24_week14_report.md", "cat 14"):
+    # ``fillDynamic()`` overwrites from the payload at boot.  The latest-report
+    # link is deliberately *not* pinned to a filename here; the payload names
+    # it, and test_latest_week_report_link_resolves_without_hardcoding pins the
+    # mechanism instead of a particular week.
+    for stale in ("Week 12 / Stage 13", "cat 12",
+                  "Week 14 / Stage 15", "cat 14"):
         assert stale not in html, "stale week reference in index.html: " + stale
     for hook in ('class="js-weeks"', 'class="js-figures"', 'class="js-latest"',
                  'id="chip-report-latest"', 'id="chip-cat-latest"'):
@@ -196,3 +199,74 @@ def test_check_mode_reports_the_site_as_consistent():
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "OK" in result.stdout
+
+
+def test_404_page_exists_and_stays_inside_the_published_folder():
+    """404.html is served from the site root for *any* missing path.
+
+    On a project Pages site a root-absolute ``href="/"`` or ``src="/..."``
+    resolves against the user-site root, not ``/electrolyte-ranking-stability/``
+    -- exactly how the first version lost its stylesheet and its way home.
+    """
+    page = DOCS / "404.html"
+    assert page.exists(), "docs/404.html is required by GitHub Pages"
+    html = page.read_text(encoding="utf-8")
+    assert 'href="/"' not in html, '404.html must not link to the user-site root'
+    assert 'src="/' not in html, "404.html must not use a root-absolute asset path"
+    assert "assets/terminal.css" in html, "404.html must still load the stylesheet"
+    assert "data.js" not in html, "the 404 must not depend on the payload to stay styled"
+    for match in re.findall(r'(?:src|href)="([^"]+)"', html):
+        if match.startswith(("http://", "https://", "#", "data:", "mailto:")):
+            continue
+        target = match.split("#", 1)[0].split("?", 1)[0]
+        if not target or not target.strip("./"):
+            continue
+        assert (DOCS / target).exists(), "404.html points outside docs/: " + match
+
+
+def test_404_counts_are_written_by_the_generator():
+    """The stale "12 周、26 张图" now follows the payload, not a hand edit."""
+    payload = _payload()
+    html = (DOCS / "404.html").read_text(encoding="utf-8")
+    assert ("%d 周" % payload["counts"]["weeks"]) in html
+    assert ("%d 张图" % payload["counts"]["figures"]) in html
+
+
+def test_index_html_does_not_hardcode_a_week_report_link():
+    """Adding week 16 must not leave a dead ``NN_weekNN_report.md`` in the markup.
+
+    The latest-report chip is filled from the payload at boot, so the path is
+    never typed into ``index.html``.
+    """
+    html = (DOCS / "index.html").read_text(encoding="utf-8")
+    dead = sorted(set(re.findall(r"\d+_week\d+_report\.md", html)))
+    assert not dead, "index.html hardcodes report link(s): " + ", ".join(dead)
+    assert 'id="chip-report-latest"' in html, "the report chip needs its dynamic id"
+
+
+def test_latest_week_report_link_resolves_without_hardcoding():
+    payload = _payload()
+    last = payload["weeks"][-1]
+    assert (REPO_ROOT / last["doc"]).exists(), last["doc"] + " is missing"
+    js = (ASSETS / "terminal.js").read_text(encoding="utf-8")
+    assert "chip-report-latest" in js, "fillDynamic must rewrite the report chip"
+    assert "last.doc" in js, "the report link must be taken from the payload"
+
+
+def test_gallery_and_search_are_real_commands():
+    js = (ASSETS / "terminal.js").read_text(encoding="utf-8")
+    for name in ("gallery", "search"):
+        assert re.search(r"\bCMDS\.%s\s*=" % name, js), "missing command: " + name
+    # thumbnails must defer offscreen work and reserve their box, or the grid
+    # reflows line by line as the bitmaps arrive.
+    assert 'loading="lazy"' in js, "gallery thumbnails must lazy-load"
+    css = (ASSETS / "terminal.css").read_text(encoding="utf-8")
+    assert "aspect-ratio" in css, "gallery cells must reserve their aspect ratio"
+    assert ".gallery" in css and ".gcell" in css, "gallery styles are missing"
+
+
+def test_terminal_js_wires_deep_links_and_browser_history():
+    js = (ASSETS / "terminal.js").read_text(encoding="utf-8")
+    assert "window.history.replaceState" in js, "open/cat must write the address bar"
+    assert 'addEventListener("popstate"' in js, "back/forward must re-route"
+    assert "fig=" in js and "w=" in js, "?fig= / ?w= deep links must be parsed"

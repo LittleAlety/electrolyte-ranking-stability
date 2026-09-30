@@ -410,7 +410,9 @@ window.HB = {
    "week": 3,
    "caption": "项目五段式流水线示意",
    "sha": "678d9926c75d486fb49dad9b1b3b68525618aa96c6b67f030150e933306ea8f3",
-   "bytes": 105281
+   "bytes": 105281,
+   "w": 2700,
+   "h": 680
   },
   {
    "id": "F1",
@@ -418,7 +420,9 @@ window.HB = {
    "week": 3,
    "caption": "core vs broad 的 family / donor 覆盖",
    "sha": "64bf071ceb0e3a94a11b2268fc45e040b504a79ab138f8c13a156896809f9f7f",
-   "bytes": 84019
+   "bytes": 84019,
+   "w": 2600,
+   "h": 1000
   },
   {
    "id": "F2",
@@ -426,7 +430,9 @@ window.HB = {
    "week": 3,
    "caption": "各 family 的 P0 分布，按氟化着色",
    "sha": "66482f867dd64f1d8c26a61f80ad8b768d494633bbd002889994983f8f3e23ce",
-   "bytes": 117985
+   "bytes": 117985,
+   "w": 2600,
+   "h": 1000
   },
   {
    "id": "F3",
@@ -434,7 +440,9 @@ window.HB = {
    "week": 3,
    "caption": "值误差 vs 排序误差（本轮核心反直觉结论）",
    "sha": "1853fd7566ecaff76c0e28106457aecec67fb04db228c875f20c16499037d802",
-   "bytes": 161827
+   "bytes": 161827,
+   "w": 2700,
+   "h": 1040
   },
   {
    "id": "F4",
@@ -442,7 +450,9 @@ window.HB = {
    "week": 4,
    "caption": "(a) 每分子 IP 三臂对照锚点（平移）；(b) 氧化轴 P0 -> P1 位次迁移（重排）",
    "sha": "e40957bf65eb0efc82258b299b05fdf6c556cd621f3f763cef24538d099967b9",
-   "bytes": 286250
+   "bytes": 286250,
+   "w": 2900,
+   "h": 1240
   },
   {
    "id": "F5",
@@ -450,7 +460,9 @@ window.HB = {
    "week": 4,
    "caption": "(a) Koopmans EA vs 真实 EA（定性失效）；(b) 还原轴位次迁移",
    "sha": "aa423fd0951805a38b8a275d1c4284dd974d32c6785ca6a456aeefa473a8a2d9",
-   "bytes": 272622
+   "bytes": 272622,
+   "w": 2900,
+   "h": 1240
   },
   {
    "id": "F6",
@@ -458,7 +470,9 @@ window.HB = {
    "week": 4,
    "caption": "(a) Top-k 重叠与 Jaccard；(b) 逐对间距与 z*sigma 不确定带",
    "sha": "812827792a328a0639a034c073fb1a3012e6d458ca7b0d164a0000bc15e4224e",
-   "bytes": 426218
+   "bytes": 426218,
+   "w": 2900,
+   "h": 1180
   },
   {
    "id": "F7",
@@ -466,7 +480,9 @@ window.HB = {
    "week": 4,
    "caption": "廉价层是「平移的尺子」还是「另一把尺子」（IP / EA 散点）",
    "sha": "a83b97ce0baf5a876209979e2f85c5762071b972ed360fb61daa3a07a02d6361",
-   "bytes": 182256
+   "bytes": 182256,
+   "w": 2600,
+   "h": 1180
   },
   {
    "id": "F8",
@@ -474,7 +490,9 @@ window.HB = {
    "week": 4,
    "caption": "(a) 每分子的气相->溶剂位移（IP 与 EA）；(b) 逐对间距与 z*sigma 不确定带（环境层）",
    "sha": "e1effccfbe041b15c7adaafd090fc735ee05483f83dddee765cfda9d40acb51f",
-   "bytes": 371807
+   "bytes": 371807,
+   "w": 2900,
+   "h": 1200
   },
   {
    "id": "F9",
@@ -482,7 +500,9 @@ window.HB = {
    "week": 4,
    "caption": "同泛函三基组对照：加弥散把 EA 系统性下拉但未翻转符号（方法适用域结论）",
    "sha": "cbc768b523093059f1b6888f8f7a200fdbbbedcbb9942d6e5ce16ee057a3b787",
-   "bytes": 96059
+   "bytes": 96059,
+   "w": 1824,
+   "h": 720
   },
   {
    "id": "F10",
@@ -490,7 +510,9 @@ window.HB = {
    "week": 4,
    "caption": "bare CPCM eps 扫描（dIP/dEA 饱和曲线 + sigma_env 与 tau_b）",
    "sha": "7a260d2c17e89e0ed988f139f073357169b128a91ab45ed01f502e62d35c7f2a",
-   "bytes": 197823
+   "bytes": 197823,
+   "w": 2346,
+   "h": 951
   },
   {
    "id": "F11",
@@ -498,7 +520,9 @@ window.HB = {
    "week": 4,
    "caption": "G1 -> G2 几何台阶（逐分子位移 + 方法/几何/环境三台阶同口径对比）",
    "sha": "3ec30faa6508f1a73f42fb395f7d9a90a7ff4eb852f0b2a857cbf195be23d3fe",
-   "bytes": 153659
+   "bytes": 153659,
+   "w": 2144,
+   "h": 928
   },
   {
    "id": "F12",
@@ -506,7 +530,9 @@ window.HB = {
    "week": 5,
    "caption": "Li+ 配位条件态 C1（逐分子 dIP/dEA + 四台阶 sigma 对比 + 配体交换 + 决策量）",
    "sha": "a8e750e5e758109378230ccb679ea937575be07c478a2c14814ee2ba35bb5473",
-   "bytes": 267753
+   "bytes": 267753,
+   "w": 2304,
+   "h": 1600
   },
   {
    "id": "F13",
@@ -514,7 +540,9 @@ window.HB = {
    "week": 5,
    "caption": "C1 条件态的 state-identity：Mulliken 投影与电荷阶梯，读自 ORCA 已写出的电荷/自旋块，不花新的量化算力",
    "sha": "4cee653dfc195e3909da08b1d3405c7bd429b40cdede29103c21ee80b26787ca",
-   "bytes": 145465
+   "bytes": 145465,
+   "w": 2560,
+   "h": 896
   },
   {
    "id": "F14",
@@ -522,7 +550,9 @@ window.HB = {
    "week": 6,
    "caption": "(a) delta_m 的三项贡献与 max 规则（菱形标注）；(b) 逐分子 P1 - P0 位移，其群体散布即 inter-method 项",
    "sha": "bcaef9916495bb13acd46ad770c8cd1e6be1c0fa6bd8370e06f3ea4662c05a00",
-   "bytes": 130587
+   "bytes": 130587,
+   "w": 2080,
+   "h": 832
   },
   {
    "id": "F15",
@@ -530,7 +560,9 @@ window.HB = {
    "week": 6,
    "caption": "(a) 每一层对的上下两侧在 delta_m = 0 / 0.05 eV / docx max 下的 f_unresolved；(b) docx max 容差下的排序一致度指标",
    "sha": "e461822379010ac337e0dc4be96b231170c4492adecee4fc0e337ec3a9e0933a",
-   "bytes": 136444
+   "bytes": 136444,
+   "w": 2160,
+   "h": 864
   },
   {
    "id": "F16",
@@ -538,7 +570,9 @@ window.HB = {
    "week": 7,
    "caption": "(a) 每种形状的最优模型（leave-one-family-out）；(b) 随机 / group / LOFO 切分下的乐观偏差；(c) tau_b(shift) - tau_b(direct)",
    "sha": "3c3d8322179dc35a4088aa1134621be688aa224acbde6cc1c6c7d41af522ec08",
-   "bytes": 193032
+   "bytes": 193032,
+   "w": 2395,
+   "h": 1567
   },
   {
    "id": "F17",
@@ -546,7 +580,9 @@ window.HB = {
    "week": 7,
    "caption": "n_T -> Kendall tau_b：random / diversity / uncertainty / ranking-aware 四种采集，20 组冻结种子重复的中位数与 2.5-97.5 分位带",
    "sha": "b3802b8b870c6beecc9cbafc82cdd9d8c35531f67ded255335e9a36897f6fa11",
-   "bytes": 464223
+   "bytes": 464223,
+   "w": 1983,
+   "h": 1592
   },
   {
    "id": "F18",
@@ -554,7 +590,9 @@ window.HB = {
    "week": 8,
    "caption": "显式微溶剂化：第一溶剂壳 1:1 -> 1:2 的位移与决策量",
    "sha": "8f3ac1ec91639cdfd1fd59be29d51942bba1f82b70608bb7206b013bfaa44d2d",
-   "bytes": 209930
+   "bytes": 209930,
+   "w": 2038,
+   "h": 1410
   },
   {
    "id": "F19",
@@ -562,7 +600,9 @@ window.HB = {
    "week": 9,
    "caption": "五级台阶合成与决策稳定性总判",
    "sha": "a85c9c9c43bfa95a54f52d15b3d75074ee5f785b319822e23d4d0eab4b07098b",
-   "bytes": 218183
+   "bytes": 218183,
+   "w": 2059,
+   "h": 1419
   },
   {
    "id": "F20",
@@ -570,7 +610,9 @@ window.HB = {
    "week": 10,
    "caption": "sigma 的代数解剖",
    "sha": "96410e63e55061f9295cc74f982520ffcc8d7482433b36b1e2482e912fa79b2b",
-   "bytes": 242909
+   "bytes": 242909,
+   "w": 1727,
+   "h": 1324
   },
   {
    "id": "F21",
@@ -578,7 +620,9 @@ window.HB = {
    "week": 10,
    "caption": "sigma 的控制变量",
    "sha": "41e8a4bee94412a986b33a57301147da64128cf9b7912ec57ba66b74652bb9e1",
-   "bytes": 246753
+   "bytes": 246753,
+   "w": 1846,
+   "h": 1324
   },
   {
    "id": "F22",
@@ -586,7 +630,9 @@ window.HB = {
    "week": 11,
    "caption": "(a) Born 线性轮廓；(b) 增量比 vs 两个模型；(c) 同一 c 的几何收缩；(d) 外推检验",
    "sha": "43058408d59a8ca218d1045341950e75e4d003dabe9a75a9dda7e086a2c8065f",
-   "bytes": 326691
+   "bytes": 326691,
+   "w": 1773,
+   "h": 1324
   },
   {
    "id": "F23",
@@ -594,7 +640,9 @@ window.HB = {
    "week": 11,
    "caption": "(a) 预算曲线；(b) 逐台阶 b_hat 分布；(c) 3 分子试点散点；(d) 判据平面",
    "sha": "8f04adc076a0318413c6c50ec897e984c141c4da9506980401beab722cdb7c19",
-   "bytes": 255817
+   "bytes": 255817,
+   "w": 1837,
+   "h": 1418
   },
   {
    "id": "F24",
@@ -602,7 +650,9 @@ window.HB = {
    "week": 12,
    "caption": "(a) 七级阶梯 vs u = 1 - 1/eps（24 条曲线）；(b) 三模型 R2；(c) 外推误差由距离决定；(d) eps = 200 距导体极限 33 meV",
    "sha": "7c060a238c426105940f1a12b21882ed6cd57ac65c53b13d1cba3a209bea3a47",
-   "bytes": 377022
+   "bytes": 377022,
+   "w": 1838,
+   "h": 1418
   },
   {
    "id": "F25",
@@ -610,7 +660,9 @@ window.HB = {
    "week": 12,
    "caption": "(a)(b) SMD 乙腈两轴的逐分子四项分解；(c) CDS 三态重合；(d) 畸变抵消比例",
    "sha": "268b5825d9fca4d1c94add5ed7ec413794675c1999a13626f9ac5149642724f8",
-   "bytes": 237962
+   "bytes": 237962,
+   "w": 1774,
+   "h": 1324
   },
   {
    "id": "F26",
@@ -618,7 +670,9 @@ window.HB = {
    "week": 13,
    "caption": "(a) 逐态畸变惩罚的逐分子柱状图；(b) dist 恰为两个逐态惩罚之差（残差 6.7e-12 eV）；(c) D_neutral vs 偶极（rho 0.909）；(d) 最佳单描述符的留一 R2",
    "sha": "53c0a18b6d650a49d77ccf6740e6c0559685b4d9a0f727433920ce0faef248f8",
-   "bytes": 214402
+   "bytes": 214402,
+   "w": 1966,
+   "h": 1418
   },
   {
    "id": "F27",
@@ -626,7 +680,9 @@ window.HB = {
    "week": 13,
    "caption": "(e)(f) 九点 bare CPCM 阶梯上六条 delta(eps) 曲线；(g) EMC / 还原轴按 SCF 解分支着色 + 粗糙度对照；(h) Born R2 随网格点数的收敛",
    "sha": "aedfbae12a72e01370bfdd7cc01d1d865331e3267b5bde6044122ae461d73cf8",
-   "bytes": 287509
+   "bytes": 287509,
+   "w": 1962,
+   "h": 1418
   },
   {
    "id": "F28",
@@ -634,7 +690,9 @@ window.HB = {
    "week": 14,
    "caption": "(a) 90 点能量差幅度直方图与 1 meV material 阈值（12 点全部为负）；(b) EMC 阴离子偶极的两条分支（默认初猜 vs ! MORead）十点对照；(c) 导体极限：Born 横坐标 u = 1 - 1/eps 上 eps = 1000 的位置；(d) 六点/九点 Born 斜率与外推缺口（修复前后没变小）",
    "sha": "25366003f0434cc9f9c2ba688e44c8a9a5633256a7bc5121e1c1d28dfeb271d6",
-   "bytes": 262529
+   "bytes": 262529,
+   "w": 1965,
+   "h": 1355
   },
   {
    "id": "F29",
@@ -642,7 +700,9 @@ window.HB = {
    "week": 14,
    "caption": "(e) spin_maxfrac 对阴离子畸变惩罚（留一 R2 0.162 -> 0.556）；(f) 参与比的秩 vs 线性（rho -0.846 对留一 R2 -2.90）；(g) 三个目标的留一 R2 对比（中性/阳离子不变）；(h) 描述符自己的域检验，标出唯一越界的 EMC/cpcm_10",
    "sha": "7eec8eff5cbc77a1d00c9d174f7acf41e33a7be65d43025afd94656acc6934d5",
-   "bytes": 231568
+   "bytes": 231568,
+   "w": 1966,
+   "h": 1355
   },
   {
    "id": "F30",
@@ -650,7 +710,9 @@ window.HB = {
    "week": 15,
    "caption": "(a) 12 分子 x 3 状态 x 10 电介质的完整双初猜网格（红 = 默认初猜偏高，灰 = 两臂一致，蓝 = 反而更高，斜纹 = 未配对）；(b) 每个开壳层 (分子, 状态) 在整个阶梯上的最坏赤字（绿虚线 = 1 meV 材料阈值）；(c) 超过各阈值的单元格计数",
    "sha": "da8d1dd91f430a52a61612323cbdfa94a4992e2c32f53d4ab57204f1fe21a54c",
-   "bytes": 233468
+   "bytes": 233468,
+   "w": 2002,
+   "h": 1605
   },
   {
    "id": "F31",
@@ -658,7 +720,9 @@ window.HB = {
    "week": 15,
    "caption": "(d) 选定气相描述符对最大赤字，绿色虚线为留一冻结阈值；(e) 每个气相描述符的单变量 AUC；(f) 留出臂逐行预测与真值；(g) 冻结规则 vs 多数类基线（明写输给平凡规则）、平衡准确率、精确置换 p，以及分电性状态的事后诊断（描述符、正例排名、留一）",
    "sha": "130283c8e543e3b55fac06bb0632b96f1e3794894edcd633d8f182121980232c",
-   "bytes": 265003
+   "bytes": 265003,
+   "w": 1877,
+   "h": 1513
   }
  ]
 };
