@@ -533,6 +533,7 @@
     setText(".js-weeks", String(COUNTS.weeks || ""));
     setText(".js-figures", String(FIGS.length || ""));
     setText(".js-orca", String(COUNTS.orca_out || ""));
+    setText(".js-tests", String(COUNTS.tests_passed || ""));
     setText(".js-latest", last.n ? ("Week " + last.n + " / " + last.stage) : "");
     setText(".js-latest-week", String(last.n || ""));
     var cat = document.getElementById("chip-cat-latest");
