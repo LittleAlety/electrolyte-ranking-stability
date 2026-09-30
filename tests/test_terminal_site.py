@@ -66,9 +66,9 @@ def test_data_js_is_a_json_payload_with_the_expected_shape():
     payload = _payload()
     for key in ("repo", "counts", "pipeline", "gates", "weeks", "figures"):
         assert key in payload, "payload misses " + key
-    assert len(payload["weeks"]) == 13
+    assert len(payload["weeks"]) == 14
     assert len(payload["pipeline"]) == 5
-    assert payload["counts"]["weeks"] == 13
+    assert payload["counts"]["weeks"] == 14
 
 
 def test_figure_payload_covers_exactly_the_repository_figures():
@@ -76,7 +76,7 @@ def test_figure_payload_covers_exactly_the_repository_figures():
     on_disk = sorted(p.name for p in REPO_FIGURES.glob("*.png"))
     listed = sorted(row["file"] for row in payload["figures"])
     assert listed == on_disk, "the site and outputs/figures/ disagree on the figure set"
-    assert len(listed) == 28
+    assert len(listed) == 30
 
 
 def test_every_figure_has_a_caption_and_a_hash():
@@ -100,9 +100,9 @@ def test_every_week_points_at_a_report_that_exists():
         assert week["stage"].strip() and week["title"].strip()
 
 
-def test_week_numbers_are_one_to_thirteen():
+def test_week_numbers_are_one_to_fourteen():
     numbers = [w["n"] for w in _payload()["weeks"]]
-    assert numbers == list(range(1, 14))
+    assert numbers == list(range(1, 15))
 
 
 def test_gate_payload_matches_the_frozen_gate_records():
@@ -166,10 +166,25 @@ def test_terminal_js_derives_the_week_and_figure_counts():
     """
 
     js = (ASSETS / "terminal.js").read_text(encoding="utf-8")
-    for stale in ("12 \u5468", "26 \u5f20\u56fe"):
-        assert stale not in js, "hard-coded count in terminal.js: " + stale
-    for expression in ("COUNTS.weeks + ", "FIGS.length + "):
+    html = (DOCS / "index.html").read_text(encoding="utf-8")
+    for stale in ("12 \u5468", "13 \u5468", "26 \u5f20\u56fe", "28 \u5f20\u56fe",
+                  "open F24", "cat 12", "week 12 / Stage 13"):
+        assert stale not in js, "hard-coded reference in terminal.js: " + stale
+    for expression in ("COUNTS.weeks + ", "FIGS.length + ", "LAST_WEEK.n", "LAST_FIG.id"):
         assert expression in js, "terminal.js does not derive: " + expression
+
+    # index.html is a hand-maintained asset too, so its prose must not name a
+    # week that has since been superseded -- the numbers it shows are spans that
+    # ``fillDynamic()`` overwrites from the payload at boot.
+    for stale in ("Week 12 / Stage 13", "22_week12_report.md", "cat 12"):
+        assert stale not in html, "stale week reference in index.html: " + stale
+    for hook in ('class="js-weeks"', 'class="js-figures"', 'class="js-latest"',
+                 'id="chip-report-latest"', 'id="chip-cat-latest"'):
+        assert hook in html, "index.html misses the dynamic hook " + hook
+    for hook in ("function fillDynamic()", '.js-weeks', 'chip-report-latest',
+                 'chip-cat-latest'):
+        assert hook in js, "terminal.js does not fill " + hook
+    assert "fillDynamic();" in js, "boot() never calls fillDynamic()"
 
 
 def test_check_mode_reports_the_site_as_consistent():

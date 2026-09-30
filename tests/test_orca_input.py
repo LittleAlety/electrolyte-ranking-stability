@@ -116,6 +116,37 @@ def test_build_input_records_charge_and_multiplicity_for_an_anion() -> None:
     assert "! r2SCAN-3c Opt" in text
 
 
+def test_build_input_can_start_from_a_stored_gbw() -> None:
+    """``moinp`` must add MORead *and* the %moinp block, or the guess is ignored."""
+
+    text = build_orca_input(
+        charge=-1,
+        multiplicity=2,
+        geometry="C 0.0 0.0 0.0",
+        epsilon=20.0,
+        moinp="EMC_gas.gbw",
+    )
+
+    assert "! r2SCAN-3c MORead" in text
+    assert '%moinp "EMC_gas.gbw"' in text
+    # the %moinp block has to precede the coordinate block
+    assert text.index("%moinp") < text.index("* xyz")
+
+
+def test_build_input_without_moinp_is_unchanged() -> None:
+    """The default path must not grow an MORead or a %moinp line."""
+
+    text = build_orca_input(
+        charge=0,
+        multiplicity=1,
+        geometry="C 0.0 0.0 0.0",
+        epsilon=20.0,
+    )
+
+    assert "MORead" not in text
+    assert "%moinp" not in text
+
+
 def test_build_input_rejects_conflicting_solvent_specifications() -> None:
     with pytest.raises(orca.ORCAError):
         build_orca_input(

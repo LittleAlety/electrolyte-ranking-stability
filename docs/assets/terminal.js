@@ -9,6 +9,8 @@
   var GATES = D.gates || [];
   var COUNTS = D.counts || {};
   var PIPELINE = D.pipeline || [];
+  var LAST_WEEK = WEEKS[WEEKS.length - 1] || {};
+  var LAST_FIG = FIGS[FIGS.length - 1] || {};
   var REPO = D.repo || "https://github.com/LittleAlety/electrolyte-ranking-stability";
 
   var scroll = document.getElementById("scroll");
@@ -146,10 +148,10 @@
       ["status", "两个 Gate、测试、作业与产物的真实计数"],
       ["pipeline", "五段式研究流水线"],
       ["weeks", COUNTS.weeks + " 周报告一览"],
-      ["cat <week>", "打印某一周的结论（如 cat 12）"],
+      ["cat <week>", "打印某一周的结论（如 cat " + LAST_WEEK.n + "）"],
       ["read <week>", "在新标签页打开该周完整报告 (.md)"],
       ["figures", FIGS.length + " 张图的总目录"],
-      ["open <F-id>", "在终端里内联看图（如 open F24）"],
+      ["open <F-id>", "在终端里内联看图（如 open " + LAST_FIG.id + "）"],
       ["theme [name]", "切换荧光色: green / amber / ice / bone"],
       ["repo", "源码与完整报告的入口"],
       ["clear", "清屏 (Ctrl+L)"],
@@ -190,9 +192,11 @@
       ["图", String(COUNTS.figures)],
       ["脚本", String(COUNTS.scripts)],
       ["测试文件", String(COUNTS.test_files)],
-      ["测试通过", String(COUNTS.tests_passed) + " passed (Week 12 run)"],
+      ["测试通过", String(COUNTS.tests_passed) + " passed"],
     ]), "out");
-    emit("最近一周：week 12 / Stage 13 —— 介电极限与四项能量账本。跑 cat 12。", "dim");
+    var lastWeek = WEEKS[WEEKS.length - 1] || {};
+    emit("最近一周：week " + lastWeek.n + " / " + lastWeek.stage + " —— "
+      + lastWeek.tag + "。跑 cat " + lastWeek.n + "。", "dim");
   };
 
   CMDS.pipeline = function () {
@@ -217,7 +221,8 @@
   CMDS.cat = function (args) {
     var n = normWeek(args[0]);
     if (n === null || !WEEKS[n - 1]) {
-      emit("用法: cat <week>   （例如 cat 12；可用周: 1 - " + WEEKS.length + "）", "warn");
+      emit("用法: cat <week>   （例如 cat " + LAST_WEEK.n + "；可用周: 1 - "
+        + WEEKS.length + "）", "warn");
       return;
     }
     var w = WEEKS[n - 1];
@@ -253,12 +258,12 @@
     emitTbl(table(["id", "wk", "file", "size"], rows.map(function (f) {
       return [f.id, String(f.week), f.file, (f.bytes / 1024).toFixed(0) + " KB"];
     })), "out");
-    emit("用 open <id> 在终端里看图（例如 open F24）。", "dim2");
+    emit("用 open <id> 在终端里看图（例如 open " + LAST_FIG.id + "）。", "dim2");
   };
 
   CMDS.open = function (args) {
     var id = normFig(args[0]);
-    if (!id) { emit("用法: open <F-id>   （例如 open F24；先用 figures 列表）", "warn"); return; }
+    if (!id) { emit("用法: open <F-id>   （例如 open " + LAST_FIG.id + "；先用 figures 列表）", "warn"); return; }
     var f = FIGS.filter(function (x) { return x.id === id; })[0];
     if (!f) { emit("没有 " + id + " 这张图。先用 figures 列表。", "warn"); return; }
     emit("opening " + f.file + "  (" + (f.bytes / 1024).toFixed(0) + " KB)", "acc");
@@ -301,7 +306,9 @@
   };
 
   CMDS.whoami = function () {
-    emit("guest — 但你可以跑 read 12 看全部结论，或者 open F24 看最新一张图。", "out");
+    var lw = (WEEKS[WEEKS.length - 1] || {}).n;
+    var lf = (FIGS[FIGS.length - 1] || {}).id;
+    emit("guest — 但你可以跑 read " + lw + " 看全部结论，或者 open " + lf + " 看最新一张图。", "out");
   };
   CMDS.date = function () { emit(new Date().toString(), "out"); };
   CMDS.echo = function (args) { emit(args.join(" "), "out"); };
@@ -361,7 +368,7 @@
     if (name === "banner") { bootBanner(); return; }
     var cmd = resolve(name);
     if (!cmd) {
-      emit(name + ": command not found   (try `help`; or `open F24`)", "warn");
+      emit(name + ": command not found   (try `help`; or `open " + LAST_FIG.id + "`)", "warn");
       return;
     }
     CMDS[cmd](args);
@@ -419,8 +426,40 @@
       "out", { raw: true, enter: false, scroll: false });
   }
 
+  /* Everything the static HTML cannot derive from the payload on its own:
+     the number of weeks / figures / ORCA outputs, and which week is the
+     latest.  Keeping this here (instead of in the HTML) means the page cannot
+     go stale after a new week is added. */
+  function fillDynamic() {
+    var last = WEEKS[WEEKS.length - 1] || {};
+    var i, nodes;
+    function setText(sel, text) {
+      nodes = document.querySelectorAll(sel);
+      for (i = 0; i < nodes.length; i++) nodes[i].textContent = text;
+    }
+    setText(".js-weeks", String(COUNTS.weeks || ""));
+    setText(".js-figures", String(FIGS.length || ""));
+    setText(".js-orca", String(COUNTS.orca_out || ""));
+    setText(".js-latest", last.n ? ("Week " + last.n + " / " + last.stage) : "");
+    setText(".js-latest-week", String(last.n || ""));
+    var cat = document.getElementById("chip-cat-latest");
+    if (cat && last.n) {
+      cat.setAttribute("href", "#cat " + last.n);
+      cat.setAttribute("data-cmd", "cat " + last.n);
+    }
+    var rep = document.getElementById("chip-report-latest");
+    if (rep && last.doc) rep.setAttribute("href", String(last.doc).replace(/^docs\//, ""));
+    var meta = document.querySelector('meta[name="description"]');
+    if (meta) {
+      meta.setAttribute("content", meta.getAttribute("content")
+        .replace(/\d+\s*周/, (COUNTS.weeks || 0) + " 周")
+        .replace(/\d+\s*张图/, (FIGS.length || 0) + " 张图"));
+    }
+  }
+
   function boot() {
     bootBanner();
+    fillDynamic();
     emit("a decision-stability study on 18 electrolyte solvents · "
       + WEEKS.length + " weeks · " + FIGS.length + " figures", "dim", { scroll: false });
     emit((COUNTS.orca_out || 0) + " ORCA outputs · " + (COUNTS.scripts || 0)
@@ -446,7 +485,8 @@
   function buildHints() {
     var defs = [
       ["help", "help"], ["status", "status"], ["weeks", "weeks"],
-      ["open F24", "open F24"], ["cat 12", "cat 12"], ["figures", "figures"]
+      ["open " + LAST_FIG.id, "open " + LAST_FIG.id],
+      ["cat " + LAST_WEEK.n, "cat " + LAST_WEEK.n], ["figures", "figures"]
     ];
     defs.forEach(function (d) {
       var b = document.createElement("button");

@@ -2,12 +2,12 @@
 window.HB = {
  "repo": "https://github.com/LittleAlety/electrolyte-ranking-stability",
  "counts": {
-  "weeks": 13,
-  "figures": 28,
-  "orca_out": 427,
-  "scripts": 58,
-  "test_files": 34,
-  "tests_passed": 744
+  "weeks": 14,
+  "figures": 30,
+  "orca_out": 527,
+  "scripts": 63,
+  "test_files": 35,
+  "tests_passed": 783
  },
  "pipeline": [
   {
@@ -356,6 +356,29 @@ window.HB = {
     "12. 产物与图表",
     "13. 本周对规范的影响"
    ]
+  },
+  {
+   "n": 14,
+   "doc": "docs/24_week14_report.md",
+   "title": "Week 14 报告 —— Stage 15：初猜协议、电子弥散度描述符，与溶液锚点的可核查否证",
+   "stage": "Stage 15",
+   "tag": "初猜协议修正亚稳态、弥散度描述符翻正否定结果",
+   "summary": "Week 13 留下三件事：一个「已知但未解释」的 EMC 还原轴异常，一个否定性的归因结果 （阴离子畸变惩罚无法用任何已存量预测，最佳留一 R² 只有 0.162），和一个始终没被真正 回答的 Gate 1 blocker（「文献里没有溶液相电位」）。本周三件一起处理，得到 一个把诊断升级为修复的结果、一个把否定结果翻正的结果、一个把借口变成证据的否证： 1. 「解不唯一」被升级为「初猜选错」，并且已经修好。对 EMC/DMC/EC 在十点介电阶梯 （5/7/10/14/20/28/40/80/200/1000）上各跑两遍：一遍用 ORCA 自己的初猜，一遍用 ! MORead 从同一电荷态的气相 MO 重启。90 个「分子 × 态 × 介电」点里， 78 个在收敛精度内给出同一能量，12 个差值超过 1 meV，而这 12 个全部是负的 （E_moread − E_default < 0，即默认初猜停在了一个更高的解上）， 反向的情况一次都没有。最大惩罚 0.2860 eV（EMC 阴离子，eps = 1000）。 EMC 还原轴的九点 Born R² 从 0.6788 升到 0.9556，一阶差分符号变化从 4 降到 0， 阴离子偶极的「粗糙度」从 1.99 降到 0.08，而修复后的偶极在十个介电点上 严格单调（Spearman rho = +1.000，默认初猜是 −0.042）。这是修复，不是解释。",
+   "sections": [
+    "0. 一句话结论",
+    "1. 为什么要有这一步（Stage 15 的动机）",
+    "2. 口径与记号",
+    "3. 本周新增的计算（99 个作业，0 失败，0 个 QC flag）",
+    "4. Part A：双初猜协议",
+    "5. 导体极限：`eps = 1000` 是第一次真正测到极限",
+    "6. Part B：电子弥散度描述符",
+    "7. Part C：溶液锚点的文献扫描",
+    "8. 物理读法",
+    "9. 读法纪律（延续 Week 9 §10 / 10 §11 / 11 §11 / 12 §10 / 13 §11）",
+    "10. 产物与图表",
+    "11. 已知限制",
+    "12. 下一步（Week 15 候选）"
+   ]
   }
  ],
  "figures": [
@@ -582,6 +605,22 @@ window.HB = {
    "caption": "(e)(f) 九点 bare CPCM 阶梯上六条 delta(eps) 曲线；(g) EMC / 还原轴按 SCF 解分支着色 + 粗糙度对照；(h) Born R2 随网格点数的收敛",
    "sha": "aedfbae12a72e01370bfdd7cc01d1d865331e3267b5bde6044122ae461d73cf8",
    "bytes": 287509
+  },
+  {
+   "id": "F28",
+   "file": "F28_two_guess_protocol.png",
+   "week": 14,
+   "caption": "(a) 90 点能量差幅度直方图与 1 meV material 阈值（12 点全部为负）；(b) EMC 阴离子偶极的两条分支（默认初猜 vs ! MORead）十点对照；(c) 导体极限：Born 横坐标 u = 1 - 1/eps 上 eps = 1000 的位置；(d) 六点/九点 Born 斜率与外推缺口（修复前后没变小）",
+   "sha": "25366003f0434cc9f9c2ba688e44c8a9a5633256a7bc5121e1c1d28dfeb271d6",
+   "bytes": 262529
+  },
+  {
+   "id": "F29",
+   "file": "F29_diffuseness_descriptor.png",
+   "week": 14,
+   "caption": "(e) spin_maxfrac 对阴离子畸变惩罚（留一 R2 0.162 -> 0.556）；(f) 参与比的秩 vs 线性（rho -0.846 对留一 R2 -2.90）；(g) 三个目标的留一 R2 对比（中性/阳离子不变）；(h) 描述符自己的域检验，标出唯一越界的 EMC/cpcm_10",
+   "sha": "7eec8eff5cbc77a1d00c9d174f7acf41e33a7be65d43025afd94656acc6934d5",
+   "bytes": 231568
   }
  ]
 };

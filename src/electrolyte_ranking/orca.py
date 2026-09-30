@@ -161,6 +161,7 @@ def build_orca_input(
     maxcore_mb: int | None = None,
     scf_convergence: str | None = None,
     extra_keywords: Sequence[str] = (),
+    moinp: str | None = None,
     title: str | None = None,
 ) -> str:
     """Render an ORCA input file for one job.
@@ -168,6 +169,11 @@ def build_orca_input(
     ``solvent`` (an SMD solvent name) and ``epsilon`` (a bare CPCM dielectric)
     are mutually exclusive; either produces the ``%cpcm`` block, and neither
     means a gas-phase calculation. ``nprocs`` writes the ``%pal`` block.
+
+    ``moinp`` starts the SCF from a stored ``.gbw`` instead of ORCA's default
+    guess: it appends ``MORead`` and writes a ``%moinp`` block.  This matters
+    when a continuum calculation has more than one accessible SCF solution,
+    because the default guess is not guaranteed to find the lowest one.
     """
 
     if job not in ORCA_JOBS:
@@ -182,6 +188,8 @@ def build_orca_input(
     keywords = [method, *_JOB_KEYWORDS[job]]
     if scf_convergence:
         keywords.append(scf_convergence)
+    if moinp:
+        keywords.append("MORead")
     keywords.extend(extra_keywords)
 
     lines: list[str] = []
@@ -201,7 +209,10 @@ def build_orca_input(
         else:
             lines.append(f"  epsilon {epsilon}")
         lines.append("end")
-    if nprocs is not None or maxcore_mb is not None or solvent is not None or epsilon is not None:
+    if moinp:
+        lines.append(f'%moinp "{moinp}"')
+    if (nprocs is not None or maxcore_mb is not None or solvent is not None
+            or epsilon is not None or moinp is not None):
         lines.append("")
 
     lines.append(f"* xyz {charge} {multiplicity}")
@@ -470,6 +481,7 @@ def run_orca(
     maxcore_mb: int | None = None,
     timeout_seconds: float | None = None,
     extra_keywords: Sequence[str] = (),
+    moinp: str | Path | None = None,
     backend=run_command,
     environment: Mapping[str, str] | None = None,
     required: Sequence[str] = ORCA_REQUIRED_FIELDS,
@@ -521,6 +533,7 @@ def run_orca(
         nprocs=resolved_nprocs,
         maxcore_mb=maxcore_mb,
         extra_keywords=extra_keywords,
+        moinp=moinp,
     )
 
     input_path = directory / input_name

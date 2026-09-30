@@ -167,6 +167,7 @@ def run_job(
     timeout_seconds: float | None = 3600.0,
     nprocs: int | None = None,
     maxcore_mb: int | None = None,
+    moinp: Path | None = None,
     dry_run: bool = False,
     scratch_root: Path | None = None,
 ) -> dict:
@@ -197,6 +198,7 @@ def run_job(
         epsilon=epsilon,
         nprocs=resolved_nprocs,
         maxcore_mb=maxcore_mb,
+        moinp=None if moinp is None else str(moinp),
     )
     input_name = f"{name}.inp"
     (outdir / input_name).write_text(input_text, encoding="utf-8", newline="\n")
@@ -217,6 +219,7 @@ def run_job(
         "nprocs": resolved_nprocs,
         "parallel_note": parallel_note,
         "maxcore_mb": maxcore_mb,
+        "moinp": None if moinp is None else str(moinp),
         "orca_path": None if located is None else located.path,
         "command": [str(located.path) if located is not None else "orca", input_name],
     }
@@ -248,6 +251,7 @@ def run_job(
                 epsilon=epsilon,
                 nprocs=nprocs,
                 maxcore_mb=maxcore_mb,
+                moinp=moinp,
                 timeout_seconds=timeout_seconds,
                 required=(),
                 scratch_root=scratch_root,

@@ -501,6 +501,57 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 13",
         ],
     },
+    14: {
+        "topic": "Stage 15（双初猜协议、电子弥散度描述符与溶液锚点扫描）",
+        "sources": [
+            ("outputs/week14/stage15_two_guess.json", None, True),
+            ("outputs/week14/stage15_two_guess_analysis.json", None, True),
+            ("outputs/week14/stage15_two_guess_energy.csv", None, True),
+            ("outputs/week14/stage15_two_guess_dipole.csv", None, True),
+            ("outputs/week14/stage15_diffuseness.json", None, True),
+            ("outputs/week14/stage15_diffuseness.csv", None, True),
+            ("outputs/week14/stage15_diffuseness_by_molecule.csv", None, True),
+            ("outputs/week14/stage15_anchor_scan.json", None, True),
+            ("outputs/week14/stage15_anchor_scan.csv", None, True),
+            ("outputs/week14/stage15_anchor_corrections.csv", None, True),
+            ("outputs/week14/stage15_summary.md", None, True),
+            ("outputs/week14/p2_core_set_cpcm_1000.csv", None, True),
+            ("outputs/week14/p2_summary_cpcm_1000.json", None, True),
+            ("outputs/week14/p2_core_set_moread_cpcm_5.csv", None, True),
+            ("outputs/week14/p2_summary_moread_cpcm_5.json", None, True),
+            ("outputs/week14/p2_core_set_moread_cpcm_7.csv", None, True),
+            ("outputs/week14/p2_summary_moread_cpcm_7.json", None, True),
+            ("outputs/week14/p2_core_set_moread_cpcm_10.csv", None, True),
+            ("outputs/week14/p2_summary_moread_cpcm_10.json", None, True),
+            ("outputs/week14/p2_core_set_moread_cpcm_14.csv", None, True),
+            ("outputs/week14/p2_summary_moread_cpcm_14.json", None, True),
+            ("outputs/week14/p2_core_set_moread_cpcm_20.csv", None, True),
+            ("outputs/week14/p2_summary_moread_cpcm_20.json", None, True),
+            ("outputs/week14/p2_core_set_moread_cpcm_28.csv", None, True),
+            ("outputs/week14/p2_summary_moread_cpcm_28.json", None, True),
+            ("outputs/week14/p2_core_set_moread_cpcm_40.csv", None, True),
+            ("outputs/week14/p2_summary_moread_cpcm_40.json", None, True),
+            ("outputs/week14/p2_core_set_moread_cpcm_80.csv", None, True),
+            ("outputs/week14/p2_summary_moread_cpcm_80.json", None, True),
+            ("outputs/week14/p2_core_set_moread_cpcm_200.csv", None, True),
+            ("outputs/week14/p2_summary_moread_cpcm_200.json", None, True),
+            ("outputs/week14/p2_core_set_moread_cpcm_1000.csv", None, True),
+            ("outputs/week14/p2_summary_moread_cpcm_1000.json", None, True),
+            ("docs/24_week14_report.md", "week14_report_full.md", True),
+            ("outputs/figures/figure_manifest_week14_stage15.md",
+             "artifacts/figure_manifest_week14_stage15.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F28_*.png", "outputs/figures/F29_*.png"],
+        "commands": [
+            "python scripts/run_stage15_two_guess.py --jobs 2 --nprocs 8",
+            "python scripts/analyze_stage15_two_guess.py",
+            "python scripts/build_stage15_diffuseness.py",
+            "python scripts/scan_stage15_anchor_literature.py",
+            "python scripts/make_stage15_figure.py",
+            "python scripts/build_deliverables.py --weeks 14",
+        ],
+    },
 }
 
 
@@ -708,6 +759,18 @@ def render_report(week, wdir, missing, excluded):
                        ("{w13_outlier_block}", w13["outlier_block"]),
                        ("{w13_repro_block}", w13["repro_block"]),
                        ("{w13_table_block}", w13["table_block"])):
+        text = text.replace(key, value)
+    w14 = week14_blocks(load_json(W14_TWO_GUESS_PATH), load_json(W14_DIFFUSENESS_PATH),
+                        load_json(W14_ANCHOR_PATH))
+    for key, value in (("{w14_did}", w14["did"]),
+                       ("{w14_metric}", w14["metric"]),
+                       ("{w14_qc}", w14["qc"]),
+                       ("{w14_limit}", w14["limit"]),
+                       ("{w14_protocol_block}", w14["protocol_block"]),
+                       ("{w14_limit_block}", w14["limit_block"]),
+                       ("{w14_diffuseness_block}", w14["diffuseness_block"]),
+                       ("{w14_anchor_block}", w14["anchor_block"]),
+                       ("{w14_table_block}", w14["table_block"])):
         text = text.replace(key, value)
     if missing:
         rows = []
@@ -1686,10 +1749,197 @@ def week13_checks(wdir: Path):
     return checks
 
 
+def week14_checks(wdir: Path):
+    """QC for week 14 (Stage 15, the two-guess protocol, diffuseness and the scan)."""
+
+    checks = []
+    run = load_json(wdir / "stage15_two_guess.json")
+    analysis = load_json(wdir / "stage15_two_guess_analysis.json")
+    diffuseness = load_json(wdir / "stage15_diffuseness.json")
+    anchor = load_json(wdir / "stage15_anchor_scan.json")
+    for name, data in (("stage15_two_guess", run), ("stage15_two_guess_analysis", analysis),
+                       ("stage15_diffuseness", diffuseness), ("stage15_anchor_scan", anchor)):
+        if data is None:
+            checks.append(check(name + ".present", None, "source not found"))
+            return checks
+        checks.append(check(name + ".present", True, name + ".json present"))
+
+    energy = analysis.get("energy") or {}
+    repro = analysis.get("stage14_reproduction") or {}
+    verdict = analysis.get("verdict") or {}
+    conductor = analysis.get("conductor_limit") or {}
+    stage13 = conductor.get("stage13_published") or {}
+    default = conductor.get("default") or {}
+    moread = conductor.get("moread") or {}
+
+    n_ok = sum(int(layer.get("n_ok") or 0) for layer in (run.get("layers") or []))
+    checks.append(check("stage15.protocol_99_jobs_all_ok",
+                        run.get("n_jobs_expected") == 99 and n_ok == 99
+                        and run.get("failures") == 0
+                        and len(run.get("layers") or []) == 11,
+                        "expected=%s ok=%d failures=%s layers=%d"
+                        % (run.get("n_jobs_expected"), n_ok, run.get("failures"),
+                           len(run.get("layers") or []))))
+    checks.append(check("stage15.protocol_used_safe_parallelism",
+                        run.get("jobs") == 2 and run.get("nprocs") == 8,
+                        "jobs=%s nprocs=%s (host has 16 logical cores)"
+                        % (run.get("jobs"), run.get("nprocs"))))
+    checks.append(check("stage15.points_are_90",
+                        energy.get("n_points") == 90
+                        and energy.get("n_identical_to_scf_convergence") == 78,
+                        "n_points=%s identical=%s"
+                        % (energy.get("n_points"), energy.get("n_identical_to_scf_convergence"))))
+    checks.append(check("stage15.material_threshold_is_one_meV",
+                        energy.get("material_threshold_ev") == 0.001,
+                        "material_threshold_ev=%s" % energy.get("material_threshold_ev")))
+    material = energy.get("material") or []
+    checks.append(check("stage15.every_material_difference_is_negative",
+                        energy.get("n_material_differences") == 12 and len(material) == 12
+                        and all((item.get("delta_ev") or 0.0) < 0.0 for item in material),
+                        "%d differences, all dE<0, worst %s eV"
+                        % (len(material), energy.get("max_default_excess_ev"))))
+    checks.append(check("stage15.no_restart_lands_above_the_default",
+                        energy.get("n_material_restart_above_the_default_state") == 0
+                        and energy.get("n_material_default_guess_above_the_lowest_state") == 12,
+                        "restart-above-default=%s, default-above-lowest=%s"
+                        % (energy.get("n_material_restart_above_the_default_state"),
+                           energy.get("n_material_default_guess_above_the_lowest_state"))))
+    checks.append(check("stage15.noise_band_is_below_the_threshold",
+                        (energy.get("worst_of_the_noise_ev") or 1.0) < 1e-3,
+                        "worst inside the noise band = %s eV"
+                        % energy.get("worst_of_the_noise_ev")))
+    hist = energy.get("magnitude_histogram") or {}
+    counts = [hist.get(key) for key in ("1e-08", "1e-07", "1e-06", "1e-05",
+                                       "1e-04", "1e-03", "1e-02", "1e-01")]
+    checks.append(check("stage15.magnitude_histogram_is_data_given",
+                        counts == [90, 86, 72, 27, 16, 12, 7, 6],
+                        "counts over thresholds = %s" % counts))
+    checks.append(check("stage15.stage14_curve_is_reproduced",
+                        repro.get("reproduces_stage14") is True
+                        and abs(float(repro.get("recomputed_default_nine_point_r2") or 0.0)
+                                - 0.6788) < 5e-4,
+                        "nine-point R2 = %s, sign changes = %s"
+                        % (repro.get("recomputed_default_nine_point_r2"),
+                           repro.get("recomputed_default_nine_sign_changes"))))
+    checks.append(check("stage15.emc_reduction_curve_is_restored",
+                        (verdict.get("emc_reduction_moread_nine_r2") or 0.0) > 0.95
+                        and verdict.get("emc_reduction_moread_nine_sign_changes") == 0
+                        and (verdict.get("emc_anion_moread_nine_roughness") or 1.0) < 0.1,
+                        "R2 %s -> %s, sign changes %s -> %s, roughness %s -> %s"
+                        % (verdict.get("emc_reduction_default_nine_r2"),
+                           verdict.get("emc_reduction_moread_nine_r2"),
+                           verdict.get("emc_reduction_default_nine_sign_changes"),
+                           verdict.get("emc_reduction_moread_nine_sign_changes"),
+                           verdict.get("emc_anion_default_nine_roughness"),
+                           verdict.get("emc_anion_moread_nine_roughness"))))
+    monotone = verdict.get("dipole_monotonicity") or {}
+    checks.append(check("stage15.dipole_monotonic_only_after_the_restart",
+                        monotone.get("moread_strictly_monotone") is True
+                        and monotone.get("default_strictly_monotone") is False,
+                        "moread rho=%s, default rho=%s"
+                        % (monotone.get("moread_spearman_dipole_vs_eps"),
+                           monotone.get("default_spearman_dipole_vs_eps"))))
+    checks.append(check("stage15.conductor_limit_gap_did_not_shrink",
+                        stage13.get("reproduces_the_worst_case") is True
+                        and abs(abs(float(default.get("gap_to_six_point_slope_at_eps200_ev") or 0.0))
+                                - abs(float(moread.get("gap_to_six_point_slope_at_eps200_ev")
+                                            or 0.0))) < 0.01,
+                        "six-point gap: default %s vs moread %s eV"
+                        % (default.get("gap_to_six_point_slope_at_eps200_ev"),
+                           moread.get("gap_to_six_point_slope_at_eps200_ev"))))
+    checks.append(check("stage15.eps_1000_is_flat_against_eps_200",
+                        abs(float(default.get("gap_between_eps200_and_eps1000_ev") or 0.0)
+                            - 0.011318) < 5e-5,
+                        "delta(200) -> delta(1000) = %s eV"
+                        % default.get("gap_between_eps200_and_eps1000_ev")))
+    checks.append(check("stage15.no_qc_flags_in_either_protocol",
+                        energy.get("n_moread_jobs_with_qc_flags") == 0
+                        and energy.get("n_default_jobs_with_qc_flags") == 0,
+                        "moread=%s default=%s"
+                        % (energy.get("n_moread_jobs_with_qc_flags"),
+                           energy.get("n_default_jobs_with_qc_flags"))))
+
+    domain = diffuseness.get("descriptor_domain") or {}
+    screen = diffuseness.get("gas_phase_screen") or {}
+    verdicts = diffuseness.get("verdicts") or {}
+    robust = diffuseness.get("robust_verdicts") or {}
+    anion = verdicts.get("anion") or {}
+    checks.append(check("stage15.descriptors_are_normalised",
+                        domain.get("n_rows") == 72
+                        and domain.get("spin_population_is_normalised") is True
+                        and domain.get("charge_is_normalised") is True,
+                        "%s rows, worst |sum s - 1| = %s, worst |sum q + 1| = %s"
+                        % (domain.get("n_rows"), domain.get("worst_abs_sum_spin_minus_one"),
+                           domain.get("worst_abs_sum_charge_plus_one"))))
+    checks.append(check("stage15.gas_phase_anion_is_outside_the_domain",
+                        screen.get("outside_layer_domain") == ["AN"]
+                        and screen.get("n_inside_domain") == 11,
+                        "outside=%s, inside=%s/%s"
+                        % (screen.get("outside_layer_domain"), screen.get("n_inside_domain"),
+                           screen.get("n_available"))))
+    checks.append(check("stage15.one_layer_flagged_without_any_energy",
+                        domain.get("layer_outliers_vs_own_median") == [["EMC", "cpcm_10", 2.799]],
+                        "layer outliers = %s"
+                        % domain.get("layer_outliers_vs_own_median")))
+    checks.append(check("stage15.diffuseness_improves_the_anion_target",
+                        anion.get("extended_best_descriptor") == "spin_maxfrac"
+                        and (anion.get("delta_loo_r2") or 0.0) > 0.39
+                        and (anion.get("extended_best_loo_r2") or 0.0) > 0.55,
+                        "best %s: LOO R2 %s -> %s (delta %s)"
+                        % (anion.get("extended_best_descriptor"),
+                           anion.get("baseline_best_loo_r2"),
+                           anion.get("extended_best_loo_r2"), anion.get("delta_loo_r2"))))
+    checks.append(check("stage15.neutral_and_cation_champions_unchanged",
+                        (verdicts.get("neutral") or {}).get("delta_loo_r2") == 0.0
+                        and (verdicts.get("cation") or {}).get("delta_loo_r2") == 0.0
+                        and (robust.get("anion") or {}).get("delta_loo_r2", 0.0) > 0.46,
+                        "delta_loo neutral=%s cation=%s; median anion=%s"
+                        % ((verdicts.get("neutral") or {}).get("delta_loo_r2"),
+                           (verdicts.get("cation") or {}).get("delta_loo_r2"),
+                           (robust.get("anion") or {}).get("delta_loo_r2"))))
+
+    gate1 = anchor.get("gate1") or {}
+    checks.append(check("stage15.corpus_is_readable_and_barely_intersects",
+                        anchor.get("n_pdfs") == 13 and anchor.get("n_readable") == 13
+                        and anchor.get("cited_dois_present_in_corpus")
+                        == ["10.1016/j.coelec.2018.10.015"],
+                        "%s/%s pdfs readable, %d of %d cited DOIs in hand"
+                        % (anchor.get("n_readable"), anchor.get("n_pdfs"),
+                           len(anchor.get("cited_dois_present_in_corpus") or []),
+                           len(anchor.get("cited_dois_of_audit") or []))))
+    checks.append(check("stage15.only_four_rows_could_be_adjudicated",
+                        gate1.get("n_rows_adjudicable") == 4
+                        and gate1.get("n_corrections_adopted") == 3
+                        and gate1.get("confirmed_rows") == ["24"],
+                        "%s adjudicable, %s adopted, confirmed %s"
+                        % (gate1.get("n_rows_adjudicable"), gate1.get("n_corrections_adopted"),
+                           gate1.get("confirmed_rows"))))
+    checks.append(check("stage15.gate1_is_still_not_closed",
+                        gate1.get("gate1_status") == "NOT CLOSED"
+                        and gate1.get("n_rows_still_est_after_scan") == 31
+                        and gate1.get("n_upgrades_meeting_conditions") == 0,
+                        "status=%s, still est=%s, upgrades=%s"
+                        % (gate1.get("gate1_status"), gate1.get("n_rows_still_est_after_scan"),
+                           gate1.get("n_upgrades_meeting_conditions"))))
+    checks.append(check("stage15.corrections_stay_in_an_overlay",
+                        (wdir / "stage15_anchor_corrections.csv").exists()
+                        and not (wdir / "solution_anchor_audit.csv").exists(),
+                        "stage15_anchor_corrections.csv present, frozen audit absent"))
+
+    checks.append(check("week14.figures_present",
+                        (wdir / "artifacts" / "F28_two_guess_protocol.png").exists()
+                        and (wdir / "artifacts" / "F29_diffuseness_descriptor.png").exists(),
+                        "artifacts/ F28 + F29"))
+    checks.append(check("week14.report_present",
+                        (wdir / "week14_report_full.md").exists(),
+                        "week14_report_full.md"))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
                   9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks,
-                  13: week13_checks}
+                  13: week13_checks, 14: week14_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -2387,13 +2637,14 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week10/               Stage 11（sigma 的代数解剖与分辨率判据）
     ├── week11/               Stage 12（介电自相似律与事前预警协议）
     ├── week12/               Stage 13（介电极限与 ORCA 能量账本）
-    └── week13/               Stage 14（畸变项归因与 EMC 离群点诊断）
+    ├── week13/               Stage 14（畸变项归因与 EMC 离群点诊断）
+    └── week14/               Stage 15（双初猜协议、电子弥散度描述符与溶液锚点扫描）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F27 中属于该周的部分）
+    ├── artifacts/            图（F0–F29 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -2417,6 +2668,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 | week10 | Stage 11（sigma 解剖） | 四条恒等式（T1–T4）+ 精确分解（T5）；判据 `f_unresolved(z) = Pr(q_ij > sqrt(2)/z)` 与实测误差精确为 0；带符号斜率 AUC 1.000（精确 p = 1/120），无符号的 sd(delta) 仅 0.810；N=10 时 tau_b 抽样标准差 0.126 | Gate 0 CLOSED |
 | week12 | Stage 13（介电极限 + ORCA 能量账本） | 6 个介电点实测 Born 形式（mean R2 0.9936）；eps = 200 距导体极限 < 50 meV；环境位移四项精确分解（CDS / D4 / gCP 对垂直量为 0） | Gate 0 CLOSED |
 | week11 | Stage 12（介电自相似 + 事前预警） | 介电扫描落在 Born 单参数族（mean R2 0.9936 vs Onsager 0.8835）；18 个台阶事件里 8 个介电台阶全部良性（b > 0、tau_b >= 0.867、无一改写清单）；预警协议 k = 5 平均抓 96%（AUC 0.946）、k = 8 一次不漏 | Gate 0 CLOSED |
+| week14 | Stage 15（双初猜协议 + 弥散度描述符 + 锚点扫描） | 90 点双初猜里 12 点超 1 meV 且**全部为负**、反向 0 次（最大惩罚 0.2860 eV）；EMC 还原轴九点 Born R2 0.6788 -> 0.9556、符号变化 4 -> 0、偶极粗糙度 1.99 -> 0.08；eps = 200 -> 1000 只走 11.3 meV 而六点缺口 +33.2 -> -30.8 meV（**没有变小**）；`D_anion` 最佳留一 R2 0.162 -> 0.556（`spin_maxfrac`，rho = +0.811），中性/阳离子 `delta_loo = 0`；31 行锚点 4 行可裁定、3 改 1 确认 | Gate 0 CLOSED |
 | week13 | Stage 14（畸变项归因 + EMC 离群点） | 逐态畸变惩罚 D_neutral / D_cation / D_anion = 0.0685 / 0.1120 / 0.3710 eV（全部 72/72 为正，变分检验无例外）；唯一稳健关系是 D_neutral 对自身偶极矩（rho = +0.909，留一 R2 0.634）；§14 的 (-0.0465, +0.3272) eV 被 510 种聚合穷举证否；63 个密集网格作业零失败、四个共享介电点逐位复现 | Gate 0 CLOSED |
 
 ## 如何复现
@@ -2428,7 +2680,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -2555,6 +2807,9 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 13 —— Stage 14（畸变项归因与 EMC 离群点诊断）
 {w13_summary}
 
+### Week 14 —— Stage 15（双初猜协议、电子弥散度描述符与溶液锚点扫描）
+{w14_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -2606,7 +2861,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F27）
+## 5. 图表索引（F0–F29）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -2637,6 +2892,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f25_row}
 {f26_row}
 {f27_row}
+{f28_row}
+{f29_row}
 
 ## 6. 复现命令
 ```powershell
@@ -2687,6 +2944,7 @@ $env:PYTHONIOENCODING = "utf-8"
 11. {w11_summary_limit}
 12. {w12_summary_limit}
 13. {w13_summary_limit}
+14. {w14_summary_limit}
 """
 
 
@@ -3900,6 +4158,38 @@ W13_CURVE_SHORT = (("EMC/oxidation", "EMC 氧化"), ("EMC/reduction", "EMC 还�
                    ("EC/oxidation", "EC 氧化"), ("EC/reduction", "EC 还原"))
 
 
+#: Stage 15 (Week 14): the two-guess protocol, the diffuseness descriptors and the scan.
+W14_RUN_PATH = REPO / "outputs" / "week14" / "stage15_two_guess.json"
+W14_TWO_GUESS_PATH = REPO / "outputs" / "week14" / "stage15_two_guess_analysis.json"
+W14_DIFFUSENESS_PATH = REPO / "outputs" / "week14" / "stage15_diffuseness.json"
+W14_ANCHOR_PATH = REPO / "outputs" / "week14" / "stage15_anchor_scan.json"
+F28_NOTE_PRESENT = ("Stage 15 双初猜协议：(a) 90 点能量差的幅度直方图与 1 meV material 阈值；"
+                    "(b) EMC 阴离子偶极的两条分支（默认初猜 vs MORead）在十点介电阶梯上的对照；"
+                    "(c) 导体极限：Born 横坐标 x = 1 - 1/eps，eps = 1000 是第一个实测到极限的位置；"
+                    "(d) 六点 / 九点 Born 斜率与外推缺口（修复前后）")
+F28_NOTE_ABSENT = "预留给 Stage 15（双初猜协议）；week14 尚未产出"
+F29_NOTE_PRESENT = ("Stage 15 电子弥散度描述符：(e) spin_maxfrac 对阴离子畸变惩罚的散点；"
+                    "(f) 参与比的秩相关 vs 线性留一 R2（秩强、线性不可用）；"
+                    "(g) 三个目标的留一 R2 对比（中性与阳离子不变）；"
+                    "(h) 逐层自旋极化的域检验，标出唯一越界的 EMC/cpcm_10")
+F29_NOTE_ABSENT = "预留给 Stage 15（弥散度描述符）；week14 尚未产出"
+W14_STATE_SHORT = (("neutral", "中性"), ("cation", "阳离子"), ("anion", "阴离子"))
+W14_TARGET_SHORT = (("neutral", "D_neutral"), ("cation", "D_cation"), ("anion", "D_anion"))
+W14_PROTOCOL_SHORT = (("default", "默认初猜"), ("moread", "MORead"))
+
+W14_TABLE_ROWS = (
+    ("`stage15_two_guess.json`", "99 个作业的运行记录（11 层 x 9 作业，0 失败）"),
+    ("`stage15_two_guess_analysis.json`", "Part A 全部分析（能量、偶极、Born 曲线、导体极限、判决）"),
+    ("`stage15_two_guess_energy.csv` / `_dipole.csv`", "90 个点的双协议能量差 / 偶极"),
+    ("`stage15_diffuseness.json`", "Part B：7 个新描述符、21 个扩展描述符、域检验、判决、配对搜索"),
+    ("`stage15_diffuseness.csv` / `_by_molecule.csv`", "72 行逐层 / 12 行逐分子（层均值与中位数两种口径）"),
+    ("`stage15_anchor_scan.json` / `.csv`", "Part C：13 篇语料、DOI 交集、31 行裁定、gate1 汇总"),
+    ("`stage15_anchor_corrections.csv`", "3 条修正的 overlay（correction of record）"),
+    ("`stage15_summary.md`", "F28 / F29 的逐面板文字 companion"),
+    ("`p2_core_set_*.csv` / `p2_summary_*.json`", "11 层的能量表与逐层汇总（eps = 1000 + 10 个 MORead 层）"),
+)
+
+
 def week13_blocks(attribution, outlier):
     """Render the week-13 (Stage 14 / distortion attribution + EMC outlier) blocks.
 
@@ -4260,6 +4550,403 @@ REPORT_TEMPLATES[13] = """# Week 13 成果小结 —— Stage 14（畸变项归�
 {artifact_list}
 
 ## 9. 源文件缺失
+{missing_list}
+"""
+
+
+def week14_blocks(analysis, diffuseness, anchor_scan):
+    """Render the week-14 (Stage 15) blocks.
+
+    Every number is read back out of ``stage15_two_guess_analysis.json``,
+    ``stage15_diffuseness.json`` and ``stage15_anchor_scan.json``, so the
+    distilled report cannot drift away from the figures it summarises.
+    """
+
+    empty = {"present": False, "did": "", "metric": "", "qc": "", "limit": "",
+             "protocol_block": "", "limit_block": "", "diffuseness_block": "",
+             "anchor_block": "", "table_block": "", "sigma_note": "", "summary": ""}
+    if not isinstance(analysis, dict) or not analysis.get("verdict"):
+        return empty
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def signed(value, digits=3):
+        text = _w8_num(value, digits)
+        if text == "\u2014":
+            return text
+        return text if text.startswith("-") else "+" + text
+
+    def eps_list(values):
+        return ", ".join("%g" % float(v) for v in (values or []))
+
+    state_label = dict(W14_STATE_SHORT)
+    energy = analysis.get("energy") or {}
+    verdict = analysis.get("verdict") or {}
+    repro = analysis.get("stage14_reproduction") or {}
+    conductor = analysis.get("conductor_limit") or {}
+    stage13 = conductor.get("stage13_published") or {}
+    default = conductor.get("default") or {}
+    moread = conductor.get("moread") or {}
+    dipole_by_key = {}
+    for item in analysis.get("dipole_changed") or []:
+        dipole_by_key[(item.get("name"), item.get("state"), item.get("epsilon"))] = item
+
+    # --- 1. the two-guess protocol ---------------------------------------
+    hist = energy.get("magnitude_histogram") or {}
+    hist_rows = ["| 幅度阈值 (eV) | 超过该阈值的点数 |", "| --- | --- |"]
+    for key in ("1e-08", "1e-07", "1e-06", "1e-05", "1e-04", "1e-03", "1e-02", "1e-01"):
+        hist_rows.append("| `%s` | %s |" % (key, hist.get(key)))
+
+    material_rows = ["| 分子 | 态 | eps | `dE` (eV) | 默认初猜偶极 (D) |", "| --- | --- | --- | --- | --- |"]
+    for item in energy.get("material") or []:
+        key = (item.get("name"), item.get("state"), item.get("epsilon"))
+        dip = dipole_by_key.get(key) or {}
+        material_rows.append("| %s | %s | %s | **%s** | %s |"
+                             % (item.get("name"), state_label.get(item.get("state"),
+                                                                  item.get("state")),
+                                num(item.get("epsilon"), 0),
+                                signed(item.get("delta_ev"), 4),
+                                num(dip.get("dipole_default_debye"), 3)))
+
+    recovery_rows = ["| eps | 默认初猜 (D) | MORead (D) | 能量降低 (eV) |", "| --- | --- | --- | --- |"]
+    for item in verdict.get("emc_anion_recovery") or []:
+        recovery_rows.append("| %s | %s | **%s** | %s |"
+                             % (num(item.get("epsilon"), 0),
+                                num(item.get("dipole_default_debye"), 3),
+                                num(item.get("dipole_moread_debye"), 3),
+                                num(item.get("energy_lowered_ev"), 4)))
+
+    protocol_block = (
+        "### 1.1 协议与规模\n"
+        "- 分子 EMC / DMC / EC；介电阶梯 5/7/10/14/20/28/40/80/200/1000（10 点）；"
+        "态 neutral / cation / anion。\n"
+        "- 每个点跑两遍：`default` = ORCA 自己的初猜；`moread` = `! MORead` + "
+        "`%moinp <同电荷态气相 .gbw>`。共 **99** 个作业，**0 失败、0 QC flag**。\n"
+        "- 差异定义 `dE = E_moread - E_default`；`dE < 0` 表示重启到达了默认初猜"
+        "没到达的更低价态。几何全部复用 G1 并逐原子核对。\n\n"
+        "### 1.2 能量差的分档（数据给出的阈值）\n"
+        + "\n".join(hist_rows) + "\n\n"
+        "- 90 个点里 **%s** 个在收敛精度内一致；**%s** 个超过 1 meV 且**全部为负**；"
+        "反向（重启更差）**%s** 次。\n"
+        "- 噪声带内最大值 **%s eV**，真解差异最小 1.5e-03 eV、最大 **%s eV**。\n\n"
+        % (energy.get("n_identical_to_scf_convergence"),
+           energy.get("n_material_differences"),
+           energy.get("n_material_restart_above_the_default_state"),
+           num(energy.get("worst_of_the_noise_ev"), 6),
+           num(energy.get("max_default_excess_ev"), 4))
+        + "### 1.3 十二个真解差异，方向全部相同\n"
+        + "\n".join(material_rows) + "\n\n"
+        "- 受影响：`%s`，态 `%s`。最大惩罚 **%s eV**（EMC 阴离子，eps = 1000）。\n\n"
+        % (", ".join(energy.get("affected_molecules") or []),
+           ", ".join(energy.get("affected_states") or []),
+           num(energy.get("max_default_excess_ev"), 4))
+        + "### 1.4 EMC 阴离子：失败集与成功集交错\n"
+        + "- 失败集（默认初猜停在亚稳态）：`{%s}`\n"
+        "- 成功集（默认初猜已落在真解）：`{%s}`\n"
+        "- 两个集合**交错**，所以这不是「大介电才出错」的单调故事，"
+        "而是两个 SCF 解的吸引域随介电常数非单调变化——"
+        "这解释了为什么 Week 13 把网格从 4 点加密到 9 点会让它**变糟**。\n\n"
+        % (eps_list(verdict.get("emc_anion_dielectrics_where_the_default_guess_failed")),
+           eps_list(verdict.get("emc_anion_dielectrics_where_it_succeeded")))
+        + "### 1.5 EMC 阴离子的修复是单调的\n"
+        + "\n".join(recovery_rows) + "\n\n"
+        "- 十个偶极逐点上升（%s -> %s D），**无一处回折**；"
+        "修复后 Spearman(偶极, eps) = **%s**，默认初猜是 %s。\n\n"
+        % (num((verdict.get("emc_anion_recovery") or [{}])[0].get("dipole_moread_debye"), 3),
+           num((verdict.get("emc_anion_recovery") or [{}])[-1].get("dipole_moread_debye"), 3),
+           num((verdict.get("dipole_monotonicity") or {}).get("moread_spearman_dipole_vs_eps"), 3),
+           num((verdict.get("dipole_monotonicity") or {}).get("default_spearman_dipole_vs_eps"), 3))
+        + "### 1.6 曲线被修好，但没修到 1\n"
+        "| 口径（九点 5…200） | 默认初猜 | MORead |\n"
+        "| --- | --- | --- |\n"
+        "| Born R2（过原点） | %s | **%s** |\n"
+        "| 一阶差分符号变化 | %s | **%s** |\n"
+        "| 阴离子偶极粗糙度 | %s | **%s** |\n\n"
+        "- 六点 Born R2 = **%s**（Stage 14 公布 %s，`reproduces_stage14 = %s`）；"
+        "九点 Born R2 = **%s**（Stage 14 公布 %s）。\n"
+        "- 六点斜率：默认 %s -> 修复 %s eV；九点：%s -> %s eV。\n"
+        "- **0.9556 不等于 1**：修复掉的是解选择伪影，不是 Born 形式的偏差（见 §2）。\n"
+        % (num(verdict.get("emc_reduction_default_nine_r2"), 4),
+           num(verdict.get("emc_reduction_moread_nine_r2"), 4),
+           verdict.get("emc_reduction_default_nine_sign_changes"),
+           verdict.get("emc_reduction_moread_nine_sign_changes"),
+           num(verdict.get("emc_anion_default_nine_roughness"), 3),
+           num(verdict.get("emc_anion_moread_nine_roughness"), 3),
+           num(repro.get("recomputed_default_six_point_r2"), 4),
+           num((repro.get("published") or {}).get("six_point_r2"), 4),
+           repro.get("reproduces_stage14"),
+           num(repro.get("recomputed_default_nine_point_r2"), 4),
+           num((repro.get("published") or {}).get("nine_point_r2"), 4),
+           num(default.get("born_slope_from_six_points_ev"), 4),
+           num(moread.get("born_slope_from_six_points_ev"), 4),
+           num(default.get("born_slope_from_nine_points_ev"), 4),
+           num(moread.get("born_slope_from_nine_points_ev"), 4)))
+
+    # --- 2. the conductor limit ------------------------------------------
+    limit_rows = ["| 口径 | 默认初猜 | MORead |", "| --- | --- | --- |",
+                  "| 六点斜率（5/10/20/40/80/200） | %s | %s |"
+                  % (num(default.get("born_slope_from_six_points_ev"), 4),
+                     num(moread.get("born_slope_from_six_points_ev"), 4)),
+                  "| 六点斜率下 eps = 200 的缺口 | **%s** | **%s** |"
+                  % (signed(default.get("gap_to_six_point_slope_at_eps200_ev"), 4),
+                     signed(moread.get("gap_to_six_point_slope_at_eps200_ev"), 4)),
+                  "| 九点斜率（5…200） | %s | %s |"
+                  % (num(default.get("born_slope_from_nine_points_ev"), 4),
+                     num(moread.get("born_slope_from_nine_points_ev"), 4)),
+                  "| `delta(eps = 200)` | %s | %s |"
+                  % (num(default.get("delta_at_eps200_ev"), 4),
+                     num(moread.get("delta_at_eps200_ev"), 4)),
+                  "| `delta(eps = 1000)` | %s | %s |"
+                  % (num(default.get("delta_at_eps1000_ev"), 4),
+                     num(moread.get("delta_at_eps1000_ev"), 4)),
+                  "| 外推误差 @200 | %s | %s |"
+                  % (signed(default.get("extrapolation_error_at_200_ev"), 4),
+                     signed(moread.get("extrapolation_error_at_200_ev"), 4)),
+                  "| 外推误差 @1000 | %s | %s |"
+                  % (signed(default.get("extrapolation_error_at_1000_ev"), 4),
+                     signed(moread.get("extrapolation_error_at_1000_ev"), 4)),
+                  "| eps 200 -> 1000 的位移 | **%s** | %s |"
+                  % (num(default.get("gap_between_eps200_and_eps1000_ev"), 4),
+                     num(moread.get("gap_between_eps200_and_eps1000_ev"), 4))]
+
+    limit_block = (
+        "Born 横坐标是 `x = 1 - 1/eps`，所以**拟合出的斜率就是 `eps -> infinity` 的"
+        "外推极限本身**。Stage 14 停在 `eps = 200`（`x = 0.995`）；"
+        "本周补的 `eps = 1000` 对应 `x = 0.999`，是第一个把横坐标推进到极限千分之一的实测点。\n\n"
+        + "\n".join(limit_rows) + "\n\n"
+        "- 默认初猜的 `+33.2 meV` 是 Week 12 §5 那个 worst case 的**逐位复现**"
+        "（`reproduces_the_worst_case = %s`），所以对比的是同一根曲线。\n"
+        "- **缺口没有变小**：默认 %s -> 修复 %s eV。符号翻了，幅度基本没动。"
+        "若 0.2860 eV 的亚稳位移是缺口来源，修掉它后缺口应塌掉一个量级；它没有。\n"
+        "- `eps = 200 -> 1000` 只走 **%s eV**（相对 2.6 eV 的斜率是 0.4%%），"
+        "所以曲线的形状已经在极限附近平了，Stage 14 停在 200 不是坏截断；"
+        "真实偏离在**形状**上，不在截断点上。\n"
+        % (stage13.get("reproduces_the_worst_case"),
+           signed(default.get("gap_to_six_point_slope_at_eps200_ev"), 4),
+           signed(moread.get("gap_to_six_point_slope_at_eps200_ev"), 4),
+           num(default.get("gap_between_eps200_and_eps1000_ev"), 4)))
+
+    # --- 3. the diffuseness descriptors ----------------------------------
+    definitions = diffuseness.get("descriptor_definitions") or {}
+    domain = diffuseness.get("descriptor_domain") or {}
+    screen = diffuseness.get("gas_phase_screen") or {}
+    verdicts = diffuseness.get("verdicts") or {}
+    robust = diffuseness.get("robust_verdicts") or {}
+    pairs = diffuseness.get("pair_search") or {}
+    ext_by_key = {}
+    for row in diffuseness.get("extended_table") or []:
+        ext_by_key[(row.get("group"), row.get("descriptor"))] = row
+
+    def stat(group, desc):
+        row = ext_by_key.get((group, desc)) or {}
+        return ((row.get("spearman") or {}).get("rho"),
+                (row.get("spearman") or {}).get("p"),
+                (row.get("ols") or {}).get("loo_r2"))
+
+    definition_rows = ["| 描述符 | 定义 |", "| --- | --- |"]
+    for key in ("spin_extent_ang2", "spin_rms_ang", "spin_maxfrac", "spin_participation",
+                "spin_extent_norm", "chg_extent_ang2", "chg_extent_norm"):
+        definition_rows.append("| `%s` | %s |" % (key, definitions.get(key)))
+
+    target_rows = ["| 目标 | Stage 14 冠军 | 留一 R2 | Stage 15 冠军 | 留一 R2 | `delta_loo_r2` |",
+                   "| --- | --- | --- | --- | --- | --- |"]
+    for key, label in W14_TARGET_SHORT:
+        item = verdicts.get(key) or {}
+        target_rows.append("| `%s` | `%s` | %s | `%s` | **%s** | **%s** |"
+                           % (label, item.get("baseline_best_descriptor"),
+                              num(item.get("baseline_best_loo_r2"), 3),
+                              item.get("extended_best_descriptor"),
+                              num(item.get("extended_best_loo_r2"), 3),
+                              num(item.get("delta_loo_r2"), 3)))
+
+    rank_rows = ["| 阴离子轴上的描述符 | Spearman rho | p | 留一直线 R2 |", "| --- | --- | --- | --- |"]
+    for desc in ("spin_maxfrac", "spin_participation"):
+        rho, pval, loo = stat("anion", desc)
+        rank_rows.append("| `%s` | **%s** | %s | **%s** |"
+                         % (desc, signed(rho, 3), num(pval, 4), signed(loo, 3)))
+
+    pair_rows = ["| 目标 | 最好的一对 | 留一 R2 |", "| --- | --- | --- |"]
+    for key, label in W14_TARGET_SHORT:
+        ranked = (pairs.get(key) or {}).get("ranked") or []
+        best = ranked[0] if ranked else {}
+        pair_rows.append("| `%s` | `%s` | **%s** |"
+                         % (label, " + ".join(best.get("descriptors") or []),
+                            num(best.get("loo_r2"), 3)))
+
+    outliers = domain.get("layer_outliers_vs_own_median") or []
+    outlier_text = ("；".join("%s/%s (%s)" % tuple(item) for item in outliers)
+                    if outliers else "无")
+
+    diffuseness_block = (
+        "### 3.1 七个新描述符（0 个新作业）\n"
+        "取自六层 bare-CPCM 阴离子的 `MULLIKEN ATOMIC CHARGES AND SPIN POPULATIONS` 块，"
+        "逐分子取层均值（另给中位数口径）：\n\n"
+        + "\n".join(definition_rows) + "\n\n"
+        "### 3.2 先检验描述符自己是否良定义\n"
+        "- 归一化：**%s** 行（12 分子 x 6 层）最坏的 `|sum s - 1| = %s`、"
+        "`|sum q + 1| = %s`，全部通过。\n"
+        "- 符号：Mulliken 自旋是**有符号**的，所以 `max|s_i| > 1` 是**强自旋极化**的标志、"
+        "不是「阴离子不束缚」；判据必须用**带符号和**。\n"
+        "- 气相排除：`%s` 落在六层张成的域之外，`n_inside_domain = %s/%s`。\n"
+        "- **唯一**偏离自身分子中位数 20%% 以上的层：**%s**"
+        "（该层 `spin_maxfrac` 跳到 1.737、参与比掉到 0.308）。"
+        "这与 §1 的能量筛查**独立命中同一个层**，所以不是循环论证。\n\n"
+        % (domain.get("n_rows"), num(domain.get("worst_abs_sum_spin_minus_one"), 7),
+           num(domain.get("worst_abs_sum_charge_plus_one"), 1),
+           ", ".join(screen.get("outside_layer_domain") or []),
+           screen.get("n_inside_domain"), screen.get("n_available"), outlier_text)
+        + "### 3.3 阴离子畸变惩罚从不可预测变成可预测\n"
+        + "\n".join(target_rows) + "\n\n"
+        "- `spin_maxfrac` 的 Spearman `rho = %s`、`p = %s`；换成层**中位数**口径，"
+        "留一 R2 = **%s**、`rho = %s`。\n"
+        "- **中性与阳离子最优描述符一变不变**（`delta_loo_r2 = 0`），"
+        "所以这不是「多加 7 个描述符所以哪都能拟合」。\n\n"
+        % (signed((verdicts.get("anion") or {}).get("extended_best_rho"), 3),
+           num((verdicts.get("anion") or {}).get("extended_best_p"), 4),
+           num((robust.get("anion") or {}).get("median_best_loo_r2"), 3),
+           signed((robust.get("anion") or {}).get("median_best_rho"), 3))
+        + "### 3.4 秩 vs 线性：两个统计量都要报\n"
+        + "\n".join(rank_rows) + "\n\n"
+        "- 参与比的**秩**信号（rho = -0.846）比 `spin_maxfrac` 还强，"
+        "但它的留一**直线** R2 是负的 —— 只报秩会严重误导。\n\n"
+        + "### 3.5 配对搜索\n"
+        + "\n".join(pair_rows) + "\n")
+
+    # --- 4. the literature scan ------------------------------------------
+    gate1 = anchor_scan.get("gate1") or {}
+    manual = anchor_scan.get("manual_adjudication") or {}
+    adjudication_rows = ["| 行 | 物种 | 性质 | 最终证据标签 | 是否改动 | 理由 |",
+                         "| --- | --- | --- | --- | --- | --- |"]
+    for row_id in sorted(manual, key=lambda item: int(item)):
+        item = manual.get(row_id) or {}
+        adjudication_rows.append("| %s | %s | %s | `%s` | %s | %s |"
+                                 % (row_id, item.get("species"), item.get("property"),
+                                    item.get("final_evidence_kind"),
+                                    "**是**" if item.get("adopted_change") else "否（确认）",
+                                    item.get("reason")))
+    rejected_rows = ["| 行 | 线索 | 否掉的理由 |", "| --- | --- | --- |"]
+    for row_id, reason in sorted((anchor_scan.get("rejected_candidate_leads") or {}).items(),
+                                 key=lambda pair: int(pair[0])):
+        rejected_rows.append("| %s | —— | %s |" % (row_id, reason))
+
+    anchor_block = (
+        "- 语料：**%s** 篇 PDF，**%s** 篇可读；审计表引用 %s 个 DOI，"
+        "语料里只有 **%s** 个在手。\n"
+        "- 31 行里 %s 行引用了那篇在手综述，其中只有 **%s** 行的引用集合完全在手，"
+        "因此只有这 %s 行可裁定。\n\n"
+        % (anchor_scan.get("n_pdfs"), anchor_scan.get("n_readable"),
+           len(anchor_scan.get("cited_dois_of_audit") or []),
+           len(anchor_scan.get("cited_dois_present_in_corpus") or []),
+           gate1.get("n_rows_citing_an_in_hand_source"), gate1.get("n_rows_adjudicable"),
+           gate1.get("n_rows_adjudicable"))
+        + "\n".join(adjudication_rows) + "\n\n"
+        "- `n_corrections_adopted = %s`、`confirmed_rows = %s`、"
+        "`n_upgrades_meeting_conditions = %s`。\n"
+        "- 三条被逐字读过、仍被否的数值线索（全部是**络合物**而非孤立溶剂）：\n\n"
+        % (gate1.get("n_corrections_adopted"),
+           ", ".join(gate1.get("confirmed_rows") or []),
+           gate1.get("n_upgrades_meeting_conditions"))
+        + "\n".join(rejected_rows) + "\n\n"
+        "- **Gate 1 仍是 `%s`**，`n_rows_still_est_after_scan = %s`；"
+        "三条修正以 overlay `stage15_anchor_corrections.csv` 作为 correction of record，"
+        "**不写回**有 digest 的冻结表。\n"
+        "- 净收益是**清账而非补值**：3 行的标签从「有综述趋势支持」降级为"
+        "「在手来源根本没覆盖这个物种」。\n"
+        % (gate1.get("gate1_status"), gate1.get("n_rows_still_est_after_scan")))
+
+    # --- 5. products ------------------------------------------------------
+    table_rows = ["| 产物 | 内容 |", "| --- | --- |"]
+    for name, note in W14_TABLE_ROWS:
+        table_rows.append("| %s | %s |" % (name, note))
+    table_block = "\n".join(table_rows)
+
+    did = ("把 Stage 14 留下的开口一次收掉：(1) **双初猜协议**——对 EMC / DMC / EC 在十点"
+           "介电阶梯（5/7/10/14/20/28/40/80/200/1000）上各跑两遍"
+           "（ORCA 默认初猜 vs `! MORead` 气相 MO 重启），99 个新作业；"
+           "(2) **导体极限**——补 `eps = 1000`（`x = 0.999`）实测点；"
+           "(3) **弥散度描述符**——从六层 bare-CPCM 的 Mulliken 自旋布居构造 7 个新量并重跑 "
+           "Stage 14 的归因（**0 个新作业**）；(4) **文献扫描**——对 13 篇在手 PDF 做"
+           "机器可核查的锚点否证（**0 个新作业**）。")
+    metric = ("90 个点里 %s 个在收敛精度内一致、**%s 个超过 1 meV 且全部为负**、反向 0 次，"
+              "最大惩罚 **%s eV**；EMC 还原轴九点 Born R2 **%s -> %s**、符号变化 %s -> 0、"
+              "偶极粗糙度 %s -> %s，修复后偶极严格单调（rho = %s）；"
+              "eps = 200 -> 1000 只走 **%s eV**，而六点缺口 %s -> %s eV（**没有变小**）；"
+              "阴离子畸变惩罚的最佳留一 R2 **%s -> %s**（%s，rho = %s），"
+              "中性与阳离子的 `delta_loo_r2` 都为 0；31 行锚点里 %s 行可裁定、%s 改 1 确认，"
+              "Gate 1 仍 NOT CLOSED。"
+              % (energy.get("n_identical_to_scf_convergence"),
+                 energy.get("n_material_differences"),
+                 num(energy.get("max_default_excess_ev"), 4),
+                 num(verdict.get("emc_reduction_default_nine_r2"), 4),
+                 num(verdict.get("emc_reduction_moread_nine_r2"), 4),
+                 verdict.get("emc_reduction_default_nine_sign_changes"),
+                 num(verdict.get("emc_anion_default_nine_roughness"), 3),
+                 num(verdict.get("emc_anion_moread_nine_roughness"), 3),
+                 num((verdict.get("dipole_monotonicity") or {}).get(
+                     "moread_spearman_dipole_vs_eps"), 3),
+                 num(default.get("gap_between_eps200_and_eps1000_ev"), 4),
+                 signed(default.get("gap_to_six_point_slope_at_eps200_ev"), 4),
+                 signed(moread.get("gap_to_six_point_slope_at_eps200_ev"), 4),
+                 num((verdicts.get("anion") or {}).get("baseline_best_loo_r2"), 3),
+                 num((verdicts.get("anion") or {}).get("extended_best_loo_r2"), 3),
+                 (verdicts.get("anion") or {}).get("extended_best_descriptor"),
+                 signed((verdicts.get("anion") or {}).get("extended_best_rho"), 3),
+                 gate1.get("n_rows_adjudicable"), gate1.get("n_corrections_adopted")))
+    qc = ("99 个作业 0 失败、0 QC flag、11 层各 9/9 ok；Stage 14 的九点 R2 %s 与符号变化 %s "
+          "被逐位复现；Week 12 的 33.2 meV worst case 逐位复现（`reproduces_the_worst_case`）；"
+          "描述符域检验 %s 行全部通过（最坏 `|sum s - 1| = %s`）；"
+          "层内越界点仅 1 个（%s）且与能量筛查独立命中同一层；13 篇 PDF 全部可读。"
+          % (num(repro.get("recomputed_default_nine_point_r2"), 4),
+             repro.get("recomputed_default_nine_sign_changes"),
+             domain.get("n_rows"), num(domain.get("worst_abs_sum_spin_minus_one"), 7),
+             outlier_text))
+    limit = ("双初猜只覆盖 EMC / DMC / EC 三个分子，所以「12 个真解差异」是这 3 个分子的**下界**；"
+             "导体极限只补了 EMC 一条曲线，其余 11 个分子的 `eps = 1000` 未算；"
+             "弥散度描述符与靶量之间只有留一交叉验证、没有第二个数据集"
+             "（**0.556 不是样本外 R2**）；描述符的域比靶集小一格"
+             "（AN 的气相点落在域外被排除）；文献扫描只覆盖 4 行，"
+             "其余 27 行仍为 `est` 且其中 7 行的部分引用不在手；"
+             "三条修正以 overlay 存在、未写回冻结表。")
+
+    summary = ("\n- 做了什么：%s\n- 关键数字：%s\n- 质检：%s\n- 限制：%s\n"
+               % (did, metric, qc, limit))
+
+    return {"present": True, "did": did, "metric": metric, "qc": qc, "limit": limit,
+            "protocol_block": protocol_block, "limit_block": limit_block,
+            "diffuseness_block": diffuseness_block, "anchor_block": anchor_block,
+            "table_block": table_block, "sigma_note": "", "summary": summary}
+
+
+REPORT_TEMPLATES[14] = """# Week 14 成果小结 —— Stage 15（双初猜协议、电子弥散度描述符与溶液锚点扫描）
+
+## 0. 一页结论
+- 做了什么：{w14_did}
+- 关键数字：{w14_metric}
+- 质检：{w14_qc}
+- 限制：{w14_limit}
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 `week14_report_full.md`。
+
+## 1. 双初猜协议：从「解不唯一」到「初猜选错」
+{w14_protocol_block}
+
+## 2. 导体极限：eps = 1000 是第一次真正测到极限
+{w14_limit_block}
+
+## 3. 电子弥散度描述符：把否定结果翻正
+{w14_diffuseness_block}
+
+## 4. 溶液锚点的文献扫描
+{w14_anchor_block}
+
+## 5. 产物与口径
+{w14_table_block}
+
+## 6. 产物清单
+{artifact_list}
+
+## 7. 源文件缺失
 {missing_list}
 """
 
@@ -4697,8 +5384,8 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13",
-                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13)")
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14",
+                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -4796,6 +5483,19 @@ def main(argv=None):
         w12_note = w12_all["summary"]
         w13_all = week13_blocks(load_json(W13_ATTRIBUTION_PATH), load_json(W13_OUTLIER_PATH))
         w13_note = w13_all["summary"]
+        w14_all = week14_blocks(load_json(W14_TWO_GUESS_PATH), load_json(W14_DIFFUSENESS_PATH),
+                                load_json(W14_ANCHOR_PATH))
+        w14_note = w14_all["summary"]
+        f28_figure = REPO / "outputs" / "figures" / "F28_two_guess_protocol.png"
+        if f28_figure.exists():
+            f28_row = "| F28 | `F28_two_guess_protocol.png` | " + F28_NOTE_PRESENT + " | week14 |"
+        else:
+            f28_row = "| F28 | 未生成 | " + F28_NOTE_ABSENT + " | —— |"
+        f29_figure = REPO / "outputs" / "figures" / "F29_diffuseness_descriptor.png"
+        if f29_figure.exists():
+            f29_row = "| F29 | `F29_diffuseness_descriptor.png` | " + F29_NOTE_PRESENT + " | week14 |"
+        else:
+            f29_row = "| F29 | 未生成 | " + F29_NOTE_ABSENT + " | —— |"
         f14_figure = REPO / "outputs" / "figures" / "F14_delta_m_derivation.png"
         if f14_figure.exists():
             f14_row = "| F14 | `F14_delta_m_derivation.png` | " + F14_NOTE_PRESENT + " | week6 |"
@@ -4910,7 +5610,11 @@ def main(argv=None):
                            ("{w10_sigma_note}", w10_all["sigma_note"]),
                            ("{w9_summary}", w9_note),
                            ("{w9_sigma_note}", w9_all["sigma_note"]),
-                           ("{w7_summary}", w7_note)):
+                           ("{w7_summary}", w7_note),
+                           ("{w14_summary}", w14_note),
+                           ("{w14_summary_limit}", w14_all["limit"]),
+                           ("{f28_row}", f28_row),
+                           ("{f29_row}", f29_row)):
             summary = summary.replace(key, value)
         write_text(out / "数据结果汇总.md", summary)
 

@@ -208,6 +208,25 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "tests/test_stage14_attribution.py",
     "docs/23_*.md",
     "outputs/week13/**/*",
+    # Stage 15 (Week 14): the two-guess protocol (99 new ORCA single points on the
+    # ten-point dielectric ladder for EMC/DMC/EC, each run twice -- ORCA's own guess
+    # vs `! MORead` restarted from the gas-phase MOs of the same charge state), the
+    # electron-delocalisation descriptors built from the frozen Mulliken spin
+    # populations (zero new jobs), and the machine-checkable scan of the
+    # solution-phase anchor audit.  Geometry is reused byte-for-byte from G1.
+    # `src/electrolyte_ranking/orca.py` gained the `moinp` argument (the `%moinp`
+    # block) and `scripts/run_orca_job.py` passes it through.
+    "scripts/run_stage15_two_guess.py",
+    "scripts/analyze_stage15_two_guess.py",
+    "scripts/build_stage15_diffuseness.py",
+    "scripts/scan_stage15_anchor_literature.py",
+    "scripts/make_stage15_figure.py",
+    "tests/test_stage15_two_guess.py",
+    "tests/test_orca_input.py",
+    "src/electrolyte_ranking/orca.py",
+    "scripts/run_orca_job.py",
+    "docs/24_*.md",
+    "outputs/week14/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large
