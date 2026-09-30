@@ -66,9 +66,9 @@ def test_data_js_is_a_json_payload_with_the_expected_shape():
     payload = _payload()
     for key in ("repo", "counts", "pipeline", "gates", "weeks", "figures"):
         assert key in payload, "payload misses " + key
-    assert len(payload["weeks"]) == 16
+    assert len(payload["weeks"]) == 17
     assert len(payload["pipeline"]) == 5
-    assert payload["counts"]["weeks"] == 16
+    assert payload["counts"]["weeks"] == 17
 
 
 def test_figure_payload_covers_exactly_the_repository_figures():
@@ -76,7 +76,7 @@ def test_figure_payload_covers_exactly_the_repository_figures():
     on_disk = sorted(p.name for p in REPO_FIGURES.glob("*.png"))
     listed = sorted(row["file"] for row in payload["figures"])
     assert listed == on_disk, "the site and outputs/figures/ disagree on the figure set"
-    assert len(listed) == 34
+    assert len(listed) == 36
 
 
 def test_every_figure_has_a_caption_and_a_hash():
@@ -100,9 +100,9 @@ def test_every_week_points_at_a_report_that_exists():
         assert week["stage"].strip() and week["title"].strip()
 
 
-def test_week_numbers_are_one_to_sixteen():
+def test_week_numbers_are_one_to_seventeen():
     numbers = [w["n"] for w in _payload()["weeks"]]
-    assert numbers == list(range(1, 17))
+    assert numbers == list(range(1, 18))
 
 
 def test_gate_payload_matches_the_frozen_gate_records():
@@ -233,7 +233,7 @@ def test_404_counts_are_written_by_the_generator():
 
 
 def test_index_html_does_not_hardcode_a_week_report_link():
-    """Adding week 16 must not leave a dead ``NN_weekNN_report.md`` in the markup.
+    """Adding a week must not leave a dead ``NN_weekNN_report.md`` in the markup.
 
     The latest-report chip is filled from the payload at boot, so the path is
     never typed into ``index.html``.

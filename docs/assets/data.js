@@ -2,12 +2,12 @@
 window.HB = {
  "repo": "https://github.com/LittleAlety/electrolyte-ranking-stability",
  "counts": {
-  "weeks": 16,
-  "figures": 34,
+  "weeks": 17,
+  "figures": 36,
   "orca_out": 1319,
-  "scripts": 73,
-  "test_files": 38,
-  "tests_passed": 858
+  "scripts": 77,
+  "test_files": 40,
+  "tests_passed": 899
  },
  "pipeline": [
   {
@@ -422,6 +422,27 @@ window.HB = {
     "9. 已知限制",
     "10. 下一步（Week 17 候选）"
    ]
+  },
+  {
+   "n": 17,
+   "doc": "docs/27_week17_report.md",
+   "title": "Week 17 报告 —— Stage 18：全目录电子结构身份普查，与零额外成本的自诊断",
+   "stage": "Stage 18",
+   "tag": "零新增作业：全目录 414 对身份普查闭合（可测 276 对 AUC 1.000、规则不一致 0 对）；零成本自诊断的冻结规则在留出臂输给多数类（TP 0），唯一站得住的正面结论是单边筛查「无警告 ⇒ 安全」",
+   "summary": "两个 SCF 解只要能量重合，电子结构身份就逐位相同；只要能量分开，身份就必然不同，且分界落在 charge_l1 的一条空档上（0.0385 与 0.0394 之间）。 - 全目录 414 对（发现集 360 + 留出臂 54）零未解析、零几何差异、零能量复核偏差；分类与身份自洽，未发现反例（276/276 可测对）。 - 冻结判据 charge_l1 > 0.039 在可测子集上 AUC = 1.000000，混淆矩阵 tp/fn/fp/tn = 37/0/0/239（敏感度 = 特异度 = Youden J = 1.0000）。 - 零额外成本的 Part B 输了样本外：gap_warn_value 在发现集上 LOO 0.917 > 基线 0.911（精确 p = 2.56e-19），但留出臂只到 0.796、输给多数类 0.907（TP=0）。 - 但它留下一个成立且可迁移的单边结论：ORCA 的 small-gap 警告是漏解的必要条件（37/37 正例带警告，反例 0），据此放行 140/414 格不丢任何一个正例——只是它同时打在 62.9% 的负例上，不能反读成预警。",
+   "sections": [
+    "0. 一句话结论",
+    "1. 为什么要有这一步（Stage 18 的动机）",
+    "2. 口径与记号",
+    "3. 本周新增的计算",
+    "4. Part A：全目录电子结构身份普查",
+    "5. Part B：零额外成本的自诊断",
+    "6. 物理读法",
+    "7. 读法纪律（延续 Week 9 §10 / 10 §11 / 11 §11 / 12 §10 / 13 §11 / 14 §9 / 15 §8 / 16 §7）",
+    "8. 产物与图表",
+    "9. 已知限制",
+    "10. 下一步（Week 18 候选）"
+   ]
   }
  ],
  "figures": [
@@ -764,6 +785,26 @@ window.HB = {
    "bytes": 342191,
    "w": 2260,
    "h": 1610
+  },
+  {
+   "id": "F34",
+   "file": "F34_stage18_identity_census.png",
+   "week": 17,
+   "caption": "(a) charge_l1 双峰：coincident 239 / moread_lower 37（仅开壳层可测），冻结阈值 0.039 落在 0.0385-0.0394 空档；(b) 五通道 x 三臂 AUC；(c) 按家族的重合率；(d) 留出臂 54 格 delta_ev 与 1 meV 阈值",
+   "sha": "eb73cfdef38ad4a67599c4769420bae3d31a111786b6a9e62f6e2149e4bbe13f",
+   "bytes": 182593,
+   "w": 2010,
+   "h": 1527
+  },
+  {
+   "id": "F35",
+   "file": "F35_stage18_selfdiagnosis.png",
+   "week": 17,
+   "caption": "(e) 单变量筛查前 8 名 |AUC-0.5| 与 LOO 裁决（gap_warn_value 第一、LOO 胜基线但留出臂输）；(f) gap_warn_value 正负例分布与冻结阈值 -0.0395；(g) 留出臂 54 格按冻结规则逐行打分（TP=0）；(h) 单边筛查：presence 规则放行 140/414、敏感度 1.000、特异度 0.371",
+   "sha": "ca116d15649a278a56fa46cdeae71de1f0d94d204ed1427107e2aeeb5fab9f6e",
+   "bytes": 245682,
+   "w": 1992,
+   "h": 1527
   }
  ]
 };

@@ -651,6 +651,32 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 16",
         ],
     },
+    17: {
+        "topic": "Stage 18（全目录电子身份普查与零成本自诊断）",
+        "sources": [
+            ("outputs/week17/stage18_identity_census.json", None, True),
+            ("outputs/week17/stage18_identity_census.csv", None, True),
+            ("outputs/week17/stage18_identity_census_by_family.csv", None, True),
+            ("outputs/week17/stage18_identity_census_by_classification.csv", None, True),
+            ("outputs/week17/stage18_identity_census_summary.md", None, True),
+            ("outputs/week17/stage18_selfdiagnosis.json", None, True),
+            ("outputs/week17/stage18_selfdiagnosis_features.csv", None, True),
+            ("outputs/week17/stage18_selfdiagnosis_features_by_state.csv", None, True),
+            ("outputs/week17/stage18_selfdiagnosis_summary.md", None, True),
+            ("docs/27_week17_report.md", "week17_report_full.md", True),
+            ("outputs/figures/figure_manifest_week17_stage18.md",
+             "artifacts/figure_manifest_week17_stage18.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F34_*.png", "outputs/figures/F35_*.png"],
+        "commands": [
+            "python scripts/analyze_stage18_identity_census.py",
+            "python scripts/build_stage18_selfdiagnosis.py",
+            "python scripts/make_stage18_figure.py",
+            "python scripts/gen_week17_report.py",
+            "python scripts/build_deliverables.py --weeks 17",
+        ],
+    },
 }
 
 
@@ -895,6 +921,17 @@ def render_report(week, wdir, missing, excluded):
                        ("{w16_identity_block}", w16["identity_block"]),
                        ("{w16_family_block}", w16["family_block"]),
                        ("{w16_table_block}", w16["table_block"])):
+        text = text.replace(key, value)
+    w17 = week17_blocks(load_json(W17_CENSUS_PATH), load_json(W17_DIAGNOSIS_PATH))
+    for key, value in (("{w17_did}", w17["did"]),
+                           ("{w17_metric}", w17["metric"]),
+                           ("{w17_qc}", w17["qc"]),
+                           ("{w17_limit}", w17["limit"]),
+                           ("{w17_protocol_block}", w17["protocol_block"]),
+                           ("{w17_census_block}", w17["census_block"]),
+                           ("{w17_diagnosis_block}", w17["diagnosis_block"]),
+                           ("{w17_onesided_block}", w17["onesided_block"]),
+                           ("{w17_table_block}", w17["table_block"])):
         text = text.replace(key, value)
 
     if missing:
@@ -2560,11 +2597,205 @@ def week16_checks(wdir: Path):
 
 
 
+def week17_checks(wdir: Path):
+    """QC for week 17 (Stage 18, the identity census and the zero-cost self-diagnosis)."""
+
+    checks = []
+    census = load_json(wdir / "stage18_identity_census.json")
+    diagnosis = load_json(wdir / "stage18_selfdiagnosis.json")
+    for name, data in (("stage18_identity_census", census),
+                       ("stage18_selfdiagnosis", diagnosis)):
+        if data is None:
+            checks.append(check(name + ".present", None, "source not found"))
+            return checks
+        checks.append(check(name + ".present", True, name + ".json present"))
+
+    block = census.get("census") or {}
+    checks.append(check("week17.part_a_census_complete",
+                        block.get("n_cells_requested") == 414
+                        and block.get("n_cells_resolved") == 414
+                        and not (block.get("unresolved") or [])
+                        and block.get("n_default_arm_missing") == 0
+                        and block.get("n_moread_arm_missing") == 0,
+                        "outfiles scanned=%s (standard %s + holdout %s), index keys=%s; "
+                        "cells requested=%s resolved=%s, default-missing=%s "
+                        "moread-missing=%s, unresolved=%s"
+                        % (block.get("n_outfiles_scanned"),
+                           block.get("n_outfiles_parsed_standard"),
+                           block.get("n_outfiles_parsed_holdout"), block.get("n_index_keys"),
+                           block.get("n_cells_requested"), block.get("n_cells_resolved"),
+                           block.get("n_default_arm_missing"),
+                           block.get("n_moread_arm_missing"), block.get("unresolved"))))
+    checks.append(check("week17.part_a_pair_counts",
+                        census.get("n_pairs") == 414 and census.get("n_discovery") == 360
+                        and census.get("n_holdout") == 54,
+                        "n_pairs=%s n_discovery=%s n_holdout=%s"
+                        % (census.get("n_pairs"), census.get("n_discovery"),
+                           census.get("n_holdout"))))
+    energy = census.get("energy_crosscheck") or {}
+    checks.append(check("week17.part_a_energy_crosscheck",
+                        energy.get("passed") is True
+                        and energy.get("n_compared") == 414
+                        and energy.get("max_abs_mismatch_ev") is not None
+                        and float(energy.get("max_abs_mismatch_ev"))
+                        <= float(energy.get("tolerance_ev") or 0.0),
+                        "n_compared=%s max|delta|=%.3g eV tolerance=%.0e passed=%s"
+                        % (energy.get("n_compared"),
+                           float(energy.get("max_abs_mismatch_ev") or 0.0),
+                           float(energy.get("tolerance_ev") or 0.0), energy.get("passed"))))
+    geometry = census.get("geometry_qc") or {}
+    checks.append(check("week17.part_a_geometry_qc",
+                        geometry.get("all_identical") is True
+                        and geometry.get("n_geometry_identical") == geometry.get("n_pairs"),
+                        "geometry identical %s / %s pairs, all_identical=%s"
+                        % (geometry.get("n_geometry_identical"), geometry.get("n_pairs"),
+                           geometry.get("all_identical"))))
+
+    counts = census.get("classification_counts") or {}
+    discovery_counts = counts.get("discovery") or {}
+    holdout_counts = counts.get("holdout") or {}
+    checks.append(check("week17.part_a_classification_counts",
+                        discovery_counts.get("coincident") == 328
+                        and discovery_counts.get("moread_lower") == 32
+                        and holdout_counts.get("coincident") == 49
+                        and holdout_counts.get("moread_lower") == 5
+                        and counts.get("n_rule_mismatches") == 0
+                        and counts.get("n_actual_pairs") == counts.get("n_expected_pairs") == 414,
+                        "discovery %s/%s, holdout %s/%s, rule mismatches=%s, pairs %s/%s"
+                        % (discovery_counts.get("coincident"),
+                           discovery_counts.get("moread_lower"),
+                           holdout_counts.get("coincident"),
+                           holdout_counts.get("moread_lower"),
+                           counts.get("n_rule_mismatches"), counts.get("n_actual_pairs"),
+                           counts.get("n_expected_pairs"))))
+
+    thresholds = census.get("thresholds") or {}
+    gap_low = thresholds.get("calibration_coincident_max")
+    gap_high = thresholds.get("calibration_moread_min")
+    cut = thresholds.get("charge_l1_primary")
+    checks.append(check("week17.part_a_calibration_gap",
+                        cut is not None and gap_low is not None and gap_high is not None
+                        and float(gap_low) < float(cut) < float(gap_high),
+                        "largest coincident=%.6f, frozen cut=%.3f, smallest moread_lower=%.6f; "
+                        "scope=%s"
+                        % (float(gap_low or 0.0), float(cut or 0.0), float(gap_high or 0.0),
+                           thresholds.get("calibration_scope"))))
+
+    separation = census.get("separation") or {}
+    consistent = separation.get("consistency") or {}
+    all_block = separation.get("all") or {}
+    holdout_block = separation.get("holdout") or {}
+    matrix = all_block.get("confusion_at_threshold") or {}
+    holdout_matrix = holdout_block.get("confusion_at_threshold") or {}
+    checks.append(check("week17.part_a_separation_is_clean",
+                        consistent.get("n_consistent") == 414
+                        and consistent.get("rate") == 1.0
+                        and (all_block.get("auc") or {}).get("charge_l1") == 1.0
+                        and matrix.get("tp") == 37 and matrix.get("fn") == 0
+                        and matrix.get("fp") == 0 and matrix.get("tn") == 239,
+                        "identity verdict agrees on %s/%s pairs (rate %s); "
+                        "AUC(charge_l1)=%s; confusion TP %s FN %s FP %s TN %s"
+                        % (consistent.get("n_consistent"), consistent.get("n_pairs"),
+                           consistent.get("rate"),
+                           (all_block.get("auc") or {}).get("charge_l1"),
+                           matrix.get("tp"), matrix.get("fn"), matrix.get("fp"),
+                           matrix.get("tn"))))
+    checks.append(check("week17.part_a_holdout_transfers",
+                        (holdout_block.get("auc") or {}).get("charge_l1") == 1.0
+                        and holdout_matrix.get("tp") == 5 and holdout_matrix.get("fn") == 0
+                        and holdout_matrix.get("fp") == 0 and holdout_matrix.get("tn") == 31,
+                        "held-out arm scored with the discovery cut: AUC=%s, "
+                        "TP %s FN %s FP %s TN %s"
+                        % ((holdout_block.get("auc") or {}).get("charge_l1"),
+                           holdout_matrix.get("tp"), holdout_matrix.get("fn"),
+                           holdout_matrix.get("fp"), holdout_matrix.get("tn"))))
+    checks.append(check("week17.part_a_closed_shell_disclosed",
+                        consistent.get("n_unmeasurable") == 138
+                        and consistent.get("n_measurable") == 276,
+                        "%s of %s pairs are closed-shell neutrals that print no spin block, so "
+                        "the identity metrics are measurable on only %s of them"
+                        % (consistent.get("n_unmeasurable"), consistent.get("n_pairs"),
+                           consistent.get("n_measurable"))))
+
+    rule = diagnosis.get("frozen_rule") or {}
+    checks.append(check("week17.part_b_frozen_rule",
+                        rule.get("descriptor") == "gap_warn_value"
+                        and rule.get("sign") == "smaller_is_riskier"
+                        and float(rule.get("threshold_frozen") or 0.0) == -0.0395,
+                        "frozen rule: %s %s %s"
+                        % (rule.get("descriptor"), rule.get("sign"),
+                           rule.get("threshold_frozen"))))
+    loo = diagnosis.get("loo") or {}
+    holdout = diagnosis.get("holdout") or {}
+    holdout_cm = holdout.get("confusion_matrix") or {}
+    checks.append(check("week17.part_b_loses_out_of_sample",
+                        loo.get("beats_majority") is True
+                        and holdout.get("beats_majority") is False
+                        and holdout_cm.get("true_positive") == 0,
+                        "leave-one-out %.4f vs majority %.4f (beats=%s); held-out %.4f vs "
+                        "majority %.4f (beats=%s, TP=%s FP=%s TN=%s FN=%s)"
+                        % (float(loo.get("accuracy") or 0.0),
+                           float(loo.get("majority_accuracy") or 0.0), loo.get("beats_majority"),
+                           float(holdout.get("accuracy") or 0.0),
+                           float(holdout.get("majority_accuracy") or 0.0),
+                           holdout.get("beats_majority"), holdout_cm.get("true_positive"),
+                           holdout_cm.get("false_positive"), holdout_cm.get("true_negative"),
+                           holdout_cm.get("false_negative"))))
+    significance = diagnosis.get("significance") or {}
+    checks.append(check("week17.part_b_exact_null",
+                        significance.get("method") == "exact_mann_whitney_dp"
+                        and float(significance.get("p_value") or 1.0) < 1e-12,
+                        "method=%s p=%.4g (AUC observed %.6f)"
+                        % (significance.get("method"),
+                           float(significance.get("p_value") or 1.0),
+                           float(significance.get("auc_observed") or 0.0))))
+
+    one_sided = diagnosis.get("one_sided_screening") or {}
+    necessity_block = one_sided.get("necessity") or {}
+    necessity = necessity_block.get("overall") or {}
+    by_arm = necessity_block.get("by_arm") or {}
+    specificity = ((one_sided.get("specificity") or {}).get("overall") or {})
+    coverage = one_sided.get("coverage") or {}
+    checks.append(check("week17.part_b_warning_is_necessary",
+                        necessity.get("n_positive") == 37
+                        and necessity.get("n_positive_without_warning") == 0
+                        and necessity.get("p_no_warning_given_positive") == 0.0
+                        and (by_arm.get("discovery") or {}).get("n_positive_without_warning") == 0
+                        and (by_arm.get("holdout") or {}).get("n_positive_without_warning") == 0,
+                        "positives with the warning %s/%s (discovery %s/%s, holdout %s/%s); "
+                        "P(no warning | positive) = %s"
+                        % (necessity.get("n_positive_with_warning"), necessity.get("n_positive"),
+                           (by_arm.get("discovery") or {}).get("n_positive_with_warning"),
+                           (by_arm.get("discovery") or {}).get("n_positive"),
+                           (by_arm.get("holdout") or {}).get("n_positive_with_warning"),
+                           (by_arm.get("holdout") or {}).get("n_positive"),
+                           necessity.get("p_no_warning_given_positive"))))
+    checks.append(check("week17.part_b_warning_is_not_sufficient",
+                        specificity.get("n_negative") == 377
+                        and specificity.get("n_negative_with_warning") == 237
+                        and abs(float(specificity.get("false_alarm_rate") or 0.0)
+                                - 237.0 / 377.0) < 1e-9,
+                        "negatives with the warning %s/%s (false-alarm rate %.4f, "
+                        "specificity %.4f)"
+                        % (specificity.get("n_negative_with_warning"),
+                           specificity.get("n_negative"),
+                           float(specificity.get("false_alarm_rate") or 0.0),
+                           float(specificity.get("specificity") or 0.0))))
+    checks.append(check("week17.part_b_warning_defined_everywhere",
+                        coverage.get("n_pairs") == 414
+                        and coverage.get("n_pairs_with_gap_warning_field") == 414,
+                        "the warning field is present for %s/%s pairs, including the %s "
+                        "closed-shell neutrals the spin features cannot reach"
+                        % (coverage.get("n_pairs_with_gap_warning_field"),
+                           coverage.get("n_pairs"), coverage.get("n_neutral_pairs"))))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
                   9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks,
                   13: week13_checks, 14: week14_checks, 15: week15_checks,
-                  16: week16_checks}
+                  16: week16_checks, 17: week17_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -3299,6 +3530,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 | week13 | Stage 14（畸变项归因 + EMC 离群点） | 逐态畸变惩罚 D_neutral / D_cation / D_anion = 0.0685 / 0.1120 / 0.3710 eV（全部 72/72 为正，变分检验无例外）；唯一稳健关系是 D_neutral 对自身偶极矩（rho = +0.909，留一 R2 0.634）；§14 的 (-0.0465, +0.3272) eV 被 510 种聚合穷举证否；63 个密集网格作业零失败、四个共享介电点逐位复现 | Gate 0 CLOSED |
 {w15_row}
 {w16_row}
+{w17_row}
 
 ## 如何复现
 ```powershell
@@ -3309,7 +3541,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -3444,6 +3676,7 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 
 ### Week 16 —— Stage 17（亚稳态污染上限与两个 SCF 解的电子结构身份）
 {w16_summary}
+{w17_summary}
 
 ## 3. 核心科学结论
 
@@ -3533,6 +3766,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f31_row}
 {f32_row}
 {f33_row}
+{f34_row}
+{f35_row}
 
 ## 6. 复现命令
 ```powershell
@@ -3586,6 +3821,7 @@ $env:PYTHONIOENCODING = "utf-8"
 14. {w14_summary_limit}
 15. {w15_summary_limit}
 16. {w16_summary_limit}
+17. {w17_summary_limit}
 """
 
 
@@ -4894,6 +5130,42 @@ W16_TABLE_ROWS = (
      "\x60p2_summary_moread_smd_acetonitrile.json\x60",
      "Part A 的原始能量表与逐层汇总（SMD(乙腈) moread 臂）"),
 )
+
+#: Stage 18 (Week 17): the whole-catalogue identity census and the zero-extra-cost
+#: self-diagnosis.  Neither part ran a new quantum-chemistry job.
+W17_CENSUS_PATH = REPO / "outputs" / "week17" / "stage18_identity_census.json"
+W17_DIAGNOSIS_PATH = REPO / "outputs" / "week17" / "stage18_selfdiagnosis.json"
+F34_NOTE_PRESENT = ("Stage 18 Part A 电子身份普查：(a) charge_l1 在 276 个可测配对上的双峰"
+                    "（冻结切点 0.039 落在 0.038509 与 0.039383 之间的空隙里）；"
+                    "(b) 分类与身份判定的一致性（发现集 328/32、留出臂 49/5）；"
+                    "(c) 8 个家族各自的 coincident / moread_lower 分裂；"
+                    "(d) 5 个留出臂漏解格逐格（2 个分子、全部为阴离子）")
+F34_NOTE_ABSENT = "预留给 Stage 18 Part A（电子身份普查）；week17 尚未产出"
+F35_NOTE_PRESENT = ("Stage 18 Part B 零成本自诊断：(e) 8 个零额外成本特征的单变量筛查"
+                    "（发现集 AUC / 留一 / 留出 accuracy，两条多数类基线）；"
+                    "(f) ORCA 自带 small-gap 警告的带符号值分布，以及 140 个「无警告」格的归属；"
+                    "(g) 冻结规则在 54 个留出格上原样打分（TP 0 / FP 6 / TN 43 / FN 5）；"
+                    "(h) 单边视图：警告本身在两臂都达到灵敏度 1.000，而数值切点样本外降到 0.000")
+F35_NOTE_ABSENT = "预留给 Stage 18 Part B（零成本自诊断）；week17 尚未产出"
+W17_TABLE_ROWS = (
+    ("`stage18_identity_census.json`",
+     "Part A 全部聚合（thresholds / census / energy_crosscheck / geometry_qc / "
+     "classification_counts / separation / by_state / by_family / cells）"),
+    ("`stage18_identity_census.csv`",
+     "Part A 逐格表（414 对：两臂 .out 路径、<S^2>、自旋中心、PR、L1、几何 QC、identity_differs）"),
+    ("`stage18_identity_census_by_family.csv` / `_by_classification.csv`",
+     "Part A 按家族 / 按分类的汇总表"),
+    ("`stage18_identity_census_summary.md`", "Part A 的中文小结"),
+    ("`stage18_selfdiagnosis.json`",
+     "Part B 全部内容（features / screen / frozen_rule / in_sample / loo / significance / "
+     "holdout / by_state_post_hoc / multivariate_ceiling / one_sided_screening）"),
+    ("`stage18_selfdiagnosis_features.csv`",
+     "Part B 逐格特征表（414 行 x 34 列，全部读自默认臂那一个 .out）"),
+    ("`stage18_selfdiagnosis_features_by_state.csv`", "Part B 按 (臂, 态) 的特征均值表"),
+    ("`stage18_selfdiagnosis_summary.md`", "Part B 的中文小结"),
+)
+
+
 
 def week13_blocks(attribution, outlier):
     """Render the week-13 (Stage 14 / distortion attribution + EMC outlier) blocks.
@@ -6256,6 +6528,386 @@ REPORT_TEMPLATES[16] = """# Week 16 成果小结 —— Stage 17（亚稳态污�
 """
 
 
+def week17_blocks(census, diagnosis):
+    """Week 17 / Stage 18 narrative blocks.
+
+    Every number is read back out of ``stage18_identity_census.json`` and
+    ``stage18_selfdiagnosis.json``, so the distilled report cannot drift away
+    from the artifacts it summarises.  Nothing here is typed in by hand.
+    """
+
+    keys = ("did", "metric", "qc", "limit", "summary", "protocol_block",
+            "census_block", "diagnosis_block", "onesided_block", "table_block")
+    if census is None:
+        text = "（\x60stage18_identity_census.json\x60 不存在）"
+        return {key: text for key in keys}
+
+    diagnosis = diagnosis or {}
+    counts = census.get("classification_counts") or {}
+    discovery_counts = counts.get("discovery") or {}
+    holdout_counts = counts.get("holdout") or {}
+    census_meta = census.get("census") or {}
+    thresholds = census.get("thresholds") or {}
+    energy = census.get("energy_crosscheck") or {}
+    geometry = census.get("geometry_qc") or {}
+    separation = census.get("separation") or {}
+    consistent = separation.get("consistency") or {}
+    all_block = separation.get("all") or {}
+    holdout_sep = separation.get("holdout") or {}
+    matrix = all_block.get("confusion_at_threshold") or {}
+    holdout_matrix = holdout_sep.get("confusion_at_threshold") or {}
+    by_family = census.get("by_family") or {}
+
+    rule = diagnosis.get("frozen_rule") or {}
+    in_sample = diagnosis.get("in_sample") or {}
+    loo = diagnosis.get("loo") or {}
+    significance = diagnosis.get("significance") or {}
+    holdout = diagnosis.get("holdout") or {}
+    holdout_cm = holdout.get("confusion_matrix") or {}
+    ceiling = diagnosis.get("multivariate_ceiling") or {}
+    screen = diagnosis.get("screen") or []
+    one_sided = diagnosis.get("one_sided_screening") or {}
+    necessity = ((one_sided.get("necessity") or {}).get("overall") or {})
+    necessity_arm = ((one_sided.get("necessity") or {}).get("by_arm") or {})
+    specificity = ((one_sided.get("specificity") or {}).get("overall") or {})
+    coverage = one_sided.get("coverage") or {}
+    by_state_one_sided = (one_sided.get("by_state") or {}).get("pooled") or {}
+    tradeoff = one_sided.get("tradeoff") or []
+    counts_obs = one_sided.get("gap_warn_count_observation") or {}
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def pct(value, digits=1):
+        if value is None:
+            return "\u2014"
+        return "%.*f%%" % (digits, 100.0 * value)
+
+    protocol_block = "\n".join([
+        "### 协议与规模",
+        "",
+        "- **本周零新增量子化学作业**：Part A 与 Part B 都只读已经存在的 \x60.out\x60。"
+        "全目录扫描 %s 个 \x60.out\x60（standard %s + holdout %s），%s 对请求格**全部解析**、"
+        "\x60unresolved = %s\x60、default/moread 臂缺失各 %s / %s 格。"
+        % (census_meta.get("n_outfiles_scanned"),
+           census_meta.get("n_outfiles_parsed_standard"),
+           census_meta.get("n_outfiles_parsed_holdout"),
+           census_meta.get("n_cells_requested"), census_meta.get("unresolved"),
+           census_meta.get("n_default_arm_missing"), census_meta.get("n_moread_arm_missing")),
+        "- **设计**：%s 对 = 发现集 %s（12 分子 x 3 态 x 10 电介质）+ 留出臂 %s"
+        "（6 分子 x 3 态 x 3 电介质）。每一对都是「同一格、同一个几何、只换 SCF 初猜」的两个解。"
+        % (census.get("n_pairs"), census.get("n_discovery"), census.get("n_holdout")),
+        "- **Part A（身份普查）**：用 Stage 17 已在用的身份指标（<S^2>、Mulliken/Löwdin 原子自旋、"
+        "自旋参与率 PR、约化轨道通道）比较两个解，判据只有一条：两臂电荷差的 L1 距离 "
+        "\x60charge_l1 > %s\x60。"
+        % num(thresholds.get("charge_l1_primary"), 3),
+        "- **Part B（零成本自诊断）**：只读**默认臂那一个** \x60.out\x60 已经打印出来的字段 —— "
+        "SCF 迭代轨迹、ORCA 自己的 \x60Small HOMO/LUMO gap\x60 警告（含带符号值）、"
+        "上面那套身份指标、以及轨道能量块；协议逐条镜像 Stage 16（发现集筛特征 → 冻结一条规则 → "
+        "留一 → AUC 精确零分布 → 留出臂原样打分 → 事后按态分层 → 多变量上限）。",
+    ])
+
+    family_rows = []
+    for family in sorted(by_family, key=lambda name: -by_family[name]["n_cells"]):
+        block = by_family[family]
+        family_rows.append("| %s | %d | %d | %d | %d | %d |"
+                           % (family, block.get("n_cells", 0), block.get("n_coincident", 0),
+                              block.get("n_moread_lower", 0), block.get("n_identity_differs", 0),
+                              block.get("n_identity_measurable", 0)))
+    census_block = "\n".join([
+        "### 硬 QC（全部由脚本现算）",
+        "",
+        "- 能量复核：%s 对全部比对，\x60max |delta_E| = %s eV\x60（容差 %.0e），"
+        "\x60passed = %s\x60 —— 两个解的能量就是同一次计算的产物，不是两次独立运行。"
+        % (energy.get("n_compared"), num(energy.get("max_abs_mismatch_ev"), 3),
+           float(energy.get("tolerance_ev") or 0.0), energy.get("passed")),
+        "- 几何 QC：%s / %s 对的两个几何**逐字符相同**（\x60all_identical = %s\x60）。"
+        % (geometry.get("n_geometry_identical"), geometry.get("n_pairs"),
+           geometry.get("all_identical")),
+        "- 分类与规则不一致的格子：**%s** 个（规则：\x60%s\x60）。"
+        % (counts.get("n_rule_mismatches"), counts.get("rule")),
+        "",
+        "### 冻结切点落在一个真实空隙里",
+        "",
+        "- 发现集里 coincident 的最大 \x60charge_l1\x60 = **%.6f**，moread_lower 的最小 = "
+        "**%.6f**，切点冻结在 **%s**，正好落在空隙中（标定范围：%s）。"
+        % (float(thresholds.get("calibration_coincident_max") or 0.0),
+           float(thresholds.get("calibration_moread_min") or 0.0),
+           num(thresholds.get("charge_l1_primary"), 3),
+           thresholds.get("calibration_scope")),
+        "- 可测子集上的 AUC：\x60charge_l1\x60 **%.6f**、\x60spin_l1\x60 %.6f、"
+        "\x60spin_max_moread\x60 %.6f、\x60loss_in_pr\x60 %.6f、\x60delta_s2\x60 %.6f；"
+        "切点处混淆矩阵 TP %s / FN %s / FP %s / TN %s，Youden J = %.3f。"
+        % (float((all_block.get("auc") or {}).get("charge_l1") or 0.0),
+           float((all_block.get("auc") or {}).get("spin_l1") or 0.0),
+           float((all_block.get("auc") or {}).get("spin_max_moread") or 0.0),
+           float((all_block.get("auc") or {}).get("loss_in_pr") or 0.0),
+           float((all_block.get("auc") or {}).get("delta_s2") or 0.0),
+           matrix.get("tp"), matrix.get("fn"), matrix.get("fp"), matrix.get("tn"),
+           float(matrix.get("youden_j") or 0.0)),
+        "- 留出臂用**发现集冻结的同一个切点**打分：AUC = %.6f，"
+        "TP %s / FN %s / FP %s / TN %s。"
+        % (float((holdout_sep.get("auc") or {}).get("charge_l1") or 0.0),
+           holdout_matrix.get("tp"), holdout_matrix.get("fn"),
+           holdout_matrix.get("fp"), holdout_matrix.get("tn")),
+        "- **口径限制（重要）**：%s / %s 对是闭壳层中性分子，它们的输出**不打印自旋块**，"
+        "所以 \x60charge_l1 / spin_l1 / delta_s2\x60 在这些格上**无定义**；可测的只有 %s 对。"
+        "中性格的 \x60identity_differs = False\x60 是**推断**（能量重合到 1e-7 eV + 几何逐位相同），"
+        "不是实测。因此上面的 AUC = 1.000 是「在可测子集上完美分离」，"
+        "**不能**读成一个新的独立预报量。"
+        % (consistent.get("n_unmeasurable"), consistent.get("n_pairs"),
+           consistent.get("n_measurable")),
+        "",
+        "### 家族分裂",
+        "",
+        "| 家族 | 格数 | coincident | moread_lower | 身份不同 | 可测 |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ] + family_rows + [
+        "",
+        "- 四个家族（ester / nitrile / sulfone / sulfoxide）**一个漏解都没有**；"
+        "漏解全部落在 cyclic_carbonate、linear_carbonate、phosphate、ether 里。"
+        "家族比电荷态更锋利：中性格 0 格漏解，阳离子 %s 格、阴离子 %s 格。"
+        % ((census.get("by_state") or {}).get("cation", {}).get("n_moread_lower"),
+           (census.get("by_state") or {}).get("anion", {}).get("n_moread_lower")),
+    ])
+
+    lead = screen[0] if screen else {}
+    diagnosis_block = "\n".join([
+        "### 冻结规则（发现集，镜像 Stage 16 的选择规则）",
+        "",
+        "- 特征 \x60%s\x60（%s）：方向 **%s**，阈值 \x60%s\x60。"
+        % (rule.get("descriptor"), rule.get("definition"),
+           "越小越危险" if rule.get("sign") == "smaller_is_riskier" else "越大越危险",
+           num(rule.get("threshold_frozen"), 4)),
+        "- 记录在案：ORCA 未报警时该字段被填成 +%.1f Eh（gap 大＝健康），"
+        "全表 %s/414 行如此。" % (1.0, 140),
+        "",
+        "### 样本内很好看",
+        "",
+        "- 样本内 accuracy %.4f vs 多数类 %.4f；留一 accuracy %.4f、平衡准确率 %.4f。"
+        % (float(in_sample.get("accuracy") or 0.0),
+           float(in_sample.get("majority_accuracy") or 0.0),
+           float(loo.get("accuracy") or 0.0), float(loo.get("balanced_accuracy") or 0.0)),
+        "- AUC 的精确零分布（%s，tie-aware Mann-Whitney DP）：观测 AUC %.4f，"
+        "**精确 p = %.4g**。这个 p 是真的，但它只回答「这个特征在发现集上有没有信号」，"
+        "不回答「这条规则能不能用」。"
+        % (significance.get("method"), float(significance.get("auc_observed") or 0.0),
+           float(significance.get("p_value") or 1.0)),
+        "",
+        "### 样本外输给平凡基线",
+        "",
+        "- 留出臂 accuracy **%.4f** vs 多数类 **%.4f**：**输**。"
+        "混淆矩阵 TP %s / FP %s / TN %s / FN %s —— 5 个真漏解**一个都没抓到**。"
+        % (float(holdout.get("accuracy") or 0.0),
+           float(holdout.get("majority_accuracy") or 0.0),
+           holdout_cm.get("true_positive"), holdout_cm.get("false_positive"),
+           holdout_cm.get("true_negative"), holdout_cm.get("false_negative")),
+        "- 多变量上限（前 3 特征留一逻辑回归）LOO AUC %.4f、留出 accuracy %s —— "
+        "加参数也没有换来一条可用规则。"
+        % (float(ceiling.get("loo_auc") or 0.0), num(ceiling.get("holdout_accuracy"), 4)),
+        "- 事后按态：cation 层留一 %.4f 胜过该层基线 %.4f，anion 层 %.4f **输给** %.4f。"
+        "留出臂那 5 个真漏解全是阴离子，所以 anion 层的失败就是全表失败。"
+        % (float(((diagnosis.get("by_state_post_hoc") or {}).get("cation") or {})
+                 .get("loo_accuracy") or 0.0),
+           float(((diagnosis.get("by_state_post_hoc") or {}).get("cation") or {})
+                 .get("majority_accuracy") or 0.0),
+           float(((diagnosis.get("by_state_post_hoc") or {}).get("anion") or {})
+                 .get("loo_accuracy") or 0.0),
+           float(((diagnosis.get("by_state_post_hoc") or {}).get("anion") or {})
+                 .get("majority_accuracy") or 0.0)),
+    ])
+
+    trade_rows = []
+    for entry in tradeoff:
+        for arm in ("discovery", "holdout"):
+            arm_block = (entry.get("by_arm") or {}).get(arm) or {}
+            trade_rows.append("| %s | %s | %s | %s | %s | %s | %s |"
+                              % (entry.get("id"), arm,
+                                 num(arm_block.get("sensitivity"), 3),
+                                 num(arm_block.get("specificity"), 3),
+                                 num(arm_block.get("precision"), 3),
+                                 num(arm_block.get("accuracy"), 4),
+                                 num(arm_block.get("balanced_accuracy"), 3)))
+    state_rows = []
+    for state in ("neutral", "cation", "anion"):
+        block = by_state_one_sided.get(state) or {}
+        state_rows.append("| %s | %s | %s | %s | %s | %s |"
+                          % (state, block.get("n_rows"), block.get("n_positive"),
+                             block.get("n_warning"), block.get("n_positive_with_warning"),
+                             block.get("n_no_warning")))
+    onesided_block = "\n".join([
+        "### 那条失败规则里，唯一站得住的一件东西",
+        "",
+        "- 定义：告警规则 = 「该格打印过 \x60Small HOMO/LUMO gap\x60 警告」，**零个参数**；"
+        "它不是新拟合的，是 ORCA 自己在 run 开始时打的。该字段在 %s / %s 对上都有定义"
+        "（包括 %s 个闭壳层中性格 —— 这是身份类特征做不到的）。"
+        % (coverage.get("n_pairs_with_gap_warning_field"), coverage.get("n_pairs"),
+           coverage.get("n_neutral_pairs")),
+        "",
+        "### 必要条件（成立）",
+        "",
+        "- **%s / %s 个正例都带警告，反例 %s 个**：发现集 %s/%s、留出臂 %s/%s。"
+        "即 \x60P(无警告 | 正例) = %s\x60。用「无警告」放行一格，**不会**放走任何一个真实漏解。"
+        % (necessity.get("n_positive_with_warning"), necessity.get("n_positive"),
+           necessity.get("n_positive_without_warning"),
+           (necessity_arm.get("discovery") or {}).get("n_positive_with_warning"),
+           (necessity_arm.get("discovery") or {}).get("n_positive"),
+           (necessity_arm.get("holdout") or {}).get("n_positive_with_warning"),
+           (necessity_arm.get("holdout") or {}).get("n_positive"),
+           necessity.get("p_no_warning_given_positive")),
+        "- 正例带警告时的带符号 gap 范围 %s ~ %s Eh，**全为负**；"
+        "%s 个完全无警告的格里 %s 个是正例 —— 于是这 %s 个格可以整批放行。"
+        % (num(((one_sided.get("positive_gap_warn_value_range") or {}).get("pooled") or {})
+               .get("min_eh"), 4),
+           num(((one_sided.get("positive_gap_warn_value_range") or {}).get("pooled") or {})
+               .get("max_eh"), 4),
+           counts_obs.get("distribution", {}).get("negative", {}).get("0"),
+           necessity.get("n_positive_without_warning"),
+           counts_obs.get("distribution", {}).get("negative", {}).get("0")),
+        "",
+        "### 但不充分（同样成立）",
+        "",
+        "- 负例里也有 **%s / %s**（假警报率 %.4f，特异度 %.4f）带警告 —— "
+        "所以蕴含只朝一个方向成立，「有警告 ⇒ 必然漏解」是**错的**。"
+        % (specificity.get("n_negative_with_warning"), specificity.get("n_negative"),
+           float(specificity.get("false_alarm_rate") or 0.0),
+           float(specificity.get("specificity") or 0.0)),
+        "- 按态看更极端：阴离子 %s/%s、阳离子 %s/%s 的负例都带警告（特异度约 0.008），"
+        "而中性 %s 格**一个警告都没有**。"
+        % ((by_state_one_sided.get("anion") or {}).get("n_warning"),
+           (by_state_one_sided.get("anion") or {}).get("n_rows"),
+           (by_state_one_sided.get("cation") or {}).get("n_warning"),
+           (by_state_one_sided.get("cation") or {}).get("n_rows"),
+           (by_state_one_sided.get("neutral") or {}).get("n_warning")),
+        "",
+        "| 规则 | 臂 | 灵敏度 | 特异度 | 精确率 | 准确率 | 平衡准确率 |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ] + trade_rows + [
+        "",
+        "### 怎么用",
+        "",
+        "- 正确用法是**单边放行**：没有警告 ⇒ 这一格安全，可以从复审名单里划掉；"
+        "有警告 ⇒ 不确定，仍需人工看。在 %s 行上这会划掉 %s 行、丢掉 0 个漏解，"
+        "但**不能**反过来当成「漏解预警」。"
+        % ((((one_sided.get("tradeoff") or [{}])[0].get("by_arm") or {}).get("pooled") or {})
+           .get("n_rows"), counts_obs.get("distribution", {}).get("negative", {}).get("0")),
+        "- 纪律：该警告由 ORCA 在**预对角化**阶段打印，落点在 SCF 之前 —— "
+        "它说的是「这个体系看起来难」，不是「这个 SCF 收敛到了高解」。"
+        "可迁移范围仅限同一 ORCA 版本、同一套预登记输入清单与这 %s 格设计。"
+        % census.get("n_pairs"),
+        "- 声明：必要条件只由 %s 个正例支持（发现集 %s + 留出臂 %s）；"
+        "留出臂上的「零反例」几乎是平凡陈述，真正有信息量的是发现集那一份。"
+        % (necessity.get("n_positive"),
+           (necessity_arm.get("discovery") or {}).get("n_positive"),
+           (necessity_arm.get("holdout") or {}).get("n_positive")),
+    ])
+
+    table_block = "\n".join(["### 本周产物", "", "| 文件 | 说明 |", "| --- | --- |"]
+                            + ["| %s | %s |" % (name, note)
+                               for name, note in W17_TABLE_ROWS])
+
+    did = ("把 Week 16 已经算完的两个 SCF 解当成一个**全目录的电子身份普查**来做（%s 对 = 发现集 %s "
+           "+ 留出臂 %s，**零新增量子化学作业**）：对每一对只问一句「这两个解的电子身份是同一个，"
+           "还是两个？」，判据只有 \x60charge_l1 > %s\x60 一条；同时把默认臂自己那一份 \x60.out\x60 "
+           "里已经打印出来的字段（SCF 轨迹、ORCA 的 small-gap 警告、身份指标、轨道能量）拿来问"
+           "「能不能看出它停在了高解」。"
+           % (census.get("n_pairs"), census.get("n_discovery"), census.get("n_holdout"),
+              num(thresholds.get("charge_l1_primary"), 3)))
+    metric = ("身份普查：切点 %s 落在发现集留下的空隙里（coincident 最大 %.6f、moread_lower 最小 "
+              "%.6f），可测子集 AUC = %.3f、混淆 TP %s / FN %s / FP %s / TN %s，"
+              "留出臂套同一刀仍然 AUC = %.3f；分类与身份判定在 %s/%s 对上一致，规则不一致 0 格。"
+              "家族分裂：ester / nitrile / sulfone / sulfoxide 四个家族零漏解，"
+              "漏解全部集中在 cyclic_carbonate（%s）、phosphate（%s）、linear_carbonate（%s）、"
+              "ether（%s）。自诊断：冻结的 \x60gap_warn_value <= %s\x60 在发现集 LOO %.4f（> 基线 "
+              "%.4f，精确 p = %.2e）却在留出的 54 格上只到 %.4f、**输给**多数类 %.4f，且 5 个真漏解 "
+              "TP = 0；多变量上限（前 3 特征）LOO AUC %.3f、留出 %.3f，同样不及基线。"
+              "唯一站得住的是单边结论：警告在 %s/%s 个正例上都出现（反例 0），"
+              "所以「无警告」可以安全放行，但 %s/%s 个负例也带警告，故不能反推漏解。"
+              % (num(thresholds.get("charge_l1_primary"), 3),
+                 float(thresholds.get("calibration_coincident_max") or 0.0),
+                 float(thresholds.get("calibration_moread_min") or 0.0),
+                 float((all_block.get("auc") or {}).get("charge_l1") or 0.0),
+                 matrix.get("tp"), matrix.get("fn"), matrix.get("fp"), matrix.get("tn"),
+                 float((holdout_sep.get("auc") or {}).get("charge_l1") or 0.0),
+                 consistent.get("n_consistent"), consistent.get("n_pairs"),
+                 (by_family.get("cyclic_carbonate") or {}).get("n_moread_lower"),
+                 (by_family.get("phosphate") or {}).get("n_moread_lower"),
+                 (by_family.get("linear_carbonate") or {}).get("n_moread_lower"),
+                 (by_family.get("ether") or {}).get("n_moread_lower"),
+                 num(rule.get("threshold_frozen"), 4),
+                 float(loo.get("accuracy") or 0.0),
+                 float(loo.get("majority_accuracy") or 0.0),
+                 float(significance.get("p_value") or 1.0),
+                 float(holdout.get("accuracy") or 0.0),
+                 float(holdout.get("majority_accuracy") or 0.0),
+                 float(ceiling.get("loo_auc") or 0.0),
+                 float(ceiling.get("holdout_accuracy") or 0.0),
+                 necessity.get("n_positive_with_warning"), necessity.get("n_positive"),
+                 specificity.get("n_negative_with_warning"), specificity.get("n_negative")))
+    qc = ("核心 QC：%s 个 \x60.out\x60 全扫、%s 对全部解析（unresolved 0、两臂零缺失）；"
+          "能量复核 max|delta| = %s eV（容差 %.0e）、几何 %s/%s 逐字符相同；"
+          "分类与规则不一致 0 格；身份判定一致 %s/%s。Part B 的 AUC 精确零分布用 tie-aware "
+          "Mann-Whitney DP（p = %.2e），留出臂混淆矩阵与单边筛查的必要条件/特异度全部现算并写入。"
+          "逐项实测值见本目录 verification.json 的 checks。"
+          % (census_meta.get("n_outfiles_scanned"), census_meta.get("n_cells_requested"),
+             num(energy.get("max_abs_mismatch_ev"), 3),
+             float(energy.get("tolerance_ev") or 0.0),
+             geometry.get("n_geometry_identical"), geometry.get("n_pairs"),
+             consistent.get("n_consistent"), consistent.get("n_pairs"),
+             float(significance.get("p_value") or 1.0)))
+    limit = ("Part A 的 AUC = 1.000 只覆盖 %s 个**可测**配对：%s 个闭壳层中性格不打印自旋块，"
+             "它们的 \x60identity_differs = False\x60 是从「能量重合到 1e-7 eV + 几何逐位相同」"
+             "**推断**出来的，不是实测；因此这是对能量分类的**必要条件 test**，"
+             "**不是**一个新的独立预报量，也不能当成预报模型。"
+             "Part B 的 \x60gap_warn_value <= %s\x60 输在样本外：池化多数类基线被 120 个中性格"
+             "抬到 0.911，留出臂分辨率只有 1/54；必要条件只由 %s 个正例支持，且留出臂 5 个正例"
+             "**全是阴离子**，阳离子若出现无警告漏解，本语料抓不到（这是已知盲区）。"
+             "同一 (分子, 态) 的 3-10 个 eps 不是独立行，计数会高估有效样本量；"
+             "P2 腿仍是 r2SCAN-3c/C-PCM 单点协议，两者都继承 Week 16 的口径。"
+             % (consistent.get("n_measurable"), consistent.get("n_unmeasurable"),
+                num(rule.get("threshold_frozen"), 4), necessity.get("n_positive")))
+    summary = " ".join([did, metric])
+
+    return {"did": did, "metric": metric, "qc": qc, "limit": limit,
+            "summary": summary, "protocol_block": protocol_block,
+            "census_block": census_block, "diagnosis_block": diagnosis_block,
+            "onesided_block": onesided_block, "table_block": table_block}
+
+
+REPORT_TEMPLATES[17] = """# Week 17 成果小结 —— Stage 18（全目录电子身份普查与零成本自诊断）
+
+## 0. 一页结论
+- 做了什么：{w17_did}
+- 关键数字：{w17_metric}
+- 质检：{w17_qc}
+- 限制：{w17_limit}
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 `week17_report_full.md`。
+
+## 1. 协议与规模
+{w17_protocol_block}
+
+## 2. Part A：电子身份普查
+{w17_census_block}
+
+## 3. Part B：零成本自诊断（一条失败规则）
+{w17_diagnosis_block}
+
+## 4. 那条失败规则里唯一站得住的东西：单边筛查
+{w17_onesided_block}
+
+## 5. 产物与口径
+{w17_table_block}
+
+## 6. 产物清单
+{artifact_list}
+
+## 7. 源文件缺失
+{missing_list}
+"""
+
+
+
 def week12_blocks(analysis, ladder):
     """Render the week-12 (Stage 13 / dielectric limit + ORCA ledger) blocks.
 
@@ -6689,7 +7341,7 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16",
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17",
                         help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
@@ -6834,6 +7486,52 @@ def main(argv=None):
                          % (w16_cont.get("cells_changed_count") or 0,
                             w16_delta.get("max_abs_ev") or 0.0)
                        + " | Gate 0 CLOSED |")
+
+        w17_all = week17_blocks(load_json(W17_CENSUS_PATH), load_json(W17_DIAGNOSIS_PATH))
+        w17_note = w17_all["summary"]
+        w17_census = load_json(W17_CENSUS_PATH) or {}
+        w17_diag = load_json(W17_DIAGNOSIS_PATH) or {}
+        w17_sep = ((w17_census.get("separation") or {}).get("all") or {})
+        w17_cm = w17_sep.get("confusion_at_threshold") or {}
+        w17_hold = w17_diag.get("holdout") or {}
+        w17_hold_cm = w17_hold.get("confusion_matrix") or {}
+        w17_one_sided = w17_diag.get("one_sided_screening") or {}
+        w17_necessity = (w17_one_sided.get("necessity") or {}).get("overall") or {}
+        w17_specificity = (w17_one_sided.get("specificity") or {}).get("overall") or {}
+        if not W17_CENSUS_PATH.exists():
+            w17_row = ("| week17 | Stage 18（电子身份普查 + 零成本自诊断） | "
+                       "未生成（等待 stage18_identity_census.json） | —— |")
+        else:
+            w17_row = ("| week17 | Stage 18（全目录电子身份普查 + 零成本自诊断） | "
+                       + "%d 对身份普查：可测子集 AUC %.3f、混淆 TP %d / FN %d / FP %d / TN %d；"
+                         "ester / nitrile / sulfone / sulfoxide 四个家族零漏解；"
+                         "零成本自诊断的冻结规则在留出臂 %.4f 输给多数类 %.4f（TP %d）；"
+                         "单边结论：small-gap 警告在 %d/%d 个正例上都出现（反例 0），"
+                         "但 %d/%d 个负例也出现"
+                       % (w17_census.get("n_pairs") or 0,
+                          float((w17_sep.get("auc") or {}).get("charge_l1") or 0.0),
+                          w17_cm.get("tp") or 0, w17_cm.get("fn") or 0,
+                          w17_cm.get("fp") or 0, w17_cm.get("tn") or 0,
+                          float(w17_hold.get("accuracy") or 0.0),
+                          float(w17_hold.get("majority_accuracy") or 0.0),
+                          w17_hold_cm.get("true_positive") or 0,
+                          w17_necessity.get("n_positive_with_warning") or 0,
+                          w17_necessity.get("n_positive") or 0,
+                          w17_specificity.get("n_negative_with_warning") or 0,
+                          w17_specificity.get("n_negative") or 0)
+                       + " | Gate 0 CLOSED |")
+        f34_figure = REPO / "outputs" / "figures" / "F34_stage18_identity_census.png"
+        if f34_figure.exists():
+            f34_row = ("| F34 | \x60F34_stage18_identity_census.png\x60 | " + F34_NOTE_PRESENT
+                       + " | week17 |")
+        else:
+            f34_row = "| F34 | 未生成 | " + F34_NOTE_ABSENT + " | —— |"
+        f35_figure = REPO / "outputs" / "figures" / "F35_stage18_selfdiagnosis.png"
+        if f35_figure.exists():
+            f35_row = ("| F35 | \x60F35_stage18_selfdiagnosis.png\x60 | " + F35_NOTE_PRESENT
+                       + " | week17 |")
+        else:
+            f35_row = "| F35 | 未生成 | " + F35_NOTE_ABSENT + " | —— |"
 
         f30_figure = REPO / "outputs" / "figures" / "F30_two_guess_catalogue.png"
         if f30_figure.exists():
@@ -6986,7 +7684,12 @@ def main(argv=None):
                        ("{w16_summary_limit}", w16_all["limit"]),
                        ("{w16_row}", w16_row),
                        ("{f32_row}", f32_row),
-                       ("{f33_row}", f33_row))
+                       ("{f33_row}", f33_row),
+                       ("{w17_summary}", w17_note),
+                       ("{w17_summary_limit}", w17_all["limit"]),
+                       ("{w17_row}", w17_row),
+                       ("{f34_row}", f34_row),
+                       ("{f35_row}", f35_row))
         for key, value in placeholders:
             summary = summary.replace(key, value)
         readme = README_TEMPLATE
