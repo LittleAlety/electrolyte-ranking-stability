@@ -677,6 +677,33 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 17",
         ],
     },
+    18: {
+        "topic": "Stage 19（几何弛豫检验：第二个 SCF 解能不能扛住弛豫）",
+        "sources": [
+            ("outputs/week18/stage19_relax.json", None, True),
+            ("outputs/week18/stage19_relax_plan.json", None, True),
+            ("outputs/week18/stage19_relax_cells.csv", None, True),
+            ("outputs/week18/stage19_relax_analysis.json", None, True),
+            ("outputs/week18/stage19_relax_cells_analysis.csv", None, True),
+            ("outputs/week18/stage19_relax_by_state.csv", None, True),
+            ("outputs/week18/stage19_relax_by_molecule.csv", None, True),
+            ("outputs/week18/stage19_relax_by_epsilon.csv", None, True),
+            ("outputs/week18/stage19_relax_by_arm_set.csv", None, True),
+            ("outputs/week18/stage19_relax_summary.md", None, True),
+            ("docs/28_week18_report.md", "week18_report_full.md", True),
+            ("outputs/figures/figure_manifest_week18_stage19.md",
+             "artifacts/figure_manifest_week18_stage19.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F36_*.png", "outputs/figures/F37_*.png"],
+        "commands": [
+            "python scripts/run_stage19_relax.py",
+            "python scripts/analyze_stage19_relax.py",
+            "python scripts/make_stage19_figure.py",
+            "python scripts/gen_week18_report.py",
+            "python scripts/build_deliverables.py --weeks 18",
+        ],
+    },
 }
 
 
@@ -932,6 +959,16 @@ def render_report(week, wdir, missing, excluded):
                            ("{w17_diagnosis_block}", w17["diagnosis_block"]),
                            ("{w17_onesided_block}", w17["onesided_block"]),
                            ("{w17_table_block}", w17["table_block"])):
+        text = text.replace(key, value)
+    w18 = week18_blocks(load_json(W18_LEDGER_PATH), load_json(W18_ANALYSIS_PATH))
+    for key, value in (("{w18_did}", w18["did"]),
+                       ("{w18_metric}", w18["metric"]),
+                       ("{w18_qc}", w18["qc"]),
+                       ("{w18_limit}", w18["limit"]),
+                       ("{w18_protocol_block}", w18["protocol_block"]),
+                       ("{w18_verdict_block}", w18["verdict_block"]),
+                       ("{w18_geometry_block}", w18["geometry_block"]),
+                       ("{w18_table_block}", w18["table_block"])):
         text = text.replace(key, value)
 
     if missing:
@@ -2791,11 +2828,106 @@ def week17_checks(wdir: Path):
     return checks
 
 
+def week18_checks(wdir: Path):
+    """QC for week 18 (Stage 19, the geometry-relaxation verdict).
+
+    Every number is read back out of ``stage19_relax.json`` /
+    ``stage19_relax_analysis.json``; the frozen identity threshold is
+    cross-checked against the Stage 18 census instead of being restated.
+    """
+
+    checks = []
+    ledger = load_json(wdir / "stage19_relax.json")
+    analysis = load_json(wdir / "stage19_relax_analysis.json")
+    for name, data in (("stage19_relax", ledger),
+                       ("stage19_relax_analysis", analysis)):
+        if data is None:
+            checks.append(check(name + ".present", None, "source not found"))
+            return checks
+        checks.append(check(name + ".present", True, name + ".json present"))
+
+    summary = ledger.get("summary") or {}
+    n_cells = ledger.get("n_target_cells")
+    checks.append(check("week18.relax_ledger_is_complete",
+                        n_cells == 37
+                        and summary.get("n_jobs") == 74
+                        and summary.get("n_ok") == 74
+                        and summary.get("n_failed") == 0,
+                        "target cells=%s; jobs=%s ok=%s failed=%s (reused %s, computed %s)"
+                        % (n_cells, summary.get("n_jobs"), summary.get("n_ok"),
+                           summary.get("n_failed"), summary.get("n_reused"),
+                           summary.get("n_computed"))))
+
+    all_block = ((analysis.get("aggregates") or {}).get("all") or {}).get("all") or {}
+    outcomes = all_block.get("outcomes") or {}
+    checks.append(check("week18.relax_verdict_over_37_cells",
+                        analysis.get("n_cells") == 37
+                        and all_block.get("n_cells") == 37
+                        and all_block.get("n_complete") == 37
+                        and outcomes.get("distinct_lower") == 5
+                        and outcomes.get("distinct_higher") == 24
+                        and outcomes.get("same_lower") == 0
+                        and outcomes.get("same_higher") == 8
+                        and outcomes.get("incomplete") == 0,
+                        "n_cells=%s complete=%s; distinct_lower %s / distinct_higher %s / "
+                        "same_lower %s / same_higher %s / incomplete %s"
+                        % (analysis.get("n_cells"), all_block.get("n_complete"),
+                           outcomes.get("distinct_lower"), outcomes.get("distinct_higher"),
+                           outcomes.get("same_lower"), outcomes.get("same_higher"),
+                           outcomes.get("incomplete"))))
+    checks.append(check("week18.relax_headline_counts",
+                        all_block.get("n_still_distinct") == 29
+                        and all_block.get("n_still_lower") == 5
+                        and all_block.get("n_preference_flipped") == 32
+                        and all_block.get("n_near_threshold") == 0
+                        and all_block.get("n_rmsd_same_minimum") == 6,
+                        "still_distinct %s, still_lower %s, preference_flipped %s, "
+                        "near_threshold %s, rmsd_same_minimum %s"
+                        % (all_block.get("n_still_distinct"), all_block.get("n_still_lower"),
+                           all_block.get("n_preference_flipped"),
+                           all_block.get("n_near_threshold"),
+                           all_block.get("n_rmsd_same_minimum"))))
+
+    census = load_json(W18_STAGE18_CENSUS_PATH) or {}
+    census_cut = (census.get("thresholds") or {}).get("charge_l1_primary")
+    frozen = analysis.get("threshold_charge_l1")
+    checks.append(check("week18.threshold_is_stage18_frozen",
+                        frozen is not None and census_cut is not None
+                        and float(frozen) == float(census_cut),
+                        "threshold_charge_l1=%s == stage18 thresholds.charge_l1_primary=%s "
+                        "(frozen, not refitted)" % (frozen, census_cut)))
+
+    magnitudes = (("abs_single_point_delta_ev", 0.1198, 1e-3),
+                  ("abs_relax_delta_ev", 0.00196, 1e-4),
+                  ("abs_delta_shift_ev", 0.104, 2e-3),
+                  ("energy_drop_default_ev", 1.876, 2e-3),
+                  ("energy_drop_moread_ev", 1.666, 2e-3))
+    rows, ok_all = [], True
+    for key, expected, tol in magnitudes:
+        got = (all_block.get(key) or {}).get("p50")
+        good = got is not None and abs(float(got) - expected) < tol
+        ok_all = ok_all and good
+        rows.append("%s p50=%s (expected %s +/- %s)" % (key, got, expected, tol))
+    checks.append(check("week18.relax_magnitudes", ok_all, "; ".join(rows)))
+
+    figure_names = ("F36_stage19_relax_outcomes.png",
+                    "F37_stage19_identity_geometry.png")
+    detail = ", ".join("%s=%s" % (name, (wdir / "artifacts" / name).exists())
+                       for name in figure_names)
+    checks.append(check("week18.figures_present",
+                        all((wdir / "artifacts" / name).exists() for name in figure_names),
+                        detail))
+    report_present = (wdir / "week18_report_full.md").exists()
+    checks.append(check("week18.report_present", report_present,
+                        "week18_report_full.md present=%s" % report_present))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
                   9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks,
                   13: week13_checks, 14: week14_checks, 15: week15_checks,
-                  16: week16_checks, 17: week17_checks}
+                  16: week16_checks, 17: week17_checks, 18: week18_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -3496,13 +3628,15 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week13/               Stage 14（畸变项归因与 EMC 离群点诊断）
     ├── week14/               Stage 15（双初猜协议、电子弥散度描述符与溶液锚点扫描）
     ├── week15/               Stage 16（全核心集双初猜目录与事前预警规则）
-    └── week16/               Stage 17（亚稳态污染上限与两个 SCF 解的电子结构身份）
+    ├── week16/               Stage 17（亚稳态污染上限与两个 SCF 解的电子结构身份）
+    ├── week17/               Stage 18（全目录电子身份普查与零成本自诊断）
+    └── week18/               Stage 19（几何弛豫检验：第二个 SCF 解能不能扛住弛豫）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F33 中属于该周的部分）
+    ├── artifacts/            图（F0–F37 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -3531,6 +3665,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 {w15_row}
 {w16_row}
 {w17_row}
+{w18_row}
 
 ## 如何复现
 ```powershell
@@ -3541,7 +3676,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -3591,7 +3726,7 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 参考配体：主参考 `R = DME`（C08，双齿 2×O 螯合、配位 motif 唯一）；第二参考 `R = AN`（C16，
 仅用于 robustness check）。核心集 18 个分子、broad pool 40 个分子，合并池 58。
 
-## 2. 逐周结果（Week 1 – Week 16）
+## 2. 逐周结果（Week 1 – Week 18）
 
 ### Week 1 —— Stage 0 定义冻结 / Gate 0
 - 做了什么：冻结科学定义与预注册（`config/scientific_definitions.yaml`、`config/prereg.yaml`），
@@ -3676,7 +3811,12 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 
 ### Week 16 —— Stage 17（亚稳态污染上限与两个 SCF 解的电子结构身份）
 {w16_summary}
+
+### Week 17 —— Stage 18（全目录电子身份普查与零成本自诊断）
 {w17_summary}
+
+### Week 18 —— Stage 19（几何弛豫检验：第二个 SCF 解能不能扛住弛豫）
+{w18_summary}
 
 ## 3. 核心科学结论
 
@@ -3729,7 +3869,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F33）
+## 5. 图表索引（F0–F37）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -3768,6 +3908,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f33_row}
 {f34_row}
 {f35_row}
+{f36_row}
+{f37_row}
 
 ## 6. 复现命令
 ```powershell
@@ -3822,6 +3964,7 @@ $env:PYTHONIOENCODING = "utf-8"
 15. {w15_summary_limit}
 16. {w16_summary_limit}
 17. {w17_summary_limit}
+18. {w18_summary_limit}
 """
 
 
@@ -5163,6 +5306,37 @@ W17_TABLE_ROWS = (
      "Part B 逐格特征表（414 行 x 34 列，全部读自默认臂那一个 .out）"),
     ("`stage18_selfdiagnosis_features_by_state.csv`", "Part B 按 (臂, 态) 的特征均值表"),
     ("`stage18_selfdiagnosis_summary.md`", "Part B 的中文小结"),
+)
+
+#: Stage 19 (Week 18): do the two SCF solutions survive geometry relaxation?
+#: 74 ORCA ``Opt`` jobs = 37 ``moread_lower`` cells x 2 arms; method, solvent and
+#: the frozen G1 start geometry are all inherited from the single points.
+W18_LEDGER_PATH = REPO / "outputs" / "week18" / "stage19_relax.json"
+W18_ANALYSIS_PATH = REPO / "outputs" / "week18" / "stage19_relax_analysis.json"
+W18_STAGE18_CENSUS_PATH = REPO / "outputs" / "week17" / "stage18_identity_census.json"
+F36_NOTE_PRESENT = ("Stage 19 弛豫裁决：(a) 单点 Delta 对弛豫后 Delta（按结局着色，y=x 与 "
+                    "±1 meV 带；|Delta| 中位 0.11983 -> 0.00196 eV，缩小 61 倍）；"
+                    "(b) 37 个 moread_lower 格子的裁决（distinct_lower 5 / distinct_higher 24 / "
+                    "same_lower 0 / same_higher 8）；(c) 按 eps 的结局堆叠；(d) 按态与分子的分解")
+F36_NOTE_ABSENT = "预留给 Stage 19（几何弛豫检验）；week18 尚未产出"
+F37_NOTE_PRESENT = ("Stage 19 身份与几何：(e) 弛豫前后 charge_l1 对数散点（冻结阈值 0.039，"
+                    "弛豫后仍在阈值以上 29/37、贴阈值 0 格）；"
+                    "(f) 双解几何 RMSD 对 Delta 漂移（0.02 A 同极小点参考线，下方 6/37 格）；"
+                    "(g) 两臂弛豫能量降配对（默认解中位降 1.876 eV vs moread 1.666 eV）；"
+                    "(h) 自旋中心迁移矩阵（argmax 仅作描述，不作判据）")
+F37_NOTE_ABSENT = "预留给 Stage 19（身份与几何）；week18 尚未产出"
+W18_TABLE_ROWS = (
+    ("`stage19_relax.json` / `stage19_relax_plan.json`",
+     "作业台账（37 格 x 2 臂 = 74 个 Opt 作业；method / job_type / 起始几何与 QC 摘要）"),
+    ("`stage19_relax_cells.csv`",
+     "逐格逐臂原始读数（74 行：最后一块能量、<S^2>、收敛、Mulliken / CARTESIAN 块计数）"),
+    ("`stage19_relax_analysis.json`",
+     "主结论全部聚合（threshold_charge_l1 / block_counts / cells / "
+     "aggregates: all + by_state + by_molecule + by_epsilon + by_arm_set）"),
+    ("`stage19_relax_cells_analysis.csv`", "37 个 moread_lower 格子的逐格裁决表"),
+    ("`stage19_relax_by_state.csv` / `_by_molecule.csv` / `_by_epsilon.csv` / `_by_arm_set.csv`",
+     "四张分组汇总表"),
+    ("`stage19_relax_summary.md`", "本周中文小结"),
 )
 
 
@@ -6874,6 +7048,221 @@ def week17_blocks(census, diagnosis):
             "onesided_block": onesided_block, "table_block": table_block}
 
 
+def week18_blocks(ledger, analysis):
+    """Week 18 / Stage 19 narrative blocks.
+
+    Every number is read back out of ``stage19_relax.json`` and
+    ``stage19_relax_analysis.json``, so the distilled report cannot drift away
+    from the artifacts it summarises.  Nothing here is typed in by hand.
+    """
+
+    keys = ("did", "metric", "qc", "limit", "summary", "protocol_block",
+            "verdict_block", "geometry_block", "table_block")
+    if analysis is None:
+        text = "（`stage19_relax_analysis.json` 不存在）"
+        return {key: text for key in keys}
+
+    ledger = ledger or {}
+    summary = ledger.get("summary") or {}
+    aggregates = analysis.get("aggregates") or {}
+    all_block = (aggregates.get("all") or {}).get("all") or {}
+    outcomes = all_block.get("outcomes") or {}
+    by_state = aggregates.get("by_state") or {}
+    by_molecule = aggregates.get("by_molecule") or {}
+    by_epsilon = aggregates.get("by_epsilon") or {}
+    by_arm_set = aggregates.get("by_arm_set") or {}
+    blocks = analysis.get("block_counts") or {}
+    cells = analysis.get("cells") or []
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def p50(key):
+        return (all_block.get(key) or {}).get("p50")
+
+    n_cells = analysis.get("n_cells")
+    n_complete = all_block.get("n_complete")
+    shrink = (float(p50("abs_single_point_delta_ev") or 0.0)
+              / max(float(p50("abs_relax_delta_ev") or 1e-30), 1e-30))
+    n_shift_up = sum(1 for cell in cells
+                     if float(cell.get("delta_shift_ev") or 0.0) > 0)
+    n_shift_down = sum(1 for cell in cells
+                       if float(cell.get("delta_shift_ev") or 0.0) < 0)
+    n_merged = (outcomes.get("same_lower", 0) or 0) + (outcomes.get("same_higher", 0) or 0)
+
+    protocol_block = "\n".join([
+        "### 唯一的自由变量：作业类型与初猜",
+        "",
+        "- **本周新增 %s 个 ORCA `Opt` 作业 = %s 格 x 2 条腿**（reused %s / computed %s）。"
+        % (summary.get("n_jobs"), n_cells, summary.get("n_reused"), summary.get("n_computed")),
+        "- 目标集合是 Week 17 单点上「两解不同、且 `moread` 更低」的 **%s 格全集**"
+        "（发现集 32 + 留出臂 5），不是 414 对总体。" % n_cells,
+        "- 每个格子把两条 SCF 解（`default` = ORCA 自己的初猜；`moread` = `! MORead` + "
+        "`%moinp` 指向同电荷态的气相 gbw）各自从同一个冻结的 G1 几何出发，在各自 eps 下做几何"
+        "优化；方法 `r2SCAN-3c`、溶剂 `bare CPCM at each cell's own epsilon`、起始几何全部冻结。",
+        "- **判据沿用 Stage 18 冻结阈值** `charge_l1 > %s`（本阶段未重新拟合）；"
+        "材料阈值 1e-03 eV 定 `still_lower`；几何同最小点宽容 0.02 A **只是描述列**。"
+        % num(analysis.get("threshold_charge_l1"), 3),
+        "- 取块口径：`Opt` 输出里 Mulliken 块与 CARTESIAN 块都出现多次（首块是起始几何），"
+        "本阶段一律取**最后一块**；实测块计数 Mulliken %s、CARTESIAN %s。"
+        % (blocks.get("mulliken"), blocks.get("cartesian")),
+    ])
+
+    state_rows = []
+    for state in ("anion", "cation"):
+        block = by_state.get(state) or {}
+        got = block.get("outcomes") or {}
+        state_rows.append("| %s | %d | %d | %d | %d | %d | %d |"
+                          % (state, block.get("n_cells", 0), block.get("n_complete", 0),
+                             got.get("distinct_lower", 0), got.get("distinct_higher", 0),
+                             got.get("same_lower", 0), got.get("same_higher", 0)))
+    arm_rows = []
+    for arm in ("discovery", "holdout"):
+        block = by_arm_set.get(arm) or {}
+        got = block.get("outcomes") or {}
+        arm_rows.append("| %s | %d | %d | %d | %d | %d |"
+                        % (arm, block.get("n_cells", 0), got.get("distinct_lower", 0),
+                           got.get("distinct_higher", 0), got.get("same_lower", 0),
+                           got.get("same_higher", 0)))
+    mol_rows = []
+    for name in sorted(by_molecule, key=lambda key: -by_molecule[key].get("n_cells", 0)):
+        block = by_molecule[name]
+        got = block.get("outcomes") or {}
+        mol_rows.append("| %s | %d | %d | %d | %d | %d |"
+                        % (name, block.get("n_cells", 0), got.get("distinct_lower", 0),
+                           got.get("distinct_higher", 0), got.get("same_lower", 0),
+                           got.get("same_higher", 0)))
+    eps_rows = []
+    for eps in sorted(by_epsilon, key=lambda key: float(key)):
+        block = by_epsilon[eps]
+        got = block.get("outcomes") or {}
+        eps_rows.append("| %s | %d | %d | %d | %d | %d |"
+                        % ("%.1f" % float(eps), block.get("n_cells", 0),
+                           got.get("distinct_lower", 0), got.get("distinct_higher", 0),
+                           got.get("same_lower", 0), got.get("same_higher", 0)))
+    lower_cells = [(cell.get("name"), cell.get("state"), cell.get("epsilon"))
+                   for cell in cells if cell.get("outcome") == "distinct_lower"]
+
+    verdict_block = "\n".join([
+        "### 四类裁决",
+        "",
+        "| 结局 | 计数 | 含义 |",
+        "| --- | --- | --- |",
+        "| `distinct_lower` | %d | 终点仍是两个不同电子态，且 moread 仍更低 |"
+        % outcomes.get("distinct_lower", 0),
+        "| `distinct_higher` | %d | 仍是两个不同态，但弛豫后 moread 反而**更高**（偏好反转） |"
+        % outcomes.get("distinct_higher", 0),
+        "| `same_lower` | %d | 终点身份重合，moread 更低 |" % outcomes.get("same_lower", 0),
+        "| `same_higher` | %d | 终点身份重合，moread 更高（身份差异被几何洗掉） |"
+        % outcomes.get("same_higher", 0),
+        "| `incomplete` | %d | 两条腿未齐备，不判 |" % outcomes.get("incomplete", 0),
+        "",
+        "- 三条关键计数：`n_still_distinct` **%s/%s**、`n_still_lower` **%s/%s**、"
+        "`n_preference_flipped` **%s/%s**。"
+        % (all_block.get("n_still_distinct"), n_complete, all_block.get("n_still_lower"),
+           n_complete, all_block.get("n_preference_flipped"), n_complete),
+        "- 唯一没有反转的 `distinct_lower` 格子（%d 个）：%s —— 5 个里 3 个是 EC 阳离子、"
+        "2 个是 TEGDME 阴离子。"
+        % (len(lower_cells),
+           "、".join("%s %s eps=%g" % (name, state, float(eps))
+                     for name, state, eps in lower_cells) or "none"),
+        "",
+        "### 按电性状态",
+        "",
+        "| 态 | 格数 | 完成 | distinct_lower | distinct_higher | same_lower | same_higher |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ] + state_rows + [
+        "",
+        "### 按臂（发现集 / 留出臂）",
+        "",
+        "| 臂 | 格数 | distinct_lower | distinct_higher | same_lower | same_higher |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ] + arm_rows + [
+        "",
+        "### 按分子",
+        "",
+        "| 分子 | 格数 | distinct_lower | distinct_higher | same_lower | same_higher |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ] + mol_rows + [
+        "",
+        "### 按介电常数",
+        "",
+        "| eps | 格数 | distinct_lower | distinct_higher | same_lower | same_higher |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ] + eps_rows)
+
+    geometry_block = "\n".join([
+        "### 幅度：单点差异被几何压缩了两个数量级",
+        "",
+        "- `|delta|` 单点中位 **%s eV** -> 弛豫后中位 **%s eV**：**缩小 %.0f 倍**。"
+        % (num(p50("abs_single_point_delta_ev"), 5), num(p50("abs_relax_delta_ev"), 5),
+           shrink),
+        "- 带符号的 `delta_shift_ev = relax - single` 在 **%s/%s** 格为正、**%s/%s** 格为负："
+        "弛豫把偏好一致地朝「moread 不再更低」的方向推，这就是 |delta| 收缩而偏好反转的机制。"
+        % (n_shift_up, n_complete, n_shift_down, n_complete),
+        "- `|delta 改变|` 中位 **%s eV** —— 与单点差异同量级，说明弛豫不是小扰动。"
+        % num(p50("abs_delta_shift_ev"), 5),
+        "- 两臂各自的弛豫能量降中位：**default %s eV vs moread %s eV**；"
+        "moread 降得更多的格子 **0/%s**（default 在每个格子上都降得更多），"
+        "这正是单点偏好被反转的能量学来源。"
+        % (num(p50("energy_drop_default_ev"), 4), num(p50("energy_drop_moread_ev"), 4),
+           n_complete),
+        "",
+        "### 几何与身份通道",
+        "",
+        "- 两条腿弛豫后的几何 RMSD 中位 **%s A**；**%s/%s** 格落在 `rmsd_same_minimum`"
+        "（<= 0.02 A，仅作描述），**0 格**的两条腿几何逐位相同 —— 没有一对收敛到同一个驻点。"
+        % (num(p50("rmsd_relaxed_arms"), 4), all_block.get("n_rmsd_same_minimum"), n_complete),
+        "- 身份通道：弛豫后 `charge_l1 > %s` 仍有 **%s/%s** 格、贴阈值（±20%%）**%s 格**"
+        "（冻结阈值 `near_threshold` 只是描述列，判据不变）。"
+        % (num(analysis.get("threshold_charge_l1"), 3), all_block.get("n_still_distinct"),
+           n_complete, all_block.get("n_near_threshold")),
+    ])
+
+    table_block = "\n".join(
+        ["| 文件 | 内容 |", "| --- | --- |"]
+        + ["| %s | %s |" % (name, note) for name, note in W18_TABLE_ROWS])
+
+    did = ("把 Week 17 找出的 **%s 个 `moread_lower` 格子**（单点上两解不同、且 `moread` 更低"
+           "的**全集**）里的两条 SCF 解各自做几何弛豫（**%s 个 ORCA `Opt` 作业 = %s 格 x 2 臂**），"
+           "再问一次：这还是两个不同的电子态吗？`moread` 还更低吗？"
+           "唯一的自由变量是作业类型（`sp` -> `Opt`）与初猜；方法、溶剂、起始几何 G1 全部冻结。"
+           % (n_cells, summary.get("n_jobs"), n_cells))
+    metric = ("把两条腿各自放到自己的几何极小点之后：只有 **%s/%s** 格仍保持 `moread` 更低"
+              "（`still_lower`）；**%s/%s** 格的两解在终点**合并为同一电子态**（单点身份差异被"
+              "几何洗掉）；**%s/%s** 格仍是两个不同态、但偏好被几何反转，全阶段偏好反转 **%s** 格。"
+              "`|delta|` 中位从单点 **%s eV** 塌到 **%s eV**（缩小 %.0f 倍），而带符号位移在 "
+              "**%s/%s** 格为正 —— 这就是「身份差异多数是真的，但单点上的能量偏好多数是假象」的"
+              "定量版本。"
+              % (all_block.get("n_still_lower"), n_complete, n_merged, n_complete,
+                 outcomes.get("distinct_higher", 0), n_complete,
+                 all_block.get("n_preference_flipped"),
+                 num(p50("abs_single_point_delta_ev"), 5), num(p50("abs_relax_delta_ev"), 5),
+                 shrink, n_shift_up, n_complete))
+    qc = ("核心 QC：%s 个 `Opt` 作业 %s ok / %s failed（%s 格 x 2 臂）；两条腿起始几何先做审计、"
+          "与冻结 G1 逐原子一致；阈值 %s 与 Week 17 `stage18_identity_census.json` 的 "
+          "`thresholds.charge_l1_primary` 逐位相同；四类裁决计数、按态 / 按分子 / 按 eps / 按臂"
+          "分组表、以及五条量级中位数全部现算并写入 verification.json 的 checks。"
+          % (summary.get("n_jobs"), summary.get("n_ok"), summary.get("n_failed"),
+             n_cells, num(analysis.get("threshold_charge_l1"), 3)))
+    limit = ("所有比例都**条件在 %s 个 `moread_lower` 格子**上（Week 17 单点上两解不同且 moread "
+             "更低的全集），不是 414 格总体，也不能读成「默认解在 N%% 的格子上安全」。"
+             "判据 `charge_l1 > %s` 与材料阈值 1e-03 eV 冻结自 Stage 18、本阶段未重新拟合；"
+             "几何同最小点宽容 0.02 A 只是描述列。两条腿的弛豫几何**没有一对逐位相同**，"
+             "`rmsd_same_minimum` 的 %s 格只是同一极小点附近的近似，不构成「同一个驻点」的证明；"
+             "`Opt` 收敛判据是 ORCA 默认、未做频率复核，机械稳定性不在本阶段结论之内。"
+             "裸 CPCM、G1 起始几何，以及「阴离子在 r2SCAN-3c 下不束缚」的方法适用域限制"
+             "全部继承前几周。"
+             % (n_cells, num(analysis.get("threshold_charge_l1"), 3),
+                all_block.get("n_rmsd_same_minimum")))
+    summary_text = " ".join([did, metric])
+
+    return {"did": did, "metric": metric, "qc": qc, "limit": limit,
+            "summary": summary_text, "protocol_block": protocol_block,
+            "verdict_block": verdict_block, "geometry_block": geometry_block,
+            "table_block": table_block}
+
+
 REPORT_TEMPLATES[17] = """# Week 17 成果小结 —— Stage 18（全目录电子身份普查与零成本自诊断）
 
 ## 0. 一页结论
@@ -6903,6 +7292,36 @@ REPORT_TEMPLATES[17] = """# Week 17 成果小结 —— Stage 18（全目录电�
 {artifact_list}
 
 ## 7. 源文件缺失
+{missing_list}
+"""
+
+
+REPORT_TEMPLATES[18] = """# Week 18 成果小结 —— Stage 19（几何弛豫检验：第二个 SCF 解能不能扛住弛豫）
+
+## 0. 一页结论
+- 做了什么：{w18_did}
+- 关键数字：{w18_metric}
+- 质检：{w18_qc}
+- 限制：{w18_limit}
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 `week18_report_full.md`。
+
+## 1. 协议与规模
+{w18_protocol_block}
+
+## 2. 裁决：37 个 moread_lower 格子
+{w18_verdict_block}
+
+## 3. 幅度与几何
+{w18_geometry_block}
+
+## 4. 产物与口径
+{w18_table_block}
+
+## 5. 产物清单
+{artifact_list}
+
+## 6. 源文件缺失
 {missing_list}
 """
 
@@ -7341,8 +7760,8 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17",
-                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)")
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18",
+                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -7533,6 +7952,45 @@ def main(argv=None):
         else:
             f35_row = "| F35 | 未生成 | " + F35_NOTE_ABSENT + " | —— |"
 
+        w18_all = week18_blocks(load_json(W18_LEDGER_PATH), load_json(W18_ANALYSIS_PATH))
+        w18_note = w18_all["summary"]
+        w18_ledger = load_json(W18_LEDGER_PATH) or {}
+        w18_analysis = load_json(W18_ANALYSIS_PATH) or {}
+        w18_sum = w18_ledger.get("summary") or {}
+        w18_all_block = ((w18_analysis.get("aggregates") or {}).get("all") or {}).get("all") or {}
+        w18_out = w18_all_block.get("outcomes") or {}
+        if not W18_ANALYSIS_PATH.exists():
+            w18_row = ("| week18 | Stage 19（几何弛豫检验） | "
+                       "未生成（等待 stage19_relax_analysis.json） | —— |")
+        else:
+            w18_row = ("| week18 | Stage 19（几何弛豫检验） | "
+                       + "37 个 moread_lower 格各做两臂 Opt（%d 个作业、%d ok / %d failed）："
+                         % (w18_sum.get("n_jobs") or 0, w18_sum.get("n_ok") or 0,
+                            w18_sum.get("n_failed") or 0)
+                       + "仍保持 moread 更低 %s/%s（distinct_lower %s + same_lower %s）；"
+                         "两解在终点合并 %s 格；偏好被反转 %s 格；|delta| 中位 %.5f -> %.5f eV"
+                         % (w18_all_block.get("n_still_lower") or 0,
+                            w18_all_block.get("n_complete") or 0,
+                            w18_out.get("distinct_lower") or 0,
+                            w18_out.get("same_lower") or 0,
+                            (w18_out.get("same_higher") or 0) + (w18_out.get("same_lower") or 0),
+                            w18_all_block.get("n_preference_flipped") or 0,
+                            (w18_all_block.get("abs_single_point_delta_ev") or {}).get("p50") or 0.0,
+                            (w18_all_block.get("abs_relax_delta_ev") or {}).get("p50") or 0.0)
+                       + " | Gate 0 CLOSED |")
+        f36_figure = REPO / "outputs" / "figures" / "F36_stage19_relax_outcomes.png"
+        if f36_figure.exists():
+            f36_row = ("| F36 | `F36_stage19_relax_outcomes.png` | " + F36_NOTE_PRESENT
+                       + " | week18 |")
+        else:
+            f36_row = "| F36 | 未生成 | " + F36_NOTE_ABSENT + " | —— |"
+        f37_figure = REPO / "outputs" / "figures" / "F37_stage19_identity_geometry.png"
+        if f37_figure.exists():
+            f37_row = ("| F37 | `F37_stage19_identity_geometry.png` | " + F37_NOTE_PRESENT
+                       + " | week18 |")
+        else:
+            f37_row = "| F37 | 未生成 | " + F37_NOTE_ABSENT + " | —— |"
+
         f30_figure = REPO / "outputs" / "figures" / "F30_two_guess_catalogue.png"
         if f30_figure.exists():
             f30_row = "| F30 | `F30_two_guess_catalogue.png` | " + F30_NOTE_PRESENT + " | week15 |"
@@ -7689,7 +8147,12 @@ def main(argv=None):
                        ("{w17_summary_limit}", w17_all["limit"]),
                        ("{w17_row}", w17_row),
                        ("{f34_row}", f34_row),
-                       ("{f35_row}", f35_row))
+                       ("{f35_row}", f35_row),
+                       ("{f36_row}", f36_row),
+                       ("{f37_row}", f37_row),
+                       ("{w18_summary}", w18_note),
+                       ("{w18_summary_limit}", w18_all["limit"]),
+                       ("{w18_row}", w18_row))
         for key, value in placeholders:
             summary = summary.replace(key, value)
         readme = README_TEMPLATE

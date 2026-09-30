@@ -2,12 +2,12 @@
 window.HB = {
  "repo": "https://github.com/LittleAlety/electrolyte-ranking-stability",
  "counts": {
-  "weeks": 17,
-  "figures": 36,
-  "orca_out": 1319,
-  "scripts": 77,
-  "test_files": 40,
-  "tests_passed": 904
+  "weeks": 18,
+  "figures": 38,
+  "orca_out": 1393,
+  "scripts": 81,
+  "test_files": 41,
+  "tests_passed": 920
  },
  "pipeline": [
   {
@@ -443,6 +443,27 @@ window.HB = {
     "9. 已知限制",
     "10. 下一步（Week 18 候选）"
    ]
+  },
+  {
+   "n": 18,
+   "doc": "docs/28_week18_report.md",
+   "title": "Week 18 报告 —— Stage 19：第二个 SCF 解能不能扛住几何弛豫？",
+   "stage": "Stage 19",
+   "tag": "37 个 moread_lower 格各让两条 SCF 解做几何弛豫（74 个 Opt 作业）：5/37 仍保持 moread 更低、8/37 在终点合并为同一电子态、32 格单点偏好被几何反转；|Delta| 中位 0.11983 -> 0.00196 eV",
+   "summary": "条件在这 37 个 moread_lower 格子上（它们是“单点上两解不同、且 moread 更低”这一定义下的全集），把两条 SCF 解各自做几何弛豫后： - 仍有 5/37 格保持 moread 更低（still_lower）：其中 5 格两解仍是不同电子态（distinct_lower）、0 格已在终点合并（same_lower）。 - 8/37 格两解在终点合并为同一电子态（same_lower + same_higher）：单点上的身份差异被几何洗掉。 - 24/37 格仍是两个不同电子态、但 moread 的偏好被几何反转（distinct_higher）；全阶段发生偏好反转的格子共 32 个。 判据沿用 Stage 18 冻结阈值 charge_l1 > 0.039，本阶段未重新拟合。 - 数值幅度：|Δ|单点 中位 0.11983 eV、|Δ|弛豫后 中位 0.00196 eV、|Δ改变| 中位 0.10411 eV（滚动求和算在 37 个完整格子上）。 - 几何：两条腿弛豫后的 RMSD 中位 0.4716 Å；6/37 格落在 rmsd_same_minimum（≤ 0.02 Å，仅作描述）；0 格的两条腿几何逐位相同。 - 判据与阈值全部冻结自上周：charge_l1 > 0.039（Stage 18，本阶段未重新拟合）；材料阈值 1e-03 eV；方法 r2SCAN-3c、裸 CPCM、起始几何 G1 全部冻结。",
+   "sections": [
+    "0. 一句话结论",
+    "1. 为什么要有这一步（Stage 19 的动机）",
+    "2. 口径与记号",
+    "3. 本周新增的计算",
+    "4. 逐格裁决",
+    "5. 身份与几何的联合读数",
+    "6. 物理读法",
+    "7. 读法纪律（延续 Week 9 §10 / 10 §11 / 11 §11 / 12 §10 / 13 §11 / 14 §9 / 15 §8 / 16 §7 / 17 §7）",
+    "8. 产物与图表",
+    "9. 已知限制",
+    "10. 下一步（Week 19 候选）"
+   ]
   }
  ],
  "figures": [
@@ -804,6 +825,26 @@ window.HB = {
    "sha": "ca116d15649a278a56fa46cdeae71de1f0d94d204ed1427107e2aeeb5fab9f6e",
    "bytes": 245682,
    "w": 1992,
+   "h": 1527
+  },
+  {
+   "id": "F36",
+   "file": "F36_stage19_relax_outcomes.png",
+   "week": 18,
+   "caption": "(a) 单点 Δ 对弛豫后 Δ（按结局着色，y=x 与 ±1 meV 带；|Δ| 中位数 0.1198 → 0.00196 eV，缩小 61 倍）；(b) 37 个 moread_lower 格子的裁决：distinct_lower 5 / distinct_higher 24 / same_lower 0 / same_higher 8（已完成 37）；(c) 按 ε 的结局堆叠；(d) 按态与分子的分解",
+   "sha": "0f46a89086d892ed04cc2133635b34557786e2ab9ac126cfb34efcd4d1ee4ca2",
+   "bytes": 238283,
+   "w": 1922,
+   "h": 1527
+  },
+  {
+   "id": "F37",
+   "file": "F37_stage19_identity_geometry.png",
+   "week": 18,
+   "caption": "(e) 弛豫前后 charge_l1 对数散点、冻结阈值 0.039 与 ±20% 贴阈值带（弛豫前后都在阈值以上 29/37，贴阈值 0 格）；(f) 双解几何 RMSD 对 Δ 漂移（0.02 Å 同极小点参考线，下方 6/37 格）；(g) 两臂弛豫能量降配对（默认解中位降 1.876 eV vs moread 1.666 eV）；(h) 自旋中心迁移矩阵（argmax 仅作描述，不作判据）",
+   "sha": "904c5f1e0f1826a2c2cec5756f5080f71d5caf1a97017419b7b86d30d637507a",
+   "bytes": 250243,
+   "w": 1905,
    "h": 1527
   }
  ]

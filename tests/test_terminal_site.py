@@ -97,9 +97,9 @@ def test_data_js_is_a_json_payload_with_the_expected_shape():
     payload = _payload()
     for key in ("repo", "counts", "pipeline", "gates", "weeks", "figures"):
         assert key in payload, "payload misses " + key
-    assert len(payload["weeks"]) == 17
+    assert len(payload["weeks"]) == 18
     assert len(payload["pipeline"]) == 5
-    assert payload["counts"]["weeks"] == 17
+    assert payload["counts"]["weeks"] == 18
 
 
 def test_figure_payload_covers_exactly_the_repository_figures():
@@ -107,7 +107,7 @@ def test_figure_payload_covers_exactly_the_repository_figures():
     on_disk = sorted(p.name for p in REPO_FIGURES.glob("*.png"))
     listed = sorted(row["file"] for row in payload["figures"])
     assert listed == on_disk, "the site and outputs/figures/ disagree on the figure set"
-    assert len(listed) == 36
+    assert len(listed) == 38
 
 
 def test_every_figure_has_a_caption_and_a_hash():
@@ -131,9 +131,9 @@ def test_every_week_points_at_a_report_that_exists():
         assert week["stage"].strip() and week["title"].strip()
 
 
-def test_week_numbers_are_one_to_seventeen():
+def test_week_numbers_are_one_to_eighteen():
     numbers = [w["n"] for w in _payload()["weeks"]]
-    assert numbers == list(range(1, 18))
+    assert numbers == list(range(1, 19))
 
 
 def test_gate_payload_matches_the_frozen_gate_records():
