@@ -63,6 +63,8 @@ FIGURES = [
     ("F27", "F27_emc_outlier.png", 13, "(e)(f) 九点 bare CPCM 阶梯上六条 delta(eps) 曲线；(g) EMC / 还原轴按 SCF 解分支着色 + 粗糙度对照；(h) Born R2 随网格点数的收敛"),
     ("F28", "F28_two_guess_protocol.png", 14, "(a) 90 点能量差幅度直方图与 1 meV material 阈值（12 点全部为负）；(b) EMC 阴离子偶极的两条分支（默认初猜 vs ! MORead）十点对照；(c) 导体极限：Born 横坐标 u = 1 - 1/eps 上 eps = 1000 的位置；(d) 六点/九点 Born 斜率与外推缺口（修复前后没变小）"),
     ("F29", "F29_diffuseness_descriptor.png", 14, "(e) spin_maxfrac 对阴离子畸变惩罚（留一 R2 0.162 -> 0.556）；(f) 参与比的秩 vs 线性（rho -0.846 对留一 R2 -2.90）；(g) 三个目标的留一 R2 对比（中性/阳离子不变）；(h) 描述符自己的域检验，标出唯一越界的 EMC/cpcm_10"),
+    ("F30", "F30_two_guess_catalogue.png", 15, "(a) 12 分子 x 3 状态 x 10 电介质的完整双初猜网格（红 = 默认初猜偏高，灰 = 两臂一致，蓝 = 反而更高，斜纹 = 未配对）；(b) 每个开壳层 (分子, 状态) 在整个阶梯上的最坏赤字（绿虚线 = 1 meV 材料阈值）；(c) 超过各阈值的单元格计数"),
+    ("F31", "F31_apriori_warning_rule.png", 15, "(d) 选定气相描述符对最大赤字，绿色虚线为留一冻结阈值；(e) 每个气相描述符的单变量 AUC；(f) 留出臂逐行预测与真值；(g) 冻结规则 vs 多数类基线（明写输给平凡规则）、平衡准确率、精确置换 p，以及分电性状态的事后诊断（描述符、正例排名、留一）"),
 ]
 
 # ---------------------------------------------------------------- week table
@@ -83,6 +85,7 @@ WEEKS = [
     (12, "22_week12_report.md", "Stage 13", "介电极限、导体极限，与环境位移的四项精确分解"),
     (13, "23_week13_report.md", "Stage 14", "畸变项的定量归因与 EMC 离群点的病理裁决"),
     (14, "24_week14_report.md", "Stage 15", "初猜协议修正亚稳态、弥散度描述符翻正否定结果"),
+    (15, "25_week15_report.md", "Stage 16", "亚稳解是全核心集现象，但单一气相描述符的事前预警输给平凡基线"),
 ]
 
 PIPELINE = [
@@ -242,7 +245,7 @@ def counts():
         # Recorded, not measured: pytest cannot be run from the generator.  Bump
         # it in the same commit that adds or removes a test, otherwise the page
         # will advertise a number the suite no longer produces.
-        "tests_passed": 783,
+        "tests_passed": 819,
     }
 
 

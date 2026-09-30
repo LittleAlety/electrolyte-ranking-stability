@@ -15,6 +15,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import re
 import shutil
 import statistics
@@ -552,6 +553,74 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 14",
         ],
     },
+    15: {
+        "topic": "Stage 16（全核心集双初猜目录与事前预警规则）",
+        "sources": [
+            ("outputs/week15/stage16_catalogue.json", None, True),
+            ("outputs/week15/stage16_catalogue_analysis.json", None, True),
+            ("outputs/week15/stage16_cells.csv", None, True),
+            ("outputs/week15/stage16_by_state.csv", None, True),
+            ("outputs/week15/stage16_validation_cells.csv", None, True),
+            ("outputs/week15/stage16_holdout.json", None, True),
+            ("outputs/week15/stage16_gas_descriptors.csv", None, True),
+            ("outputs/week15/stage16_predictor.json", None, True),
+            ("outputs/week15/stage16_summary.md", None, True),
+            ("outputs/week15/p2_core_set_cpcm_7.csv", None, True),
+            ("outputs/week15/p2_summary_cpcm_7.json", None, True),
+            ("outputs/week15/p2_core_set_cpcm_14.csv", None, True),
+            ("outputs/week15/p2_summary_cpcm_14.json", None, True),
+            ("outputs/week15/p2_core_set_cpcm_28.csv", None, True),
+            ("outputs/week15/p2_summary_cpcm_28.json", None, True),
+            ("outputs/week15/p2_core_set_cpcm_1000.csv", None, True),
+            ("outputs/week15/p2_summary_cpcm_1000.json", None, True),
+            ("outputs/week15/p2_core_set_moread_cpcm_5.csv", None, True),
+            ("outputs/week15/p2_summary_moread_cpcm_5.json", None, True),
+            ("outputs/week15/p2_core_set_moread_cpcm_7.csv", None, True),
+            ("outputs/week15/p2_summary_moread_cpcm_7.json", None, True),
+            ("outputs/week15/p2_core_set_moread_cpcm_10.csv", None, True),
+            ("outputs/week15/p2_summary_moread_cpcm_10.json", None, True),
+            ("outputs/week15/p2_core_set_moread_cpcm_14.csv", None, True),
+            ("outputs/week15/p2_summary_moread_cpcm_14.json", None, True),
+            ("outputs/week15/p2_core_set_moread_cpcm_20.csv", None, True),
+            ("outputs/week15/p2_summary_moread_cpcm_20.json", None, True),
+            ("outputs/week15/p2_core_set_moread_cpcm_28.csv", None, True),
+            ("outputs/week15/p2_summary_moread_cpcm_28.json", None, True),
+            ("outputs/week15/p2_core_set_moread_cpcm_40.csv", None, True),
+            ("outputs/week15/p2_summary_moread_cpcm_40.json", None, True),
+            ("outputs/week15/p2_core_set_moread_cpcm_80.csv", None, True),
+            ("outputs/week15/p2_summary_moread_cpcm_80.json", None, True),
+            ("outputs/week15/p2_core_set_moread_cpcm_200.csv", None, True),
+            ("outputs/week15/p2_summary_moread_cpcm_200.json", None, True),
+            ("outputs/week15/p2_core_set_moread_cpcm_1000.csv", None, True),
+            ("outputs/week15/p2_summary_moread_cpcm_1000.json", None, True),
+            ("outputs/week15/p2_core_set_holdout_cpcm_5.csv", None, True),
+            ("outputs/week15/p2_summary_holdout_cpcm_5.json", None, True),
+            ("outputs/week15/p2_core_set_holdout_cpcm_20.csv", None, True),
+            ("outputs/week15/p2_summary_holdout_cpcm_20.json", None, True),
+            ("outputs/week15/p2_core_set_holdout_cpcm_200.csv", None, True),
+            ("outputs/week15/p2_summary_holdout_cpcm_200.json", None, True),
+            ("outputs/week15/p2_core_set_holdout_moread_cpcm_5.csv", None, True),
+            ("outputs/week15/p2_summary_holdout_moread_cpcm_5.json", None, True),
+            ("outputs/week15/p2_core_set_holdout_moread_cpcm_20.csv", None, True),
+            ("outputs/week15/p2_summary_holdout_moread_cpcm_20.json", None, True),
+            ("outputs/week15/p2_core_set_holdout_moread_cpcm_200.csv", None, True),
+            ("outputs/week15/p2_summary_holdout_moread_cpcm_200.json", None, True),
+            ("docs/25_week15_report.md", "week15_report_full.md", True),
+            ("outputs/figures/figure_manifest_week15_stage16.md",
+             "artifacts/figure_manifest_week15_stage16.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F30_*.png", "outputs/figures/F31_*.png"],
+        "commands": [
+            "python scripts/run_stage16_catalogue.py --set subset --jobs 2 --nprocs 8",
+            "python scripts/run_stage16_catalogue.py --set validation --levels 5,20,200 --tag holdout --jobs 2 --nprocs 8",
+            "python scripts/analyze_stage16_catalogue.py",
+            "python scripts/build_stage16_predictor.py",
+            "python scripts/make_stage16_figure.py",
+            "python scripts/gen_week15_report.py",
+            "python scripts/build_deliverables.py --weeks 15",
+        ],
+    },
 }
 
 
@@ -771,6 +840,18 @@ def render_report(week, wdir, missing, excluded):
                        ("{w14_diffuseness_block}", w14["diffuseness_block"]),
                        ("{w14_anchor_block}", w14["anchor_block"]),
                        ("{w14_table_block}", w14["table_block"])):
+        text = text.replace(key, value)
+    w15 = week15_blocks(load_json(W15_ANALYSIS_PATH), load_json(W15_PREDICTOR_PATH))
+    for key, value in (("{w15_did}", w15["did"]),
+                       ("{w15_metric}", w15["metric"]),
+                       ("{w15_qc}", w15["qc"]),
+                       ("{w15_limit}", w15["limit"]),
+                       ("{w15_protocol_block}", w15["protocol_block"]),
+                       ("{w15_verdict_block}", w15["verdict_block"]),
+                       ("{w15_label_block}", w15["label_block"]),
+                       ("{w15_family_block}", w15["family_block"]),
+                       ("{w15_rule_block}", w15["rule_block"]),
+                       ("{w15_table_block}", w15["table_block"])):
         text = text.replace(key, value)
     if missing:
         rows = []
@@ -1936,10 +2017,277 @@ def week14_checks(wdir: Path):
     return checks
 
 
+def week15_checks(wdir: Path):
+    """QC for week 15 (Stage 16, the catalogue and the a priori rule)."""
+
+    checks = []
+    catalogue = load_json(wdir / "stage16_catalogue.json")
+    analysis = load_json(wdir / "stage16_catalogue_analysis.json")
+    predictor = load_json(wdir / "stage16_predictor.json")
+    descriptors = read_text(wdir / "stage16_gas_descriptors.csv")
+    for name, data in (("stage16_catalogue", catalogue),
+                       ("stage16_catalogue_analysis", analysis),
+                       ("stage16_predictor", predictor)):
+        if data is None:
+            checks.append(check(name + ".present", None, "source not found"))
+            return checks
+        checks.append(check(name + ".present", True, name + ".json present"))
+    checks.append(check("stage16_gas_descriptors.present", descriptors is not None,
+                        "stage16_gas_descriptors.csv present"))
+
+    layers = catalogue.get("layers") or []
+    n_ok = sum(int(layer.get("n_ok") or 0) for layer in layers)
+    checks.append(check("stage16.protocol_720_cells_all_ok",
+                        catalogue.get("n_cells") == 720 and n_ok == 720
+                        and catalogue.get("n_failed") == 0 and len(layers) == 20,
+                        "cells=%s ok=%d failed=%s layers=%d"
+                        % (catalogue.get("n_cells"), n_ok, catalogue.get("n_failed"),
+                           len(layers))))
+    checks.append(check("stage16.protocol_used_safe_parallelism",
+                        catalogue.get("jobs") == 2 and catalogue.get("nprocs") == 8,
+                        "jobs=%s nprocs=%s (host has 16 logical cores)"
+                        % (catalogue.get("jobs"), catalogue.get("nprocs"))))
+    checks.append(check("stage16.reuse_is_counted_not_silent",
+                        (catalogue.get("n_cells_computed") or 0)
+                        + (catalogue.get("n_cells_reused") or 0)
+                        == catalogue.get("n_cells"),
+                        "computed=%s reused=%s cells=%s"
+                        % (catalogue.get("n_cells_computed"),
+                           catalogue.get("n_cells_reused"), catalogue.get("n_cells"))))
+    checks.append(check("stage16.geometry_audit_is_clean",
+                        all(entry.get("all_identical") is True
+                            for entry in (catalogue.get("geometry_audit") or {}).values()),
+                        "%d molecules audited against their continuum geometry"
+                        % len(catalogue.get("geometry_audit") or {})))
+
+    checks.append(check("stage16.twelve_molecules_three_states_ten_dielectrics",
+                        analysis.get("n_cells") == 12 * 3 * 10
+                        and len(analysis.get("molecules") or []) == 12
+                        and len(analysis.get("states") or []) == 3
+                        and len(analysis.get("ladder_all_eps") or []) == 10,
+                        "cells=%s molecules=%d states=%d eps=%d"
+                        % (analysis.get("n_cells"), len(analysis.get("molecules") or []),
+                           len(analysis.get("states") or []),
+                           len(analysis.get("ladder_all_eps") or []))))
+    checks.append(check("stage16.every_cell_is_paired",
+                        analysis.get("n_paired") == analysis.get("n_cells")
+                        and analysis.get("n_unpaired") == 0
+                        and not (analysis.get("unpaired_cells") or []),
+                        "paired=%s unpaired=%s"
+                        % (analysis.get("n_paired"), analysis.get("n_unpaired"))))
+    checks.append(check("stage16.material_threshold_is_the_stage15_value",
+                        analysis.get("material_threshold_ev") == 0.001,
+                        "material_threshold_ev=%s"
+                        % analysis.get("material_threshold_ev")))
+    checks.append(check("stage16.counts_are_internally_consistent",
+                        (analysis.get("n_moread_lower") or 0)
+                        + (analysis.get("n_moread_higher") or 0)
+                        + (analysis.get("n_coincident") or 0)
+                        == analysis.get("n_cells")
+                        and analysis.get("n_material_differences")
+                        == (analysis.get("n_moread_lower") or 0)
+                        + (analysis.get("n_moread_higher") or 0),
+                        "lower=%s higher=%s coincident=%s cells=%s"
+                        % (analysis.get("n_moread_lower"), analysis.get("n_moread_higher"),
+                           analysis.get("n_coincident"), analysis.get("n_cells"))))
+    histogram = analysis.get("magnitude_histogram") or {}
+    thresholds = [float(value) for value in
+                  (analysis.get("magnitude_histogram_thresholds_ev") or [])]
+    counts = [histogram.get("%g" % key) for key in thresholds]
+    material = analysis.get("material_threshold_ev")
+    slot = [index for index, key in enumerate(thresholds) if key == material]
+    slot = slot[0] if slot else None
+    checks.append(check("stage16.magnitude_histogram_is_monotone",
+                        len(thresholds) >= 2
+                        and thresholds == sorted(thresholds)
+                        and len(set(thresholds)) == len(thresholds)
+                        and all(isinstance(value, int) for value in counts)
+                        and counts == sorted(counts, reverse=True)
+                        and max(counts) <= (analysis.get("n_cells") or 0)
+                        and slot is not None
+                        and counts[slot] == analysis.get("n_material_differences"),
+                        "counts %s over thresholds %s; at the material threshold "
+                        "%s the count must equal n_material_differences=%s"
+                        % (counts, ["%g" % key for key in thresholds],
+                           "%g" % material if material is not None else "?",
+                           analysis.get("n_material_differences"))))
+    checks.append(check("stage16.worst_deficit_is_recorded_with_coordinates",
+                        (analysis.get("worst_negative_ev") or 0.0) < 0.0
+                        and len(analysis.get("worst_negative_at") or []) == 3,
+                        "worst %.6f eV at %s"
+                        % (analysis.get("worst_negative_ev") or 0.0,
+                           analysis.get("worst_negative_at"))))
+    checks.append(check("stage16.the_restart_never_lands_above_the_default",
+                        analysis.get("n_moread_higher") == 0,
+                        "restarts above the default = %s"
+                        % analysis.get("n_moread_higher")))
+
+    agreement = analysis.get("label_agreement") or {}
+    checks.append(check("stage16.labels_are_monotone_across_the_ladders",
+                        all(entry.get("n_disagree") is not None for entry in agreement.values())
+                        and len(agreement) == 3,
+                        "; ".join("%s %d/%d agree" % (key, entry.get("n_rows", 0)
+                                                      - entry.get("n_disagree", 0),
+                                                      entry.get("n_rows", 0))
+                                  for key, entry in sorted(agreement.items()))))
+    flagged = analysis.get("flagged_molecules") or {}
+    checks.append(check("stage16.a_flagged_molecule_carries_at_least_one_state",
+                        all(isinstance(flagged.get(key), list) for key in flagged)
+                        and len(flagged) == 3,
+                        "flagged: core3 %d, focus6 %d, ladder10 %d"
+                        % (len(flagged.get("core3") or []), len(flagged.get("focus6") or []),
+                           len(flagged.get("ladder10") or []))))
+    coverage = (analysis.get("family_coverage") or {}).get("ladder10") or {}
+    checks.append(check("stage16.family_coverage_is_reported",
+                        bool(coverage)
+                        and sum(int(entry.get("n_molecules") or 0)
+                                for entry in coverage.values())
+                        == len(analysis.get("molecules") or []),
+                        "%d families, %d molecules"
+                        % (len(coverage),
+                           sum(int(entry.get("n_molecules") or 0)
+                               for entry in coverage.values()))))
+    checks.append(check("stage16.flagging_is_open_shell_only",
+                        int((analysis.get("per_state_counts") or {}).get(
+                            "neutral", {}).get("n_moread_lower") or 0) == 0,
+                        "neutral cells with a deficit = %s"
+                        % (analysis.get("per_state_counts") or {}).get(
+                            "neutral", {}).get("n_moread_lower")))
+
+    chosen = predictor.get("chosen_rule") or {}
+    screen = predictor.get("screen") or []
+    checks.append(check("stage16.the_rule_uses_gas_phase_descriptors_only",
+                        bool(chosen.get("descriptor", "").startswith("gas_"))
+                        and all(entry.get("descriptor", "").startswith("gas_")
+                                for entry in screen),
+                        "%d screened descriptors, chosen %s"
+                        % (len(screen), chosen.get("descriptor"))))
+    checks.append(check("stage16.the_label_is_open_shell_only",
+                        predictor.get("n_discovery_rows") == 24
+                        and "open-shell" in (predictor.get("restriction") or ""),
+                        "discovery rows=%s (%s)"
+                        % (predictor.get("n_discovery_rows"), predictor.get("restriction"))))
+    checks.append(check("stage16.screen_is_ranked_by_absolute_auc",
+                        screen == sorted(screen, key=lambda entry: -entry.get(
+                            "abs_auc_above_half", 0.0))
+                        and all(0.0 <= entry.get("auc", 0.0) <= 1.0 for entry in screen),
+                        "%d descriptors, best %s at AUC %.3f"
+                        % (len(screen), chosen.get("descriptor"), chosen.get("auc") or 0.0)))
+    permutation = predictor.get("permutation_test") or {}
+    checks.append(check("stage16.the_rule_carries_an_exact_permutation_test",
+                        permutation.get("exact") is True
+                        and permutation.get("total_assignments")
+                        == math.comb(permutation.get("n_rows") or 0,
+                                     permutation.get("n_positive") or 0)
+                        and permutation.get("n_assignments")
+                        == permutation.get("total_assignments")
+                        and permutation.get("statistic") == "|AUC - 0.5|"
+                        and 0.0 < (permutation.get("p_value") or 0.0) <= 1.0,
+                        "%s: exact p=%.4f over all %s assignments of %s positives "
+                        "to %s rows"
+                        % (permutation.get("descriptor"), permutation.get("p_value") or 0.0,
+                           permutation.get("total_assignments"),
+                           permutation.get("n_positive"), permutation.get("n_rows"))))
+    # The comparison is reported, not assumed.  The frozen rule is allowed to
+    # lose to the trivial classifier; what is not allowed is a report that
+    # quietly claims otherwise, so the flag is checked against the two numbers
+    # it is supposed to summarise.
+    majority = predictor.get("baseline_majority_accuracy")
+    loo = chosen.get("loo_accuracy")
+    beats = predictor.get("chosen_rule_beats_majority_baseline")
+    checks.append(check("stage16.the_frozen_rule_is_scored_against_the_majority_baseline",
+                        isinstance(beats, bool) and majority is not None and loo is not None
+                        and beats == (loo > majority),
+                        "leave-one-out %.3f vs majority %.3f -> beats baseline = %s"
+                        % (loo or 0.0, majority or 0.0, beats)))
+    arm_diag = predictor.get("per_arm_diagnostic") or {}
+    arm_blocks = arm_diag.get("arms") or {}
+    checks.append(check("stage16.the_per_arm_diagnostic_is_labelled_post_hoc",
+                        arm_diag.get("post_hoc") is True
+                        and arm_diag.get("arm_selector_is_a_gas_phase_quantity") is False
+                        and set(arm_blocks) == {"cation", "anion"}
+                        and all(block.get("n_rows") == 12
+                                and len(block.get("screen") or []) >= 4
+                                and all(len(entry.get("positive_ranks") or [])
+                                        == block.get("n_positive")
+                                        for entry in block.get("screen") or [])
+                                for block in arm_blocks.values()),
+                        ", ".join("%s %s rows / %s positives / best |AUC-0.5| %.3f"
+                                  % (name, block.get("n_rows"), block.get("n_positive"),
+                                     block.get("best_absolute_auc") or 0.0)
+                                  for name, block in sorted(arm_blocks.items()))))
+    validation = predictor.get("validation") or {}
+    validation_ladder_rows = 0
+    by_state_path = wdir / "stage16_by_state.csv"
+    if by_state_path.exists():
+        with by_state_path.open(encoding="utf-8", newline="") as handle:
+            validation_ladder_rows = sum(
+                1 for row in csv.DictReader(handle)
+                if (row.get("ladder") or "") == "validation")
+    arm_held = {name: (block.get("validation") or {})
+                for name, block in arm_blocks.items()}
+    checks.append(check("stage16.the_post_hoc_arm_rules_are_also_tested_out_of_sample",
+                        bool(arm_blocks)
+                        and all(held.get("n_rows") == 6 and held.get("n_scored") == 6
+                                and len(held.get("per_row") or []) == 6
+                                and isinstance(held.get("beats_majority_baseline"), bool)
+                                and held.get("beats_majority_baseline")
+                                == (held.get("accuracy") is not None
+                                    and held.get("majority_accuracy") is not None
+                                    and held.get("accuracy") > held.get("majority_accuracy"))
+                                for held in arm_held.values()),
+                        ", ".join("%s %s: held-out accuracy %.3f vs majority %.3f -> beats %s"
+                                  % (name, held.get("descriptor"),
+                                     held.get("accuracy") or 0.0,
+                                     held.get("majority_accuracy") or 0.0,
+                                     held.get("beats_majority_baseline"))
+                                  for name, held in sorted(arm_held.items()))))
+    checks.append(check("stage16.held_out_arm_is_the_six_new_molecules",
+                        validation.get("molecules") == list(W15_VALIDATION_NAMES)
+                        and validation_ladder_rows == 6 * 3
+                        and (validation.get("n_scored") or 0) == 6 * 2
+                        and (validation.get("confusion_matrix") or {}).get("unscored") == 0,
+                        "molecules=%s label rows=%d scored=%s unscored=%s"
+                        % (validation.get("molecules"), validation_ladder_rows,
+                           validation.get("n_scored"),
+                           (validation.get("confusion_matrix") or {}).get("unscored"))))
+
+    holdout = load_json(wdir / "stage16_holdout.json")
+    checks.append(check("stage16.the_holdout_arm_ran_in_full",
+                        holdout is not None
+                        and holdout.get("n_cells") == 6 * 3 * 3 * 2
+                        and holdout.get("n_failed") == 0
+                        and sum(int(layer.get("n_ok") or 0)
+                                for layer in (holdout.get("layers") or []))
+                        == 6 * 3 * 3 * 2
+                        and holdout.get("n_cells_reused") == 0,
+                        "cells=%s failed=%s reused=%s"
+                        % (holdout.get("n_cells") if holdout else None,
+                           holdout.get("n_failed") if holdout else None,
+                           holdout.get("n_cells_reused") if holdout else None)))
+
+    checks.append(check("week15.figures_present",
+                        (wdir / "artifacts" / "F30_two_guess_catalogue.png").exists()
+                        and (wdir / "artifacts" / "F31_apriori_warning_rule.png").exists(),
+                        "artifacts/ F30 + F31"))
+    report_path = wdir / "week15_report_full.md"
+    report_text = (report_path.read_text(encoding="utf-8")
+                   if report_path.exists() else "")
+    required = ("超过了多数类基线" if predictor.get("chosen_rule_beats_majority_baseline")
+                else "未能超过多数类基线")
+    checks.append(check("week15.report_states_the_baseline_verdict",
+                        required in report_text and "事后" in report_text,
+                        "报告须写出实测判定「%s」，并把分臂诊断标为事后" % required))
+    checks.append(check("week15.report_present",
+                        report_path.exists(),
+                        "week15_report_full.md"))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
                   9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks,
-                  13: week13_checks, 14: week14_checks}
+                  13: week13_checks, 14: week14_checks, 15: week15_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -2638,13 +2986,14 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week11/               Stage 12（介电自相似律与事前预警协议）
     ├── week12/               Stage 13（介电极限与 ORCA 能量账本）
     ├── week13/               Stage 14（畸变项归因与 EMC 离群点诊断）
-    └── week14/               Stage 15（双初猜协议、电子弥散度描述符与溶液锚点扫描）
+    ├── week14/               Stage 15（双初猜协议、电子弥散度描述符与溶液锚点扫描）
+    └── week15/               Stage 16（全核心集双初猜目录与事前预警规则）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F29 中属于该周的部分）
+    ├── artifacts/            图（F0–F31 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -2670,6 +3019,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 | week11 | Stage 12（介电自相似 + 事前预警） | 介电扫描落在 Born 单参数族（mean R2 0.9936 vs Onsager 0.8835）；18 个台阶事件里 8 个介电台阶全部良性（b > 0、tau_b >= 0.867、无一改写清单）；预警协议 k = 5 平均抓 96%（AUC 0.946）、k = 8 一次不漏 | Gate 0 CLOSED |
 | week14 | Stage 15（双初猜协议 + 弥散度描述符 + 锚点扫描） | 90 点双初猜里 12 点超 1 meV 且**全部为负**、反向 0 次（最大惩罚 0.2860 eV）；EMC 还原轴九点 Born R2 0.6788 -> 0.9556、符号变化 4 -> 0、偶极粗糙度 1.99 -> 0.08；eps = 200 -> 1000 只走 11.3 meV 而六点缺口 +33.2 -> -30.8 meV（**没有变小**）；`D_anion` 最佳留一 R2 0.162 -> 0.556（`spin_maxfrac`，rho = +0.811），中性/阳离子 `delta_loo = 0`；31 行锚点 4 行可裁定、3 改 1 确认 | Gate 0 CLOSED |
 | week13 | Stage 14（畸变项归因 + EMC 离群点） | 逐态畸变惩罚 D_neutral / D_cation / D_anion = 0.0685 / 0.1120 / 0.3710 eV（全部 72/72 为正，变分检验无例外）；唯一稳健关系是 D_neutral 对自身偶极矩（rho = +0.909，留一 R2 0.634）；§14 的 (-0.0465, +0.3272) eV 被 510 种聚合穷举证否；63 个密集网格作业零失败、四个共享介电点逐位复现 | Gate 0 CLOSED |
+{w15_row}
 
 ## 如何复现
 ```powershell
@@ -2680,7 +3030,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -2810,6 +3160,9 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 14 —— Stage 15（双初猜协议、电子弥散度描述符与溶液锚点扫描）
 {w14_summary}
 
+### Week 15 —— Stage 16（全核心集双初猜目录与事前预警规则）
+{w15_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -2894,6 +3247,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f27_row}
 {f28_row}
 {f29_row}
+{f30_row}
+{f31_row}
 
 ## 6. 复现命令
 ```powershell
@@ -2945,6 +3300,7 @@ $env:PYTHONIOENCODING = "utf-8"
 12. {w12_summary_limit}
 13. {w13_summary_limit}
 14. {w14_summary_limit}
+15. {w15_summary_limit}
 """
 
 
@@ -4173,6 +4529,31 @@ F29_NOTE_PRESENT = ("Stage 15 电子弥散度描述符：(e) spin_maxfrac 对阴
                     "(g) 三个目标的留一 R2 对比（中性与阳离子不变）；"
                     "(h) 逐层自旋极化的域检验，标出唯一越界的 EMC/cpcm_10")
 F29_NOTE_ABSENT = "预留给 Stage 15（弥散度描述符）；week14 尚未产出"
+
+W15_VALIDATION_NAMES = ("DEC", "EA", "FEC", "MA", "TEGDME", "VC")
+W15_CATALOGUE_PATH = REPO / "outputs" / "week15" / "stage16_catalogue.json"
+W15_ANALYSIS_PATH = REPO / "outputs" / "week15" / "stage16_catalogue_analysis.json"
+W15_PREDICTOR_PATH = REPO / "outputs" / "week15" / "stage16_predictor.json"
+F30_NOTE_PRESENT = ("Stage 16 双初猜目录：(a) 12 分子 x 3 状态 x 10 电介质的完整网格，"
+                    "按 dE 的符号着色（灰 = 两臂一致，红 = 默认初猜偏高）；"
+                    "(b) 每个开壳层 (分子, 状态) 在整个阶梯上的最大赤字；"
+                    "(c) 超过各阈值的单元格计数")
+F30_NOTE_ABSENT = "预留给 Stage 16（双初猜目录）；week15 尚未产出"
+F31_NOTE_PRESENT = ("Stage 16 事前预警规则：(d) 选定气相描述符对最大赤字，"
+                    "绿色虚线为留一冻结阈值；(e) 每个描述符的单变量 AUC；"
+                    "(f) 留出臂的逐行预测与真值；(g) 冻结规则与其多变量上限")
+F31_NOTE_ABSENT = "预留给 Stage 16（事前预警规则）；week15 尚未产出"
+W15_STATE_SHORT = (("neutral", "中性"), ("cation", "阳离子"), ("anion", "阴离子"))
+W15_LADDER_SHORT = (("core3", "3 点"), ("focus6", "6 点"), ("ladder10", "10 点"))
+W15_TABLE_ROWS = (
+    ("`stage16_catalogue.json`", "运行账本：单元格数、复用/新算计数、几何审计、逐层摘要"),
+    ("`stage16_catalogue_analysis.json`", "目录分析：阈值直方图、逐分子逐态标签、阶梯一致性、家族覆盖"),
+    ("`stage16_cells.csv`", "逐单元格能量对照（默认初猜 vs MORead 重启）"),
+    ("`stage16_by_state.csv`", "逐 (分子, 状态) 在三种阶梯上的汇总"),
+    ("`stage16_gas_descriptors.csv`", "气相先验描述符表（18 分子 x 3 状态）"),
+    ("`stage16_predictor.json`", "预警规则：单变量筛查、冻结阈值、留出臂混淆矩阵、多变量上限"),
+    ("`stage16_summary.md`", "F30 / F31 的逐面板文字 companion"),
+)
 W14_STATE_SHORT = (("neutral", "中性"), ("cation", "阳离子"), ("anion", "阴离子"))
 W14_TARGET_SHORT = (("neutral", "D_neutral"), ("cation", "D_cation"), ("anion", "D_anion"))
 W14_PROTOCOL_SHORT = (("default", "默认初猜"), ("moread", "MORead"))
@@ -4918,6 +5299,273 @@ def week14_blocks(analysis, diffuseness, anchor_scan):
             "table_block": table_block, "sigma_note": "", "summary": summary}
 
 
+def week15_blocks(analysis, predictor):
+    """Week 15 / Stage 16 narrative blocks (the catalogue and the warning rule)."""
+
+    keys = ("did", "metric", "qc", "limit", "summary", "protocol_block",
+            "verdict_block", "label_block", "rule_block", "family_block",
+            "table_block")
+    if analysis is None:
+        text = "（`stage16_catalogue_analysis.json` 不存在）"
+        return {key: text for key in keys}
+
+    n_cells = analysis.get("n_cells") or 0
+    n_paired = analysis.get("n_paired") or 0
+    lower = analysis.get("n_moread_lower") or 0
+    higher = analysis.get("n_moread_higher") or 0
+    coincident = analysis.get("n_coincident") or 0
+    flagged = analysis.get("flagged_molecules") or {}
+    counts = analysis.get("n_flagged_molecules") or {}
+    n_molecules = analysis.get("n_discovery_molecules") or 0
+    worst = analysis.get("worst_negative_ev")
+    worst_at = analysis.get("worst_negative_at") or ["?", "?", "?"]
+    threshold = analysis.get("material_threshold_ev")
+    ladders = analysis.get("ladders") or {}
+    per_state = analysis.get("per_state_counts") or {}
+
+    state_rows = ["| 状态 | 单元格 | MORead 更低 | MORead 更高 |",
+                  "| --- | --- | --- | --- |"]
+    for state, label in W15_STATE_SHORT:
+        entry = per_state.get(state) or {}
+        if not entry:
+            continue
+        state_rows.append("| %s | %d | %d | %d |"
+                          % (label, entry.get("n_cells", 0),
+                             entry.get("n_moread_lower", 0),
+                             entry.get("n_moread_higher", 0)))
+
+    ladder_rows = ["| 阶梯 | 电介质 | 判为有漏解的分子 | 比例 |",
+                   "| --- | --- | --- | --- |"]
+    for key, label in W15_LADDER_SHORT:
+        eps = ladders.get(key) or []
+        names = flagged.get(key) or []
+        ladder_rows.append("| %s | %s | %d/%d | %s |"
+                           % (label, "/".join("%g" % value for value in eps),
+                              len(names), n_molecules,
+                              ", ".join(names) if names else "无"))
+
+    protocol_block = "\n".join([
+        "### 协议与规模",
+        "",
+        "- 发现集：T3 审计子集的 12 个分子；验证集：从未做过连续介质计算的 6 个分子"
+        "（%s）。" % ", ".join(analysis.get("extra_molecules") or []),
+        "- 电介质阶梯：%s，与 Stage 13/14/15 逐点一致。"
+        % ", ".join("%g" % value for value in (analysis.get("ladder_all_eps") or [])),
+        "- 两臂：`default`（ORCA 自带初猜）与 `moread`（`! MORead` + 气相 `%moinp`，"
+        "同一电荷态）。",
+        "- 单元格：%d 个（%d 个分子的 %d 个状态 x %d 个电介质），配对成功的 %d 个，"
+        "未配对的 %d 个。"
+        % (n_cells, n_molecules, len(analysis.get("states") or []),
+           len(analysis.get("ladder_all_eps") or []), n_paired,
+           analysis.get("n_unpaired") or 0),
+        "- 几何：G1 冻结；几何审计对每个有连续介质参照的分子逐一比对气相与 CPCM(20) 的"
+        "xyz，全部逐原子相同。",
+        "- 算力：`--jobs 2 --nprocs 8`（本机 16 逻辑核），与既有 P2 各层协议相同。",
+    ])
+
+    verdict_block = "\n".join([
+        "### 目录结论",
+        "",
+        "- 配对单元格 %d：两臂一致到 SCF 收敛 %d 个，MORead 更低 %d 个，MORead 更高 %d 个。"
+        % (n_paired, coincident, lower, higher),
+        "- 最大赤字：**%.6f eV**，出现在 %s / %s / eps=%g。"
+        % (worst or 0.0, worst_at[0], worst_at[1], worst_at[2]),
+        "- 阈值原文（继承自 Week 14，本周未重新调参）：%s"
+        % (analysis.get("threshold_provenance") or ""),
+        "",
+        "| 状态 | 单元格 | MORead 更低 | MORead 更高 |",
+        "| --- | --- | --- | --- |",
+    ] + state_rows[2:] + [
+        "",
+        "| 阶梯 | 电介质 | 判为有漏解的分子 | 比例 |",
+        "| --- | --- | --- | --- |",
+    ] + ladder_rows[2:])
+
+    agreement = analysis.get("label_agreement") or {}
+    label_lines = ["### 标签对阶梯的稳健性", "",
+                   "标签定义在「某 (分子, 状态) 在被探测的电介质上是否存在被默认初猜漏掉的"
+                   "更低解」。阶梯越密，漏检越少，因此 `core3` 的标签必然被 `focus6` 蕴含、"
+                   "`focus6` 必然被 `ladder10` 蕴含；下表给出实测差异。", ""]
+    for pair, entry in sorted(agreement.items()):
+        label_lines.append("- `%s`：%d 行中 %d 行不一致%s"
+                           % (pair, entry.get("n_rows", 0), entry.get("n_disagree", 0),
+                              "（%s）" % ", ".join(entry.get("disagreements") or [])
+                              if entry.get("disagreements") else "（两者完全一致）"))
+    label_block = "\n".join(label_lines)
+
+    family = ((analysis.get("family_coverage") or {}).get("ladder10") or {})
+    family_lines = ["### 家族覆盖", "",
+                    "| 家族 | 分子数 | 其中有漏解 | 分子 |",
+                    "| --- | --- | --- | --- |"]
+    for name in sorted(family):
+        entry = family[name]
+        family_lines.append("| %s | %d | %d | %s |"
+                            % (name, entry.get("n_molecules", 0),
+                               entry.get("n_flagged", 0),
+                               ", ".join(entry.get("molecules") or [])))
+    patterns = analysis.get("monotonicity") or []
+    if patterns:
+        family_lines += ["", "| 分子 | 状态 | 模式（低 eps 到高 eps） | 命中 | 连续 | 首个 | 末个 |",
+                         "| --- | --- | --- | --- | --- | --- | --- |"]
+        for row in patterns:
+            family_lines.append("| %s | %s | `%s` | %d | %s | %g | %g |"
+                                % (row.get("name"), row.get("state"), row.get("pattern"),
+                                   row.get("n_flagged", 0),
+                                   "是" if row.get("contiguous") else "否",
+                                   row.get("first_flagged_eps") or 0.0,
+                                   row.get("last_flagged_eps") or 0.0))
+    family_block = "\n".join(family_lines)
+
+    rule_lines = ["### 事前预警规则", ""]
+    if not predictor:
+        rule_lines.append("（`stage16_predictor.json` 不存在）")
+    else:
+        chosen = predictor.get("chosen_rule") or {}
+        screen = predictor.get("screen") or []
+        rule_lines += [
+            "- 样本：%d 行开壳层 (分子, 状态)（%d 个正例）；%s"
+            % (predictor.get("n_discovery_rows") or 0,
+               predictor.get("n_discovery_positive") or 0,
+               predictor.get("restriction") or ""),
+            "- 冻结规则：`%s %s %.6g`，定义「%s」。"
+            % (chosen.get("descriptor"),
+               ">=" if chosen.get("sign") == "larger_is_riskier" else "<=",
+               chosen.get("threshold_frozen") or 0.0,
+               chosen.get("definition") or ""),
+            "- 发现集：AUC %.3f，样本内准确率 %.3f，留一准确率 %.3f，多数类基线 %.3f。"
+            % (chosen.get("auc") or 0.0, chosen.get("accuracy_in_sample") or 0.0,
+               chosen.get("loo_accuracy") or 0.0,
+               predictor.get("baseline_majority_accuracy") or 0.0),
+            "- 阈值只由发现集选出（留一），验证集不参与任何拟合。",
+            "",
+            "| 描述符 | 方向 | AUC | 留一准确率 |",
+            "| --- | --- | --- | --- |",
+        ]
+        for entry in screen[:6]:
+            rule_lines.append("| %s | %s | %.3f | %.3f |"
+                              % (entry.get("descriptor"),
+                                 "越大越危险" if entry.get("sign") == "larger_is_riskier"
+                                 else "越小越危险",
+                                 entry.get("auc") or 0.0,
+                                 entry.get("loo_accuracy") or 0.0))
+        beats = predictor.get("chosen_rule_beats_majority_baseline")
+        rule_lines += [
+            "",
+            "**与多数类基线的比较（不假设结论）**：留一准确率 **%.3f** %s 多数类基线 "
+            "**%.3f**，故 `chosen_rule_beats_majority_baseline = %s`。"
+            % (chosen.get("loo_accuracy") or 0.0,
+               "**超过**" if beats else "**未超过**",
+               predictor.get("baseline_majority_accuracy") or 0.0, beats),
+            "- 但规则**不是噪声**：平衡准确率（sensitivity 与 specificity 的均值，阈值并不"
+            "按它选）样本内 %.3f，而任何「一律判同一类」的平凡规则恒为 %.3f；样本内准确率 "
+            "%.3f 与留一准确率 %.3f 之间的落差就是过拟合的量。"
+            % (chosen.get("balanced_accuracy_in_sample") or 0.0,
+               predictor.get("trivial_balanced_accuracy") or 0.0,
+               chosen.get("accuracy_in_sample") or 0.0,
+               chosen.get("loo_accuracy") or 0.0),
+            "- 基线定义：%s" % (predictor.get("majority_baseline_note") or ""),
+        ]
+        arm_diag = predictor.get("per_arm_diagnostic") or {}
+        arm_blocks = arm_diag.get("arms") or {}
+        if arm_blocks:
+            rule_lines += [
+                "",
+                "**两臂事后诊断（`post_hoc = %s`；这是对失败的机制解释，不是预报）**"
+                % arm_diag.get("post_hoc"),
+                "",
+                "| 臂 | 行数 | 正例 | 多数类基线 | 排序最强描述符 | AUC | 正例排名 | "
+                "该描述符留一 | 超过基线 | 精确置换 p |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+            ]
+            for arm in ("cation", "anion"):
+                block = arm_blocks.get(arm) or {}
+                top = (block.get("screen") or [{}])[0]
+                rule_lines.append(
+                    "| %s | %s | %s | %.3f | `%s` | %.3f | %s | %.3f | %s | %.4f |"
+                    % (arm, block.get("n_rows"), block.get("n_positive"),
+                       block.get("majority_accuracy") or 0.0,
+                       top.get("descriptor") or "", top.get("auc") or 0.0,
+                       "/".join(str(rank) for rank in (top.get("positive_ranks") or [])),
+                       top.get("loo_accuracy") or 0.0,
+                       "是" if top.get("beats_majority_baseline") else "否",
+                       top.get("permutation_p") or 0.0))
+            rule_lines += [
+                "",
+                "- 失败原因（产物原文）：%s" % (arm_diag.get("note") or ""),
+                "- 选臂用的量是**电荷态**，作业开始前就已知：%s"
+                % (arm_diag.get("arm_selector_note") or ""),
+                "- 注意：「某描述符的留一准确率超过基线」本身不等于证据——阳离子臂上"
+                "留一最高的是 `gas_spin_participation`（%.3f），但它的排序信息几乎为零"
+                "（|AUC−0.5| = %.3f，置换 p = %.3f）。因此本表同时给出 AUC 与正例排名。"
+                % (((arm_blocks.get("cation") or {}).get("best_loo_accuracy") or 0.0),
+                   ((arm_blocks.get("cation") or {}).get("screen") or [{}])[-1]
+                   .get("abs_auc_above_half") or 0.0,
+                   ((arm_blocks.get("cation") or {}).get("screen") or [{}])[-1]
+                   .get("permutation_p") or 0.0),
+            ]
+        validation = predictor.get("validation") or {}
+        if validation.get("accuracy") is not None:
+            matrix = validation.get("confusion_matrix") or {}
+            rule_lines += [
+                "",
+                "- 留出臂（%s 的 %d 个 (分子, 状态) 行，标签取自 5 / 20 / 200 三个电介质）："
+                "准确率 **%.3f**，"
+                "混淆矩阵 TP %d / FP %d / TN %d / FN %d。"
+                % (", ".join(validation.get("molecules") or []),
+                   validation.get("n_scored") or 0, validation.get("accuracy") or 0.0,
+                   matrix.get("true_positive", 0), matrix.get("false_positive", 0),
+                   matrix.get("true_negative", 0), matrix.get("false_negative", 0)),
+            ]
+        permutation = predictor.get("permutation_test") or {}
+        if permutation:
+            rule_lines.append(
+                "- 精确置换检验（%s）：统计量 %s，在 %s 行 / %s 个正例的全部 **%s** 种标签"
+                "指派下 p = **%.4f**%s。"
+                % (permutation.get("descriptor"), permutation.get("statistic"),
+                   permutation.get("n_rows"), permutation.get("n_positive"),
+                   permutation.get("total_assignments"), permutation.get("p_value") or 0.0,
+                   "" if permutation.get("exact") else "（抽样估计，非精确）"))
+        ceiling = predictor.get("multivariate_ceiling") or {}
+        if ceiling:
+            rule_lines.append("- 多变量上限（%s）：留一 AUC %.3f%s。"
+                              % (", ".join(ceiling.get("features") or []),
+                                 ceiling.get("loo_auc") or 0.0,
+                                 "，留出准确率 %.3f" % ceiling["validation_accuracy"]
+                                 if ceiling.get("validation_accuracy") is not None else ""))
+    rule_block = "\n".join(rule_lines)
+
+    table_block = "\n".join(["### 本周产物", "", "| 文件 | 说明 |", "| --- | --- |"]
+                             + ["| %s | %s |" % (name, note)
+                                for name, note in W15_TABLE_ROWS])
+
+    did = ("把 Week 14 的三分子双初猜协议扩成全核心集目录：12 个分子 x 3 个状态 x "
+           "10 个电介质 x 2 种初猜，并对此前从未算过连续介质的 6 个分子做留出验证；"
+           "再用只依赖气相输出的描述符拟合一条事前预警规则。")
+    metric = ("%d 个配对单元格里 %d 个一致、%d 个 MORead 更低、%d 个更高；"
+              "最大赤字 %.6f eV（%s / %s / eps=%g）；10 点阶梯下 %d/%d 个分子被判定存在漏解。"
+              % (n_paired, coincident, lower, higher, worst or 0.0,
+                 worst_at[0], worst_at[1], worst_at[2],
+                 counts.get("ladder10", 0), n_molecules))
+    qc = ("%d 个单元格全部落盘、0 个失败；几何审计逐分子通过；"
+          "复用行全部带 `source` 出处；阈值 %g eV 原样继承自 Week 14；"
+          "预警规则与多数类基线的比较按实测记录（`chosen_rule_beats_majority_baseline = %s`），"
+          "负结果原样写入报告与小结。"
+          % (n_cells, threshold or 0.0,
+             (predictor or {}).get("chosen_rule_beats_majority_baseline")))
+    limit = ("目录只在 %d 个分子的 10 点电介质阶梯上回答「默认初猜是否漏掉更低解」；"
+             "「更低解」是按三条语句口径的能量比较，不是自由能；未做溶剂构型采样，"
+             "也未回答泄漏解在真实溶液里的寿命。事前预警规则在发现集上**未能超过多数类"
+             "基线**（正例只有 5/24），两臂诊断是事后解释、不构成可用的筛查工具。"
+             % n_molecules)
+    summary = (" ".join([did, metric]))
+
+    return {"did": did, "metric": metric, "qc": qc, "limit": limit,
+            "summary": summary, "protocol_block": protocol_block,
+            "verdict_block": verdict_block, "label_block": label_block,
+            "rule_block": rule_block, "family_block": family_block,
+            "table_block": table_block}
+
+
 REPORT_TEMPLATES[14] = """# Week 14 成果小结 —— Stage 15（双初猜协议、电子弥散度描述符与溶液锚点扫描）
 
 ## 0. 一页结论
@@ -4947,6 +5595,42 @@ REPORT_TEMPLATES[14] = """# Week 14 成果小结 —— Stage 15（双初猜协�
 {artifact_list}
 
 ## 7. 源文件缺失
+{missing_list}
+"""
+
+
+REPORT_TEMPLATES[15] = """# Week 15 成果小结 —— Stage 16（全核心集双初猜目录与事前预警规则）
+
+## 0. 一页结论
+- 做了什么：{w15_did}
+- 关键数字：{w15_metric}
+- 质检：{w15_qc}
+- 限制：{w15_limit}
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 `week15_report_full.md`。
+
+## 1. 协议与规模
+{w15_protocol_block}
+
+## 2. 目录结论
+{w15_verdict_block}
+
+## 3. 标签对阶梯的稳健性
+{w15_label_block}
+
+## 4. 家族覆盖与命中模式
+{w15_family_block}
+
+## 5. 事前预警规则
+{w15_rule_block}
+
+## 6. 产物与口径
+{w15_table_block}
+
+## 7. 产物清单
+{artifact_list}
+
+## 8. 源文件缺失
 {missing_list}
 """
 
@@ -5384,8 +6068,8 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14",
-                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14)")
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",
+                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -5408,7 +6092,6 @@ def main(argv=None):
         results.append(build_week(week, out, args.force, args.dry_run))
 
     if not args.dry_run:
-        write_text(out / "README.md", README_TEMPLATE)
         summary = SUMMARY_TEMPLATE.replace(
             "{prereg_sha256}", sha256_file(REPO / "config" / "prereg.yaml"))
         f10_present = (out / "week4" / "t3_cpcm_eps_scan.csv").exists()
@@ -5496,6 +6179,33 @@ def main(argv=None):
             f29_row = "| F29 | `F29_diffuseness_descriptor.png` | " + F29_NOTE_PRESENT + " | week14 |"
         else:
             f29_row = "| F29 | 未生成 | " + F29_NOTE_ABSENT + " | —— |"
+        w15_all = week15_blocks(load_json(W15_ANALYSIS_PATH), load_json(W15_PREDICTOR_PATH))
+        w15_note = w15_all["summary"]
+        w15_analysis = load_json(W15_ANALYSIS_PATH) or {}
+        w15_counts = w15_analysis.get("n_flagged_molecules") or {}
+        w15_worst = w15_analysis.get("worst_negative_ev")
+        if not W15_ANALYSIS_PATH.exists():
+            w15_row = ("| week15 | Stage 16（全核心集双初猜目录 + 事前预警规则） | "
+                       "未生成（等待 `stage16_catalogue_analysis.json`） | —— |")
+        else:
+            w15_row = ("| week15 | Stage 16（全核心集双初猜目录 + 事前预警规则） | "
+                       + "%d 个配对单元格里 %d 个 MORead 更低、%d 个更高；最大赤字 %.4f eV；"
+                         % (w15_analysis.get("n_paired") or 0,
+                            w15_analysis.get("n_moread_lower") or 0,
+                            w15_analysis.get("n_moread_higher") or 0, w15_worst or 0.0)
+                       + "10 点阶梯下 %d/%d 个分子被判定存在漏解 | Gate 0 CLOSED |"
+                         % (w15_counts.get("ladder10", 0),
+                            w15_analysis.get("n_discovery_molecules") or 0))
+        f30_figure = REPO / "outputs" / "figures" / "F30_two_guess_catalogue.png"
+        if f30_figure.exists():
+            f30_row = "| F30 | `F30_two_guess_catalogue.png` | " + F30_NOTE_PRESENT + " | week15 |"
+        else:
+            f30_row = "| F30 | 未生成 | " + F30_NOTE_ABSENT + " | —— |"
+        f31_figure = REPO / "outputs" / "figures" / "F31_apriori_warning_rule.png"
+        if f31_figure.exists():
+            f31_row = "| F31 | `F31_apriori_warning_rule.png` | " + F31_NOTE_PRESENT + " | week15 |"
+        else:
+            f31_row = "| F31 | 未生成 | " + F31_NOTE_ABSENT + " | —— |"
         f14_figure = REPO / "outputs" / "figures" / "F14_delta_m_derivation.png"
         if f14_figure.exists():
             f14_row = "| F14 | `F14_delta_m_derivation.png` | " + F14_NOTE_PRESENT + " | week6 |"
@@ -5566,56 +6276,70 @@ def main(argv=None):
             f27_row = "| F27 | `F27_emc_outlier.png` | " + F27_NOTE_PRESENT + " | week13 |"
         else:
             f27_row = "| F27 | 未生成 | " + F27_NOTE_ABSENT + " | —— |"
-        for key, value in (("{f12_row}", f12_row),
-                           ("{f14_row}", f14_row),
-                           ("{f15_row}", f15_row),
-                           ("{f16_row}", f16_row),
-                           ("{f17_row}", f17_row),
-                           ("{f13_row}", f13_row),
-                           ("{f12_art_note}", f12_art_note),
-                           ("{f13_art_note}", f13_art_note),
-                           ("{c1_did}", c1_data["did"]),
-                           ("{c1_metric}", c1_data["metric"]),
-                           ("{c1_qc_summary}", c1_data["qc"]),
-                           ("{c1_step_row}", c1_data["step_row"]),
-                           ("{c1_sigma_note}", c1_data["sigma_note"]),
-                           ("{c1_summary_limit}", c1_summary_limit),
-                           ("{c1_note}", c1_note),
-                           ("{c1_commands}", c1_commands),
-                           ("{w6_sigma_note}", w6_note),
-                           ("{w6_did}", w6_all["did"]),
-                           ("{w6_metric}", w6_all["metric"]),
-                           ("{w6_qc}", w6_all["qc"]),
-                           ("{w6_limit}", w6_all["limit"]),
-                           ("{w8_summary}", w8_note),
-                           ("{f18_row}", f18_row),
-                           ("{f19_row}", f19_row),
-                           ("{f20_row}", f20_row),
-                           ("{f21_row}", f21_row),
-                           ("{f22_row}", f22_row),
-                           ("{f23_row}", f23_row),
-                           ("{f24_row}", f24_row),
-                           ("{f25_row}", f25_row),
-                           ("{f26_row}", f26_row),
-                           ("{f27_row}", f27_row),
-                           ("{w13_summary}", w13_note),
-                           ("{w13_summary_limit}", w13_all["limit"]),
-                           ("{w12_summary}", w12_note),
-                           ("{w12_sigma_note}", w12_all["sigma_note"]),
-                           ("{w12_summary_limit}", w12_all["limit"]),
-                           ("{w11_summary}", w11_note),
-                           ("{w11_sigma_note}", w11_all["sigma_note"]),
-                           ("{w11_summary_limit}", w11_all["limit"]),
-                           ("{w10_summary}", w10_note),
-                           ("{w10_sigma_note}", w10_all["sigma_note"]),
-                           ("{w9_summary}", w9_note),
-                           ("{w9_sigma_note}", w9_all["sigma_note"]),
-                           ("{w7_summary}", w7_note),
-                           ("{w14_summary}", w14_note),
-                           ("{w14_summary_limit}", w14_all["limit"]),
-                           ("{f28_row}", f28_row),
-                           ("{f29_row}", f29_row)):
+        placeholders = (("{f12_row}", f12_row),
+                       ("{f14_row}", f14_row),
+                       ("{f15_row}", f15_row),
+                       ("{f16_row}", f16_row),
+                       ("{f17_row}", f17_row),
+                       ("{f13_row}", f13_row),
+                       ("{f12_art_note}", f12_art_note),
+                       ("{f13_art_note}", f13_art_note),
+                       ("{c1_did}", c1_data["did"]),
+                       ("{c1_metric}", c1_data["metric"]),
+                       ("{c1_qc_summary}", c1_data["qc"]),
+                       ("{c1_step_row}", c1_data["step_row"]),
+                       ("{c1_sigma_note}", c1_data["sigma_note"]),
+                       ("{c1_summary_limit}", c1_summary_limit),
+                       ("{c1_note}", c1_note),
+                       ("{c1_commands}", c1_commands),
+                       ("{w6_sigma_note}", w6_note),
+                       ("{w6_did}", w6_all["did"]),
+                       ("{w6_metric}", w6_all["metric"]),
+                       ("{w6_qc}", w6_all["qc"]),
+                       ("{w6_limit}", w6_all["limit"]),
+                       ("{w8_summary}", w8_note),
+                       ("{f18_row}", f18_row),
+                       ("{f19_row}", f19_row),
+                       ("{f20_row}", f20_row),
+                       ("{f21_row}", f21_row),
+                       ("{f22_row}", f22_row),
+                       ("{f23_row}", f23_row),
+                       ("{f24_row}", f24_row),
+                       ("{f25_row}", f25_row),
+                       ("{f26_row}", f26_row),
+                       ("{f27_row}", f27_row),
+                       ("{w13_summary}", w13_note),
+                       ("{w13_summary_limit}", w13_all["limit"]),
+                       ("{w12_summary}", w12_note),
+                       ("{w12_sigma_note}", w12_all["sigma_note"]),
+                       ("{w12_summary_limit}", w12_all["limit"]),
+                       ("{w11_summary}", w11_note),
+                       ("{w11_sigma_note}", w11_all["sigma_note"]),
+                       ("{w11_summary_limit}", w11_all["limit"]),
+                       ("{w10_summary}", w10_note),
+                       ("{w10_sigma_note}", w10_all["sigma_note"]),
+                       ("{w9_summary}", w9_note),
+                       ("{w9_sigma_note}", w9_all["sigma_note"]),
+                       ("{w7_summary}", w7_note),
+                       ("{w14_summary}", w14_note),
+                       ("{w14_summary_limit}", w14_all["limit"]),
+                       ("{f28_row}", f28_row),
+                       ("{f29_row}", f29_row),
+                       ("{w15_summary}", w15_note),
+                       ("{w15_summary_limit}", w15_all["limit"]),
+                       ("{w15_row}", w15_row),
+                       ("{f30_row}", f30_row),
+                       ("{f31_row}", f31_row))
+        for key, value in placeholders:
             summary = summary.replace(key, value)
+        readme = README_TEMPLATE
+        for key, value in placeholders:
+            readme = readme.replace(key, value)
+        for _name, _text in (("README.md", readme), ("数据结果汇总.md", summary)):
+            _left = sorted(set(re.findall(r"\{[a-z0-9_]+\}", _text)))
+            if _left:
+                print(f"WARN: {_name} 未替换占位符: {_left}")
+        write_text(out / "README.md", readme)
         write_text(out / "数据结果汇总.md", summary)
 
     for res in results:

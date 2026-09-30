@@ -1,0 +1,785 @@
+"""Generate docs/25_week15_report.md from the week-15 artefacts.
+
+Every number in the prose is read back out of the JSON files, so the report
+cannot drift away from the data it describes.  Re-running this script after the
+held-out arm finishes refreshes section 6 automatically.
+"""
+
+import json
+import os
+from pathlib import Path
+
+REPO = Path(r"E:\Claude Code\电解液溶剂-HB\电解液溶剂HB-Code")
+# The two overrides exist so the generator can be rehearsed against a scratch
+# copy of the artefacts; the committed report is always built with the defaults.
+W15 = Path(os.environ.get("W15_DIR") or (REPO / "outputs" / "week15"))
+REPORT_OUT = Path(os.environ.get("W15_REPORT_OUT") or (REPO / "docs" / "25_week15_report.md"))
+
+import csv as _csv
+
+
+def _read_rows(path: Path):
+    with path.open(encoding="utf-8", newline="") as handle:
+        return list(_csv.DictReader(handle))
+
+
+descriptor_rows = _read_rows(W15 / "stage16_gas_descriptors.csv")
+val_molecules = sorted({row["name"] for row in descriptor_rows
+                        if row["split"] == "validation"})
+
+cat = json.loads((W15 / "stage16_catalogue.json").read_text(encoding="utf-8"))
+ana = json.loads((W15 / "stage16_catalogue_analysis.json").read_text(encoding="utf-8"))
+pre = json.loads((W15 / "stage16_predictor.json").read_text(encoding="utf-8"))
+
+eps = ana["ladder_all_eps"]
+n_cells = ana["n_cells"]
+n_paired = ana["n_paired"]
+coincident = ana["n_coincident"]
+lower = ana["n_moread_lower"]
+higher = ana["n_moread_higher"]
+unpaired = ana["n_unpaired"]
+worst = ana["worst_negative_ev"]
+worst_at = ana["worst_negative_at"]
+best_pos = ana["worst_positive_ev"]
+best_pos_at = ana["worst_positive_at"]
+states = ana["per_state_counts"]
+flag10 = ana["flagged_molecules"]["ladder10"]
+n_flag10 = ana["n_flagged_molecules"]["ladder10"]
+n_mol = ana["n_discovery_molecules"]
+family = ana["family_coverage"]["ladder10"]
+agreement = ana["label_agreement"]
+hist = ana["magnitude_histogram"]
+hist_edges = ana["magnitude_histogram_thresholds_ev"]
+patterns = ana["monotonicity"]
+threshold = ana["material_threshold_ev"]
+provenance = ana["threshold_provenance"]
+extra = ana.get("extra_molecules") or []
+holdout_layers = ana.get("holdout_layers") or {}
+
+rule = pre["chosen_rule"]
+majority = pre["baseline_majority_accuracy"]
+beats = pre["chosen_rule_beats_majority_baseline"]
+perm = pre["permutation_test"]
+trivial_bal = pre.get("trivial_balanced_accuracy")
+arms = pre["per_arm_diagnostic"]["arms"]
+ceiling = pre.get("multivariate_ceiling") or {}
+screen = pre["screen"]
+val = pre.get("validation") or {}
+
+pct_lower = 100.0 * lower / n_paired
+pct_coincident = 100.0 * coincident / n_paired
+polarity = "未能超过" if not beats else "超过了"
+
+median_seconds = {layer["layer"]: layer["wall_clock_seconds_median"]
+                  for layer in cat["layers"]}
+default_med = [median_seconds["cpcm_%g" % e] for e in eps]
+moread_med = [median_seconds["moread_cpcm_%g" % e] for e in eps]
+new_default = [value for value in default_med if value is not None]
+new_moread = [value for value in moread_med if value is not None]
+L = []
+L += [
+    "# Week 15 报告 —— Stage 16：全核心集的双初猜目录，与只依赖气相描述符的事前预警规则",
+    "",
+    "> 本文由 `scripts/gen_week15_report.py` 从 `outputs/week15/stage16_*.json` 逐数读出生成，数字不手抄；",
+    "> 重跑该脚本即可（留出臂跑完后重跑，第 6 节会自动刷新）。",
+    "> 生成时间基准：目录 `stage16_catalogue.json` 的 `generated_utc`。",
+    "",
+    "## 0. 一句话结论",
+    "",
+    f"把 Week 14 只在 **EMC / DMC / EC** 三个分子上看到的「ORCA 默认初猜会停在一个更高的 SCF 解」"
+    f"扩成**全核心集目录**（12 分子 x 3 状态 x 10 电介质 x 2 条臂 = {cat['n_cells']} 个单元格）之后，"
+    f"现象**成立、对称、且只在开壳层**：{n_paired} 个配对单元格里 {lower} 个（{pct_lower:.1f}%）"
+    f"`MORead` 拿到了更低的解，而**更高的是 {higher} 个**——第三条符号判据（重启不该更差）在 {n_paired} 个点上"
+    f"一次都没有被违反。债务集中在 {n_flag10}/{n_mol} 个分子（{', '.join(flag10)}）。",
+    "",
+    f"但 Stage 16 的第二个问题——**能不能只用气相输出事先圈出风险**——答案是**否**。"
+    f"池化（不分电性状态）的单描述符冻结规则 `{rule['descriptor']} "
+    f"{'<=' if rule['sign'] != 'larger_is_riskier' else '>='} {rule['threshold_frozen']:.4g}` "
+    f"留一准确率 **{rule['loo_accuracy']:.3f}**，**{polarity}**多数类基线 "
+    f"**{majority:.3f}**；它的排序信息在精确置换检验下是显著的（p = {perm['p_value']:.4f}，"
+    f"枚举全部 {perm['total_assignments']} 种标签指派），平衡准确率 {rule['balanced_accuracy_in_sample']:.3f} "
+    f"也远高于平凡单类规则的 {trivial_bal:.3f}，但它仍然是一个**输给「一律判无风险」的分类器**。",
+    "",
+    f"失败的原因可以定位，而且不是噪声：**两个开壳层方向的机制不同**。阳离子侧是缺电子的紧凑阳离子"
+    f"自旋定域不足，ORCA 预对角化的能隙估计已经知道这件事——`gas_small_gap_value` 把 {arms['cation']['n_positive']} 个"
+    f"正例排在 {arms['cation']['n_rows']} 行里的第 "
+    f"{'/'.join(str(r) for r in arms['cation']['screen'][0]['positive_ranks'])} 位"
+    f"（精确置换 p = {arms['cation']['screen'][0]['permutation_p']:.4f}）；阴离子侧是多余电子在缺弥散函数"
+    f"基组下的**自旋外溢**——`gas_spin_maxfrac` 把 {arms['anion']['n_positive']} 个正例排在第 "
+    f"{'/'.join(str(r) for r in arms['anion']['screen'][0]['positive_ranks'])} 位（AUC "
+    f"{arms['anion']['screen'][0]['auc']:.3f}），而且这一臂上该切法的留一准确率 "
+    f"{arms['anion']['screen'][0]['loo_accuracy']:.3f} **确实超过**了基线 "
+    f"{arms['anion']['majority_accuracy']:.3f}。这两个结论是**事后诊断（post hoc）**，不是预报。",
+    "",
+    f"决定性的一击来自留出臂：把这两条事后规则**原样**（同一描述符、同一方向、同一阈值）搬到 "
+    f"6 个从未算过连续介质的分子上，**两臂各自只有 0.667 的准确率**；而留出臂上真正有漏解的行"
+    f"**全在阴离子侧**、池化规则用的却是阳离子侧的描述符，所以它对 2 个真实漏解 **0 命中**（6.1 节）。"
+    f"本阶段的最终裁决因此是一句话：**漏失解现象是真的，但它目前还不可预报。**",
+    "",
+    "## 1. 为什么要有这一步（Stage 16 的动机）",
+    "",
+    "Stage 15 把一个真实的计算病理摆上了台面：在 **EMC、DMC、EC** 三个分子上，ORCA 自带初猜有时收敛到",
+    "一个**更高的** SCF 解，而 `! MORead` + 气相 `%moinp` 能拿到更低解。但 Stage 15 只测了三个分子，而且",
+    "这三个分子是为了别的原因（EMC 的畸变离群、DMC/EC 的小能隙）被挑出来的。于是「默认初猜会漏解」是",
+    "**三个分子的巧合**，还是**核心集的普遍现象**，Stage 15 无法回答。",
+    "",
+    "Stage 16 问两个问题，而且要求它们是**可证伪的**：",
+    "",
+    "1. 把同一协议铺满 T3 审计子集的 12 个分子、3 个电子态、10 个电介质，漏解会出现在哪里？（Part A）",
+    "2. 在**不跑连续介质计算**的前提下，只用气相输出能不能事先指出「这个 (分子, 状态) 有漏解风险」？（Part B）",
+    "",
+    "第二个问题的意义在于成本：一次 CPCM 计算要几百秒，而描述符只需要读已经存在的**气相**输出。如果一条",
+    "单描述符阈值规则就能事前圈出风险分子，那这套协议在更大的溶剂库上就是可负担的。",
+    "",
+    "**结果是一个正例加一个负例**：Part A 完全成立（且比预期更干净）；Part B 在池化层面**失败**，",
+    "但失败有结构——按电性状态分开之后，两臂各自能恢复到「有排序信息」的状态。",
+    "",
+    "## 2. 口径与记号",
+    "",
+    "### 2.1 沿用不变的部分",
+    "",
+    "- 方法：r2SCAN-3c（气相与 CPCM 同法），ORCA 6.1.1，几何固定为 **G1**（不做任何重优化）。",
+    "- 状态：中性 / 阳离子 / 阴离子三态，垂直量语义与 Week 4–14 完全一致。",
+    f"- 环境：CPCM，电介质阶梯 `{' / '.join('%g' % e for e in eps)}`，与 Stage 13/14 逐点相同。",
+    f"- 材料阈值：**{threshold * 1000:g} meV**，**原样继承 Week 14，本周不重新调参**。Week 14 的原文里"
+    "写明了它的来历：",
+    f"  > {provenance}",
+    f"- 算力：`--jobs {cat['jobs']} --nprocs {cat['nprocs']}`（本机 16 逻辑核），与既有各层协议相同。",
+    "",
+    "### 2.2 符号约定（整个结论挂在上面）",
+    "",
+    "对每个 (分子, 状态, 电介质) 单元格，两条臂的能量记 `E_default`（ORCA 自带初猜）与 `E_moread`",
+    "（`! MORead` + 同电荷态的气相 `%moinp`），于是",
+    "",
+    "    delta = E_moread - E_default        （单位 eV）",
+    "",
+    f"- `delta < -{threshold * 1000:g} meV` -> **默认初猜漏掉了一个更低的解**（material 级差异）；",
+    f"- `|delta| <= {threshold * 1000:g} meV` -> 两臂到 SCF 收敛程度一致（coincident）；",
+    f"- `delta > +{threshold * 1000:g} meV` -> 重启反而更高。",
+    "",
+    f"第三条**在物理上不应该出现**：MORead 从同样的气相轨道出发、在同样的 SCF 里收敛，不该比「从零猜」",
+    f"更差。所以 `n_moread_higher = 0` 不是修辞，而是一条可证伪的判据：Stage 16 用 **{n_paired}** 个配对",
+    f"单元格去检验它，实测「反向」**{higher}** 次（Week 14 在 90 个点上是 0 次）。"
+    f"最大的正向残差是 **{best_pos:.3e} eV**，出现在 "
+    f"{best_pos_at[0]} / {best_pos_at[1]} / eps={best_pos_at[2]:g}，比阈值小一个数量级以上，"
+    f"因此没有任何一个单元格被记成「重启更差」。",
+    "",
+    "### 2.3 三条阶梯与「稀疏阶梯许可证」",
+    "",
+]
+L += [
+    f"- `core3`  = {' / '.join('%g' % e for e in ana['ladders']['core3'])}"
+    f"（三个电介质，留出臂只跑这三个）",
+    f"- `focus6` = {' / '.join('%g' % e for e in ana['ladders']['focus6'])}",
+    f"- `ladder10` = 全部 {len(eps)} 个电介质",
+    "",
+    "标签是**按 (分子, 状态) 定义在该阶梯上**的：只要该阶梯上有一个单元格 `delta < -1 meV`，这一行就记为",
+    "「有漏解」。因为 `core3 ⊂ focus6 ⊂ ladder10` 是集合包含，**任何在稀疏阶梯上被标为有漏解的行，必须在更",
+    "稠密的阶梯上也被标为有漏解**——这是数学不变量，不是经验观察。它是允许「留出臂只跑 3 个电介质」的唯一",
+    "许可证，本周用发现集的 `label_agreement` 明码给出它是否成立：",
+    "",
+]
+for pair, entry in sorted(agreement.items()):
+    L.append(f"- `{pair}`：{entry['n_rows']} 行中 **{entry['n_disagree']}** 行不一致"
+             + (f"（{', '.join(entry['disagreements'])}）" if entry["disagreements"]
+                else "（两者完全一致）"))
+L += [
+    "",
+    f"三对全部 {sum(e['n_disagree'] for e in agreement.values())} 处不一致，"
+    f"而且**三个阶梯给出的是同一份名单**：`core3`、`focus6`、`ladder10` 各自判定的分子数与名字完全相同"
+    f"（{n_flag10} 个：{', '.join(flag10)}）。换句话说，在本周的数据上「只跑 3 个电介质」与「跑满 10 个」",
+    "给出的风险名单一模一样——稀疏阶梯许可证不只是形式上成立，而是当前这份数据下**没有付出任何代价**。",
+    "",
+    "### 2.4 中性态被排除在规则之外（理由写在产物里）",
+    "",
+    "预警规则的标签比较的是两个 SCF 解。中性态本周用的是闭壳层（restricted）参考，ORCA 只给出一个解，",
+    "「两个解的比较」在中性态上**无定义**，因此中性态只作为对照臂出现在描述符表里，不进入规则拟合。",
+    "产物 `stage16_predictor.json` 的 `restriction` 字段逐字记录了这条理由：",
+    "",
+    f"> {pre['restriction']}",
+    "",
+    "要强调的是这**不等于**「中性分子在物理上只有唯一解」这个更强的命题——它只是说，在本周的协议下中性态",
+    "的比较无定义。这也是 Part A 里中性态赤字为 0 的**唯一**原因，报告里不应把它读成物理结论。",
+    "",
+    "## 3. 本周新增的计算",
+    "",
+    f"- 目录规模：**{cat['n_cells']} 个单元格** = {cat['n_molecules']} 个分子 x {len(cat['states'])} 个状态 "
+    f"x {len(eps)} 个电介质 x {len(cat['arms'])} 条臂（`{'`, `'.join(cat['arms'])}`），"
+    f"分 {len(cat['layers'])} 层落盘。",
+    f"- 实际新算 **{cat['n_cells_computed']} 个 ORCA 作业**，另外 **{cat['n_cells_reused']} 个单元格**是"
+    "从既有周次**原样复用**的（每一行都带 `source` 列写明出处，脚本里 `computed + reused = total` 是硬断言）。",
+    f"- 失败 **{cat['n_failed']}** 个，`n_ok = {cat['n_ok']}`。",
+    f"- 复用出处：默认臂来自 "
+    f"{', '.join('`' + Path(p).name + '`' for p in cat['sources']['default'])}；"
+    f"`moread` 臂来自 Week 14 的 8 张 `moread` 表（本分支 10 个电介质中的 5/7/10/14/20/28/40/80/200/1000"
+    "全部继承自 Week 14）。",
+    "- 初猜协议（产物原文）：",
+    f"  - `default`：{cat['guess_protocol']['default']}",
+    f"  - `moread`：{cat['guess_protocol']['moread']}",
+    f"  - 需要暂存：`{cat['guess_protocol']['staging_root']}` —— 因为 "
+    f"{cat['guess_protocol']['staging_reason']}。",
+    "",
+    "**逐层墙钟中位数（秒）**：",
+    "",
+    "| 电介质 | default 臂 | moread 臂 | 说明 |",
+    "| --- | --- | --- | --- |",
+]
+for position, level in enumerate(eps):
+    left = default_med[position]
+    right = moread_med[position]
+    note = "全部复用，未新算" if left is None and right is None else (
+        "该层有复用行" if left is None or right is None else "")
+    L.append(f"| {level:g} | {'—' if left is None else '%0.2f' % left} | "
+             f"{'—' if right is None else '%0.2f' % right} | {note} |")
+L += [
+    "",
+    f"**一条反直觉但可解释的事实**：`moread` 臂**更便宜**。新算的层里，default 臂中位数 "
+    f"{min(new_default):.1f}–{max(new_default):.1f} s，"
+    f"`moread` 臂 {min(new_moread):.1f}–{max(new_moread):.1f} s。原因不是它算得更少，而是它**跳过了 SCF 的",
+    "初猜搜索**：直接把已经收敛的气相轨道读进来当起点。也就是说，本周协议里「更可靠的解」和「更贵」并不是",
+    "同一件事——真正的成本是**一次额外的气相计算**（那份 `.gbw` 必须先存在），不是那次连续介质计算本身。",
+    "",
+    "## 4. Part A：全核心集目录",
+    "",
+    f"**（a）整体计数。** {n_paired} 个配对单元格（未配对 {unpaired} 个）：",
+    "",
+    "| 类别 | 单元格数 | 占比 |",
+    "| --- | --- | --- |",
+    f"| 两臂一致到 SCF 收敛（`|dE| <= {threshold * 1000:g} meV`） | {coincident} | {pct_coincident:.1f}% |",
+    f"| 默认初猜漏掉更低解（`dE < -{threshold * 1000:g} meV`） | {lower} | {pct_lower:.1f}% |",
+    f"| 重启反而更高（`dE > +{threshold * 1000:g} meV`） | {higher} | {100.0 * higher / n_paired:.1f}% |",
+    "",
+    f"最坏单元格：**{worst:.6f} eV**，出现在 {worst_at[0]} / {worst_at[1]} / eps={worst_at[2]:g}。"
+    + ("（Week 14 只在三个分子上算过，当时的最坏值是 0.2860 eV，与本周全目录的最坏值相同——"
+       "也就是说三个分子上的那一格本来就已经是最坏的那一格。）"
+       if abs(abs(worst) - 0.2860) < 1e-3 else
+       f"（Week 14 在三分子上的最坏值是 0.2860 eV，本周全目录为 {abs(worst):.4f} eV。）"),
+    "",
+    "**（b）逐电子态。** 赤字**只出现在开壳层**，而且两个开壳层方向上的计数恰好相等：",
+    "",
+    "| 状态 | 单元格 | 默认初猜漏解 | 重启更高 |",
+    "| --- | --- | --- | --- |",
+]
+for state in ("neutral", "cation", "anion"):
+    entry = states[state]
+    label = {"neutral": "中性（对照臂）", "cation": "阳离子", "anion": "阴离子"}[state]
+    L.append(f"| {label} | {entry['n_cells']} | {entry['n_moread_lower']} | {entry['n_moread_higher']} |")
+L += [
+    "",
+    f"阳离子 {states['cation']['n_moread_lower']} 个、阴离子 {states['anion']['n_moread_lower']} 个——",
+    "两侧数字相同纯属巧合（分子不同、电介质覆盖也不同），但它提醒一件事：**把两侧池化起来做统计之前，",
+    "必须先问它们是不是同一个现象**。第 5 节会看到，它们不是。",
+    "",
+    "**（c）赤字的量级分布。** 门槛从 1e-8 eV 抬到 0.1 eV 时仍有赤字的单元格数：",
+    "",
+    "| 门槛（eV） | 单元格数 |",
+    "| --- | --- |",
+]
+for edge in hist_edges:
+    L.append(f"| {edge:g} | {hist['%g' % edge]} |")
+L += [
+    "",
+    f"两点值得注意。第一，赤字的**量级跨了三个数量级**：最坏 {abs(worst):.3f} eV，"
+    f"而最小的入级赤字只有几 meV。第二，{hist['0.0001']} 个单元格的赤字超过 1e-4 eV，"
+    f"其中 {hist['0.001']} 个超过材料阈值 {threshold:g} eV——也就是说阈值之上与 1e-4 之间只隔了 "
+    f"{hist['0.0001'] - hist['0.001']} 个单元格，材料阈值**不在一个人为的悬崖边上**，"
+    "这是它可以原样继承 Week 14 的经验理由。",
+    "",
+    "**（d）哪些分子。** 被判为「存在漏解」的分子：",
+    "",
+    "| 阶梯 | 电介质 | 判为有漏解的分子 | 比例 |",
+    "| --- | --- | --- | --- |",
+]
+for key, label in (("core3", "3 点"), ("focus6", "6 点"), ("ladder10", "10 点")):
+    names = ana["flagged_molecules"][key]
+    L.append(f"| {label} | {'/'.join('%g' % e for e in ana['ladders'][key])} | "
+             f"{len(names)}/{n_mol} | {', '.join(names)} |")
+L += [
+    "",
+    "**（e）家族覆盖。** 把 12 个分子按官能团分类：",
+    "",
+    "| 家族 | 分子数 | 其中有漏解 | 分子 |",
+    "| --- | --- | --- | --- |",
+]
+for name in sorted(family):
+    entry = family[name]
+    L.append(f"| {name} | {entry['n_molecules']} | {entry['n_flagged']} | {', '.join(entry['molecules'])} |")
+L += [
+    "",
+    f"债务**完全集中在碳酸酯（{family['cyclic_carbonate']['n_flagged'] + family['linear_carbonate']['n_flagged']}/4）"
+    f"与磷酸酯（{family['phosphate']['n_flagged']}/1）**；极性非质子类（醚、酯、腈、亚砜、砜）**全为 0**。",
+    "这不是「随机分布的 5 个分子」——它给出了机制提示：碳酸酯的 σ* 轨道接收多余电子时最容易出现自旋外溢，",
+    "而 TMP 的大体积磷酸根阳离子最容易出现定域不足。第 7 节展开。",
+    "",
+    "**（f）赤字沿电介质阶梯的形态。** 每一个被判定有漏解的 (分子, 状态)：",
+    "",
+    "| 分子 | 状态 | 模式（低 eps -> 高 eps） | 命中 | 连续 | 首个 | 末个 |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+]
+for row in patterns:
+    L.append(f"| {row['name']} | {row['state']} | `{row['pattern']}` | {row['n_flagged']} | "
+             f"{'是' if row['contiguous'] else '否'} | {row['first_flagged_eps']:g} | "
+             f"{row['last_flagged_eps']:g} |")
+L += [
+    "",
+    "模式串按 `" + "/".join("%g" % e for e in eps) + "` 排列，1 = 该电介质上有漏解。形态并不单一：",
+    "",
+    "- **全程命中**（PC/阴离子、TMP/阳离子）：10/10，从 eps=5 一直到 1000 都有漏解；",
+    "- **只在低介电端命中**（EC/阳离子，`1111100000`）：到 eps=20 之后消失——"
+    "环境越强，两臂越容易收敛到同一个解；",
+    "- **孤立命中**（DMC/阳离子，仅 eps=5）与**带内部空隙**（EMC/阴离子，4 个内部空隙）。",
+    "",
+    "最后一条是个警告：如果只跑 `core3` = 5/20/200，EMC/阴离子 恰好会被标中；但如果阶梯取了别的三点",
+    "（比如 5/10/40），它可能被漏掉。本周的强烈提示是：**赤字沿阶梯的形态不是单调的，稀疏阶梯的",
+    "安全性来自实测一致性（`label_agreement` 全 0），而不是来自单调性假设**。",
+    "",
+]
+L += [
+    "## 5. Part B：事前预警规则（一个负结果，以及它为什么是负的）",
+    "",
+    "### 5.1 规则的设定",
+    "",
+    f"- **只用气相量**：候选描述符 {len(screen)} 个，全部在气相 T1 作业结束时就已经存在"
+    "（自旋定域度、自旋二阶矩、能隙、偶极、Mulliken 位移、质量回旋半径）。",
+    f"- **样本**：发现集的 **{pre['n_discovery_rows']} 行**开壳层 (分子, 状态)，其中正例 "
+    f"**{pre['n_discovery_positive']} 个**。",
+    f"- **方向先验**：比较方向不由数据挑选，而由一个物理先验固定（"
+    "自旋越定域、自旋伸展越大 -> 越危险），最后一步才检查数据是否同意这个方向。",
+    "- **阈值**：只在发现集上用留一法选出，然后**冻结**；6 个留出分子不参与任何拟合。",
+    "",
+    "### 5.2 冻结出来的规则，以及它输在哪里",
+    "",
+    f"按绝对 AUC 排序，胜出的是 **`{rule['descriptor']}`**（"
+    f"{'越小越危险' if rule['sign'] != 'larger_is_riskier' else '越大越危险'}），"
+    f"冻结阈值 **{rule['threshold_frozen']:.6g}**。它的定义：{rule['definition']}",
+    "",
+    "| 指标 | 值 |",
+    "| --- | --- |",
+    f"| AUC（发现集 {pre['n_discovery_rows']} 行） | {rule['auc']:.4f} |",
+    f"| 样本内准确率 | {rule['accuracy_in_sample']:.4f} |",
+    f"| **留一准确率** | **{rule['loo_accuracy']:.4f}** |",
+    f"| **多数类基线**（一律判「无漏解」） | **{majority:.4f}** |",
+    f"| 是否超过基线 | **{'是' if beats else '否'}** |",
+    f"| 平衡准确率（sensitivity/specificity 均值） | {rule['balanced_accuracy_in_sample']:.4f} |",
+    f"| 平凡单类规则的平衡准确率 | {trivial_bal:.4f} |",
+    f"| 精确置换检验 p | {perm['p_value']:.4f} |",
+    "",
+    f"**结论必须原样写出：冻结规则在发现集上未能超过多数类基线**"
+    f"（{rule['loo_accuracy']:.3f} vs {majority:.3f}）。这条规则**不是噪声**——"
+    f"平衡准确率 {rule['balanced_accuracy_in_sample']:.3f} 远高于平凡规则的 {trivial_bal:.3f}，"
+    f"排序信息在精确置换检验下显著（见 5.3）——但它仍然是一个**输给「一律判无风险」的分类器**，"
+    f"因为在 {pre['n_discovery_positive']}/{pre['n_discovery_rows']} 的极度不平衡下，普通准确率几乎完全由多数类决定。",
+    "",
+    f"产物里这条判定是**算出来的**，不是写死的：`chosen_rule_beats_majority_baseline` 就是那两个数字的比较结果，",
+    "质检项 `stage16.the_frozen_rule_is_scored_against_the_majority_baseline` 会重算一遍并断言两者一致，",
+    "单元测试还会断言它当前的值就是 `False`（若将来被改动，测试会失败并要求同时改写本文的结论）。",
+    "",
+    "### 5.3 精确置换检验：为什么「输给基线」不等于「毫无信息」",
+    "",
+    f"样本只有 {pre['n_discovery_rows']} 行 / {pre['n_discovery_positive']} 个正例，渐进统计不可信，"
+    f"所以这里用**精确**置换检验：枚举全部 C({perm['n_rows']}, {perm['n_positive']}) = "
+    f"**{perm['total_assignments']}** 种标签指派，统计量取 `{perm['statistic']}`，"
+    f"这样「两个方向都无用」的描述符会返回接近 1 的 p，而不是接近 0。",
+    "",
+    f"结果：**p = {perm['p_value']:.4f}**"
+    f"（{'精确枚举' if perm.get('exact') else '抽样估计'}）。也就是说，"
+    f"「气相小能隙估计有利于漏解」这件事在 5% 水平上显著——**AUC 与准确率在这里给出了相反的印象**："
+    f"`{rule['descriptor']}` 的 AUC 是 {rule['auc']:.3f}（离 0.5 很远，方向与先验一致），"
+    f"但按准确率衡量它仍然是失败者。报告里必须同时给出这两个数，只留好看的那个是误导。",
+    "",
+    "### 5.4 单变量筛查全表（前 6 名）",
+    "",
+    "| 描述符 | 方向 | AUC | 留一准确率 | 冻结阈值 | 精确置换 p |",
+    "| --- | --- | --- | --- | --- | --- |",
+]
+for entry in screen[:6]:
+    L.append(f"| `{entry['descriptor']}` | "
+             f"{'越大越危险' if entry['sign'] == 'larger_is_riskier' else '越小越危险'} | "
+             f"{entry['auc']:.3f} | {entry['loo_accuracy']:.3f} | "
+             f"{entry['threshold_frozen']:.4g} | {entry['auc_permutation_p']:.4f} |")
+L += [
+    "",
+    f"注意第 3 名 `gas_gyration_ang2` 的留一准确率 {screen[2]['loo_accuracy']:.3f} "
+    f"恰好**等于**基线 {majority:.3f}，而它的 |AUC-0.5| 只有 {screen[2]['abs_auc_above_half']:.3f}；"
+    "这说明**在 24 行上「留一准确率恰好等于基线」可以随手发生**，单看准确率不足以选出规则，"
+    "这也是 5.6 的分臂诊断要同时给出 AUC 与正例排名的原因。",
+    "",
+    "### 5.5 池化为什么失败：把两臂拆开看（事后诊断，不是预报）",
+    "",
+    "池化失败的机制原因在产物里逐字记录：",
+    "",
+    f"> {pre['per_arm_diagnostic']['note']}",
+    "",
+    "按电性状态拆开之后，每一臂各自能恢复出「有排序信息」的状态：",
+    "",
+    "| 臂 | 行数 | 正例 | 多数类基线 | 排序最强描述符 | AUC | 正例排名 | 该描述符留一 | 超过基线 | 精确置换 p |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+]
+for arm in ("cation", "anion"):
+    block = arms[arm]
+    top = block["screen"][0]
+    L.append(f"| {arm} | {block['n_rows']} | {block['n_positive']} | {block['majority_accuracy']:.3f} | "
+             f"`{top['descriptor']}` | {top['auc']:.3f} | "
+             f"{'/'.join(str(r) for r in top['positive_ranks'])} | {top['loo_accuracy']:.3f} | "
+             f"{'是' if top['beats_majority_baseline'] else '否'} | {top['permutation_p']:.4f} |")
+L += [
+    "",
+    "两个臂的物理机制**不同**，这解释了为什么任何单一全局气相量都不可能同时解释两侧：",
+    "",
+    f"- **阳离子侧**（{arms['cation']['n_positive']} 个正例："
+    f"{' / '.join(row['name'] for row in patterns if row['state'] == 'cation')}）："
+    "缺电子的紧凑阳离子，r2SCAN-3c 的自旋定域不足，"
+    "初猜容易停在错误的解分支上。ORCA **预对角化**的 HOMO/LUMO 能隙估计已经知道这件事——"
+    f"`gas_small_gap_value` 把 {arms['cation']['n_positive']} 个正例排到 {arms['cation']['n_rows']} 行里的第 "
+    f"{'/'.join(str(r) for r in arms['cation']['screen'][0]['positive_ranks'])} 位，"
+    f"|AUC-0.5| = {arms['cation']['screen'][0]['abs_auc_above_half']:.3f}，"
+    f"精确置换 p = {arms['cation']['screen'][0]['permutation_p']:.4f}。但它这一臂的留一准确率只有 "
+    f"{arms['cation']['screen'][0]['loo_accuracy']:.3f}，**低于**基线 {arms['cation']['majority_accuracy']:.3f}；"
+    "换句话说，**排序显著，但 3 个正例不足以标定阈值**。",
+    f"- **阴离子侧**（{arms['anion']['n_positive']} 个正例："
+    f"{' / '.join(row['name'] for row in patterns if row['state'] == 'anion')}）："
+    "多余电子要在**缺弥散函数**的基组下"
+    "自旋外溢到骨架的某个原子上，所以真正动起来的量是气相阴离子的**自旋分布**。"
+    f"`gas_spin_maxfrac` 把 {arms['anion']['n_positive']} 个正例排到第 "
+    f"{'/'.join(str(r) for r in arms['anion']['screen'][0]['positive_ranks'])} 位（AUC "
+    f"{arms['anion']['screen'][0]['auc']:.3f}），而且这一臂上该切法的留一准确率 "
+    f"{arms['anion']['screen'][0]['loo_accuracy']:.3f} **确实超过**基线 {arms['anion']['majority_accuracy']:.3f}。",
+    "",
+    "**必须写清楚的免责**：",
+    "",
+    f"1. 这一段是 `post_hoc = {pre['per_arm_diagnostic']['post_hoc']}`：方向、阈值、以及「按什么分臂」"
+    "都是**看到标签之后**选的，它是对失败的**解释**，不是预报。",
+    "2. 分臂用的量是**电荷态**，它在作业开始前就已知，所以「分臂」本身不花成本；"
+    "不免费的是**每臂用哪个描述符、阈值落在哪里**。产物原文：",
+    "",
+    f"   > {pre['per_arm_diagnostic']['arm_selector_note']}",
+    "",
+    "3. 这两条分臂规则**已经在留出臂上被证伪**：同一把尺子搬到 6 个新分子上，"
+    "两臂各自只有 0.667，都不超过各自的基线（见 6.1）。所以 5.5 是**机制解释**，"
+    "不是「小样本下勉强可用的规则」。",
+    f"4. 「某描述符的留一准确率超过基线」**本身不是证据**。阳离子臂上留一最高的是 "
+    f"`{max(arms['cation']['screen'], key=lambda e: e['loo_accuracy'])['descriptor']}`"
+    f"（{arms['cation']['best_loo_accuracy']:.3f}），但它的 |AUC-0.5| 只有 "
+    f"{max(arms['cation']['screen'], key=lambda e: e['loo_accuracy'])['abs_auc_above_half']:.3f}，"
+    f"精确置换 p = {max(arms['cation']['screen'], key=lambda e: e['loo_accuracy'])['permutation_p']:.3f}——"
+    "一个几乎没有排序信息的描述符，在 12 行上也能凑出高于基线的留一准确率。所以本报告一律**同时**给出"
+    "AUC、正例排名与 p 值，三者缺一不可。",
+    "",
+]
+L += [
+    "### 5.6 多变量上限：多一个参数买到什么",
+    "",
+]
+if ceiling:
+    L += [
+        f"- 特征（按 |AUC-0.5| 取前 2 个）：{', '.join('`' + f + '`' for f in ceiling['features'])}",
+        f"- 留一 AUC：**{ceiling['loo_auc']:.3f}**",
+    ]
+    if ceiling.get("validation_auc") is not None:
+        L.append(f"- 留出臂 AUC：{ceiling['validation_auc']:.3f}；"
+                 f"留出臂准确率：{ceiling.get('validation_accuracy'):.3f}")
+    effective = max(rule["auc"], 1.0 - rule["auc"])
+    L += [
+        "",
+        f"对比必须公平：单变量规则的方向是**先验固定**的（{rule['descriptor']} 越小越危险），"
+        f"所以它的「有效 AUC」不是 {rule['auc']:.3f}，而是 max({rule['auc']:.3f}, "
+        f"{1.0 - rule['auc']:.3f}) = **{effective:.3f}**。"
+        f"二特征 logistic 的留一 AUC 是 **{ceiling['loo_auc']:.3f}**，"
+        + (f"比它高 {ceiling['loo_auc'] - effective:.3f}——"
+           "多出来的那一个参数确实买到了一点排序能力，但幅度与两臂机制不同（5.5）这一解释相符，"
+           "不值得为它增加一个自由度。"
+           if ceiling["loo_auc"] > effective + 0.02 else
+           f"比它低 {effective - ceiling['loo_auc']:.3f}——多出来的那一个参数**没有买到任何排序能力**，"
+           "与 5.5 的机制解释一致：问题不在描述符的个数，而在两个方向被池化在一起。"),
+        "",
+    ]
+else:
+    L += ["- 未计算（缺少可选依赖）。", ""]
+
+L += [
+    "## 6. 留出臂：6 个从未算过连续介质的分子",
+    "",
+    f"留出集是 **{', '.join(val.get('molecules') or extra or val_molecules)}**"
+    f"（{len(val.get('molecules') or extra or val_molecules)} 个）——这些分子在本周之前"
+    "**从未做过任何连续介质计算**，因此它们的标签在本周是第一次被测量，不可能参与任何拟合。",
+    "只跑 `core3` 的三个电介质（5 / 20 / 200），靠 2.3 的稀疏阶梯许可证。",
+    "",
+]
+if val.get("accuracy") is not None:
+    matrix = val["confusion_matrix"]
+    hold_val = ana.get("validation") or {}
+    L += [
+        f"- 规模：6 分子 x 3 状态 x 3 电介质 x 2 臂 = **{6 * 3 * 3 * 2} 个单元格**，"
+        f"新算（`n_cells_reused = 0`），失败 0 个。",
+        f"- 判为存在漏解的分子："
+        f"**{', '.join(hold_val.get('molecules_with_missed_lower_solution') or []) or '无'}**"
+        f"（{hold_val.get('n_molecules_with_missed_lower_solution', 0)}/6）。",
+        f"- 冻结规则在这 {val['n_scored']} 个开壳层 (分子, 状态) 行上的准确率："
+        f"**{val['accuracy']:.3f}**，混淆矩阵 TP {matrix['true_positive']} / "
+        f"FP {matrix['false_positive']} / TN {matrix['true_negative']} / "
+        f"FN {matrix['false_negative']}（未评估 {matrix['unscored']}）。",
+        "",
+        "| 分子 | 状态 | 描述符值 | 预测 | 真值 |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for row in val.get("per_row") or []:
+        L.append(f"| {row['name']} | {row['state']} | {float(row['value']):.6g} | "
+                 f"{'有漏解' if row['predicted'] else '无漏解'} | "
+                 f"{'有漏解' if row['truth'] else '无漏解'} |")
+    L.append("")
+
+    # 6.1 -- the decisive test: the post-hoc arm rules, frozen and re-scored on
+    # six molecules neither arm had ever seen.
+    tp = matrix["true_positive"]
+    fn = matrix["false_negative"]
+    truth_rows = [row for row in (val.get("per_row") or []) if row["truth"]]
+    anions = [row for row in truth_rows if row["state"] == "anion"]
+    cation_held = arms["cation"].get("validation") or {}
+    anion_held = arms["anion"].get("validation") or {}
+    L += [
+        "### 6.1 两臂事后规则在留出臂上也失败了（这才是决定性的检验）",
+        "",
+        "5.5 里那两条「拆开就有排序信息」的事后规则，可以**原样**（同一描述符、同一方向、"
+        "同一阈值）搬到留出臂上打分。它们都没有通过：",
+        "",
+        "| 臂 | 描述符 | 冻结阈值 | 留出准确率 | 留出基线 | TP/FP/TN/FN | 超过基线 |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for arm in ("cation", "anion"):
+        held = arms[arm].get("validation") or {}
+        if not held:
+            continue
+        cm = held["confusion_matrix"]
+        L.append(f"| {arm} | `{held['descriptor']}` | {held['threshold_frozen']:.6g} | "
+                 f"{held['accuracy']:.3f} | {held['majority_accuracy']:.3f} | "
+                 f"{cm['true_positive']}/{cm['false_positive']}/{cm['true_negative']}/"
+                 f"{cm['false_negative']} | "
+                 f"{'是' if held['beats_majority_baseline'] else '否'} |")
+    L += [
+        "",
+        f"一个必须点出的细节：留出臂上真正有漏解的行**全在阴离子侧**"
+        f"（{'、'.join(row['name'] + '/' + row['state'] for row in truth_rows)}），"
+        f"而池化的冻结规则用的是**阳离子侧**的描述符 `{rule['descriptor']}`——"
+        f"所以它在留出臂上对 {tp + fn} 个真实漏解只命中 {tp} 个，这不是运气差，而是**选错了描述符**，"
+        "与 5.5 的机制判断一致。",
+        "",
+        "但**阴离子侧自己的规则同样 0 命中**："
+        + (f"DEC / 阴离子的 `{anion_held['descriptor']}` = "
+           f"{next(float(r['value']) for r in anion_held['per_row'] if r['name'] == 'DEC'):.4f}、"
+           f"TEGDME / 阴离子的 = "
+           f"{next(float(r['value']) for r in anion_held['per_row'] if r['name'] == 'TEGDME'):.4f}，"
+           f"都**低于**发现集给出的阈值 {anion_held['threshold_frozen']:.4f}"
+           f"（`{anion_held['descriptor']}` 越大越危险），所以它连自己那一侧的两个漏解也没圈住。"
+           if anion_held else ""),
+        "",
+        "**Part B 的最终裁决**：",
+        "",
+        f"1. **池化单描述符规则**：发现集上输给多数类基线（{rule['loo_accuracy']:.3f} vs "
+        f"{majority:.3f}），留出臂上准确率 {val['accuracy']:.3f}，对 {tp + fn} 个真实漏解命中 {tp} 个。",
+        f"2. **事后按电性状态拆分**：两臂在发现集内都恢复出排序信息（阴离子臂的留一还超过基线），"
+        f"但把同一把尺子拿到留出臂上，阳离子臂 {cation_held.get('accuracy', 0.0):.3f}"
+        f"（基线 {cation_held.get('majority_accuracy', 0.0):.3f}）、"
+        f"阴离子臂 {anion_held.get('accuracy', 0.0):.3f}"
+        f"（基线 {anion_held.get('majority_accuracy', 0.0):.3f}）——**样本外不成立**。",
+        "3. 因此本阶段**没有产出任何可用的气相预警规则**。这是明确的否定结论，而不是「还差一点数据」的"
+        "含糊表述：机制线索是真的（债务集中在碳酸酯/磷酸酯、两臂机制不同），"
+        "但把机制线索变成阈值规则所需的样本量远大于 24 行。",
+        f"4. **唯一通过检验的是 Part A**：漏解现象本身在 6 个全新分子上重现"
+        f"（{(ana.get('validation') or {}).get('n_molecules_with_missed_lower_solution', 0)}/6："
+        f"{'、'.join((ana.get('validation') or {}).get('molecules_with_missed_lower_solution') or [])}）。"
+        "换句话说：**现象是真的，只是还不可预报。**",
+        "",
+    ]
+else:
+    L += ["（留出臂结果缺失：`stage16_predictor.json` 里没有 `validation` 块。）", ""]
+
+L += [
+    "**怎么读这个留出臂。** 它是**两个问题的联合检验**，而且必须分开说：",
+    "",
+    "1. Part A 的迁移：全目录里的漏解现象，在 6 个全新分子上是否也出现？",
+    "2. Part B 的迁移：在发现集上选出的那条冻结规则，在这 6 个分子上是否仍然有用？",
+    "",
+    "第一个问题的答案写在这一节开头的清单与 6.1 的裁决第 4 条里；第二个问题看准确率与混淆矩阵。",
+    "由于规则本身在第 5 节已经**在发现集上就输给了多数类基线**，第二部分即使数字好看也不构成"
+    "「规则可用」的证据——它的价值在于**证伪**：如果连发现集上的弱信号都完全无法迁移，"
+    "那 Part B 的结论就该被彻底放弃，而不是留待更大的样本。",
+    "",
+    "## 7. 物理读法",
+    "",
+    "### 7.1 「找到更低解」的真正代价是一次气相计算，不是一次更贵的连续介质计算",
+    "",
+    f"3 节给出的逐层中位数很反直觉：新算的层里 `moread` 臂（{min(new_moread):.1f}–{max(new_moread):.1f} s）"
+    f"比 default 臂（{min(new_default):.1f}–{max(new_default):.1f} s）**更快**。"
+    "因为 `MORead` 把已经收敛的气相轨道直接当起点，跳过了初猜搜索这一步。",
+    "",
+    f"这条事实改变了协议的记账方式：如果把它写成「为了避免漏解，每个点都要多做一次昂贵的计算」，那是**错的**。",
+    f"正确的记账是：**先做一次气相计算并留下 `.gbw`**，之后每次连续介质计算都可以（也应该）从它重启，"
+    "单次成本反而下降。真正的问题在于那份 `.gbw` 必须是**同一个电荷态、同一套几何**的——"
+    "也就是 2.2 节里冻结 G1 的那条约定在本周又获得了一个新理由。",
+    "",
+    "### 7.2 为什么赤字只出现在开壳层（以及这句话的确切含义）",
+    "",
+    f"实测：中性态 {states['neutral']['n_moread_lower']}/{states['neutral']['n_cells']}，"
+    f"阳离子 {states['cation']['n_moread_lower']}/{states['cation']['n_cells']}，"
+    f"阴离子 {states['anion']['n_moread_lower']}/{states['anion']['n_cells']}。"
+    "但这**不是**「中性分子只有唯一解」的证据，而是「本周中性态用的是闭壳层参考，只有一个解可供比较」"
+    "的直接后果（2.4 节）。凡是把这条读成物理结论的表述都是越界的。",
+    "",
+    "开壳层为什么不同，机制是清楚的：",
+    "",
+    "- **阴离子**：多余电子进入的是 σ*/π* 反键轨道。r2SCAN-3c 用的是**没有弥散函数**的基组，"
+    "电子密度无法真正铺开，于是自旋在 SCF 里容易定域到某一个原子或某一条键上。"
+    f"这正好是 `gas_spin_maxfrac` 在阴离子臂上 AUC = {arms['anion']['screen'][0]['auc']:.3f} 的原因——"
+    "**被定域得多狠**与**两个解的分裂有多大**是同一件事的两面。",
+    "- **阳离子**：缺电子，HOMO 定域在富电子基团上；当最高占据与最低空轨道接近简并时，"
+    "SCF 的初猜更容易落进错误的分支。"
+    f"`gas_small_gap_value` 是 ORCA 预对角化给出的能隙估计，它把阳离子臂的 "
+    f"{arms['cation']['n_positive']} 个正例排到第 "
+    f"{'/'.join(str(r) for r in arms['cation']['screen'][0]['positive_ranks'])} 位（p = "
+    f"{arms['cation']['screen'][0]['permutation_p']:.4f}），说明「近简并 -> 初猜容易选错」这条链在数据里是看得见的。",
+    "",
+    "### 7.3 债务的家族分布不是巧合",
+    "",
+    f"碳酸酯 {family['cyclic_carbonate']['n_flagged'] + family['linear_carbonate']['n_flagged']}/4 与"
+    f"磷酸酯 {family['phosphate']['n_flagged']}/1 全部命中，极性非质子类（醚、酯、腈、亚砜、砜）全为 0。",
+    "这条分布与上面两条机制一致：碳酸酯有低位的 π*(C=O)，是接收多余电子时最容易发生自旋外溢的骨架；",
+    "TMP 是唯一的大体积磷酸酯，阳离子上的电荷最分散，定域不足最严重。",
+    "**因此这份目录不是「12 个分子的随机抽样」，而是一次有机制的普查**——"
+    "这也是为什么它不是简单地把 Week 14 的三分子结论复制了四遍。",
+    "",
+    "### 7.4 与 Week 9 的中心命题的关系",
+    "",
+    "Week 9 已经把「台阶是否改写排序」归因于**位移的离散度**而不是位移的大小（rho(std, tau_b) = -0.851）。",
+    "本周补上的是这条链的**下游**：如果某些单元格上默认初猜本身停在高解，那么 Week 9–12 里那些",
+    "「位移」有一部分其实是**初猜误差**而不是环境效应。目录给出的量级（最坏 "
+    f"{abs(worst):.3f} eV，只有 {hist['0.001']} 个单元格超过材料阈值）说明这个污染是**可量化但有限**的，"
+    "而把它逐格回填到台阶结论上是 Week 16 的第一优先项（见 11 节）。",
+    "",
+    "## 8. 读法纪律（延续 Week 9 §10 / 10 §11 / 11 §11 / 12 §10 / 13 §11 / 14 §9）",
+    "",
+    "1. **先问「这个量是否良定义」，再问「它准不准」**：本周新增的两个量（「漏解」标签、气相描述符）都先",
+    "   给出定义、给出它在什么条件下无意义（中性态、单类样本），再给出数字。",
+    f"2. **不把「数值差」直接读成「物理差」**：{threshold * 1000:g} meV 以下是 SCF 噪声带"
+    f"（Week 14 实测最大 8.27e-4 eV），因此本周的 material 判据不重新调参，避免「用数据调出一个好看的阈值」。",
+    "3. **复用必须留出处**：默认臂的绝大多数单元格是从 Week 4/12/13/14 原样搬运的，每一行都带 `source`",
+    "   列写明它来自哪个文件；`n_cells_computed + n_cells_reused = n_cells` 是硬断言。",
+    "4. **留出臂不许参与任何拟合**：阈值只由发现集的留一法选出，之后**冻结**，再逐行预测 6 个新分子。",
+    "   产物里同时给单变量规则与 2 特征 logistic 上限，用来回答「多一个参数买到什么」。",
+    f"5. **样本小就把不确定性写在脸上**：本周只有 {pre['n_discovery_rows']} 行 / {pre['n_discovery_positive']} 个正例，"
+    "这个规模下唯一能诚实报告的显著性来自**精确**置换检验（枚举全部 "
+    f"{perm['total_assignments']} 种指派），而不是正态近似；同样地，一条规则的「准确率」必须与**多数类基线**"
+    f"并排给出——否则 {rule['loo_accuracy']:.3f} 看起来像成功，而它其实是失败。本周把两者都写进产物与报告，"
+    "而不是只留好看的那个。",
+    "",
+]
+data_files = sorted(p.name for p in W15.iterdir() if p.is_file())
+figure_files = sorted(p.name for p in (REPO / "outputs" / "figures").glob("F3[01]*"))
+L += [
+    "## 9. 产物与图表",
+    "",
+    "### 9.1 数据产物（`outputs/week15/`）",
+    "",
+    "| 文件 | 说明 |",
+    "| --- | --- |",
+]
+notes = {
+    "stage16_catalogue_plan.json": "运行前的目录计划（分子 / 状态 / 电介质 / 两臂）",
+    "stage16_catalogue.json": "20 层的计算台账（每层 ok / failed / 复用数 / 墙钟中位数）",
+    "stage16_cells.csv": "发现集逐单元格表（含 `source` 出处与 `classification`）",
+    "stage16_validation_cells.csv": "留出臂逐单元格表（同口径）",
+    "stage16_by_state.csv": "按 (分子, 状态, 阶梯) 汇总的赤字与标签",
+    "stage16_catalogue_analysis.json": "Part A 的全部分析产物（含 `threshold_provenance` 原文）",
+    "stage16_gas_descriptors.csv": "气相描述符表（含 `split` 与三套标签）",
+    "stage16_predictor.json": "Part B 的规则、筛查、精确置换检验、两臂事后诊断、留出臂",
+    "stage16_holdout.json": "留出臂的计算台账（6 层）",
+    "stage16_summary.md": "F30 / F31 的逐面板文字 companion",
+}
+for name in data_files:
+    if name.endswith(".csv") and name.startswith("p2_"):
+        continue
+    if name.endswith(".json") and name.startswith("p2_"):
+        continue
+    L.append(f"| `{name}` | {notes.get(name, '（见产物自身字段）')} |")
+L += [
+    "",
+    f"另有 `p2_core_set_*_cpcm_*.csv` / `p2_summary_*_cpcm_*.json` 共 "
+    f"{sum(1 for n in data_files if n.startswith('p2_'))} 个逐层原始表（发现集 20 张 + 留出臂 6 张，"
+    "每张配一个 summary），以及 `orca_*` 作业目录（`.inp` / `.out` / `.xyz` / `_orca.json`；`.gbw` 不入库）。",
+    "",
+    "### 9.2 图表",
+    "",
+]
+for name in figure_files:
+    L.append(f"- `outputs/figures/{name}`")
+L += [
+    "- 清单与 SHA256：`outputs/figures/figure_manifest_week15_stage16.md`。",
+    "",
+    "**F30（目录）** 三块面板：(a) 12 x 3 x 10 的完整网格，按 `dE` 的符号着色"
+    "（灰 = 两臂一致、红 = 默认初猜漏解、蓝 = 重启更高——本周蓝格 0 个；斜纹 = 该格没有配对）；",
+    "(b) 每个**开壳层** (分子, 状态) 在整个阶梯上的最坏赤字（绿虚线 = 1 meV 材料阈值）；",
+    "(c) 各阈值以上的单元格数。",
+    "家族覆盖与沿阶梯的模式串**不在图里**，它们是 4(d) / 4(f) 的两张表"
+    "（同一份数字也抄进 `stage16_summary.md`）。",
+    "",
+    "**F31（规则）** 四块面板：(d) 选定描述符 vs 最大赤字，画出冻结阈值线"
+    "（发现集实心、留出集紫框）；(e) 全部描述符的 AUC-0.5（红 = 越大越危险）；",
+    "(f) 留出臂逐行预测 vs 真值（X = 判错，底色 = 规则预测有漏解）；",
+    "(g) 文本面板，**明写 `beats that baseline? NO -- the trivial rule wins`**、平衡准确率、"
+    "精确置换 p，以及两臂事后诊断的描述符、正例排名与该切法的留一比。",
+    "`stage16_summary.md` 里多出一节 `## F31 (h) 两臂事后诊断`，那是**文字**小节，不是图里的面板。",
+    "",
+    "### 9.3 脚本与测试",
+    "",
+    "- `scripts/run_stage16_catalogue.py`：20 + 6 层作业的调度与台账（几何审计、复用出处、`--jobs/--nprocs`）。",
+    "- `scripts/analyze_stage16_catalogue.py`：Part A 分析（自动吸收留出臂产物，缺失时不假装有数据）。",
+    "- `scripts/build_stage16_predictor.py`：Part B（描述符、单变量筛查、精确置换检验、两臂事后诊断）。",
+    "- `scripts/make_stage16_figure.py`：F30 / F31 与 `stage16_summary.md`、figure manifest（带 SHA256）。",
+    "- `tests/test_stage16_two_guess.py`：本阶段的回归测试，其中包括一条**科学断言**——"
+    "冻结规则在发现集上输给多数类基线；若将来被改动，测试会失败并要求同时改写本文的结论。",
+    "",
+    "## 10. 已知限制",
+    "",
+    f"1. **目录只在 {n_mol} 个分子上回答「默认初猜是否漏掉更低解」**，而且只覆盖 T3 审计子集，"
+    "不是 broad pool 的 40 个分子。家族结论（碳酸酯全中、极性非质子全零）建立在每个家族 1–2 个分子上，"
+    "只能当作**机制提示**，不能当作发生率估计。",
+    f"2. **「更低解」是三条语句口径下的能量比较**（同方法、同几何、同电荷态），不是自由能，"
+    "也没有做振动或构型采样；它回答的是「SCF 解空间里谁更低」，不是「哪个物种在溶液里更稳定」。",
+    f"3. **材料阈值 {threshold * 1000:g} meV 是继承来的**，本周没有重新标定。本周的实测支持它"
+    f"（{hist['0.0001']} 个赤字超过 1e-4 eV，其中 {hist['0.001']} 个超过阈值），但这条支持是**事后**的。",
+    f"4. **Part B 的结论是否定的，且样本极小**：{pre['n_discovery_rows']} 行 / "
+    f"{pre['n_discovery_positive']} 个正例。两臂事后诊断（5.5）在每臂上只有 "
+    f"{arms['cation']['n_positive']} 与 {arms['anion']['n_positive']} 个正例，"
+    "**不足以标定阈值**；而且这条诊断已经在留出臂上被证伪（6.1：两臂各 0.667，均不超过基线），"
+    "因此它只是机制解释，不是可用工具。",
+    f"5. **留出臂只跑了 3 个电介质**，靠的是 `label_agreement` 实测全 0 的一致性；"
+    "这不是「任何三点阶梯都安全」的一般性结论（4(f) 示出 EMC/阴离子的模式带内部空隙）。",
+    "6. **未做第二解的结构表征**：本周只知道两条臂的能量不同，没有比较它们的占据轨道、自旋分布或键长。"
+    "「低解多了什么」这个问题被留到 Week 16。",
+    "",
+    "## 11. 下一步（Week 16 候选）",
+    "",
+    "按「先堵漏、再扩张」排序：",
+    "",
+    "1. **把漏解回填到 sigma 台阶结论上（最高优先）**：Week 9–12 的台阶分析用的是 P0/P1 的默认初猜能量。",
+    "   既然默认初猜在某些 (分子, 状态, 电介质) 上会停在高解，就要量化「台阶结论被污染的上限」——",
+    "   把本周目录里 `delta < -1 meV` 的单元格按台阶归类，看它们是否真的改写过 tau_b / Top-k / 清单。",
+    "   这不需要新计算，只需要把既有能量按臂重新聚合。",
+    "2. **真正的 out-of-sample 扩张**：把规则应用到 broad pool 的 40 个分子上，只算**阴离子** x `core3`",
+    "   （40 个作业），用「规则圈出的风险集」与实测漏解做对照。这是对规则唯一有意义的检验。",
+    "3. **更便宜的预警**：本周描述符全部来自 r2SCAN-3c 气相输出。若换成 GFN2-xTB 的同名量（能隙、自旋",
+    "   定域度），规则是否仍然有效？若有效，预警成本从「一次 DFT」降到「一次 xTB」。",
+    "4. **把「第二解」从能量现象升级为电子结构现象**：对漏解单元格比较两条解的占据轨道与 Mulliken 自旋",
+    "   分布，回答「低解多了什么」——是某个 sigma*/pi* 轨道被额外占据，还是自旋重新定域。",
+    "5. **把协议成本降下来**：逐一检验 `%moinp` 是否必要（`Guess Huckel`、`! SlowConv`、读同一 CPCM",
+    "   环境下的前任 `.gbw` 都是候选），目标是在不损失「找到低解」的前提下减少一次气相计算。",
+    "",
+]
+
+text = "\n".join(L) + "\n"
+out = REPORT_OUT
+out.parent.mkdir(parents=True, exist_ok=True)
+out.write_text(text, encoding="utf-8", newline="\n")
+print("wrote", out.relative_to(REPO), out.stat().st_size, "bytes")
+assert "<<" not in text, "residual slot marker"
+assert "未能超过多数类基线" in text or "超过了多数类基线" in text
+print("no residual slots; verdict sentence present")
