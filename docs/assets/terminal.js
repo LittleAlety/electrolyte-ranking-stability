@@ -66,7 +66,13 @@
       node.className = "ln " + item.cls;
       node.textContent = item.html === "" ? "\u00a0" : item.html;
     }
-    if (!reduce && item.o.enter !== false) node.classList.add("enter");
+    if (!reduce && item.o.enter !== false) {
+      node.classList.add("enter");
+      // belt and braces: if the entrance animation never runs (some
+      // headless/print contexts freeze animations), drop the class so the
+      // line cannot stay parked at its faded start state.
+      window.setTimeout(function () { node.classList.remove("enter"); }, 600);
+    }
     scroll.appendChild(node);
     if (item.o.scroll !== false) keepBottom();
     if (queue.length) setTimeout(pump, reduce ? 0 : 13); else pumping = false;
@@ -104,6 +110,13 @@
       ""].concat(body.map(function (l) { return "  " + l.replace(/\s+$/, ""); })).join("\n");
   }
 
+  function emitTbl(text, cls, opts) {
+    emit(text, (cls || "out") + " tbl", opts || {});
+    if (window.innerWidth < 700) {
+      emit("  ↔ 表格超屏宽，可左右滑动", "dim2", { scroll: false });
+    }
+  }
+
   function rule(label) {
     label = label ? " " + label + " " : "";
     return "\u2500\u2500" + label + "\u2500\u2500";
@@ -128,7 +141,7 @@
 
   CMDS.help = function () {
     emit("可用命令", "acc");
-    emit(table(["command", "what it does"], [
+    emitTbl(table(["command", "what it does"], [
       ["about", "这个项目是什么（一段话）"],
       ["status", "两个 Gate、测试、作业与产物的真实计数"],
       ["pipeline", "五段式研究流水线"],
@@ -171,7 +184,7 @@
     emit("它不影响任何排序结论，只影响「绝对值」的可引用性。", "dim");
     blank();
     emit("规模", "acc");
-    emit(table(["item", "value"], [
+    emitTbl(table(["item", "value"], [
       ["周数", String(COUNTS.weeks)],
       ["ORCA 输出 (.out)", String(COUNTS.orca_out)],
       ["图", String(COUNTS.figures)],
@@ -197,7 +210,7 @@
     var rows = WEEKS.map(function (w) {
       return [padL(String(w.n), 2), w.stage, w.tag];
     });
-    emit(table(["wk", "stage", "conclusion"], rows), "out");
+    emitTbl(table(["wk", "stage", "conclusion"], rows), "out");
     emit("用 cat <week> 打印某一周的结论，read <week> 打开完整报告。", "dim2");
   };
 
@@ -237,7 +250,7 @@
     var rows = FIGS.filter(function (f) { return only === null || f.week === only; });
     if (!rows.length) { emit("没有匹配的图。用法: figures [week]", "warn"); return; }
     emit("图表目录" + (only ? "（week " + only + "）" : "（全部 " + FIGS.length + " 张）"), "acc");
-    emit(table(["id", "wk", "file", "size"], rows.map(function (f) {
+    emitTbl(table(["id", "wk", "file", "size"], rows.map(function (f) {
       return [f.id, String(f.week), f.file, (f.bytes / 1024).toFixed(0) + " KB"];
     })), "out");
     emit("用 open <id> 在终端里看图（例如 open F24）。", "dim2");
@@ -423,7 +436,7 @@
     emit("type \u0060help\u0060 — or click a command below.", "out", { scroll: false });
     blank();
     emit("12 周报告", "acc", { scroll: false });
-    emit(table(["wk", "stage", "conclusion"], WEEKS.map(function (w) {
+    emitTbl(table(["wk", "stage", "conclusion"], WEEKS.map(function (w) {
       return [padL(String(w.n), 2), w.stage, w.tag];
     })), "out", { scroll: false });
     if (!location.hash) window.scrollTo(0, 0);
@@ -508,6 +521,7 @@
     setTimeout(function () { run(hashText.replace(/^week(\d)/i, "cat $1")); }, 260);
   }
   input.focus({ preventScroll: true });
+
 
   window.addEventListener("hashchange", function () {
     var h = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
