@@ -236,7 +236,10 @@ def counts():
         "orca_out": len(orca_out),
         "scripts": len(scripts),
         "test_files": len(tests),
-        "tests_passed": 743,
+        # Recorded, not measured: pytest cannot be run from the generator.  Bump
+        # it in the same commit that adds or removes a test, otherwise the page
+        # will advertise a number the suite no longer produces.
+        "tests_passed": 744,
     }
 
 
