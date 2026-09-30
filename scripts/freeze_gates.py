@@ -184,6 +184,17 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "tests/test_stage12_prescreen.py",
     "docs/21_*.md",
     "outputs/week11/**/*",
+    # Stage 13 (Week 12): the dielectric limit (eps = 80/200 and SMD water, 108 new
+    # ORCA single points) plus ORCA's own per-state energy ledger, which splits an
+    # environment shift exactly into solute distortion + CPCM dielectric + SMD CDS +
+    # Delta(D4) + Delta(gCP).  Geometry is reused byte-for-byte from G1.
+    "scripts/orca_energy_ledger.py",
+    "scripts/build_stage13_ladder.py",
+    "scripts/analyze_stage13_dielectric_limit.py",
+    "scripts/make_stage13_figure.py",
+    "tests/test_stage13_dielectric_limit.py",
+    "docs/22_*.md",
+    "outputs/week12/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large

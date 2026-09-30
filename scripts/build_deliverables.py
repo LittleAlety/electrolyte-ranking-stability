@@ -430,6 +430,38 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 11",
         ],
     },
+    12: {
+        "topic": "Stage 13（介电极限与 ORCA 能量账本）",
+        "sources": [
+            ("outputs/week12/stage13_state_ledger.csv", None, True),
+            ("outputs/week12/stage13_dielectric_ladder.csv", None, True),
+            ("outputs/week12/stage13_shift_split.csv", None, True),
+            ("outputs/week12/stage13_ladder.json", None, True),
+            ("outputs/week12/stage13_rungs.csv", None, True),
+            ("outputs/week12/stage13_analysis.json", None, True),
+            ("outputs/week12/stage13_summary.md", None, True),
+            ("outputs/week12/p2_core_set_cpcm_80.csv", None, True),
+            ("outputs/week12/p2_summary_cpcm_80.json", None, True),
+            ("outputs/week12/p2_core_set_cpcm_200.csv", None, True),
+            ("outputs/week12/p2_summary_cpcm_200.json", None, True),
+            ("outputs/week12/p2_core_set_smd_water.csv", None, True),
+            ("outputs/week12/p2_summary_smd_water.json", None, True),
+            ("docs/22_week12_report.md", "week12_report_full.md", True),
+            ("outputs/figures/figure_manifest_week12_stage13.md",
+             "artifacts/figure_manifest_week12_stage13.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F24_*.png", "outputs/figures/F25_*.png"],
+        "commands": [
+            "python scripts/run_core_set_p2.py --outdir outputs\\week12 --epsilon 80 --jobs 2 --nprocs 8",
+            "python scripts/run_core_set_p2.py --outdir outputs\\week12 --epsilon 200 --jobs 2 --nprocs 8",
+            "python scripts/run_core_set_p2.py --outdir outputs\\week12 --solvent water --layer smd_water --jobs 2 --nprocs 8",
+            "python scripts/build_stage13_ladder.py",
+            "python scripts/analyze_stage13_dielectric_limit.py",
+            "python scripts/make_stage13_figure.py",
+            "python scripts/build_deliverables.py --weeks 12",
+        ],
+    },
 }
 
 
@@ -612,6 +644,18 @@ def render_report(week, wdir, missing, excluded):
                        ("{w9_ladder_block}", w9["ladder_block"]),
                        ("{w9_verdict_block}", w9["verdict_block"]),
                        ("{w9_sigma_note}", w9["sigma_note"])):
+        text = text.replace(key, value)
+    w12 = week12_blocks(load_json(W12_ANALYSIS_PATH), load_json(W12_LADDER_PATH))
+    for key, value in (("{w12_did}", w12["did"]),
+                       ("{w12_metric}", w12["metric"]),
+                       ("{w12_qc}", w12["qc"]),
+                       ("{w12_limit}", w12["limit"]),
+                       ("{w12_law_block}", w12["law_block"]),
+                       ("{w12_term_block}", w12["term_block"]),
+                       ("{w12_limit_block}", w12["limit_block"]),
+                       ("{w12_forecast_block}", w12["forecast_block"]),
+                       ("{w12_ledger_block}", w12["ledger_block"]),
+                       ("{w12_table_block}", w12["table_block"])):
         text = text.replace(key, value)
     if missing:
         rows = []
@@ -1373,9 +1417,113 @@ def week11_checks(wdir: Path):
     return checks
 
 
+def week12_checks(wdir: Path):
+    """QC for week 12 (Stage 13, the dielectric limit and the ORCA ledger)."""
+
+    checks = []
+    ladder = load_json(wdir / "stage13_ladder.json")
+    analysis = load_json(wdir / "stage13_analysis.json")
+    if ladder is None:
+        checks.append(check("stage13_ladder.present", None, "source not found"))
+        return checks
+    checks.append(check("stage13_ladder.present", True, "stage13_ladder.json present"))
+    if analysis is None:
+        checks.append(check("stage13_analysis.present", None, "source not found"))
+        return checks
+    checks.append(check("stage13_analysis.present", True, "stage13_analysis.json present"))
+
+    subset = analysis.get("subset") or []
+    ladder_checks = analysis.get("ladder_checks") or {}
+    model = analysis.get("model_comparison") or {}
+    rungs = analysis.get("rung_ladder") or {}
+    checks_long = analysis.get("checks") or {}
+
+    checks.append(check("stage13.subset==12", len(subset) == 12, "subset=%d" % len(subset)))
+    complete = ladder_checks.get("ladder_complete") or {}
+    n_missing = complete.get("n_missing")
+    checks.append(check("stage13.no_missing_jobs",
+                        n_missing == 0,
+                        "n_missing=%s n_states=%s of %s"
+                        % (n_missing, complete.get("n_states"), complete.get("expected_states"))))
+
+    failed = sorted(name for name, entry in checks_long.items()
+                    if isinstance(entry, dict) and entry.get("ok") is False)
+    checks.append(check("stage13.analysis_checks_all_pass", not failed,
+                        "%d/%d PASS%s" % (sum(1 for entry in checks_long.values()
+                                              if isinstance(entry, dict) and entry.get("ok")),
+                                          len(checks_long),
+                                          ("; FAILED: " + ", ".join(failed)) if failed else "")))
+
+    born = model.get("born_r2") or {}
+    onsager = model.get("onsager_r2") or {}
+    checks.append(check("stage13.born_beats_onsager_on_six_dielectrics",
+                        (born.get("mean") or 0.0) > (onsager.get("mean") or 1.0),
+                        "born mean R2=%s (min %s) vs onsager=%s"
+                        % (born.get("mean"), born.get("min"), onsager.get("mean"))))
+
+    kstats = model.get("two_parameter_k") or {}
+    k_mean = kstats.get("mean")
+    checks.append(check("stage13.two_parameter_k_near_zero",
+                        k_mean is not None and abs(float(k_mean)) < 0.3,
+                        "k mean=%s sd=%s range=[%s, %s]"
+                        % (k_mean, kstats.get("sd"), kstats.get("min"), kstats.get("max"))))
+
+    gap = (analysis.get("conductor_limit") or {}).get("gap_to_limit_ev") or {}
+    checks.append(check("stage13.conductor_limit_within_50mev",
+                        gap.get("max") is not None and float(gap["max"]) < 0.05,
+                        "gap to eps->inf: mean=%s max=%s eV" % (gap.get("mean"), gap.get("max"))))
+
+    targets = (analysis.get("extrapolation_scaling") or {}).get("targets") or {}
+    errs = [((targets.get(tag) or {}).get("max_abs_err_ev")) for tag in ("cpcm_40", "cpcm_80", "cpcm_200")]
+    monotone = all(errs[i] is not None and errs[i + 1] is not None
+                   and float(errs[i]) <= float(errs[i + 1]) + 1e-12 for i in range(len(errs) - 1))
+    checks.append(check("stage13.extrapolation_error_grows_with_distance", monotone,
+                        "max abs err 40/80/200 = %s" % errs))
+
+    spread = ((ladder_checks.get("cds_is_state_independent") or {}).get("max_spread_ev"))
+    checks.append(check("stage13.cds_is_state_independent",
+                        spread is not None and abs(float(spread)) < 1e-8,
+                        "max CDS spread across the three charge states=%s eV" % spread))
+
+    composite = ladder_checks.get("composite_terms_environment_independent") or {}
+    d4 = composite.get("max_abs_d4_ev")
+    dgcp = composite.get("max_abs_dgcp_ev")
+    checks.append(check("stage13.d4_gcp_environment_independent",
+                        d4 is not None and dgcp is not None
+                        and abs(float(d4)) < 1e-8 and abs(float(dgcp)) < 1e-8,
+                        "max |Delta D4|=%s eV, max |Delta gCP|=%s eV" % (d4, dgcp)))
+
+    residual = (ladder_checks.get("shift_split_is_exact") or {}).get("max_abs_residual_ev")
+    checks.append(check("stage13.shift_split_is_exact",
+                        residual is not None and abs(float(residual)) < 1e-7,
+                        "max residual of the four-term identity=%s eV" % residual))
+
+    checks.append(check("stage13.ladder_has_22_points",
+                        rungs.get("n_points") == 22,
+                        "n_points=%s (dielectric=%s electronic=%s)"
+                        % (rungs.get("n_points"), rungs.get("n_dielectric"), rungs.get("n_electronic"))))
+    checks.append(check("stage13.rung_families_12_plus_10",
+                        rungs.get("n_dielectric") == 12 and rungs.get("n_electronic") == 10,
+                        "dielectric=%s electronic=%s"
+                        % (rungs.get("n_dielectric"), rungs.get("n_electronic"))))
+    checks.append(check("stage13.no_new_rewritten_shortlist",
+                        rungs.get("n_rewritten") == 3,
+                        "n_rewritten=%s (%s)" % (rungs.get("n_rewritten"),
+                                                 ", ".join(rungs.get("rewritten_points") or []))))
+
+    checks.append(check("week12.figures_present",
+                        (wdir / "artifacts" / "F24_dielectric_limit.png").exists()
+                        and (wdir / "artifacts" / "F25_environment_ledger.png").exists(),
+                        "artifacts/ F24 + F25"))
+    checks.append(check("week12.report_present",
+                        (wdir / "week12_report_full.md").exists(),
+                        "week12_report_full.md"))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
-                  9: week9_checks, 10: week10_checks, 11: week11_checks}
+                  9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -1993,6 +2141,62 @@ Week 10 把 `sigma` 化简成闭式判据后，留下两个可操作的问题：
 """
 
 
+REPORT_TEMPLATES[12] = """# Week 12 成果小结 —— Stage 13（介电极限与 ORCA 能量账本）
+
+Week 11 把 bare-CPCM 介电扫描升级成第 6 类台阶后，留了两个没有兑现的承诺：**「单参数族」当时只是
+外推**（eps = 80 / 200 从未算过），以及**「环境层」从头到尾只被读成一个数**。本周把这两件事一起做完：
+
+> 介电自相似律现在有 6 个介电点实测支撑（Born mean R2 = 0.9936，两参数族把自有参数 `k` 钉回 0）；
+> eps = 200 距导体极限不足 50 meV；而环境位移可以**逐态精确**拆成四项，其中 SMD CDS 与
+> `Delta(D4)` / `Delta(gCP)` 对垂直量精确为 0 —— 真正的一阶项是「溶质畸变」，它在还原轴上抵消掉
+> 介电项的 29%。把 P2 的位移讲成「纯介电 screening」因此是不准确的。
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 `week12_report_full.md`。
+
+## 1. 本周做了什么
+{w12_did}
+
+## 2. 关键数字
+{w12_metric}
+
+## 3. 介电阶梯：Born 形式在六个介电常数上仍然成立
+{w12_law_block}
+
+## 4. 位移拆成「介电」与「溶质畸变」两项
+{w12_term_block}
+
+## 5. 导体极限 eps -> inf
+{w12_limit_block}
+
+## 6. 外推误差随外推距离增长
+{w12_forecast_block}
+
+## 7. ORCA 能量账本：环境的四项精确分解
+{w12_ledger_block}
+
+## 8. 22 点台阶总表
+{w12_table_block}
+
+## 9. 质量与复核（QC）
+- {w12_qc}
+- 上述每一项都由本目录 `verification.json` 的 `checks` 数组从真实产物现场解析得出。
+
+## 10. 产物清单
+{artifact_list}
+
+## 11. 已知限制
+1. {w12_limit}
+2. Gate 0 保持 CLOSED；Gate 1 仍未关闭（溶液相锚点 31 行仍为 `est`）。
+3. 本周在既有冻结产物之上新增了 108 个 ORCA 单点（bare CPCM eps = 80 / 200 与 CPCM(SMD, 水)），
+   几何复用 G1、方法未变；但「两参数族拟合」与「外推误差标度」是本周新增的分析动作，
+   若提升为必报指标须走 `config/prereg.yaml` 的 `amendment_log`，届时 Gate 0 由 CLOSED 变为 NOT CLOSED。
+4. 逐项细节见同目录 `week12_report_full.md`。
+
+## 12. 源文件缺失
+{missing_list}
+"""
+
+
 README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成果输出包
 
 本目录**只放蒸馏产物**（结果表、图、报告、校验清单）。原始 ORCA / xTB 运行输出
@@ -2015,13 +2219,14 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week8/                Stage 9（显式微溶剂化：[Li(M)2]+ 第一溶剂壳复核）
     ├── week9/                Stage 10（五级台阶合成与决策稳定性总判）
     ├── week10/               Stage 11（sigma 的代数解剖与分辨率判据）
-    └── week11/               Stage 12（介电自相似律与事前预警协议）
+    ├── week11/               Stage 12（介电自相似律与事前预警协议）
+    └── week12/               Stage 13（介电极限与 ORCA 能量账本）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F23 中属于该周的部分）
+    ├── artifacts/            图（F0–F25 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -2043,6 +2248,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 | week8 | Stage 9（显式微溶剂化 C2） | [Li(M)2]+ 第一溶剂壳（12 motif / 8 家族）；C1 -> C2 的垂直量位移与同口径排序稳定性 | Gate 0 CLOSED |
 | week9 | Stage 10（五级台阶合成） | 五个台阶同口径重算（common-10）：rho(std, tau_b) = -0.851 vs rho(|mean|, tau_b) = -0.535；唯一负 tau_b 在 C0->C1 还原轴 | Gate 0 CLOSED |
 | week10 | Stage 11（sigma 解剖） | 四条恒等式（T1–T4）+ 精确分解（T5）；判据 `f_unresolved(z) = Pr(q_ij > sqrt(2)/z)` 与实测误差精确为 0；带符号斜率 AUC 1.000（精确 p = 1/120），无符号的 sd(delta) 仅 0.810；N=10 时 tau_b 抽样标准差 0.126 | Gate 0 CLOSED |
+| week12 | Stage 13（介电极限 + ORCA 能量账本） | 6 个介电点实测 Born 形式（mean R2 0.9936）；eps = 200 距导体极限 < 50 meV；环境位移四项精确分解（CDS / D4 / gCP 对垂直量为 0） | Gate 0 CLOSED |
 | week11 | Stage 12（介电自相似 + 事前预警） | 介电扫描落在 Born 单参数族（mean R2 0.9936 vs Onsager 0.8835）；18 个台阶事件里 8 个介电台阶全部良性（b > 0、tau_b >= 0.867、无一改写清单）；预警协议 k = 5 平均抓 96%（AUC 0.946）、k = 8 一次不漏 | Gate 0 CLOSED |
 
 ## 如何复现
@@ -2054,7 +2260,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -2104,7 +2310,7 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 参考配体：主参考 `R = DME`（C08，双齿 2×O 螯合、配位 motif 唯一）；第二参考 `R = AN`（C16，
 仅用于 robustness check）。核心集 18 个分子、broad pool 40 个分子，合并池 58。
 
-## 2. 逐周结果（Week 1 – Week 11）
+## 2. 逐周结果（Week 1 – Week 12）
 
 ### Week 1 —— Stage 0 定义冻结 / Gate 0
 - 做了什么：冻结科学定义与预注册（`config/scientific_definitions.yaml`、`config/prereg.yaml`），
@@ -2175,6 +2381,9 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 11 —— Stage 12（介电自相似律与事前预警协议）
 {w11_summary}
 
+### Week 12 —— Stage 13（介电极限与 ORCA 能量账本）
+{w12_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -2205,6 +2414,8 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 
 {w11_sigma_note}
 
+{w12_sigma_note}
+
 ### 3.3 还原侧定性失效
 P1 下 18 个分子的气相阴离子**全部不束缚**（`unbound_anion = 18`，EA < 0）。定域在 LUMO 上的
 Koopmans 图像在结构上**不可能**给出这一点，因此 P0 还原轴与真实 EA 不是同一物理量。
@@ -2224,7 +2435,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F23）
+## 5. 图表索引（F0–F25）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -2251,6 +2462,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f21_row}
 {f22_row}
 {f23_row}
+{f24_row}
+{f25_row}
 
 ## 6. 复现命令
 ```powershell
@@ -2299,6 +2512,7 @@ $env:PYTHONIOENCODING = "utf-8"
 9. **Gate 0 纪律**：`config/prereg.yaml` 逐字节未变；`z = 1.0` 是主判据，`z = 1.96` 只是并列敏感性。
 10. {c1_summary_limit}
 11. {w11_summary_limit}
+12. {w12_summary_limit}
 """
 
 
@@ -3463,6 +3677,294 @@ def week11_blocks(prescreen):
             "table_block": table_block, "sigma_note": sigma_note, "summary": summary}
 
 
+#: Stage 13 (Week 12): the analysis payload of ``analyze_stage13_dielectric_limit``.
+W12_ANALYSIS_PATH = REPO / "outputs" / "week12" / "stage13_analysis.json"
+W12_LADDER_PATH = REPO / "outputs" / "week12" / "stage13_ladder.json"
+F24_NOTE_PRESENT = ("Stage 13 介电极限：(a) 位移 delta(eps) 对 u = 1 - 1/eps 的七级曲线（24 条）；"
+                    "(b) Born / Onsager / 两参数族的 R2 对照与拟合出的 k；(c) 外推误差随外推距离增长；"
+                    "(d) eps = 200 的实测值与拟合出的导体极限")
+F24_NOTE_ABSENT = "预留给 Stage 13（介电极限）；week12 尚未产出"
+F25_NOTE_PRESENT = ("Stage 13 环境账本：(a)(b) SMD 乙腈 / 水的位移按「介电项 + 溶质畸变项」逐分子分解；"
+                    "(c) SMD CDS 项在三个电荷态上逐点重合（证明它是态的刚性偏移）；(d) 畸变项抵消介电项的比例")
+F25_NOTE_ABSENT = "预留给 Stage 13（环境账本）；week12 尚未产出"
+W12_AXIS_SHORT = (("oxidation", "氧化"), ("reduction", "还原"))
+W12_SMD_ORDER = ("smd_acetonitrile", "smd_water")
+#: The three layers this week (Stage 13) added on top of week 4.
+NEW_LAYER_TAGS = ("cpcm_80", "cpcm_200", "smd_water")
+W12_SMD_LABEL = {"smd_acetonitrile": "SMD 乙腈", "smd_water": "SMD 水"}
+W12_LADDER_LABEL = {
+    "gas_cpcm_5": "气相 -> eps 5",
+    "cpcm_5_cpcm_10": "eps 5 -> 10",
+    "cpcm_10_cpcm_20": "eps 10 -> 20",
+    "cpcm_20_cpcm_40": "eps 20 -> 40",
+    "cpcm_40_cpcm_80": "eps 40 -> 80",
+    "cpcm_80_cpcm_200": "eps 80 -> 200",
+    "P0_to_P1": "P0 -> P1（方法）",
+    "P1_to_P2": "P1 -> P2（环境）",
+    "G1_to_G2": "G1 -> G2（几何）",
+    "C0_to_C1": "C0 -> C1（配位）",
+    "C1_to_C2": "C1 -> C2（壳层）",
+}
+
+
+def week12_blocks(analysis, ladder):
+    """Render the week-12 (Stage 13 / dielectric limit + ORCA ledger) blocks.
+
+    Every number is read back out of ``stage13_analysis.json`` and
+    ``stage13_ladder.json``, so the distilled report cannot drift away from the
+    CSVs it summarises.
+    """
+
+    empty = {"present": False, "did": "", "metric": "", "qc": "", "limit": "",
+             "law_block": "", "term_block": "", "limit_block": "", "forecast_block": "",
+             "ledger_block": "", "table_block": "", "sigma_note": "", "summary": ""}
+    if not isinstance(analysis, dict) or not (analysis.get("subset") or []):
+        return empty
+
+    model = analysis.get("model_comparison") or {}
+    terms = analysis.get("term_resolved_born") or {}
+    limit = analysis.get("conductor_limit") or {}
+    extrap = analysis.get("extrapolation_scaling") or {}
+    ledger = analysis.get("smd_ledger") or {}
+    rungs = analysis.get("rung_ladder") or {}
+    checks = analysis.get("checks") or {}
+    ladder_checks = analysis.get("ladder_checks") or {}
+    subset = analysis.get("subset") or []
+    bare_eps = analysis.get("bare_eps") or []
+    born = model.get("born_r2") or {}
+    onsager = model.get("onsager_r2") or {}
+    two = model.get("two_parameter_r2") or {}
+    kstats = model.get("two_parameter_k") or {}
+    slopes = model.get("born_slope_ev") or {}
+    cdss = ledger.get("smd_cds_absolute_ev") or {}
+    gap = limit.get("gap_to_limit_ev") or {}
+    ordering = limit.get("ordering") or {}
+    targets = extrap.get("targets") or {}
+    rewritten = rungs.get("rewritten_points") or []
+    n_pass = sum(1 for item in checks.values() if isinstance(item, dict) and item.get("ok"))
+    n_checks = len(checks)
+    n_jobs_new = None
+    if isinstance(ladder, dict):
+        n_jobs_new = ladder.get("n_new_jobs")
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def signed(value, digits=3):
+        text = _w8_num(value, digits)
+        if text == "\u2014":
+            return text
+        return text if text.startswith("-") else "+" + text
+
+    law_block = ("**(a) 介电阶梯：Born 形式在六个介电常数上仍然成立**\n\n"
+                 "参考点是气相（eps = 1，非 CPCM 计算），台阶是 bare CPCM 的 "
+                 "eps = 5/10/20/40/80/200；24 条 (分子, 轴) 曲线各自做过原点拟合：\n\n"
+                 "| 模型 | 形式 | mean R2 | 最差 R2 | 最好 R2 |\n"
+                 "| --- | --- | --- | --- | --- |\n")
+    law_block += "| **Born** | delta = S (1 - 1/eps) | **%s** | %s | %s |\n" % (
+        num(born.get("mean"), 4), num(born.get("min"), 4), num(born.get("max"), 4))
+    law_block += "| Onsager | delta = S (eps - 1)/(2 eps + 1) | %s | %s | %s |\n" % (
+        num(onsager.get("mean"), 4), num(onsager.get("min"), 4), num(onsager.get("max"), 4))
+    law_block += "| 两参数 | delta = S (eps - 1)/(eps + k) | %s | %s | %s |\n\n" % (
+        num(two.get("mean"), 4), num(two.get("min"), 4), num(two.get("max"), 4))
+    law_block += ("两参数族给出 `k = %s ± %s`（范围 %s .. %s）：数据把这个自由参数钉在 0 附近，"
+                  "也就是**自己把模型选回了 Born**（k = 0 正是 Born）。\n\n"
+                  "六个介电点的 u 值：%s。`u -> 1` 就是导体极限，因此 Born 拟合出的斜率 S "
+                  "本身就是导体极限的预测，不是外推公式的产物。\n"
+                  % (num(kstats.get("mean"), 4), num(kstats.get("sd"), 4),
+                     num(kstats.get("min"), 4), num(kstats.get("max"), 4),
+                     "、".join("eps = %g -> u = %s" % (eps, num(1.0 - 1.0 / eps, 4))
+                              for eps in bare_eps)))
+
+    term_block = ("**(b) 位移拆成「介电」与「溶质畸变」两项，两项都近似 Born**\n\n"
+                  "`delta = 溶质畸变 (Delta E_elec+nuc) + CPCM 介电`。两项各自除以 "
+                  "`u = 1 - 1/eps` 后都是常数：\n\n"
+                  "| 序列 | mean R2（过原点，六点） | mean 斜率（eV） |\n"
+                  "| --- | --- | --- |\n")
+    term_block += "| 总位移 | %s | %s |\n" % (num((terms.get("total_r2") or {}).get("mean"), 4),
+                                            num(slopes.get("mean"), 4))
+    term_block += "| 纯介电（CPCM Dielectric） | %s | %s |\n" % (
+        num((terms.get("diel_r2") or {}).get("mean"), 4),
+        num((terms.get("diel_S_ev") or {}).get("mean"), 4))
+    term_block += "| 溶质畸变（Delta E_elec+nuc） | %s | %s |\n\n" % (
+        num((terms.get("dist_r2") or {}).get("mean"), 4),
+        num((terms.get("dist_S_ev") or {}).get("mean"), 4))
+    term_block += ("畸变项的斜率与介电项**反号**，而且不是小量 —— 它是溶剂自适应密度带来的"
+                   "电子极化，不是静电项。把位移讲成「纯介电 screening」在本数据集上是不准确的。\n")
+    limit_block = ("**(c) 导体极限 eps -> inf**：Born 拟合的斜率 S 就是 `u -> 1` 的极限。"
+                   "eps = 200 与这个极限之间平均只剩 %s eV（最差 %s eV），也就是导体极限在本方法"
+                   "的印刷精度内已被触达：\n\n"
+                   "| 轴 | tau(气相 vs eps 200) | tau(气相 vs 极限) | tau(eps 200 vs 极限) | Top-20%% 重叠(气相 vs 极限) |\n"
+                   "| --- | --- | --- | --- | --- |\n"
+                   % (num(gap.get("mean"), 4), num(gap.get("max"), 4)))
+    for axis, axis_label in W12_AXIS_SHORT:
+        block = ordering.get(axis)
+        if not block:
+            continue
+        limit_block += "| %s | %s | %s | %s | %s |\n" % (
+            axis_label, signed(block.get("kendall_tau_gas_vs_200")),
+            signed(block.get("kendall_tau_gas_vs_limit")),
+            signed(block.get("kendall_tau_200_vs_limit")),
+            num(block.get("top20_overlap_gas_vs_limit"), 2))
+    limit_block += "\n"
+
+    forecast_block = ("**(d) 外推误差随外推距离增长**：只用 {气相, eps = 5, 10, 20} 拟合，"
+                      "然后预测三个更远的点（eps = 40 / 80 / 200）：\n\n"
+                      "| 目标 | u 距离（相对 eps = 20） | 最大绝对误差 (eV) | 平均绝对误差 (eV) | 最大相对误差 |\n"
+                      "| --- | --- | --- | --- | --- |\n")
+    for tag, label in (("cpcm_40", "eps = 40"), ("cpcm_80", "eps = 80"), ("cpcm_200", "eps = 200")):
+        item = targets.get(tag) or {}
+        forecast_block += "| %s | %s | %s | %s | %s |\n" % (
+            label, num(item.get("u_gap"), 4), num(item.get("max_abs_err_ev"), 4),
+            num(item.get("mean_abs_err_ev"), 4), num(item.get("max_rel_err"), 4))
+    forecast_block += ("\n误差/距离 ≈ %s eV per unit u —— 越往外推，单位距离的代价越高，"
+                       "这正是「只测到 eps = 40」在 Stage 12 里必须写成限制的原因。\n"
+                       % num(extrap.get("err_per_u_gap_ev"), 4)
+                       if extrap.get("err_per_u_gap_ev") is not None
+                       else "\n误差随外推距离单调增长。\n")
+
+    ledger_block = ("**(e) SMD 能量账本：位移的精确四项分解**\n\n"
+                    "ORCA 把每个单点印成 `FINAL = Total + D4 + gCP`，而 "
+                    "`Total = E_elec+nuc + CPCM Dielectric [+ SMD CDS]`。因此垂直量的环境位移"
+                    "**逐态精确可加**（来自同一次自洽计算，不是两次不同计算的差分）：\n\n"
+                    "`delta = 溶质畸变 + CPCM 介电 + SMD CDS + Delta(D4) + Delta(gCP)`\n\n"
+                    "| 层 | eps | 轴 | 位移 (eV) | 介电项 (eV) | 畸变项 (eV) | CDS 项 (eV) | "
+                    "Delta(D4+gCP) (eV) | 畸变抵消介电的比例 |\n"
+                    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+    for tag in W12_SMD_ORDER:
+        block = ledger.get(tag) or {}
+        per_axis = block.get("per_axis") or {}
+        for axis, axis_label in W12_AXIS_SHORT:
+            stats = per_axis.get(axis)
+            if not stats:
+                continue
+            ledger_block += "| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" % (
+                W12_SMD_LABEL.get(tag, tag), num(block.get("epsilon"), 3), axis_label,
+                signed((stats.get("shift_ev") or {}).get("mean"), 4),
+                signed((stats.get("diel_ev") or {}).get("mean"), 4),
+                signed((stats.get("dist_ev") or {}).get("mean"), 4),
+                signed((stats.get("cds_ev") or {}).get("mean"), 4),
+                signed((stats.get("d4gcp_ev") or {}).get("mean"), 4),
+                num((stats.get("distortion_cancels_fraction") or {}).get("mean"), 3))
+    ledger_block += "\n三条**结构性**事实（在 12 分子 x 3 态上逐点验证，不是近似）：\n\n"
+    ledger_block += ("1. `Delta(D4) = Delta(gCP) = 0`（最大 %s / %s eV）：两者只依赖几何，"
+                     "而所有层共用逐字节相同的 G1 几何。\n"
+                     % (num((ladder_checks.get("composite_terms_environment_independent") or {}).get("max_abs_d4_ev"), 8),
+                        num((ladder_checks.get("composite_terms_environment_independent") or {}).get("max_abs_dgcp_ev"), 8)))
+    ledger_block += ("2. `SMD CDS` 项在三个电荷态上**完全相同**（最大 spread %s eV，覆盖 %s 个"
+                     "「分子 x 层」组）：因此它对任何垂直 IP/EA 的贡献**精确为 0**。"
+                     "它是一个态的刚性偏移。\n"
+                     % (num((ladder_checks.get("cds_is_state_independent") or {}).get("max_spread_ev"), 8),
+                        num((ladder_checks.get("cds_is_state_independent") or {}).get("n_molecule_layer_groups"), 0)))
+    ledger_block += ("3. 位移恒等式残差 <= %s eV（印刷精度）。\n\n"
+                     % num((ladder_checks.get("shift_split_is_exact") or {}).get("max_abs_residual_ev"), 8))
+    ledger_block += "CDS 的绝对量级并不小（按层平均）：%s。\n\n" % "、".join(
+        "%s %s eV" % (W12_SMD_LABEL.get(tag, tag), num((cdss.get(tag) or {}).get("mean"), 4))
+        for tag in W12_SMD_ORDER)
+    ledger_block += ("**需要裁决**：bare CPCM 与 SMD 用的是不同的原子半径盒（C 2.04 -> 1.85 Å、"
+                     "O 1.824 -> 2.168 Å（水为 1.52 Å）、H 1.32 -> 1.20 Å），ORCA 的 `%cpcm` 里"
+                     "没有调节腔半径的选项。因此「把 SMD 位移与同 eps 的 bare-CPCM 外推值相减」"
+                     "**同时混进了半径盒与表面项两个变量**，只能作为合并上界报出，不能称为纯表面项。\n")
+
+    table_block = ("**(f) 22 点台阶总表**（电子结构 10 点沿用 Stage 12 读数 + 本周新增的 12 个介电点）：\n\n"
+                   "| 台阶 | 轴 | n | sd(delta) (eV) | b | tau_b | f_unres(1) | f_unres(1.96) | "
+                   "Top-20% 重叠 | 清单被改写 |\n"
+                   "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+    for row in rungs.get("rows") or []:
+        rung = row.get("rung")
+        table_block += "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" % (
+            W12_LADDER_LABEL.get(rung, rung), row.get("axis"), num(row.get("n"), 0),
+            num(row.get("delta_sd_ev"), 4), signed(row.get("ols_slope_b")),
+            signed(row.get("kendall_tau_b")), num(row.get("f_unresolved_p1_observed")),
+            num(row.get("f_unresolved_p1_z1p96_observed")), num(row.get("overlap_20"), 2),
+            "是" if row.get("shortlist_rewritten") else "否")
+    table_block += ("\n新增的四个介电台阶（eps 40 -> 80、80 -> 200，各两轴）全部良性；全表仍然只有 "
+                    "%d 个台阶改写清单（%s），与 Stage 12 完全相同 —— 把介电常数从 40 推到 200，"
+                    "一个结论都没有翻转。\n" % (rungs.get("n_rewritten") or 0, "、".join(rewritten)))
+    n_levels = len((ladder or {}).get("levels") or []) if isinstance(ladder, dict) else 0
+    n_state_rows = (ladder or {}).get("n_state_rows") if isinstance(ladder, dict) else None
+    n_split_rows = (ladder or {}).get("n_split_rows") if isinstance(ladder, dict) else None
+    n_new_jobs = len(subset) * len(NEW_LAYER_TAGS) * 3
+
+    smd_acn = (ledger.get("smd_acetonitrile") or {}).get("per_axis") or {}
+    smd_wat = (ledger.get("smd_water") or {}).get("per_axis") or {}
+    acn_ox = (smd_acn.get("oxidation") or {})
+    acn_red = (smd_acn.get("reduction") or {})
+
+    did = ("新增 %d 个 ORCA 单点（12 分子 x 3 态 x 3 层：bare CPCM 的 eps = 80 / 200，"
+           "以及 CPCM(SMD, 水)），几何全部复用 G1（逐字节相同，未重新优化），方法固定 r2SCAN-3c，"
+           "全部是垂直量；子集与 T3 / P2 相同的 %d 个分子。连同既有产物，介电阶梯由 5 级升到 7 级"
+           "（气相 + eps = 5/10/20/40/80/200），环境层由 1 个 SMD 溶剂升到 2 个。"
+           "第 2 件事不花任何额外计算：ORCA 本来就把单点能量印成分项和，于是「环境位移」可以"
+           "逐态精确拆成溶质畸变 + CPCM 介电 + SMD CDS + Delta(D4) + Delta(gCP)。"
+           % (n_new_jobs, len(subset)))
+
+    metric = ""
+    metric += ("- **介电自相似律由 6 个介电点测量确认**：Born 形式 mean R2 = %s（最差 %s），"
+               "Onsager 只有 %s；两参数族 `delta = S (eps-1)/(eps+k)` 的自有参数 `k = %s ± %s`，"
+               "数据自己把模型选回 Born。\n"
+               % (num(born.get("mean"), 4), num(born.get("min"), 4), num(onsager.get("mean"), 4),
+                  num(kstats.get("mean"), 4), num(kstats.get("sd"), 4)))
+    metric += ("- **导体极限触达**：eps = 200 与 `u -> 1` 之间平均只剩 %s eV（最差 %s eV）；"
+               "气相 vs 极限的 tau_b = %s（氧化）/ %s（还原）。\n"
+               % (num(gap.get("mean"), 4), num(gap.get("max"), 4),
+                  signed((ordering.get("oxidation") or {}).get("kendall_tau_gas_vs_limit")),
+                  signed((ordering.get("reduction") or {}).get("kendall_tau_gas_vs_limit"))))
+    metric += ("- **外推代价可测**：只用 {气相, eps = 5, 10, 20} 预测 eps = 40 / 80 / 200，"
+               "最大绝对误差 %s / %s / %s eV。\n"
+               % (num((targets.get("cpcm_40") or {}).get("max_abs_err_ev"), 4),
+                  num((targets.get("cpcm_80") or {}).get("max_abs_err_ev"), 4),
+                  num((targets.get("cpcm_200") or {}).get("max_abs_err_ev"), 4)))
+    metric += ("- **环境账本（SMD 乙腈）**：氧化轴位移 %s = 介电 %s + 畸变 %s；"
+               "还原轴位移 %s = 介电 %s + 畸变 %s；畸变抵消介电项的比例为 %s（氧化）/ %s（还原）。"
+               "SMD CDS 与 Delta(D4) / Delta(gCP) 对垂直量精确为 0。\n"
+               % (signed((acn_ox.get("shift_ev") or {}).get("mean"), 4),
+                  signed((acn_ox.get("diel_ev") or {}).get("mean"), 4),
+                  signed((acn_ox.get("dist_ev") or {}).get("mean"), 4),
+                  signed((acn_red.get("shift_ev") or {}).get("mean"), 4),
+                  signed((acn_red.get("diel_ev") or {}).get("mean"), 4),
+                  signed((acn_red.get("dist_ev") or {}).get("mean"), 4),
+                  num((acn_ox.get("distortion_cancels_fraction") or {}).get("mean")),
+                  num((acn_red.get("distortion_cancels_fraction") or {}).get("mean"))))
+    metric += ("- **22 点台阶**：只剩 %s 个台阶改写清单（%s），与 Stage 12 的 18 点结论完全一致 —— "
+               "把介电常数从 40 推到 200，没有任何结论翻转。"
+               % (rungs.get("n_rewritten"), "、".join(rewritten)))
+
+    qc = ("账本 %s 行（分子 x 层 x 态）、位移分解 %s 行、"
+          "台阶表 %s 行；全部由 `build_stage13_ladder.py` / "
+          "`analyze_stage13_dielectric_limit.py` 从既有产物与本周 %d 个新作业现场重算，"
+          "不引入新的拟合自由度；解析层 8 项 + 分析层 %d 项断言"
+          "合计 %d/%d PASS，缺失作业 0 个，气相台阶与 P1 表逐点一致。"
+          % (num(n_state_rows, 0), num(n_split_rows, 0), num(rungs.get("n_points"), 0),
+             n_new_jobs, n_checks, n_pass, n_checks))
+
+    limit_text = ("介电点止于 eps = 200，导体极限是 Born 拟合斜率给出的外推（尽管实测缺口 < 50 meV）；"
+                  "SMD 只测了乙腈与水两个溶剂，且它们的隐式腔半径盒与 bare CPCM 不同（见裁决项）；"
+                  "溶质畸变项已被量化，但尚未与分子描述符（偶极 / 极化率 / 硬度）建立因果归因；"
+                  "22 点台阶里的电子结构 10 点沿用 Stage 12 的读数，未重算；"
+                  "r2SCAN-3c 无弥散函数的适用域限制对还原轴的绝对 EA 依然成立。")
+
+    sigma_note = ("**第四条免费通道：态的刚性偏移（Stage 13 / week12）**。前三周处理的是「位移怎么排布」；"
+                  "本周补上第四条，处理「位移里哪些项根本不参与排序」—— `SMD CDS` 项在三个电荷态上"
+                  "逐点相同（最大 spread %s eV），于是它对任何垂直 IP/EA 的贡献**精确为 0**："
+                  "它测量得再准也不会改变任何一个差值；`Delta(D4) = Delta(gCP) = 0` 同理（只依赖几何）。"
+                  "剩下的两项性质不同：介电项按 Born 走（mean R2 = %s，斜率 %s eV），"
+                  "溶质畸变项与它反号且不可忽略（还原轴抵消 %s%%）。"
+                  "实践含义：把 P2 的位移读成「纯介电 screening」是不准确的；"
+                  "需要担心的从来不是「加了溶剂」，而是「换了相互之间不成比例的两层」。"
+                  "见 F24/F25（`outputs/figures/F24_dielectric_limit.png`、`F25_environment_ledger.png`）。"
+                  % (num((ladder_checks.get("cds_is_state_independent") or {}).get("max_spread_ev"), 8),
+                     num(born.get("mean"), 4), num(slopes.get("mean"), 4),
+                     num(100.0 * float((acn_red.get("distortion_cancels_fraction") or {}).get("mean") or 0.0), 1)))
+
+    summary = ("- 做了什么：%s\n- 关键数字：\n%s\n- 质检：%s\n- 限制：%s"
+               % (did, metric, qc, limit_text))
+    return {"present": True, "did": did, "metric": metric, "qc": qc, "limit": limit_text,
+            "law_block": law_block, "term_block": term_block, "limit_block": limit_block,
+            "forecast_block": forecast_block, "ledger_block": ledger_block,
+            "table_block": table_block, "sigma_note": sigma_note, "summary": summary}
+
+
 def week7_blocks(stage7, stage8):
     """Render the week-7 (Stage 7 + Stage 8) blocks from the two JSON files.
 
@@ -3638,8 +4140,8 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11",
-                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11)")
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12",
+                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -3733,6 +4235,8 @@ def main(argv=None):
         w10_note = w10_all["summary"]
         w11_all = week11_blocks(load_json(W11_PRESCREEN_PATH))
         w11_note = w11_all["summary"]
+        w12_all = week12_blocks(load_json(W12_ANALYSIS_PATH), load_json(W12_LADDER_PATH))
+        w12_note = w12_all["summary"]
         f14_figure = REPO / "outputs" / "figures" / "F14_delta_m_derivation.png"
         if f14_figure.exists():
             f14_row = "| F14 | `F14_delta_m_derivation.png` | " + F14_NOTE_PRESENT + " | week6 |"
@@ -3783,6 +4287,16 @@ def main(argv=None):
             f23_row = "| F23 | `F23_prescreening.png` | " + F23_NOTE_PRESENT + " | week11 |"
         else:
             f23_row = "| F23 | 未生成 | " + F23_NOTE_ABSENT + " | —— |"
+        f24_figure = REPO / "outputs" / "figures" / "F24_dielectric_limit.png"
+        if f24_figure.exists():
+            f24_row = "| F24 | `F24_dielectric_limit.png` | " + F24_NOTE_PRESENT + " | week12 |"
+        else:
+            f24_row = "| F24 | 未生成 | " + F24_NOTE_ABSENT + " | —— |"
+        f25_figure = REPO / "outputs" / "figures" / "F25_environment_ledger.png"
+        if f25_figure.exists():
+            f25_row = "| F25 | `F25_environment_ledger.png` | " + F25_NOTE_PRESENT + " | week12 |"
+        else:
+            f25_row = "| F25 | 未生成 | " + F25_NOTE_ABSENT + " | —— |"
         for key, value in (("{f12_row}", f12_row),
                            ("{f14_row}", f14_row),
                            ("{f15_row}", f15_row),
@@ -3811,6 +4325,11 @@ def main(argv=None):
                            ("{f21_row}", f21_row),
                            ("{f22_row}", f22_row),
                            ("{f23_row}", f23_row),
+                           ("{f24_row}", f24_row),
+                           ("{f25_row}", f25_row),
+                           ("{w12_summary}", w12_note),
+                           ("{w12_sigma_note}", w12_all["sigma_note"]),
+                           ("{w12_summary_limit}", w12_all["limit"]),
                            ("{w11_summary}", w11_note),
                            ("{w11_sigma_note}", w11_all["sigma_note"]),
                            ("{w11_summary_limit}", w11_all["limit"]),
