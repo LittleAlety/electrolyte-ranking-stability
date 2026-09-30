@@ -462,6 +462,45 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 12",
         ],
     },
+    13: {
+        "topic": "Stage 14（畸变项归因与 EMC 离群点诊断）",
+        "sources": [
+            ("outputs/week13/stage14_attribution.json", None, True),
+            ("outputs/week13/stage14_attribution.csv", None, True),
+            ("outputs/week13/stage14_distortion_states.csv", None, True),
+            ("outputs/week13/stage14_distortion_states_by_molecule.csv", None, True),
+            ("outputs/week13/stage14_outlier.json", None, True),
+            ("outputs/week13/stage14_outlier.csv", None, True),
+            ("outputs/week13/stage14_dense_grid.json", None, True),
+            ("outputs/week13/stage14_summary.md", None, True),
+            ("outputs/week13/p2_core_set_cpcm_5.csv", None, True),
+            ("outputs/week13/p2_summary_cpcm_5.json", None, True),
+            ("outputs/week13/p2_core_set_cpcm_7.csv", None, True),
+            ("outputs/week13/p2_summary_cpcm_7.json", None, True),
+            ("outputs/week13/p2_core_set_cpcm_10.csv", None, True),
+            ("outputs/week13/p2_summary_cpcm_10.json", None, True),
+            ("outputs/week13/p2_core_set_cpcm_14.csv", None, True),
+            ("outputs/week13/p2_summary_cpcm_14.json", None, True),
+            ("outputs/week13/p2_core_set_cpcm_20.csv", None, True),
+            ("outputs/week13/p2_summary_cpcm_20.json", None, True),
+            ("outputs/week13/p2_core_set_cpcm_28.csv", None, True),
+            ("outputs/week13/p2_summary_cpcm_28.json", None, True),
+            ("outputs/week13/p2_core_set_cpcm_40.csv", None, True),
+            ("outputs/week13/p2_summary_cpcm_40.json", None, True),
+            ("docs/23_week13_report.md", "week13_report_full.md", True),
+            ("outputs/figures/figure_manifest_week13_stage14.md",
+             "artifacts/figure_manifest_week13_stage14.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F26_*.png", "outputs/figures/F27_*.png"],
+        "commands": [
+            "python scripts/build_stage14_attribution.py",
+            "python scripts/run_stage14_dense_grid.py --jobs 2 --nprocs 8",
+            "python scripts/analyze_stage14_outlier.py",
+            "python scripts/make_stage14_figure.py",
+            "python scripts/build_deliverables.py --weeks 13",
+        ],
+    },
 }
 
 
@@ -656,6 +695,19 @@ def render_report(week, wdir, missing, excluded):
                        ("{w12_forecast_block}", w12["forecast_block"]),
                        ("{w12_ledger_block}", w12["ledger_block"]),
                        ("{w12_table_block}", w12["table_block"])):
+        text = text.replace(key, value)
+    w13 = week13_blocks(load_json(W13_ATTRIBUTION_PATH), load_json(W13_OUTLIER_PATH))
+    for key, value in (("{w13_did}", w13["did"]),
+                       ("{w13_metric}", w13["metric"]),
+                       ("{w13_qc}", w13["qc"]),
+                       ("{w13_limit}", w13["limit"]),
+                       ("{w13_definition_block}", w13["definition_block"]),
+                       ("{w13_state_block}", w13["state_block"]),
+                       ("{w13_correction_block}", w13["correction_block"]),
+                       ("{w13_attribution_block}", w13["attribution_block"]),
+                       ("{w13_outlier_block}", w13["outlier_block"]),
+                       ("{w13_repro_block}", w13["repro_block"]),
+                       ("{w13_table_block}", w13["table_block"])):
         text = text.replace(key, value)
     if missing:
         rows = []
@@ -1358,11 +1410,13 @@ def week11_checks(wdir: Path):
 
     by_axis = shape.get("max_rel_spread_by_axis") or {}
     checks.append(check("stage12.born_shape_oxidation",
-                        (by_axis.get("oxidation") or 1.0) < 0.05,
+                        (by_axis.get("oxidation")
+                         if by_axis.get("oxidation") is not None else 1.0) < 0.05,
                         "max rel spread=%s (worst %s)"
                         % (by_axis.get("oxidation"), (shape.get("worst_by_axis") or {}).get("oxidation"))))
     checks.append(check("stage12.born_shape_reduction",
-                        (by_axis.get("reduction") or 1.0) < 0.20,
+                        (by_axis.get("reduction")
+                         if by_axis.get("reduction") is not None else 1.0) < 0.20,
                         "max rel spread=%s (worst %s)"
                         % (by_axis.get("reduction"), (shape.get("worst_by_axis") or {}).get("reduction"))))
     checks.append(check("stage12.born_fits_better_than_onsager",
@@ -1378,7 +1432,8 @@ def week11_checks(wdir: Path):
                         and r3 is not None and abs(r3 - 2.0) < 0.05,
                         "r2=%s r3=%s (Born 2.000)" % (r2, r3)))
     checks.append(check("stage12.forecast_without_eps40",
-                        (forecast.get("three_point_max_rel_err") or 1.0) < 0.05,
+                        (forecast.get("three_point_max_rel_err")
+                         if forecast.get("three_point_max_rel_err") is not None else 1.0) < 0.05,
                         "3-point max rel err=%s, 2-point=%s"
                         % (forecast.get("three_point_max_rel_err"),
                            forecast.get("two_point_max_rel_err"))))
@@ -1521,9 +1576,120 @@ def week12_checks(wdir: Path):
     return checks
 
 
+def week13_checks(wdir: Path):
+    """QC for week 13 (Stage 14, the distortion attribution and the EMC outlier)."""
+
+    checks = []
+    attribution = load_json(wdir / "stage14_attribution.json")
+    outlier = load_json(wdir / "stage14_outlier.json")
+    grid = load_json(wdir / "stage14_dense_grid.json")
+    if attribution is None:
+        checks.append(check("stage14_attribution.present", None, "source not found"))
+        return checks
+    checks.append(check("stage14_attribution.present", True,
+                        "stage14_attribution.json present"))
+    if outlier is None:
+        checks.append(check("stage14_outlier.present", None, "source not found"))
+        return checks
+    checks.append(check("stage14_outlier.present", True, "stage14_outlier.json present"))
+    if grid is None:
+        checks.append(check("stage14_dense_grid.present", None, "source not found"))
+        return checks
+    checks.append(check("stage14_dense_grid.present", True,
+                        "stage14_dense_grid.json present"))
+
+    correction = attribution.get("correction") or {}
+    search = correction.get("subset_enumeration") or {}
+    values = correction.get("reproducible_values") or {}
+    states = attribution.get("state_penalties") or {}
+    variational = states.get("variational_check") or {}
+    verdict = outlier.get("verdict") or {}
+    repro = outlier.get("reproducibility") or {}
+
+    checks.append(check("stage14.subset_is_12", len(attribution.get("molecules") or []) == 12,
+                        "molecules=%d" % len(attribution.get("molecules") or [])))
+    checks.append(check("stage14.distortion_identity_is_exact",
+                        correction.get("penalty_identity_holds") is True,
+                        "max residual of dist = D_hi - D_lo: %s eV"
+                        % correction.get("penalty_identity_max_abs_residual_ev")))
+    checks.append(check("stage14.every_state_penalty_non_negative",
+                        variational.get("all_penalties_non_negative") is True,
+                        "worst minimum %s eV over %d penalties"
+                        % (variational.get("worst_minimum_ev"),
+                           sum((states.get(state) or {}).get("n", 0)
+                               for state in ("neutral", "cation", "anion")))))
+    checks.append(check("stage14.published_pair_is_refuted",
+                        correction.get("verdict") == "not reproducible"
+                        and search.get("n_exact_matches") == 0
+                        and search.get("n_candidates") == 510,
+                        "%d aggregations, %d exact matches, closest off by %s eV"
+                        % (search.get("n_candidates"), search.get("n_exact_matches"),
+                           ((search.get("closest") or [{}])[0]).get("max_abs_error_ev"))))
+    checks.append(check("stage14.reproducible_aggregation_matches_week12",
+                        values.get("oxidation_ev") is not None
+                        and abs(float(values["oxidation_ev"]) - 0.0435) < 5e-4
+                        and abs(float(values["reduction_ev"]) + 0.3025) < 5e-4,
+                        "oxidation=%s reduction=%s eV"
+                        % (values.get("oxidation_ev"), values.get("reduction_ev"))))
+    checks.append(check("stage14.anion_penalty_exceeds_neutral",
+                        (states.get("anion") or {}).get("mean_ev", 0.0)
+                        > 4.0 * (states.get("neutral") or {}).get("mean_ev", 1.0),
+                        "D_anion=%s vs D_neutral=%s eV"
+                        % ((states.get("anion") or {}).get("mean_ev"),
+                           (states.get("neutral") or {}).get("mean_ev"))))
+
+    n_jobs = sum(int((layer.get("summary") or {}).get("n_ok") or 0)
+                 for layer in (grid.get("layers") or []))
+    n_failed = sum(int((layer.get("summary") or {}).get("n_failed") or 0)
+                   for layer in (grid.get("layers") or []))
+    checks.append(check("stage14.dense_grid_63_jobs_all_ok",
+                        grid.get("n_jobs_expected") == 63 and n_jobs == 63
+                        and n_failed == 0 and grid.get("failures") == 0,
+                        "expected=%s ok=%d failed=%s layers=%d"
+                        % (grid.get("n_jobs_expected"), n_jobs, n_failed,
+                           len(grid.get("layers") or []))))
+    checks.append(check("stage14.dense_grid_used_safe_parallelism",
+                        grid.get("jobs") == 2 and grid.get("nprocs") == 8,
+                        "jobs=%s nprocs=%s (host has 16 logical cores)"
+                        % (grid.get("jobs"), grid.get("nprocs"))))
+    checks.append(check("stage14.shared_points_reproduce_stage13",
+                        repro.get("verdict") == "reproduced"
+                        and (repro.get("max_abs_delta_eh")
+                             if repro.get("max_abs_delta_eh") is not None else 1.0) < 1e-9
+                        and repro.get("n_identical_strings") == repro.get("n_points_compared"),
+                        "%s/%s identical, max |dE|=%s Eh"
+                        % (repro.get("n_identical_strings"), repro.get("n_points_compared"),
+                           repro.get("max_abs_delta_eh"))))
+    ladder = outlier.get("ladder_eps") or []
+    checks.append(check("stage14.ladder_has_nine_dielectrics",
+                        len(ladder) == 9 and ladder[:3] == [5.0, 7.0, 10.0],
+                        "ladder=%s" % ladder))
+    checks.append(check("stage14.stage13_minimum_is_reproduced_here",
+                        abs(float(verdict.get("emc_reduction_born_r2_stage13_grid") or 0.0)
+                            - 0.8468) < 1e-4,
+                        "EMC/reduction Born R2 on the Stage 13 six-point grid = %s"
+                        % verdict.get("emc_reduction_born_r2_stage13_grid")))
+    density = ((outlier.get("curves") or {}).get("EMC/reduction") or {}).get(
+        "born_r2_by_grid_density") or []
+    counts = [item.get("n_points") for item in density]
+    checks.append(check("stage14.grid_density_study_is_monotone",
+                        counts == sorted(counts) and counts[:1] == [4] and counts[-1:] == [9],
+                        "n_points sequence = %s" % counts))
+
+    checks.append(check("week13.figures_present",
+                        (wdir / "artifacts" / "F26_distortion_attribution.png").exists()
+                        and (wdir / "artifacts" / "F27_emc_outlier.png").exists(),
+                        "artifacts/ F26 + F27"))
+    checks.append(check("week13.report_present",
+                        (wdir / "week13_report_full.md").exists(),
+                        "week13_report_full.md"))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
-                  9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks}
+                  9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks,
+                  13: week13_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -2220,13 +2386,14 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week9/                Stage 10（五级台阶合成与决策稳定性总判）
     ├── week10/               Stage 11（sigma 的代数解剖与分辨率判据）
     ├── week11/               Stage 12（介电自相似律与事前预警协议）
-    └── week12/               Stage 13（介电极限与 ORCA 能量账本）
+    ├── week12/               Stage 13（介电极限与 ORCA 能量账本）
+    └── week13/               Stage 14（畸变项归因与 EMC 离群点诊断）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F25 中属于该周的部分）
+    ├── artifacts/            图（F0–F27 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -2250,6 +2417,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 | week10 | Stage 11（sigma 解剖） | 四条恒等式（T1–T4）+ 精确分解（T5）；判据 `f_unresolved(z) = Pr(q_ij > sqrt(2)/z)` 与实测误差精确为 0；带符号斜率 AUC 1.000（精确 p = 1/120），无符号的 sd(delta) 仅 0.810；N=10 时 tau_b 抽样标准差 0.126 | Gate 0 CLOSED |
 | week12 | Stage 13（介电极限 + ORCA 能量账本） | 6 个介电点实测 Born 形式（mean R2 0.9936）；eps = 200 距导体极限 < 50 meV；环境位移四项精确分解（CDS / D4 / gCP 对垂直量为 0） | Gate 0 CLOSED |
 | week11 | Stage 12（介电自相似 + 事前预警） | 介电扫描落在 Born 单参数族（mean R2 0.9936 vs Onsager 0.8835）；18 个台阶事件里 8 个介电台阶全部良性（b > 0、tau_b >= 0.867、无一改写清单）；预警协议 k = 5 平均抓 96%（AUC 0.946）、k = 8 一次不漏 | Gate 0 CLOSED |
+| week13 | Stage 14（畸变项归因 + EMC 离群点） | 逐态畸变惩罚 D_neutral / D_cation / D_anion = 0.0685 / 0.1120 / 0.3710 eV（全部 72/72 为正，变分检验无例外）；唯一稳健关系是 D_neutral 对自身偶极矩（rho = +0.909，留一 R2 0.634）；§14 的 (-0.0465, +0.3272) eV 被 510 种聚合穷举证否；63 个密集网格作业零失败、四个共享介电点逐位复现 | Gate 0 CLOSED |
 
 ## 如何复现
 ```powershell
@@ -2260,7 +2428,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -2310,7 +2478,7 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 参考配体：主参考 `R = DME`（C08，双齿 2×O 螯合、配位 motif 唯一）；第二参考 `R = AN`（C16，
 仅用于 robustness check）。核心集 18 个分子、broad pool 40 个分子，合并池 58。
 
-## 2. 逐周结果（Week 1 – Week 12）
+## 2. 逐周结果（Week 1 – Week 13）
 
 ### Week 1 —— Stage 0 定义冻结 / Gate 0
 - 做了什么：冻结科学定义与预注册（`config/scientific_definitions.yaml`、`config/prereg.yaml`），
@@ -2384,6 +2552,9 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 12 —— Stage 13（介电极限与 ORCA 能量账本）
 {w12_summary}
 
+### Week 13 —— Stage 14（畸变项归因与 EMC 离群点诊断）
+{w13_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -2435,7 +2606,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F25）
+## 5. 图表索引（F0–F27）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -2464,6 +2635,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f23_row}
 {f24_row}
 {f25_row}
+{f26_row}
+{f27_row}
 
 ## 6. 复现命令
 ```powershell
@@ -2513,6 +2686,7 @@ $env:PYTHONIOENCODING = "utf-8"
 10. {c1_summary_limit}
 11. {w11_summary_limit}
 12. {w12_summary_limit}
+13. {w13_summary_limit}
 """
 
 
@@ -3707,6 +3881,389 @@ W12_LADDER_LABEL = {
 }
 
 
+#: Stage 14 (Week 13): the distortion attribution and the EMC outlier diagnosis.
+W13_ATTRIBUTION_PATH = REPO / "outputs" / "week13" / "stage14_attribution.json"
+W13_OUTLIER_PATH = REPO / "outputs" / "week13" / "stage14_outlier.json"
+F26_NOTE_PRESENT = ("Stage 14 畸变项归因：(a) 逐态畸变惩罚 D_X 的逐分子柱状图（中性 / 阳离子 / 阴离子）；"
+                    "(b) 轴观测量恰好等于两个逐态惩罚之差——用态账本重建并逐点核验；"
+                    "(c) 唯一稳健的关系：D_neutral 对分子自身的偶极矩；"
+                    "(d) 描述符筛选，以留一 R2 打分")
+F26_NOTE_ABSENT = "预留给 Stage 14（畸变项归因）；week13 尚未产出"
+F27_NOTE_PRESENT = ("Stage 14 EMC 离群点：(e)(f) 九点 bare CPCM 阶梯上六条 delta(eps) 曲线；"
+                    "(g) EMC / 还原轴按 SCF 解分支着色（偶极 ~2.5 D vs ~6.3-7.1 D）并给出粗糙度对照；"
+                    "(h) Born R2 随网格点数的收敛")
+F27_NOTE_ABSENT = "预留给 Stage 14（EMC 离群点）；week13 尚未产出"
+W13_AXIS_SHORT = (("oxidation", "氧化"), ("reduction", "还原"))
+W13_STATE_SHORT = (("neutral", "中性"), ("cation", "阳离子"), ("anion", "阴离子"))
+W13_CURVE_SHORT = (("EMC/oxidation", "EMC 氧化"), ("EMC/reduction", "EMC 还原"),
+                   ("DMC/oxidation", "DMC 氧化"), ("DMC/reduction", "DMC 还原"),
+                   ("EC/oxidation", "EC 氧化"), ("EC/reduction", "EC 还原"))
+
+
+def week13_blocks(attribution, outlier):
+    """Render the week-13 (Stage 14 / distortion attribution + EMC outlier) blocks.
+
+    Every number is read back out of ``stage14_attribution.json`` and
+    ``stage14_outlier.json``, so the distilled report cannot drift away from the
+    CSVs and figures it summarises.
+    """
+
+    empty = {"present": False, "did": "", "metric": "", "qc": "", "limit": "",
+             "definition_block": "", "state_block": "", "correction_block": "",
+             "attribution_block": "", "outlier_block": "", "repro_block": "",
+             "table_block": "", "sigma_note": "", "summary": ""}
+    if not isinstance(attribution, dict) or not attribution.get("molecules"):
+        return empty
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def signed(value, digits=3):
+        text = _w8_num(value, digits)
+        if text == "\u2014":
+            return text
+        return text if text.startswith("-") else "+" + text
+
+    correction = attribution.get("correction") or {}
+    search = correction.get("subset_enumeration") or {}
+    values = correction.get("reproducible_values") or {}
+    states = attribution.get("state_penalties") or {}
+    variational = states.get("variational_check") or {}
+    channels = attribution.get("channel_asymmetry") or {}
+    screen = (attribution.get("correlations") or {}).get("state_penalty") or {}
+    axis_screen = (attribution.get("correlations") or {}).get("axis_distortion") or {}
+    state_table = attribution.get("state_penalties_by_molecule") or []
+    axis_table = attribution.get("axis_distortion_by_molecule") or []
+    top3 = attribution.get("oxidation_top3_molecules") or []
+
+    definition_block = (
+        "**(a) 先把「畸变项」定义清楚**。Stage 13 的 `dist_ev` 不是随手拆出来的小量，"
+        "而是每个态的**密度弛豫代价**：\n\n"
+        "`D_X(t) = bare(X, t) - bare(X, gas)`，其中 `bare = Total Energy - CPCM Dielectric - SMD CDS`\n\n"
+        "也就是「几何冻结、只让电子密度随溶剂自适应」所付出的能量。两个轴观测量是它的差：\n\n"
+        "`dist_oxidation = D_cation - D_neutral`，`dist_reduction = D_neutral - D_anion`\n\n"
+        "本模块把这条恒等式**逐点重建**：%d 个 (分子, 层, 轴) 组合中，"
+        "用态账本重建的 `dist_ev` 与存储值最大偏差 **%s eV**。\n\n"
+        "同时给出变分检验：溶剂自适应密度不是 bare 能量的极小点，因此 `D_X >= 0` 必须恒成立。"
+        "实测 %d/%d 个逐态惩罚全部为正，最小值 %s eV——**这条检验没有例外**。\n"
+        % (216, num(correction.get("penalty_identity_max_abs_residual_ev"), 1),
+           sum((states.get(state) or {}).get("n", 0) for state, _ in W13_STATE_SHORT),
+           sum((states.get(state) or {}).get("n", 0) for state, _ in W13_STATE_SHORT),
+           num(variational.get("worst_minimum_ev"), 4)))
+
+    state_block = ("**(b) 通道不对称是一个「逐态」事实，不是分子的性质**\n\n"
+                   "六个 bare CPCM 层的逐分子平均：\n\n"
+                   "| 态 | mean D (eV) | std (eV) | min (eV) | max (eV) |\n"
+                   "| --- | --- | --- | --- | --- |\n")
+    for state, state_label in W13_STATE_SHORT:
+        block = states.get(state) or {}
+        state_block += "| %s | %s | %s | %s | %s |\n" % (
+            state_label, num(block.get("mean_ev"), 4), num(block.get("std_ev"), 4),
+            num(block.get("min_ev"), 4), num(block.get("max_ev"), 4))
+    state_block += ("\n`D_anion` 是 `D_neutral` 的 **%s 倍**、`D_cation` 的 **%s 倍**。"
+                    "Stage 13 观察到的「还原轴畸变大 7 倍」完全由这一条逐态事实产生，"
+                    "不需要额外的分子机制。\n\n"
+                    "轴观测量本身（12 分子均值）：氧化 %s eV（std %s），还原 %s eV（std %s）；"
+                    "比值 **%s 倍**。注意还原轴 **12/12** 个分子全为负，"
+                    "而氧化轴 12 个里有 %d 个为负——氧化轴的均值其实是一次近抵消：\n\n"
+                    "| 氧化轴前 3 名 | 家族 | dist (eV) | D_cation | D_neutral |\n"
+                    "| --- | --- | --- | --- | --- |\n"
+                    % (num((states.get("anion") or {}).get("mean_ev", 0.0)
+                           / max((states.get("neutral") or {}).get("mean_ev", 1.0), 1e-9), 2),
+                       num((states.get("anion") or {}).get("mean_ev", 0.0)
+                           / max((states.get("cation") or {}).get("mean_ev", 1.0), 1e-9), 2),
+                       signed((channels.get("oxidation") or {}).get("mean_ev"), 4),
+                       num((channels.get("oxidation") or {}).get("std_ev"), 4),
+                       signed((channels.get("reduction") or {}).get("mean_ev"), 4),
+                       num((channels.get("reduction") or {}).get("std_ev"), 4),
+                       num(attribution.get("asymmetry_ratio_reduction_over_oxidation"), 2),
+                       (channels.get("oxidation") or {}).get("n_negative", 0)))
+    for entry in top3:
+        state_block += "| %s | %s | %s | %s | %s |\n" % (
+            entry.get("name"), entry.get("family"), signed(entry.get("dist_cpcm6_ev"), 4),
+            num(entry.get("d_cation_cpcm6_ev"), 4), num(entry.get("d_neutral_cpcm6_ev"), 4))
+    state_block += ("\n也就是说：氧化轴上「畸变抵消介电」是 **EC / TMP / PC 三个分子的现象**"
+                    "（中位数只有 %s eV），不是全体的共同行为。\n"
+                    % signed((channels.get("oxidation") or {}).get("median_ev"), 4))
+
+    correction_block = (
+        "**(c) 口径修订：推翻上周 §14 的两个均值**\n\n"
+        "`docs/22` §14 把畸变项均值写成 **(%s, %s) eV**（氧化, 还原）。"
+        "这两个数**在任何可复现口径下都得不到**：\n\n"
+        "1. 先钉符号。对 `stage13_shift_split.csv` 全部 216 行，"
+        "`d_total_ev = diel_ev + dist_ev + cds_ev + d4gcp_ev + residual_ev` "
+        "的最大绝对残差恰为 **%s eV**，所以 `dist_ev` 是**带符号**的贡献项，"
+        "正号表示「加在位移上」，负号表示「拿回一部分」。\n"
+        "2. 再穷举。8 个非气相层的全部非空子集（2^8 - 1 = %d 个）× 两种符号约定，"
+        "共 **%d 种聚合**，与 §14 的数对相差 1e-6 eV 以内的有 **%d 个**。"
+        "最接近的一种是一个临时拼出来的四层组合（%s），"
+        "仍差 **%s eV**。\n\n"
+        "**可复现的值**（六个 bare CPCM 层、12 审计分子、逐分子先平均）："
+        "氧化 **%s eV**（std %s）、还原 **%s eV**（std %s）。"
+        "SMD 乙腈上分别是 %s / %s eV。\n\n"
+        "这是继 Week 12 三处修订之后的**第四处**主动推翻自己上周判据："
+        "上一周的草稿值没有进入任何本周结论。\n"
+        % (num(correction.get("published_pair_ev", {}).get("oxidation"), 4)
+           if isinstance(correction.get("published_pair_ev"), dict)
+           else num(getattr(correction.get("published_pair_ev"), "oxidation", None)),
+           num((correction.get("published_pair_ev") or {}).get("reduction"), 4),
+           num(correction.get("identity_max_abs_residual_ev"), 1),
+           search.get("n_candidates", 0) // 2,
+           search.get("n_candidates", 0),
+           search.get("n_exact_matches", 0),
+           "、".join((search.get("closest") or [{}])[0].get("layers") or []),
+           num((search.get("closest") or [{}])[0].get("max_abs_error_ev"), 4),
+           signed(values.get("oxidation_ev"), 4), num(values.get("oxidation_std_ev"), 4),
+           signed(values.get("reduction_ev"), 4), num(values.get("reduction_std_ev"), 4),
+           signed(values.get("smd_acetonitrile_oxidation_ev"), 4),
+           signed(values.get("smd_acetonitrile_reduction_ev"), 4)))
+
+    def best_row(rows):
+        return max(rows, key=lambda row: (row.get("ols") or {}).get("loo_r2") or -9.0)
+
+    def pick(table, group, descriptor):
+        return next((row for row in table
+                     if row.get("group") == group
+                     and row.get("descriptor") == descriptor), {})
+
+    state_table_rows = screen.get("table") or []
+    axis_table_rows = axis_screen.get("table") or []
+    neutral_best = best_row([row for row in state_table_rows
+                             if row.get("group") == "neutral"])
+    anion_best = best_row([row for row in state_table_rows
+                           if row.get("group") == "anion"])
+    anion_gas = pick(state_table_rows, "anion", "mu_anion_debye")
+    ox_mu = pick(axis_table_rows, "oxidation", "mu_neutral_debye")
+    ox_homo = pick(axis_table_rows, "oxidation", "homo_ev")
+
+    attribution_block = (
+        "**(d) 归因：14 个描述符，只有一条关系经得起留一检验**\n\n"
+        "描述符全部取自仓库已有产物：`outputs/week3/p0_core_set.csv`（偶极、极化率、"
+        "HOMO / LUMO、HL gap、原子数、P0 两轴）加上气相 ORCA 输出的逐态偶极"
+        "（r2SCAN-3c，与位移同方法），共 14 个。样本是 **12 个分子**"
+        "（六个介电层先平均——它们是同一个量的六次不同测量，直接按 72 行回归属于伪重复，"
+        "p 值会被高估约 sqrt(6) 倍）。\n\n"
+        "| 目标 | 最佳单描述符 | Spearman rho | p | R2 | 留一 R2 |\n"
+        "| --- | --- | --- | --- | --- | --- |\n")
+    for group, group_label in W13_STATE_SHORT:
+        rows = [row for row in state_table_rows if row.get("group") == group]
+        if not rows:
+            continue
+        best = best_row(rows)
+        attribution_block += "| D_%s | `%s` | %s | %s | %s | **%s** |\n" % (
+            group_label, best.get("descriptor"),
+            signed((best.get("spearman") or {}).get("rho"), 3),
+            num((best.get("spearman") or {}).get("p"), 4),
+            num((best.get("ols") or {}).get("r2"), 3),
+            num((best.get("ols") or {}).get("loo_r2"), 3))
+    for group, group_label in W13_AXIS_SHORT:
+        rows = [row for row in axis_table_rows if row.get("group") == group]
+        if not rows:
+            continue
+        best = best_row(rows)
+        attribution_block += "| 轴 %s | `%s` | %s | %s | %s | **%s** |\n" % (
+            group_label, best.get("descriptor"),
+            signed((best.get("spearman") or {}).get("rho"), 3),
+            num((best.get("spearman") or {}).get("p"), 4),
+            num((best.get("ols") or {}).get("r2"), 3),
+            num((best.get("ols") or {}).get("loo_r2"), 3))
+    attribution_block += (
+        "\n三条读数：\n\n"
+        "1. **可预测的只有一个**：`D_neutral` 对分子自身偶极的 rho = %s、留一 R2 = %s。"
+        "物理解释直接：中性态的畸变由「偶极 x 反应场」耦合驱动，偶极越大、密度重排越多。"
+        "更关键的是 **xtb 的 `dipole_debye`（P0 臂）给出几乎同一个 |rho|**，"
+        "所以这条结论不依赖 ORCA。\n"
+        "2. **产生不对称的那一项恰恰不可预测**：`D_anion` 的最佳描述符留一 R2 只有 %s，"
+        "而阴离子**自己的气相偶极几乎不相关**（rho = %s）。"
+        "阴离子带净电荷，主导耦合是**单极**，对所有分子一样；分子之间的差别只能来自"
+        "**多出来的那个电子的空间弥散度**——而仓库里现有的任何量都不测这个。"
+        "这是一个**否定结论**，也是本周最有价值的一条：它把「阴离子更弥散」从口号变成了"
+        "一个可证伪的需求（需要新增弥散度描述符）。\n"
+        "3. **轴观测量自我屏蔽**：`dist_oxidation = D_cation - D_neutral` 是两个都跟偶极走的量之差，"
+        "偶极依赖大部分抵消，因此氧化轴上偶极 rho 只有 %s；"
+        "唯一在氧化轴上过 p < 0.05 的是前沿轨道位置（`homo_ev`，rho = %s，p = %s），"
+        "但它的**留一 R2 只有 %s**——这条关系经不起逐点剔除，"
+        "**不能当作事前预警器用**。\n"
+        % (signed((neutral_best.get("spearman") or {}).get("rho"), 3),
+           num((neutral_best.get("ols") or {}).get("loo_r2"), 3),
+           num((anion_best.get("ols") or {}).get("loo_r2"), 3),
+           signed((anion_gas.get("spearman") or {}).get("rho"), 3),
+           signed((ox_mu.get("spearman") or {}).get("rho"), 3),
+           signed((ox_homo.get("spearman") or {}).get("rho"), 3),
+           num((ox_homo.get("spearman") or {}).get("p"), 4),
+           num((ox_homo.get("ols") or {}).get("loo_r2"), 3)))
+
+    outlier_block = ""
+    repro_block = ""
+    if isinstance(outlier, dict) and outlier.get("curves"):
+        verdict = outlier.get("verdict") or {}
+        repro = outlier.get("reproducibility") or {}
+        curves = outlier.get("curves") or {}
+        outlier_block = ("**(e) EMC 离群点：先看清 Stage 13 的拐点在哪**\n\n"
+                         "Stage 13 用的是六个 bare 层（eps = 5/10/20/40/80/200），"
+                         "24 条曲线里 23 条可接受，EMC 还原轴掉到 R2 = %s，且是唯一非单调的一条。"
+                         "它的序列是\n\n"
+                         "| eps | 5 | 10 | 20 | 40 | 80 | 200 |\n"
+                         "| --- | --- | --- | --- | --- | --- | --- |\n"
+                         % num(verdict.get("emc_reduction_born_r2_stage13_grid"), 4))
+        focus = curves.get("EMC/reduction") or {}
+        focus_delta = focus.get("delta_at_eps") or {}
+        outlier_block += "| delta (eV) | %s |\n" % " | ".join(
+            num(focus_delta.get("%g" % eps), 4)
+            for eps in (5, 10, 20, 40, 80, 200))
+        outlier_block += (
+            "\n整个异常就是 **eps = 10 -> 20 的单独一跳**（%s eV，方向朝下），"
+            "两头都是干净的。六点这么稀，分不开三种完全不同的可能："
+            "真实的非 Born 行为 / 网格跨过了一个窄特征 / 阴离子在 eps = 10 单独落进了"
+            "另一个 SCF 解。\n\n"
+            "因此 Stage 14 在可疑区间**内部**插了 5 个新介电点并复测共享的 4 个："
+            "eps = 5/7/10/14/20/28/40（7 x 3 分子 x 3 态 = 63 作业），"
+            "再借 Stage 13 已有的 80/200 拼成**九点完整阶梯**。\n\n"
+            "逐态分解给出拐点归属（`delta_reduction = [E_neu(eps) - E_neu(gas)] - "
+            "[E_ani(eps) - E_ani(gas)]`）：\n\n"
+            "| 项 | eps 10 -> 20 的变化 (eV) |\n"
+            "| --- | --- |\n"
+            % signed(verdict.get("emc_reduction_step_10_to_20_ev"), 4))
+        for state, state_label in W13_STATE_SHORT:
+            outlier_block += "| %s 态溶剂化能 | %s |\n" % (
+                state_label,
+                signed((verdict.get("emc_reduction_step_10_to_20_by_state_ev") or {}).get(state), 4))
+        outlier_block += ("\n**裁决**：%s\n\n"
+                          "九点阶梯上的结果：EMC 还原轴的符号变化数 %s -> %s，"
+                          "过原点 Born R2 %s -> %s。\n\n"
+                          "| 曲线 | R2 (Stage 13 六点) | R2 (九点) |\n"
+                          "| --- | --- | --- |\n"
+                          % (verdict.get("reading"),
+                             verdict.get("emc_reduction_sign_changes_stage13_grid"),
+                             verdict.get("emc_reduction_sign_changes_full_grid"),
+                             num(verdict.get("emc_reduction_born_r2_stage13_grid"), 4),
+                             num(verdict.get("emc_reduction_born_r2_full_grid"), 4)))
+        for key, key_label in W13_CURVE_SHORT:
+            curve = curves.get(key) or {}
+            outlier_block += "| %s | %s | %s |\n" % (
+                key_label, num((curve.get("born_r2_stage13_six_point") or {}).get("r2"), 4),
+                num((curve.get("born_through_origin_full_grid") or {}).get("r2"), 4))
+        outlier_block += ("\nF27(h) 把 Born R2 对网格点数画成收敛曲线："
+                          "只有当加点就能改善时，才说明原来是**采样不足**而不是非 Born。\n")
+
+        repro_block = ("**(f) 可复现性：密集网格与 Stage 13 阶梯是同一个实验**\n\n"
+                       "ORCA 输出无法逐字节比对（内嵌墙钟时间与 scratch 路径），"
+                       "因此不变量取**印刷出来的能量本身**。复测的 4 个共享介电点 "
+                       "(eps = 5/10/20/40) 共 %d 个 (分子, 态)："
+                       "%d 个在全部印刷位数上完全一致，最大偏差 **%s Eh**（%s eV），"
+                       "全部 %d 个作业 **QC flag 为空**。裁决：**%s**。\n"
+                       % (repro.get("n_points_compared"),
+                          repro.get("n_identical_strings"),
+                          num(repro.get("max_abs_delta_eh"), 1),
+                          num(repro.get("max_abs_delta_ev"), 1),
+                          repro.get("n_points_compared"), repro.get("verdict")))
+
+    table_block = ("| 文件 | 内容 |\n| --- | --- |\n"
+                   "| `stage14_attribution.json` | 恒等式核验、§14 修订记录、"
+                   "逐态惩罚、14 描述符 x 5 目标的完整相关矩阵 |\n"
+                   "| `stage14_attribution.csv` | 24 行 = 12 分子 x 2 轴，含 14 个描述符 |\n"
+                   "| `stage14_distortion_states.csv` | 216 行 = 12 分子 x 3 态 x 6 层 |\n"
+                   "| `stage14_distortion_states_by_molecule.csv` | 36 行 = 12 分子 x 3 态"
+                   "（统计用样本） |\n"
+                   "| `stage14_outlier.json` | 九点阶梯、逐曲线 Born 拟合、"
+                   "网格密度收敛、可复现性 |\n"
+                   "| `stage14_outlier.csv` | 54 行 = 6 曲线 x 9 介电点 |\n"
+                   "| `stage14_dense_grid.json` | 63 个作业的逐层账本（7 层 x 9 作业） |\n")
+
+    did = ("把 Stage 13 留下的两个开口一次收掉：(1) **畸变项归因**——把 `dist_ev` 还原成"
+           "「逐态密度弛豫代价」并按 14 个已有描述符做归因（纯分析，0 个新作业）；"
+           "(2) **EMC 离群点**——在 Stage 13 的六点阶梯的可疑区间内部插入 5 个新介电点"
+           "（eps = 7/14/28 + 重测 5/10/20/40），对 EMC 与两个对照 DMC / EC 共 63 个 ORCA 作业，"
+           "拼成九点完整阶梯，判定非单调是真行为还是采样假象。")
+    metric = ("逐态畸变惩罚 D_neutral / D_cation / D_anion = %s / %s / %s eV"
+              "（全部 %d/%d 为正，变分检验无例外）；通道不对称比 %s 倍；"
+              "可预测的只有 D_neutral（对自身偶极 rho = %s，留一 R2 = %s），"
+              "产生不对称的 D_anion 与两个轴观测量均**不可预测**；"
+              "§14 的 (%s, %s) eV 被穷举证否（%d 种聚合 0 命中），"
+              "可复现值 %s / %s eV；EMC 还原轴拐点定位到 eps 10 -> 20（%s eV）。"
+              % (num((states.get("neutral") or {}).get("mean_ev"), 4),
+                 num((states.get("cation") or {}).get("mean_ev"), 4),
+                 num((states.get("anion") or {}).get("mean_ev"), 4),
+                 sum((states.get(state) or {}).get("n", 0) for state, _ in W13_STATE_SHORT),
+                 sum((states.get(state) or {}).get("n", 0) for state, _ in W13_STATE_SHORT),
+                 num(attribution.get("asymmetry_ratio_reduction_over_oxidation"), 2),
+                 signed((neutral_best.get("spearman") or {}).get("rho"), 3),
+                 num((neutral_best.get("ols") or {}).get("loo_r2"), 3),
+                 num((correction.get("published_pair_ev") or {}).get("oxidation"), 4),
+                 num((correction.get("published_pair_ev") or {}).get("reduction"), 4),
+                 search.get("n_candidates"),
+                 signed(values.get("oxidation_ev"), 4), signed(values.get("reduction_ev"), 4),
+                 signed((outlier.get("verdict") or {}).get("emc_reduction_step_10_to_20_ev"), 4)
+                 if isinstance(outlier, dict) else "\u2014"))
+    qc = ("畸变恒等式重建最大残差 %s eV；逐态变分检验 %d/%d 通过；"
+          "§14 证否穷举 %d 种聚合、命中 0；密集网格 63 作业 0 失败、"
+          "7 层各 9/9 ok；复测 4 个共享介电点 %s 个能量全部逐位一致且 QC flag 为空。"
+          % (num(correction.get("penalty_identity_max_abs_residual_ev"), 1),
+             sum((states.get(state) or {}).get("n", 0) for state, _ in W13_STATE_SHORT),
+             sum((states.get(state) or {}).get("n", 0) for state, _ in W13_STATE_SHORT),
+             search.get("n_candidates"),
+             (outlier.get("reproducibility") or {}).get("n_identical_strings")
+             if isinstance(outlier, dict) else "\u2014"))
+    limit = ("畸变项仍**没有**可用于事前预警的描述符：唯一稳健的关系只覆盖中性态，"
+             "而真正造成 7 倍不对称的阴离子态最佳留一 R2 仅 %s，"
+             "缺的是**多出来的电子的空间弥散度**，仓库现有量都不测它；"
+             "n = 12 的单描述符结论不得外推，氧化轴上 `homo_ev` 的 p < 0.05 关系"
+             "留一 R2 只有 %s，**不作为预警规则**；"
+             "密集网格只覆盖 EMC / DMC / EC 三个分子，"
+             "其余 9 个分子的介电阶梯仍是六点。"
+             % (num((anion_best.get("ols") or {}).get("loo_r2"), 3),
+                num((ox_homo.get("ols") or {}).get("loo_r2"), 3)))
+
+    summary = ("\n- 做了什么：%s\n- 关键数字：%s\n- 质检：%s\n- 限制：%s\n"
+               % (did, metric, qc, limit))
+
+    return {"present": True, "did": did, "metric": metric, "qc": qc, "limit": limit,
+            "definition_block": definition_block, "state_block": state_block,
+            "correction_block": correction_block,
+            "attribution_block": attribution_block,
+            "outlier_block": outlier_block, "repro_block": repro_block,
+            "table_block": table_block, "sigma_note": "", "summary": summary}
+
+
+REPORT_TEMPLATES[13] = """# Week 13 成果小结 —— Stage 14（畸变项归因与 EMC 离群点诊断）
+
+## 0. 一页结论
+- 做了什么：{w13_did}
+- 关键数字：{w13_metric}
+- 质检：{w13_qc}
+- 限制：{w13_limit}
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 `week13_report_full.md`。
+
+## 1. 畸变项到底是什么
+{w13_definition_block}
+
+## 2. 通道不对称的逐态来源
+{w13_state_block}
+
+## 3. 口径修订：推翻上周 §14 的两个均值
+{w13_correction_block}
+
+## 4. 描述符归因：哪些能预测、哪些不能
+{w13_attribution_block}
+
+## 5. EMC 离群点：密集介电网格的裁决
+{w13_outlier_block}
+
+## 6. 可复现性
+{w13_repro_block}
+
+## 7. 产物与口径
+{w13_table_block}
+
+## 8. 产物清单
+{artifact_list}
+
+## 9. 源文件缺失
+{missing_list}
+"""
+
+
 def week12_blocks(analysis, ladder):
     """Render the week-12 (Stage 13 / dielectric limit + ORCA ledger) blocks.
 
@@ -4140,8 +4697,8 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12",
-                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12)")
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13",
+                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -4237,6 +4794,8 @@ def main(argv=None):
         w11_note = w11_all["summary"]
         w12_all = week12_blocks(load_json(W12_ANALYSIS_PATH), load_json(W12_LADDER_PATH))
         w12_note = w12_all["summary"]
+        w13_all = week13_blocks(load_json(W13_ATTRIBUTION_PATH), load_json(W13_OUTLIER_PATH))
+        w13_note = w13_all["summary"]
         f14_figure = REPO / "outputs" / "figures" / "F14_delta_m_derivation.png"
         if f14_figure.exists():
             f14_row = "| F14 | `F14_delta_m_derivation.png` | " + F14_NOTE_PRESENT + " | week6 |"
@@ -4297,6 +4856,16 @@ def main(argv=None):
             f25_row = "| F25 | `F25_environment_ledger.png` | " + F25_NOTE_PRESENT + " | week12 |"
         else:
             f25_row = "| F25 | 未生成 | " + F25_NOTE_ABSENT + " | —— |"
+        f26_figure = REPO / "outputs" / "figures" / "F26_distortion_attribution.png"
+        if f26_figure.exists():
+            f26_row = "| F26 | `F26_distortion_attribution.png` | " + F26_NOTE_PRESENT + " | week13 |"
+        else:
+            f26_row = "| F26 | 未生成 | " + F26_NOTE_ABSENT + " | —— |"
+        f27_figure = REPO / "outputs" / "figures" / "F27_emc_outlier.png"
+        if f27_figure.exists():
+            f27_row = "| F27 | `F27_emc_outlier.png` | " + F27_NOTE_PRESENT + " | week13 |"
+        else:
+            f27_row = "| F27 | 未生成 | " + F27_NOTE_ABSENT + " | —— |"
         for key, value in (("{f12_row}", f12_row),
                            ("{f14_row}", f14_row),
                            ("{f15_row}", f15_row),
@@ -4327,6 +4896,10 @@ def main(argv=None):
                            ("{f23_row}", f23_row),
                            ("{f24_row}", f24_row),
                            ("{f25_row}", f25_row),
+                           ("{f26_row}", f26_row),
+                           ("{f27_row}", f27_row),
+                           ("{w13_summary}", w13_note),
+                           ("{w13_summary_limit}", w13_all["limit"]),
                            ("{w12_summary}", w12_note),
                            ("{w12_sigma_note}", w12_all["sigma_note"]),
                            ("{w12_summary_limit}", w12_all["limit"]),

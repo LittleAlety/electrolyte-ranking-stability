@@ -2,12 +2,12 @@
 window.HB = {
  "repo": "https://github.com/LittleAlety/electrolyte-ranking-stability",
  "counts": {
-  "weeks": 12,
-  "figures": 26,
-  "orca_out": 364,
-  "scripts": 54,
-  "test_files": 32,
-  "tests_passed": 694
+  "weeks": 13,
+  "figures": 28,
+  "orca_out": 427,
+  "scripts": 58,
+  "test_files": 34,
+  "tests_passed": 743
  },
  "pipeline": [
   {
@@ -332,6 +332,30 @@ window.HB = {
     "12. 本周对规范的影响：三处口径修订",
     "13. 遗留与需裁决项"
    ]
+  },
+  {
+   "n": 13,
+   "doc": "docs/23_week13_report.md",
+   "title": "Week 13 报告 —— Stage 14：畸变项的定量归因，与 EMC 离群点的病理裁决",
+   "stage": "Stage 14",
+   "tag": "畸变项的定量归因与 EMC 离群点的病理裁决",
+   "summary": "Week 12 把环境位移精确拆成四项之后，留下了两个「已知但没有被解释」的东西： 被量化却未被归因的畸变项，和 24 条曲线里唯一非单调的 EMC 还原轴。 本周把两者一起裁决，得到一个结构性结果与一个否定性结果： 1. 畸变项不是一项，是两个单态惩罚之差。定义 D_态(t) = bare(X,t) − bare(X,gas)（bare = 同一次自洽计算里摘掉 CPCM 介电项与 SMD CDS 项之后的电子能量），则 dist_oxidation = D_cation − D_neutral dist_reduction = D_neutral − D_anion 该恒等式在 192 个「分子 × 层」行上重建，最大残差 6.7e-12 eV； 五项位移恒等式 d_total = diel + dist + cds + d4gcp + residual 在 216 行上 残差恰为 0。逐态惩罚 D_neutral = 0.0685、D_cation = 0.1120、 D_anion = 0.3710 eV，并且 72/72 全部为正（最差 +0.0113 eV）—— 变分检验无例外：溶剂自适应密度不是裸电子能量的极小点，因此「弛豫回去」不可能降能。 2. 通道不对称是阴离子效应，而氧化轴的小均值是相消的产物。",
+   "sections": [
+    "0. 一句话结论",
+    "1. 为什么要有这一步（Stage 14 的动机）",
+    "2. 口径与记号",
+    "3. 本周新增的计算（63 个作业，0 失败）",
+    "4. Part A：畸变项的恒等式与逐态身份",
+    "5. Part A：通道不对称是阴离子效应",
+    "6. Part A：归因筛选（14 个描述符 × 5 个目标，n = 12）",
+    "7. ★ 口径修订 1：Week 12 §14 的那对均值被证否",
+    "8. Part B：EMC 加密网格（九点阶梯）",
+    "9. Part B：偶极解身份筛查与裁决",
+    "10. 物理读法",
+    "11. 读法纪律（延续 Week 9 §10 / 10 §11 / 11 §11 / 12 §10）",
+    "12. 产物与图表",
+    "13. 本周对规范的影响"
+   ]
   }
  ],
  "figures": [
@@ -542,6 +566,22 @@ window.HB = {
    "caption": "(a)(b) SMD 乙腈两轴的逐分子四项分解；(c) CDS 三态重合；(d) 畸变抵消比例",
    "sha": "268b5825d9fca4d1c94add5ed7ec413794675c1999a13626f9ac5149642724f8",
    "bytes": 237962
+  },
+  {
+   "id": "F26",
+   "file": "F26_distortion_attribution.png",
+   "week": 13,
+   "caption": "(a) 逐态畸变惩罚的逐分子柱状图；(b) dist 恰为两个逐态惩罚之差（残差 6.7e-12 eV）；(c) D_neutral vs 偶极（rho 0.909）；(d) 最佳单描述符的留一 R2",
+   "sha": "53c0a18b6d650a49d77ccf6740e6c0559685b4d9a0f727433920ce0faef248f8",
+   "bytes": 214402
+  },
+  {
+   "id": "F27",
+   "file": "F27_emc_outlier.png",
+   "week": 13,
+   "caption": "(e)(f) 九点 bare CPCM 阶梯上六条 delta(eps) 曲线；(g) EMC / 还原轴按 SCF 解分支着色 + 粗糙度对照；(h) Born R2 随网格点数的收敛",
+   "sha": "aedfbae12a72e01370bfdd7cc01d1d865331e3267b5bde6044122ae461d73cf8",
+   "bytes": 287509
   }
  ]
 };

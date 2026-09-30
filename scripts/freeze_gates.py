@@ -195,6 +195,19 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "tests/test_stage13_dielectric_limit.py",
     "docs/22_*.md",
     "outputs/week12/**/*",
+    # Stage 14 (Week 13): the distortion attribution -- pure analysis of the Stage 13
+    # ledger, which shows that each axis shift is exactly a difference of two per-state
+    # density-relaxation penalties -- plus the EMC outlier diagnosis, 63 new ORCA single
+    # points on a dense bare-CPCM grid (eps = 5/7/10/14/20/28/40 for EMC/DMC/EC) that
+    # re-measure the four shared dielectrics as a reproducibility check.  Geometry is
+    # reused byte-for-byte from G1.
+    "scripts/build_stage14_attribution.py",
+    "scripts/run_stage14_dense_grid.py",
+    "scripts/analyze_stage14_outlier.py",
+    "scripts/make_stage14_figure.py",
+    "tests/test_stage14_attribution.py",
+    "docs/23_*.md",
+    "outputs/week13/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large

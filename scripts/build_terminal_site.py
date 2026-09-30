@@ -59,6 +59,8 @@ FIGURES = [
     ("F23", "F23_prescreening.png", 11, "(a) 预算曲线；(b) 逐台阶 b_hat 分布；(c) 3 分子试点散点；(d) 判据平面"),
     ("F24", "F24_dielectric_limit.png", 12, "(a) 七级阶梯 vs u = 1 - 1/eps（24 条曲线）；(b) 三模型 R2；(c) 外推误差由距离决定；(d) eps = 200 距导体极限 33 meV"),
     ("F25", "F25_environment_ledger.png", 12, "(a)(b) SMD 乙腈两轴的逐分子四项分解；(c) CDS 三态重合；(d) 畸变抵消比例"),
+    ("F26", "F26_distortion_attribution.png", 13, "(a) 逐态畸变惩罚的逐分子柱状图；(b) dist 恰为两个逐态惩罚之差（残差 6.7e-12 eV）；(c) D_neutral vs 偶极（rho 0.909）；(d) 最佳单描述符的留一 R2"),
+    ("F27", "F27_emc_outlier.png", 13, "(e)(f) 九点 bare CPCM 阶梯上六条 delta(eps) 曲线；(g) EMC / 还原轴按 SCF 解分支着色 + 粗糙度对照；(h) Born R2 随网格点数的收敛"),
 ]
 
 # ---------------------------------------------------------------- week table
@@ -77,6 +79,7 @@ WEEKS = [
     (10, "20_week10_report.md", "Stage 11", "sigma 的代数解剖与分辨率判据"),
     (11, "21_week11_report.md", "Stage 12", "介电响应是一条单参数族，判据可事前使用"),
     (12, "22_week12_report.md", "Stage 13", "介电极限、导体极限，与环境位移的四项精确分解"),
+    (13, "23_week13_report.md", "Stage 14", "畸变项的定量归因与 EMC 离群点的病理裁决"),
 ]
 
 PIPELINE = [
@@ -228,12 +231,12 @@ def counts():
     scripts = glob.glob(os.path.join(REPO, "scripts", "*.py"))
     tests = glob.glob(os.path.join(REPO, "tests", "test_*.py"))
     return {
-        "weeks": 12,
+        "weeks": len(WEEKS),
         "figures": len(FIGURES),
         "orca_out": len(orca_out),
         "scripts": len(scripts),
         "test_files": len(tests),
-        "tests_passed": 694,
+        "tests_passed": 743,
     }
 
 
