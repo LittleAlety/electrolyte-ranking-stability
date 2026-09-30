@@ -145,10 +145,10 @@
       ["about", "这个项目是什么（一段话）"],
       ["status", "两个 Gate、测试、作业与产物的真实计数"],
       ["pipeline", "五段式研究流水线"],
-      ["weeks", "12 周报告一览"],
+      ["weeks", COUNTS.weeks + " 周报告一览"],
       ["cat <week>", "打印某一周的结论（如 cat 12）"],
       ["read <week>", "在新标签页打开该周完整报告 (.md)"],
-      ["figures", "26 张图的总目录"],
+      ["figures", FIGS.length + " 张图的总目录"],
       ["open <F-id>", "在终端里内联看图（如 open F24）"],
       ["theme [name]", "切换荧光色: green / amber / ice / bone"],
       ["repo", "源码与完整报告的入口"],
@@ -170,7 +170,7 @@
     blank();
     emit("规模：" + COUNTS.weeks + " 周 · " + COUNTS.orca_out + " 个 ORCA 输出 · " +
       COUNTS.figures + " 张图 · " + COUNTS.test_files + " 个测试文件", "dim");
-    emit("跑 status 看质量门，跑 weeks 看 12 周的结论。", "dim2");
+    emit("跑 status 看质量门，跑 weeks 看 " + COUNTS.weeks + " 周的结论。", "dim2");
   };
 
   CMDS.status = function () {
@@ -206,7 +206,7 @@
   };
 
   CMDS.weeks = function () {
-    emit("12 周报告", "acc");
+    emit(COUNTS.weeks + " 周报告", "acc");
     var rows = WEEKS.map(function (w) {
       return [padL(String(w.n), 2), w.stage, w.tag];
     });
@@ -435,7 +435,7 @@
     blank();
     emit("type \u0060help\u0060 — or click a command below.", "out", { scroll: false });
     blank();
-    emit("12 周报告", "acc", { scroll: false });
+    emit(COUNTS.weeks + " 周报告", "acc", { scroll: false });
     emitTbl(table(["wk", "stage", "conclusion"], WEEKS.map(function (w) {
       return [padL(String(w.n), 2), w.stage, w.tag];
     })), "out", { scroll: false });

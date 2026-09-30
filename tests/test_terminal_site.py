@@ -157,6 +157,21 @@ def test_terminal_js_defines_the_commands_it_advertises():
         assert label in listed, "help does not mention " + label
 
 
+def test_terminal_js_derives_the_week_and_figure_counts():
+    """Stale counts are the quiet way a generated page starts to lie.
+
+    ``terminal.js`` is a hand-maintained asset (unlike ``data.js``), so nothing
+    else stops a "12 周" from surviving week 13.  It must read the numbers out
+    of the payload it was served with.
+    """
+
+    js = (ASSETS / "terminal.js").read_text(encoding="utf-8")
+    for stale in ("12 \u5468", "26 \u5f20\u56fe"):
+        assert stale not in js, "hard-coded count in terminal.js: " + stale
+    for expression in ("COUNTS.weeks + ", "FIGS.length + "):
+        assert expression in js, "terminal.js does not derive: " + expression
+
+
 def test_check_mode_reports_the_site_as_consistent():
     result = subprocess.run(
         [sys.executable, str(GENERATOR), "--check"],
