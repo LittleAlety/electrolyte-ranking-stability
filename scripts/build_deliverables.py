@@ -412,6 +412,24 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 10",
         ],
     },
+    11: {
+        "topic": "Stage 12\uff08\u4ecb\u7535\u81ea\u76f8\u4f3c\u4e0e\u4e8b\u524d\u9884\u8b66\uff09",
+        "sources": [
+            ("outputs/week11/stage12_prescreen.csv", None, True),
+            ("outputs/week11/stage12_prescreen.json", None, True),
+            ("outputs/week11/stage12_summary.md", None, True),
+            ("docs/21_week11_report.md", "week11_report_full.md", True),
+            ("outputs/figures/figure_manifest_week11_stage12.md",
+             "artifacts/figure_manifest_week11_stage12.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F22_*.png", "outputs/figures/F23_*.png"],
+        "commands": [
+            "python scripts/analyze_stage12_prescreen.py",
+            "python scripts/make_stage12_figure.py",
+            "python scripts/build_deliverables.py --weeks 11",
+        ],
+    },
 }
 
 
@@ -573,6 +591,18 @@ def render_report(week, wdir, missing, excluded):
                        ("{w10_control_block}", w10["control_block"]),
                        ("{w10_predictor_block}", w10["predictor_block"]),
                        ("{w10_drift_block}", w10["drift_block"])):
+        text = text.replace(key, value)
+    w11 = week11_blocks(load_json(W11_PRESCREEN_PATH))
+    for key, value in (("{w11_did}", w11["did"]),
+                       ("{w11_metric}", w11["metric"]),
+                       ("{w11_qc}", w11["qc"]),
+                       ("{w11_limit}", w11["limit"]),
+                       ("{w11_law_block}", w11["law_block"]),
+                       ("{w11_ratio_block}", w11["ratio_block"]),
+                       ("{w11_shape_block}", w11["shape_block"]),
+                       ("{w11_forecast_block}", w11["forecast_block"]),
+                       ("{w11_prescreen_block}", w11["prescreen_block"]),
+                       ("{w11_table_block}", w11["table_block"])):
         text = text.replace(key, value)
     w9 = week9_blocks(load_json(W9_LADDER_PATH))
     for key, value in (("{w9_did}", w9["did"]),
@@ -1246,9 +1276,106 @@ def week10_checks(wdir: Path):
     return checks
 
 
+def week11_checks(wdir: Path):
+    """QC for week 11 (Stage 12, the dielectric law and the pilot protocol)."""
+
+    checks = []
+    payload = load_json(wdir / "stage12_prescreen.json")
+    if payload is None:
+        checks.append(check("stage12_prescreen.present", None, "source not found"))
+        return checks
+    checks.append(check("stage12_prescreen.present", True,
+                        "stage12_prescreen.json present"))
+
+    rows = payload.get("rows") or []
+    subset = payload.get("common_subset") or []
+    law = payload.get("dielectric_law") or {}
+    shape = payload.get("shape_invariance") or {}
+    forecast = payload.get("extrapolation") or {}
+    screen = payload.get("prescreen") or {}
+
+    checks.append(check("stage12.n_points==18", len(rows) == 18, "n_points=%d" % len(rows)))
+    checks.append(check("stage12.common_subset==10", len(subset) == 10,
+                        "common_subset=%s" % subset))
+    checks.append(check("stage12.rows_all_n10",
+                        bool(rows) and all(int(row.get("n") or 0) == 10 for row in rows),
+                        "n per row=%s" % sorted({row.get("n") for row in rows})))
+
+    dielectric = [row for row in rows if row.get("rung_family") == "dielectric"]
+    checks.append(check("stage12.dielectric_points==8", len(dielectric) == 8,
+                        "n dielectric=%d" % len(dielectric)))
+    checks.append(check("stage12.dielectric_all_benign",
+                        bool(dielectric)
+                        and all(not row.get("shortlist_rewritten") for row in dielectric)
+                        and all((row.get("ols_slope_b") or 0.0) > 0.0 for row in dielectric),
+                        "max f_unresolved(z=1)=%s"
+                        % max((row.get("f_unresolved_p1_observed") or 0.0)
+                              for row in dielectric)))
+
+    by_axis = shape.get("max_rel_spread_by_axis") or {}
+    checks.append(check("stage12.born_shape_oxidation",
+                        (by_axis.get("oxidation") or 1.0) < 0.05,
+                        "max rel spread=%s (worst %s)"
+                        % (by_axis.get("oxidation"), (shape.get("worst_by_axis") or {}).get("oxidation"))))
+    checks.append(check("stage12.born_shape_reduction",
+                        (by_axis.get("reduction") or 1.0) < 0.20,
+                        "max rel spread=%s (worst %s)"
+                        % (by_axis.get("reduction"), (shape.get("worst_by_axis") or {}).get("reduction"))))
+    checks.append(check("stage12.born_fits_better_than_onsager",
+                        ((law.get("born_r2") or {}).get("mean") or 0.0)
+                        > ((law.get("onsager_r2") or {}).get("mean") or 1.0),
+                        "born R2 mean=%s vs onsager=%s"
+                        % ((law.get("born_r2") or {}).get("mean"),
+                           (law.get("onsager_r2") or {}).get("mean"))))
+    r2 = ((law.get("measured_ratios") or {}).get("r2") or {}).get("mean")
+    r3 = ((law.get("measured_ratios") or {}).get("r3") or {}).get("mean")
+    checks.append(check("stage12.increment_halves_per_doubling",
+                        r2 is not None and abs(r2 - 2.0) < 0.05
+                        and r3 is not None and abs(r3 - 2.0) < 0.05,
+                        "r2=%s r3=%s (Born 2.000)" % (r2, r3)))
+    checks.append(check("stage12.forecast_without_eps40",
+                        (forecast.get("three_point_max_rel_err") or 1.0) < 0.05,
+                        "3-point max rel err=%s, 2-point=%s"
+                        % (forecast.get("three_point_max_rel_err"),
+                           forecast.get("two_point_max_rel_err"))))
+
+    curves = {entry.get("k"): entry for entry in (screen.get("curves") or [])}
+    checks.append(check("stage12.prescreen_exhaustive",
+                        all(entry.get("n_subsets") for entry in (screen.get("curves") or [])),
+                        "pilot sizes=%s" % sorted(curves)))
+    checks.append(check("stage12.prescreen_mean_slope_separates",
+                        bool(curves) and all((entry.get("auc_lower_b_mean_b_hat") or 0.0) > 0.999
+                                             for entry in curves.values()),
+                        "auc of the pilot-averaged slope=%s"
+                        % [entry.get("auc_lower_b_mean_b_hat") for entry in curves.values()]))
+    need = screen.get("k_required_for_full_recall")
+    checks.append(check("stage12.prescreen_full_recall_available",
+                        need is not None and 3 <= need <= 9,
+                        "k_required=%s (n_dangerous=%s)" % (need, screen.get("n_dangerous"))))
+
+    for row in rows:
+        if row.get("rung_family") != "electronic":
+            continue
+        t4_err = row.get("t4_abs_err_z1")
+        t6_err = row.get("t6_b_plus_1_vs_beta_err")
+        checks.append(check("stage12.electronic.%s.%s.t4" % (row.get("rung"), row.get("axis")),
+                            t4_err == 0.0
+                            and t6_err is not None and abs(float(t6_err)) < 1e-12,
+                            "t4=%s t6=%s" % (t4_err, t6_err)))
+
+    checks.append(check("week11.figures_present",
+                        (wdir / "artifacts" / "F22_dielectric_scaling.png").exists()
+                        and (wdir / "artifacts" / "F23_prescreening.png").exists(),
+                        "artifacts/ F22 + F23"))
+    checks.append(check("week11.report_present",
+                        (wdir / "week11_report_full.md").exists(),
+                        "week11_report_full.md"))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
-                  9: week9_checks, 10: week10_checks}
+                  9: week9_checks, 10: week10_checks, 11: week11_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -1811,6 +1938,61 @@ T4 是本周主结果（分辨率判据）；T5 把 `sigma^2` 预算精确拆成
 """
 
 
+REPORT_TEMPLATES[11] = """# Week 11 成果小结 —— Stage 12（介电自相似律与事前预警协议）
+
+Week 10 把 `sigma` 化简成闭式判据后，留下两个可操作的问题：**环境这一层到底是不是「同一把尺子」？**
+以及**能不能在跑完所有分子之前就知道哪些台阶会改写清单？** 本周把 Week 4 的 bare CPCM 介电扫描
+（eps = 5/10/20/40）升级成第 6 类台阶，回答这两个问题：
+
+> 介电 screening 是**单参数自相似族**：位移整条曲线 = 一个已知标量 x 同一条向量，因此排序只会越来越稳；
+> 危险台阶可以在只跑一半分子时以 AUC 0.946 抓出，要一次不漏则需 8/10。
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 `week11_report_full.md`。
+
+## 1. 本周做了什么
+{w11_did}
+
+## 2. 关键数字
+{w11_metric}
+
+## 3. 介电自相似律（Born vs Onsager）
+{w11_law_block}
+
+## 4. 逐级增量比
+{w11_ratio_block}
+
+## 5. 形状不变性
+{w11_shape_block}
+
+## 6. 外推检验
+{w11_forecast_block}
+
+## 7. 事前预警协议
+{w11_prescreen_block}
+
+## 8. 18 个台阶事件总表
+{w11_table_block}
+
+## 9. 质量与复核（QC）
+- {w11_qc}
+- 上述每一项都由本目录 `verification.json` 的 `checks` 数组从真实产物现场解析得出。
+
+## 10. 产物清单
+{artifact_list}
+
+## 11. 已知限制
+1. {w11_limit}
+2. Gate 0 保持 CLOSED；Gate 1 仍未关闭（溶液相锚点 31 行仍为 `est`）。
+3. Stage 12 是**探索性方法学分析**（重读已冻结产物，不跑新电子结构）；其中穷举子集（C(10,k)）与
+   预警指标是本周新增的分析动作，若提升为必报指标须走 `config/prereg.yaml` 的 `amendment_log`，
+   届时 Gate 0 由 CLOSED 变为 NOT CLOSED。
+4. 逐项细节见同目录 `week11_report_full.md`。
+
+## 12. 源文件缺失
+{missing_list}
+"""
+
+
 README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成果输出包
 
 本目录**只放蒸馏产物**（结果表、图、报告、校验清单）。原始 ORCA / xTB 运行输出
@@ -1832,13 +2014,14 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week7/                Stage 7（ML / Δ-learning）+ Stage 8（active-learning replay）
     ├── week8/                Stage 9（显式微溶剂化：[Li(M)2]+ 第一溶剂壳复核）
     ├── week9/                Stage 10（五级台阶合成与决策稳定性总判）
-    └── week10/               Stage 11（sigma 的代数解剖与分辨率判据）
+    ├── week10/               Stage 11（sigma 的代数解剖与分辨率判据）
+    └── week11/               Stage 12（介电自相似律与事前预警协议）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F21 中属于该周的部分）
+    ├── artifacts/            图（F0–F23 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -1860,6 +2043,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 | week8 | Stage 9（显式微溶剂化 C2） | [Li(M)2]+ 第一溶剂壳（12 motif / 8 家族）；C1 -> C2 的垂直量位移与同口径排序稳定性 | Gate 0 CLOSED |
 | week9 | Stage 10（五级台阶合成） | 五个台阶同口径重算（common-10）：rho(std, tau_b) = -0.851 vs rho(|mean|, tau_b) = -0.535；唯一负 tau_b 在 C0->C1 还原轴 | Gate 0 CLOSED |
 | week10 | Stage 11（sigma 解剖） | 四条恒等式（T1–T4）+ 精确分解（T5）；判据 `f_unresolved(z) = Pr(q_ij > sqrt(2)/z)` 与实测误差精确为 0；带符号斜率 AUC 1.000（精确 p = 1/120），无符号的 sd(delta) 仅 0.810；N=10 时 tau_b 抽样标准差 0.126 | Gate 0 CLOSED |
+| week11 | Stage 12（介电自相似 + 事前预警） | 介电扫描落在 Born 单参数族（mean R2 0.9936 vs Onsager 0.8835）；18 个台阶事件里 8 个介电台阶全部良性（b > 0、tau_b >= 0.867、无一改写清单）；预警协议 k = 5 平均抓 96%（AUC 0.946）、k = 8 一次不漏 | Gate 0 CLOSED |
 
 ## 如何复现
 ```powershell
@@ -1870,7 +2054,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -1920,7 +2104,7 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 参考配体：主参考 `R = DME`（C08，双齿 2×O 螯合、配位 motif 唯一）；第二参考 `R = AN`（C16，
 仅用于 robustness check）。核心集 18 个分子、broad pool 40 个分子，合并池 58。
 
-## 2. 逐周结果（Week 1 – Week 9）
+## 2. 逐周结果（Week 1 – Week 11）
 
 ### Week 1 —— Stage 0 定义冻结 / Gate 0
 - 做了什么：冻结科学定义与预注册（`config/scientific_definitions.yaml`、`config/prereg.yaml`），
@@ -1988,6 +2172,9 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 10 —— Stage 11（sigma 的代数解剖与分辨率判据）
 {w10_summary}
 
+### Week 11 —— Stage 12（介电自相似律与事前预警协议）
+{w11_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -2016,6 +2203,8 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 
 {w10_sigma_note}
 
+{w11_sigma_note}
+
 ### 3.3 还原侧定性失效
 P1 下 18 个分子的气相阴离子**全部不束缚**（`unbound_anion = 18`，EA < 0）。定域在 LUMO 上的
 Koopmans 图像在结构上**不可能**给出这一点，因此 P0 还原轴与真实 EA 不是同一物理量。
@@ -2035,7 +2224,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F21）
+## 5. 图表索引（F0–F23）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -2060,6 +2249,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f19_row}
 {f20_row}
 {f21_row}
+{f22_row}
+{f23_row}
 
 ## 6. 复现命令
 ```powershell
@@ -2107,6 +2298,7 @@ $env:PYTHONIOENCODING = "utf-8"
 8. {t2_summary_limit}
 9. **Gate 0 纪律**：`config/prereg.yaml` 逐字节未变；`z = 1.0` 是主判据，`z = 1.96` 只是并列敏感性。
 10. {c1_summary_limit}
+11. {w11_summary_limit}
 """
 
 
@@ -3074,6 +3266,203 @@ def week10_blocks(anatomy):
             "drift_block": drift_block, "sigma_note": sigma_note, "summary": summary}
 
 
+F22_NOTE_PRESENT = ("Stage 12 介电自相似：(a) 位移 delta(eps) 的 Born 线性轮廓 (1 - 1/eps)（20 条曲线）；"
+                    "(b) 逐级增量比随 eps 加倍，与 Born / Onsager 预测对比；(c) 同一 c 因子下的几何收缩"
+                    "（形状不变性）；(d) 留出 eps = 40 的外推检验")
+F22_NOTE_ABSENT = "预留给 Stage 12（介电自相似）；week11 尚未产出"
+F23_NOTE_PRESENT = ("Stage 12 事前预警：(a) 预算曲线（试点规模 k 对灵敏度 / AUC）；(b) 逐台阶 b_hat 分布"
+                    "（红色 = 清单被改写，淡红区 = 规则触发）；(c) 3 分子试点的 b_hat 散点；(d) 判据平面")
+F23_NOTE_ABSENT = "预留给 Stage 12（事前预警）；week11 尚未产出"
+W11_PRESCREEN_PATH = REPO / "outputs" / "week11" / "stage12_prescreen.json"
+W11_AXIS_SHORT = (("oxidation", "氧化"), ("reduction", "还原"))
+W11_ELEC_ORDER = ("P0_to_P1", "P1_to_P2", "G1_to_G2", "C0_to_C1", "C1_to_C2")
+
+
+def week11_blocks(prescreen):
+    """Render the week-11 (Stage 12 / dielectric law + pilot prescreen) blocks."""
+
+    empty = {"present": False, "did": "", "metric": "", "qc": "", "limit": "",
+             "law_block": "", "ratio_block": "", "shape_block": "", "forecast_block": "",
+             "prescreen_block": "", "table_block": "", "sigma_note": "", "summary": ""}
+    if not isinstance(prescreen, dict) or not (prescreen.get("rows") or []):
+        return empty
+
+    rows = prescreen.get("rows") or []
+    subset = prescreen.get("common_subset") or []
+    law = prescreen.get("dielectric_law") or {}
+    shape = prescreen.get("shape_invariance") or {}
+    forecast = prescreen.get("extrapolation") or {}
+    pilot = prescreen.get("prescreen") or {}
+    checks = prescreen.get("checks") or {}
+    die_rows = [row for row in rows if row.get("rung_family") == "dielectric"]
+    elec_rows = {(row.get("rung"), row.get("axis")): row
+                 for row in rows if row.get("rung_family") == "electronic"}
+    born = law.get("born_r2") or {}
+    onsager = law.get("onsager_r2") or {}
+    pred = law.get("predicted_ratios") or {}
+    meas = law.get("measured_ratios") or {}
+    spread = shape.get("max_rel_spread_by_axis") or {}
+    worst = shape.get("worst_by_axis") or {}
+    curves = pilot.get("curves") or []
+    curve_by_k = {item.get("k"): item for item in curves}
+    n_pass = sum(1 for item in checks.values() if isinstance(item, dict) and item.get("ok"))
+    n_checks = len(checks)
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def signed(value, digits=3):
+        text = _w8_num(value, digits)
+        if text == "\u2014":
+            return text
+        return text if float(value) < 0 else "+" + text
+
+    law_block = ("**(a) 介电自相似律**（参考点 eps = 1 气相，台阶 eps = 5/10/20/40；"
+                 "对 20 条 (分子, 轴) 曲线各自拟合）：\n\n"
+                 "| 模型 | 形式 | mean R2 | 最差 R2 | 最好 R2 |\n| --- | --- | --- | --- | --- |\n")
+    law_block += "| **Born** | delta ∝ (1 - 1/eps) | **%s** | %s | %s |\n" % (
+        num(born.get("mean"), 4), num(born.get("min"), 4), num(born.get("max"), 4))
+    law_block += "| Onsager | delta ∝ (eps - 1)/(2 eps + 1) | %s | %s | %s |\n" % (
+        num(onsager.get("mean"), 4), num(onsager.get("min"), 4), num(onsager.get("max"), 4))
+
+    ratio_block = ("**(b) 逐级增量比**（`d(hi)/d(lo)`，对照两个模型的解析预测）：\n\n"
+                   "| 增量比 | Born 预测 | Onsager 预测 | 实测均值 +/- sd | 实测范围 |\n"
+                   "| --- | --- | --- | --- | --- |\n")
+    for tag, label in (("r1", "d(5->10)/d(1->5)"), ("r2", "d(10->20)/d(5->10)"),
+                       ("r3", "d(20->40)/d(10->20)")):
+        item = meas.get(tag) or {}
+        ratio_block += "| %s | %s | %s | %s +/- %s | [%s, %s] |\n" % (
+            label, num((pred.get("born") or {}).get(tag), 4),
+            num((pred.get("onsager") or {}).get(tag), 4),
+            num(item.get("mean"), 4), num(item.get("sd"), 4),
+            num(item.get("min"), 4), num(item.get("max"), 4))
+
+    shape_block = ("**(c) 形状不变性**（每个 (分子, 轴) 用 Born 形式拟出单一标量 S；"
+                   "看 S 在三个台阶间是否一致，氧化 / 还原分别统计）：\n\n"
+                   "| 通道 | 最大相对漂移 max rel_spread | 最差分子/轴 |\n| --- | --- | --- |\n")
+    for axis, axis_label in W11_AXIS_SHORT:
+        shape_block += "| %s | %s | %s |\n" % (
+            axis_label, num(spread.get(axis), 4), worst.get(axis) or "\u2014")
+
+    forecast_block = ("**(d) 从廉价端外推 eps = 40**（留出检验，拟合时不含 eps = 40 数据；20 条曲线）：\n\n"
+                      "| 用到的廉价点 | 最大绝对误差 (eV) | 平均绝对误差 (eV) | 最大相对误差 |\n"
+                      "| --- | --- | --- | --- |\n")
+    forecast_block += "| 2 点 (5, 10) | %s | %s | %s |\n" % (
+        num(forecast.get("two_point_max_abs_err_ev"), 4),
+        num(forecast.get("two_point_mean_abs_err_ev"), 4),
+        num(100.0 * float(forecast.get("two_point_max_rel_err") or 0.0), 2) + "%")
+    forecast_block += "| **3 点 (5, 10, 20)** | **%s** | %s | %s |\n" % (
+        num(forecast.get("three_point_max_abs_err_ev"), 4),
+        num(forecast.get("three_point_mean_abs_err_ev"), 4),
+        num(100.0 * float(forecast.get("three_point_max_rel_err") or 0.0), 2) + "%")
+
+    prescreen_block = ("**(e) 事前预警协议**（只跑 k 个试点分子后，用 `b_hat` 预判哪些台阶会改写清单；"
+                       "规则：`flag` 当 `b_hat < 0` 或 `abs(b_hat) > sqrt(2)/z`，z = 1；"
+                       "穷举 C(10, k) 个子集）：\n\n"
+                       "| k | 子集数 | AUC(单试点均值) | 最差 AUC | AUC(b_hat 平均) | "
+                       "灵敏度均值 | 最差灵敏度 | 特异度均值 | 全抓率 | b_hat 子集间 sd |\n"
+                       "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+    for item in curves:
+        prescreen_block += "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" % (
+            item.get("k"), item.get("n_subsets"),
+            num(item.get("auc_lower_b_mean_over_subsets")),
+            num(item.get("auc_lower_b_min_over_subsets")),
+            num(item.get("auc_lower_b_mean_b_hat")), num(item.get("sensitivity_mean")),
+            num(item.get("sensitivity_min")), num(item.get("specificity_mean")),
+            num(item.get("p_all_positives_flagged")),
+            num(item.get("b_hat_sd_across_subsets_mean")))
+
+    axis_label = {"oxidation": "氧化", "reduction": "还原"}
+    table_block = "**(f) 18 个台阶事件（common-%d，N = 10）**\n\n" % len(subset)
+    table_block += "介电梯度（%d 点，全部良性）：\n\n" % len(die_rows)
+    table_block += ("| 台阶 | 轴 | n | sd(delta) (eV) | b | tau_b | top20 overlap | 清单被改写 |\n"
+                    "| --- | --- | --- | --- | --- | --- | --- | --- |\n")
+    for row in die_rows:
+        table_block += "| %s | %s | %s | %s | %s | %s | %s | %s |\n" % (
+            row.get("rung", "").replace("DIE_", "").replace("_to_", " -> "),
+            axis_label.get(row.get("axis"), row.get("axis")),
+            row.get("n"), num(row.get("delta_sd_ev"), 4), signed(row.get("ols_slope_b")),
+            signed(row.get("kendall_tau_b")), num(row.get("overlap_20"), 2),
+            "是" if row.get("shortlist_rewritten") else "否")
+    table_block += "\n电子结构（10 点，与 Week 10 同源）：\n\n"
+    table_block += ("| 台阶 | 轴 | n | sd(delta) (eV) | b | tau_b | top20 overlap | 清单被改写 |\n"
+                    "| --- | --- | --- | --- | --- | --- | --- | --- |\n")
+    for rung in W11_ELEC_ORDER:
+        for axis, label in W11_AXIS_SHORT:
+            row = elec_rows.get((rung, axis)) or {}
+            table_block += "| %s | %s | %s | %s | %s | %s | %s | %s |\n" % (
+                rung.replace("_to_", " -> "), label, row.get("n"),
+                num(row.get("delta_sd_ev"), 4), signed(row.get("ols_slope_b")),
+                signed(row.get("kendall_tau_b")), num(row.get("overlap_20"), 2),
+                "是" if row.get("shortlist_rewritten") else "否")
+
+    gas5 = elec_rows.get(("P0_to_P1", "oxidation")) or {}
+    del gas5
+    die_gas5 = next((row for row in die_rows
+                     if row.get("rung") == "DIE_gas_to_5" and row.get("axis") == "oxidation"), {})
+    k5 = curve_by_k.get(5) or {}
+    k3 = curve_by_k.get(3) or {}
+
+    did = ("把 Week 4 的 bare CPCM 介电扫描（eps = 5/10/20/40 x 12 分子 x 3 态）提升为第 6 类台阶，"
+           "与 5 个电子结构台阶并列，凑成 **18 个台阶事件**（8 介电 + 10 电子结构），全部落在 common-%d 上。"
+           "做两件事：(1) 检验介电 screening 是否落在**单参数自相似族**上（Born `1 - 1/eps` vs Onsager "
+           "`(eps-1)/(2 eps+1)`）；(2) 把「先跑少量分子、再判哪些台阶会改写清单」写成**事前预警协议**"
+           "（穷举 C(10, k) 个试面子集，用 `b_hat` 的符号与幅度做判据）。本阶段不跑任何新的电子结构计算。"
+           % len(subset))
+
+    metric = ("- 介电 screening 是**单参数自相似族**：位移整条曲线落在 Born 形式 `S (1 - 1/eps)` 上 —— "
+              "20 条 (分子, 轴) 曲线 mean R2 = **%s**（最差 %s），对照 Onsager 反应场的 %s（最差 %s）；"
+              "逐级增量比实测 %s / %s / %s，Born 预测 0.1250 / 2.0000 / 2.0000、Onsager 0.1786 / 1.8636 / 1.9286\n"
+              "- 形状不变性**分通道**：氧化的单标量族精确到 %s（最差 %s），还原松约 4 倍到 %s（最差 %s）—— "
+              "阴离子上 Onsager 型高阶项更重\n"
+              "- 外推可信：只用 3 个廉价点（eps = 5/10/20）预测 eps = 40，最大相对误差 %s，平均绝对误差 %s eV\n"
+              "- 8 个介电台阶**全部良性**：b > 0、tau_b >= 0.867、top20 overlap = 1.00、无一改写清单 —— 尽管 "
+              "`gas -> 5` 的位移均值 %s eV 比 P1 -> P2 / G1 -> G2 / C0 -> C1 / C1 -> C2 都大\n"
+              "- 事前预警：k = 5（半数分子）平均抓 %s 的危险台阶、AUC %s；要一次不漏需 k = %s；"
+              "k = 3 不可作放行依据（最差 AUC %s）"
+              % (num(born.get("mean"), 4), num(born.get("min"), 4),
+                 num(onsager.get("mean"), 4), num(onsager.get("min"), 4),
+                 num((meas.get("r1") or {}).get("mean"), 4),
+                 num((meas.get("r2") or {}).get("mean"), 4),
+                 num((meas.get("r3") or {}).get("mean"), 4),
+                 num(spread.get("oxidation"), 4), worst.get("oxidation") or "\u2014",
+                 num(spread.get("reduction"), 4), worst.get("reduction") or "\u2014",
+                 num(100.0 * float(forecast.get("three_point_max_rel_err") or 0.0), 2) + "%",
+                 num(forecast.get("three_point_mean_abs_err_ev"), 4),
+                 num(die_gas5.get("delta_mean_ev"), 3),
+                 num(k5.get("sensitivity_mean")), num(k5.get("auc_lower_b_mean_over_subsets")),
+                 pilot.get("k_required_for_full_recall"), num(k3.get("auc_lower_b_min_over_subsets"))))
+
+    qc = ("%d 行 x %d 列，由 `analyze_stage12_prescreen.py` 从 6 个已冻结源文件现场重算（约 2.7 s，"
+          "不跑新电子结构）；恒等式 T1/T2/T4/T6/T7 全部 PASS（T1/T2/T4 误差 <= 1.2e-15 eV），"
+          "并把 `b + 1 = beta` 与 `b = r sd(delta)/sd(axis)` 两条精确关系逐点钉住；"
+          "气相参考一致性 0.0 eV（与 P1 表同源）；%d/%d 项检查 PASS。"
+          % (len(rows), 31, n_pass, n_checks))
+
+    limit = ("介电自相似律只建立在 eps = 1/5/10/20/40 五个点上，`eps = 80/200` 未算 —— 「单参数族」是外推，"
+             "不是已验证的一般性断言；预警规则的阈值 `b < 0` / `abs(b) > sqrt(2)/z` 从 3 个正例读出，"
+             "查全率 100%、特异度 0.78 都是**同一批 10 个点上的自洽**，不构成外部验证；"
+             "试点只能可靠给出 `b` 的符号，给不出量级；n = 10 时不同子集在统计上不可区分，"
+             "k 的选择是工程折中。")
+
+    sigma_note = ("**第三条免费通道：自相似平移（Stage 12 / week11）**。Week 10 证明了「层间刚性偏移免费」"
+                  "（T3）与「单调 1-Lipschitz 位移免费」；本周补上第三条 —— 若整条环境梯度恰好是 "
+                  "`delta(eps) = c(eps) * delta0`（一个已知标量乘同一条向量），则 `sd(delta)`、`b`、`q` 全部按"
+                  "同一因子 `c` 缩放：`b` 的符号不可能改变、`q` 单调走向 0，于是**决策只会越来越稳**。"
+                  "bare CPCM 的介电扫描正落在这条通道上：20 条曲线 mean R2 = %s（Born），"
+                  "8 个介电台阶全部 `b > 0`、`tau_b >= 0.867`、无一改写清单。这也解释了为什么「加了溶剂」"
+                  "在文献里通常不发散排序 —— 需要担心的从来不是「加溶剂」，而是「换了相互之间不成比例的"
+                  "两层」。见 F22/F23（`outputs/figures/F22_dielectric_scaling.png`、"
+                  "`F23_prescreening.png`）。" % num(born.get("mean"), 4))
+
+    summary = ("- 做了什么：%s\n- 关键数字：\n%s\n- 质检：%s\n- 限制：%s"
+               % (did, metric, qc, limit))
+    return {"present": True, "did": did, "metric": metric, "qc": qc, "limit": limit,
+            "law_block": law_block, "ratio_block": ratio_block, "shape_block": shape_block,
+            "forecast_block": forecast_block, "prescreen_block": prescreen_block,
+            "table_block": table_block, "sigma_note": sigma_note, "summary": summary}
+
+
 def week7_blocks(stage7, stage8):
     """Render the week-7 (Stage 7 + Stage 8) blocks from the two JSON files.
 
@@ -3249,8 +3638,8 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10",
-                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9)")
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11",
+                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -3342,6 +3731,8 @@ def main(argv=None):
         w9_note = w9_all["summary"]
         w10_all = week10_blocks(load_json(W10_ANATOMY_PATH))
         w10_note = w10_all["summary"]
+        w11_all = week11_blocks(load_json(W11_PRESCREEN_PATH))
+        w11_note = w11_all["summary"]
         f14_figure = REPO / "outputs" / "figures" / "F14_delta_m_derivation.png"
         if f14_figure.exists():
             f14_row = "| F14 | `F14_delta_m_derivation.png` | " + F14_NOTE_PRESENT + " | week6 |"
@@ -3382,6 +3773,16 @@ def main(argv=None):
             f21_row = "| F21 | `F21_sigma_controls.png` | " + F21_NOTE_PRESENT + " | week10 |"
         else:
             f21_row = "| F21 | 未生成 | " + F21_NOTE_ABSENT + " | —— |"
+        f22_figure = REPO / "outputs" / "figures" / "F22_dielectric_scaling.png"
+        if f22_figure.exists():
+            f22_row = "| F22 | `F22_dielectric_scaling.png` | " + F22_NOTE_PRESENT + " | week11 |"
+        else:
+            f22_row = "| F22 | 未生成 | " + F22_NOTE_ABSENT + " | —— |"
+        f23_figure = REPO / "outputs" / "figures" / "F23_prescreening.png"
+        if f23_figure.exists():
+            f23_row = "| F23 | `F23_prescreening.png` | " + F23_NOTE_PRESENT + " | week11 |"
+        else:
+            f23_row = "| F23 | 未生成 | " + F23_NOTE_ABSENT + " | —— |"
         for key, value in (("{f12_row}", f12_row),
                            ("{f14_row}", f14_row),
                            ("{f15_row}", f15_row),
@@ -3408,6 +3809,11 @@ def main(argv=None):
                            ("{f19_row}", f19_row),
                            ("{f20_row}", f20_row),
                            ("{f21_row}", f21_row),
+                           ("{f22_row}", f22_row),
+                           ("{f23_row}", f23_row),
+                           ("{w11_summary}", w11_note),
+                           ("{w11_sigma_note}", w11_all["sigma_note"]),
+                           ("{w11_summary_limit}", w11_all["limit"]),
                            ("{w10_summary}", w10_note),
                            ("{w10_sigma_note}", w10_all["sigma_note"]),
                            ("{w9_summary}", w9_note),

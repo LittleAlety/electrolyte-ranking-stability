@@ -174,6 +174,16 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "tests/test_stage11_sigma_anatomy.py",
     "docs/20_*.md",
     "outputs/week10/**/*",
+    # Stage 12 (Week 11): the dielectric self-similarity law and the
+    # before-the-fact pilot protocol -- the Born/Onsager model test, the
+    # shape-invariance split, the leave-one-out extrapolation and the
+    # exhaustive-subset prescreen, with their figures, tests and report.
+    # Like Stages 10/11 this runs no new electronic structure.
+    "scripts/analyze_stage12_prescreen.py",
+    "scripts/make_stage12_figure.py",
+    "tests/test_stage12_prescreen.py",
+    "docs/21_*.md",
+    "outputs/week11/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large
