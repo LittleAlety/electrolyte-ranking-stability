@@ -67,6 +67,8 @@ FIGURES = [
     ("F29", "F29_diffuseness_descriptor.png", 14, "(e) spin_maxfrac 对阴离子畸变惩罚（留一 R2 0.162 -> 0.556）；(f) 参与比的秩 vs 线性（rho -0.846 对留一 R2 -2.90）；(g) 三个目标的留一 R2 对比（中性/阳离子不变）；(h) 描述符自己的域检验，标出唯一越界的 EMC/cpcm_10"),
     ("F30", "F30_two_guess_catalogue.png", 15, "(a) 12 分子 x 3 状态 x 10 电介质的完整双初猜网格（红 = 默认初猜偏高，灰 = 两臂一致，蓝 = 反而更高，斜纹 = 未配对）；(b) 每个开壳层 (分子, 状态) 在整个阶梯上的最坏赤字（绿虚线 = 1 meV 材料阈值）；(c) 超过各阈值的单元格计数"),
     ("F31", "F31_apriori_warning_rule.png", 15, "(d) 选定气相描述符对最大赤字，绿色虚线为留一冻结阈值；(e) 每个气相描述符的单变量 AUC；(f) 留出臂逐行预测与真值；(g) 冻结规则 vs 多数类基线（明写输给平凡规则）、平衡准确率、精确置换 p，以及分电性状态的事后诊断（描述符、正例排名、留一）"),
+    ("F32", "F32_stage17_contamination.png", 16, "(a) 逐分子逐轴的污染界 delta = p2_moread - p2_default（参考带 1e-03 eV，最坏 0.1562 eV）；(b) 排序稳定性对照：两轴 tau_b 的 95% CI 重叠；(c) 决策量 default vs moread 与「无已发布结论被改写」的裁决"),
+    ("F33", "F33_stage17_solution_identity.png", 16, "(d) PC/阴离子/cpcm_10 的逐原子自旋剖面（两臂同峰于 C4，几何与自旋中心一致）；(e) 32 格逐格的局域化迁移（cyclic/linear/phosphate 的 PR 均值变化）；(f) 自旋纯度：Δ<S²> 落在 [-0.004534, +0.001457]，参考纯双重态 0.75；(g) 电荷 vs 自旋重组（各 family 的 charge_l1 与 spin_l1 均值）"),
 ]
 
 # ---------------------------------------------------------------- week table
@@ -88,6 +90,7 @@ WEEKS = [
     (13, "23_week13_report.md", "Stage 14", "畸变项的定量归因与 EMC 离群点的病理裁决"),
     (14, "24_week14_report.md", "Stage 15", "初猜协议修正亚稳态、弥散度描述符翻正否定结果"),
     (15, "25_week15_report.md", "Stage 16", "亚稳解是全核心集现象，但单一气相描述符的事前预警输给平凡基线"),
+    (16, "26_week16_report.md", "Stage 17", "P2 腿换 moread 初猜重算 54 格，无任何已发布结论被改写；32 个漏解格两解皆自旋纯双重态，差异主轴是电荷重组"),
 ]
 
 PIPELINE = [
@@ -263,7 +266,7 @@ def counts():
         # Recorded, not measured: pytest cannot be run from the generator.  Bump
         # it in the same commit that adds or removes a test, otherwise the page
         # will advertise a number the suite no longer produces.
-        "tests_passed": 819,
+        "tests_passed": 858,
     }
 
 

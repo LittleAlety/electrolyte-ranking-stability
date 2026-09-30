@@ -2,12 +2,12 @@
 window.HB = {
  "repo": "https://github.com/LittleAlety/electrolyte-ranking-stability",
  "counts": {
-  "weeks": 15,
-  "figures": 32,
-  "orca_out": 1265,
-  "scripts": 68,
-  "test_files": 36,
-  "tests_passed": 819
+  "weeks": 16,
+  "figures": 34,
+  "orca_out": 1319,
+  "scripts": 73,
+  "test_files": 38,
+  "tests_passed": 858
  },
  "pipeline": [
   {
@@ -401,6 +401,27 @@ window.HB = {
     "10. 已知限制",
     "11. 下一步（Week 16 候选）"
    ]
+  },
+  {
+   "n": 16,
+   "doc": "docs/26_week16_report.md",
+   "title": "Week 16 报告 —— Stage 17：亚稳态对已发布台阶结论的污染上限，与两个 SCF 解的电子结构身份",
+   "stage": "Stage 17",
+   "tag": "P2 腿换 moread 初猜重算 54 格，无任何已发布结论被改写；32 个漏解格两解皆自旋纯双重态，差异主轴是电荷重组",
+   "summary": "Part A（污染上限）：把 Week 9「五级台阶」第 2 级 P1 -> P2 的 P2 腿（取自 SMD(乙腈) 层）从 ORCA 自带初猜换成 moread 初猜重算（18 分子 x 3 态 = 54 格，全部 ok）之后，两条轴上的 tau_b / O_20% / f_unresolved / f_robust_inv 没有任何一条被改写：oxidation tau_b 0.8954 -> 0.9216（Δ +0.0261）、reduction tau_b 0.6732 -> 0.6732（Δ +0.0000），两臂 tau_b 的 95% CI 都重叠（污染被 CI 吸收）。更强的一条是：在这套估计量下，f_robust_inv 从 0 变非 0 是结构性不可能（§4.7 的两行证明），不是「本周恰好看不到」。 Part B（解的电子结构身份）：受影响 32 格的两个 SCF 解都是自旋纯双重态（<S^2> 全部落在 0.75±0.01，32/32），所以这不是破缺对称性 / 自旋污染伪影，而是同一自旋量子数下的两个不同 SCF 驻点；差异的主轴是电荷重组（charge_l1 均值 0.983）而不只是自旋重排。阴离子的自旋中心在两臂完全一致（16/16），阳离子只有 5/16 —— 「默认初猜把空穴放在哪」比「把电子放在哪」更不稳定。",
+   "sections": [
+    "0. 一句话结论",
+    "1. 为什么要有这一步（Stage 17 的动机）",
+    "2. 口径与记号",
+    "3. 本周新增的计算",
+    "4. Part A：污染上限（P1 -> P2 台阶的第 2 级，只换 P2 腿）",
+    "5. Part B：两个 SCF 解的电子结构身份",
+    "6. 物理读法",
+    "7. 读法纪律（延续 Week 9 §10 / 10 §11 / 11 §11 / 12 §10 / 13 §11 / 14 §9 / 15 §8）",
+    "8. 产物与图表",
+    "9. 已知限制",
+    "10. 下一步（Week 17 候选）"
+   ]
   }
  ],
  "figures": [
@@ -723,6 +744,26 @@ window.HB = {
    "bytes": 265003,
    "w": 1877,
    "h": 1513
+  },
+  {
+   "id": "F32",
+   "file": "F32_stage17_contamination.png",
+   "week": 16,
+   "caption": "(a) 逐分子逐轴的污染界 delta = p2_moread - p2_default（参考带 1e-03 eV，最坏 0.1562 eV）；(b) 排序稳定性对照：两轴 tau_b 的 95% CI 重叠；(c) 决策量 default vs moread 与「无已发布结论被改写」的裁决",
+   "sha": "3ed91df76ccdb562637605bb19d4a23369b216d2b3736d7d5150b9979ea15da8",
+   "bytes": 258938,
+   "w": 2599,
+   "h": 1686
+  },
+  {
+   "id": "F33",
+   "file": "F33_stage17_solution_identity.png",
+   "week": 16,
+   "caption": "(d) PC/阴离子/cpcm_10 的逐原子自旋剖面（两臂同峰于 C4，几何与自旋中心一致）；(e) 32 格逐格的局域化迁移（cyclic/linear/phosphate 的 PR 均值变化）；(f) 自旋纯度：Δ<S²> 落在 [-0.004534, +0.001457]，参考纯双重态 0.75；(g) 电荷 vs 自旋重组（各 family 的 charge_l1 与 spin_l1 均值）",
+   "sha": "700b1bf53a2bf607fcf3fd27461b67c2b978b08f4282ef440deb696adc97f2c0",
+   "bytes": 342191,
+   "w": 2260,
+   "h": 1610
   }
  ]
 };

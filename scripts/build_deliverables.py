@@ -621,6 +621,36 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 15",
         ],
     },
+    16: {
+        "topic": "Stage 17（亚稳态对已发布台阶结论的污染上限与两个 SCF 解的电子结构身份）",
+        "sources": [
+            ("outputs/week16/p2_core_set_moread_smd_acetonitrile.csv", None, True),
+            ("outputs/week16/p2_summary_moread_smd_acetonitrile.json", None, True),
+            ("outputs/week16/stage17_smd_moread.json", None, True),
+            ("outputs/week16/stage17_smd_moread_plan.json", None, True),
+            ("outputs/week16/stage17_contamination.json", None, True),
+            ("outputs/week16/stage17_contamination_ladder.csv", None, True),
+            ("outputs/week16/stage17_contamination_cells.csv", None, True),
+            ("outputs/week16/stage17_contamination_summary.md", None, True),
+            ("outputs/week16/stage17_solution_identity.json", None, True),
+            ("outputs/week16/stage17_solution_identity.csv", None, True),
+            ("outputs/week16/stage17_solution_identity_by_molecule.csv", None, True),
+            ("outputs/week16/stage17_solution_identity_summary.md", None, True),
+            ("docs/26_week16_report.md", "week16_report_full.md", True),
+            ("outputs/figures/figure_manifest_week16_stage17.md",
+             "artifacts/figure_manifest_week16_stage17.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F32_*.png", "outputs/figures/F33_*.png"],
+        "commands": [
+            "python scripts/run_stage17_smd_moread.py",
+            "python scripts/analyze_stage17_contamination.py",
+            "python scripts/analyze_stage17_solution_identity.py",
+            "python scripts/make_stage17_figure.py",
+            "python scripts/gen_week16_report.py",
+            "python scripts/build_deliverables.py --weeks 16",
+        ],
+    },
 }
 
 
@@ -853,6 +883,20 @@ def render_report(week, wdir, missing, excluded):
                        ("{w15_rule_block}", w15["rule_block"]),
                        ("{w15_table_block}", w15["table_block"])):
         text = text.replace(key, value)
+    w16 = week16_blocks(load_json(W16_SMD_PATH), load_json(W16_CONTAMINATION_PATH),
+                        load_json(W16_IDENTITY_PATH))
+    for key, value in (("{w16_did}", w16["did"]),
+                       ("{w16_metric}", w16["metric"]),
+                       ("{w16_qc}", w16["qc"]),
+                       ("{w16_limit}", w16["limit"]),
+                       ("{w16_protocol_block}", w16["protocol_block"]),
+                       ("{w16_verdict_block}", w16["verdict_block"]),
+                       ("{w16_cells_block}", w16["cells_block"]),
+                       ("{w16_identity_block}", w16["identity_block"]),
+                       ("{w16_family_block}", w16["family_block"]),
+                       ("{w16_table_block}", w16["table_block"])):
+        text = text.replace(key, value)
+
     if missing:
         rows = []
         for entry in missing:
@@ -2284,10 +2328,243 @@ def week15_checks(wdir: Path):
     return checks
 
 
+def week16_checks(wdir: Path):
+    """QC for week 16 (Stage 17, the contamination ceiling and the solution identity)."""
+
+    checks = []
+    smd = load_json(wdir / "stage17_smd_moread.json")
+    p2 = load_json(wdir / "p2_summary_moread_smd_acetonitrile.json")
+    contamination = load_json(wdir / "stage17_contamination.json")
+    identity = load_json(wdir / "stage17_solution_identity.json")
+    for name, data in (("stage17_smd_moread", smd),
+                       ("p2_summary_moread_smd_acetonitrile", p2),
+                       ("stage17_contamination", contamination),
+                       ("stage17_solution_identity", identity)):
+        if data is None:
+            checks.append(check(name + ".present", None, "source not found"))
+            return checks
+        checks.append(check(name + ".present", True, name + ".json present"))
+
+    layers = smd.get("layers") or []
+    layer = layers[0] if layers else {}
+    checks.append(check("week16.part_a_run_ledger",
+                        p2.get("n_jobs") == 54 and p2.get("n_ok") == 54
+                        and p2.get("n_failed") == 0 and p2.get("n_computed") == 54
+                        and p2.get("n_reused") == 0
+                        and layer.get("n_jobs") == 54 and layer.get("n_ok") == 54
+                        and layer.get("n_failed") == 0
+                        and layer.get("n_computed") == 54
+                        and layer.get("n_reused") == 0,
+                        "p2_summary: jobs=%s ok=%s failed=%s computed=%s reused=%s; "
+                        "stage17_smd_moread.layers[0]: jobs=%s ok=%s failed=%s "
+                        "computed=%s reused=%s"
+                        % (p2.get("n_jobs"), p2.get("n_ok"), p2.get("n_failed"),
+                           p2.get("n_computed"), p2.get("n_reused"),
+                           layer.get("n_jobs"), layer.get("n_ok"),
+                           layer.get("n_failed"), layer.get("n_computed"),
+                           layer.get("n_reused"))))
+    checks.append(check("week16.part_a_layer_and_arm",
+                        smd.get("layer") == "moread_smd_acetonitrile"
+                        and smd.get("arm") == "moread"
+                        and p2.get("layer") == "moread_smd_acetonitrile"
+                        and p2.get("arm") == "moread",
+                        "stage17_smd_moread layer=%s arm=%s; p2_summary layer=%s arm=%s"
+                        % (smd.get("layer"), smd.get("arm"),
+                           p2.get("layer"), p2.get("arm"))))
+    checks.append(check("week16.part_a_cells_and_reference",
+                        smd.get("n_cells") == 54
+                        and smd.get("n_cells_without_reference") == 0
+                        and not (smd.get("cells_without_reference") or []),
+                        "stage17_smd_moread: n_cells=%s n_cells_without_reference=%s "
+                        "cells_without_reference=%s"
+                        % (smd.get("n_cells"), smd.get("n_cells_without_reference"),
+                           smd.get("cells_without_reference"))))
+
+    audit = smd.get("geometry_audit") or {}
+    checks.append(check("week16.geometry_audit_is_clean",
+                        len(audit) == 18
+                        and all(entry.get("all_identical") is True
+                                for entry in audit.values()),
+                        "%d molecules audited against their SMD(acetonitrile) "
+                        "reference geometry; all_identical=True for every entry"
+                        % len(audit)))
+
+    per_axis = contamination.get("per_axis") or {}
+    published = contamination.get("published_comparison") or {}
+
+    block_ok = True
+    block_detail = []
+    for axis in ("oxidation", "reduction"):
+        for arm in ("default", "moread"):
+            block = (per_axis.get(axis) or {}).get(arm) or {}
+            block_ok = block_ok and block.get("n") == 18
+            block_detail.append("%s/%s n=%s" % (axis, arm, block.get("n")))
+    checks.append(check("week16.part_a_four_axis_arm_blocks_are_18_each",
+                        block_ok, "; ".join(block_detail)))
+
+    tau_spec = (("week16.part_a_tau_b_oxidation_default", "oxidation", "default",
+                 0.8954248366013072),
+                ("week16.part_a_tau_b_oxidation_moread", "oxidation", "moread",
+                 0.9215686274509803),
+                ("week16.part_a_tau_b_reduction_default", "reduction", "default",
+                 0.673202614379085),
+                ("week16.part_a_tau_b_reduction_moread", "reduction", "moread",
+                 0.673202614379085))
+    for name, axis, arm, want in tau_spec:
+        block = (per_axis.get(axis) or {}).get(arm) or {}
+        got = block.get("kendall_tau_b")
+        checks.append(check(name, got is not None and abs(got - want) < 1e-9,
+                            "per_axis.%s.%s.kendall_tau_b=%s (expected %.16f)"
+                            % (axis, arm, got, want)))
+
+    f_ok = True
+    f_detail = []
+    for axis in ("oxidation", "reduction"):
+        for arm in ("default", "moread"):
+            block = (per_axis.get(axis) or {}).get(arm) or {}
+            value = block.get("f_robust_inv")
+            f_ok = f_ok and value is not None and abs(value) < 1e-12
+            f_detail.append("%s/%s=%s" % (axis, arm, value))
+    checks.append(check("week16.part_a_f_robust_inv_is_zero_everywhere",
+                        f_ok, "per_axis.*.*.f_robust_inv: " + "; ".join(f_detail)))
+
+    verdict = contamination.get("verdict") or {}
+    checks.append(check("week16.part_a_no_published_conclusion_rewritten",
+                        verdict.get("any_published_conclusion_rewritten") is False,
+                        "verdict.any_published_conclusion_rewritten=%s; "
+                        "conclusions_rewritten=%s"
+                        % (verdict.get("any_published_conclusion_rewritten"),
+                           verdict.get("conclusions_rewritten"))))
+    checks.append(check("week16.part_a_tau_b_ci_overlap_both_axes",
+                        verdict.get("tau_b_ci_overlap_both_axes") is True,
+                        "verdict.tau_b_ci_overlap_both_axes=%s"
+                        % verdict.get("tau_b_ci_overlap_both_axes")))
+
+    changed = contamination.get("cells_changed") or []
+    checks.append(check("week16.part_a_six_cells_changed",
+                        contamination.get("cells_changed_count") == 6
+                        and len(changed) == 6,
+                        "cells_changed_count=%s; len(cells_changed)=%d"
+                        % (contamination.get("cells_changed_count"), len(changed))))
+
+    cells54 = (contamination.get("delta_stats") or {}).get("cells_54") or {}
+    checks.append(check("week16.part_a_delta_stats_54_cells",
+                        cells54.get("n") == 54
+                        and cells54.get("argmin") == "TEGDME/anion"
+                        and cells54.get("argmax") == "EC/anion",
+                        "delta_stats.cells_54: n=%s argmin=%s argmax=%s"
+                        % (cells54.get("n"), cells54.get("argmin"),
+                           cells54.get("argmax"))))
+
+    sign = (contamination.get("sign_test") or {}).get("cells_54") or {}
+    p_two = sign.get("p_two_sided")
+    checks.append(check("week16.part_a_sign_test_54_cells",
+                        sign.get("n_positive") == 22 and sign.get("n_negative") == 32
+                        and sign.get("n_zero") == 0 and p_two is not None
+                        and abs(p_two - 0.22032849417661104) < 1e-9,
+                        "sign_test.cells_54: pos=%s neg=%s zero=%s "
+                        "p_two_sided=%s (expected 0.22032849417661104)"
+                        % (sign.get("n_positive"), sign.get("n_negative"),
+                           sign.get("n_zero"), p_two)))
+
+    csv_rows = None
+    csv_path = wdir / "stage17_solution_identity.csv"
+    if csv_path.exists():
+        with csv_path.open(encoding="utf-8", newline="") as handle:
+            csv_rows = sum(1 for _ in csv.DictReader(handle))
+    cells_list = identity.get("cells") or []
+    checks.append(check("week16.part_b_32_cells_5_molecules",
+                        identity.get("n_cells") == 32
+                        and identity.get("n_molecules") == 5
+                        and len(cells_list) == 32,
+                        "stage17_solution_identity.json: n_cells=%s n_molecules=%s "
+                        "len(cells)=%d"
+                        % (identity.get("n_cells"), identity.get("n_molecules"),
+                           len(cells_list))))
+    checks.append(check("week16.part_b_csv_row_count_matches_json",
+                        csv_rows == 32 and len(cells_list) == 32,
+                        "stage17_solution_identity.csv rows=%s vs len(cells)=%d"
+                        % (csv_rows, len(cells_list))))
+    census = identity.get("census") or {}
+    checks.append(check("week16.part_b_census_unresolved_is_empty",
+                        census.get("unresolved") == []
+                        and census.get("n_cells_resolved") == 32,
+                        "census.unresolved=%s; census.n_cells_resolved=%s"
+                        % (census.get("unresolved"), census.get("n_cells_resolved"))))
+
+    def _s2_ok(cell):
+        s2d = cell.get("s2_default")
+        s2m = cell.get("s2_moread")
+        return (s2d is not None and 0.74 <= s2d <= 0.76
+                and s2m is not None and 0.74 <= s2m <= 0.76)
+
+    bad = [cell.get("name") for cell in cells_list if not _s2_ok(cell)]
+    checks.append(check("week16.part_b_both_arms_are_spin_pure_doublets",
+                        len(cells_list) == 32 and not bad,
+                        "stage17_solution_identity.csv <S^2> in [0.74, 0.76] on both "
+                        "arms for %d/32 cells; out of range: %s"
+                        % (len(cells_list) - len(bad), bad or "none")))
+
+    family = identity.get("by_family") or {}
+    fam_spec = (("week16.part_b_family_cyclic_carbonate", "cyclic_carbonate",
+                 15, -0.5025033067938645, 0.6688745333333334, 15),
+                ("week16.part_b_family_linear_carbonate", "linear_carbonate",
+                 7, 0.40339449194493693, 2.5862442857142858, 6),
+                ("week16.part_b_family_phosphate", "phosphate",
+                 10, -0.22152821938109923, 0.33053270000000007, 0))
+    for name, fam, n_cells, loss, charge, same_spin in fam_spec:
+        block = family.get(fam) or {}
+        loss_v = block.get("loss_in_pr_mean")
+        charge_v = block.get("charge_l1_mean")
+        checks.append(check(name,
+                            block.get("n_cells") == n_cells
+                            and loss_v is not None and abs(loss_v - loss) < 1e-4
+                            and charge_v is not None and abs(charge_v - charge) < 1e-4
+                            and block.get("n_same_spin_center") == same_spin,
+                            "by_family.%s: n_cells=%s loss_in_pr_mean=%s "
+                            "charge_l1_mean=%s n_same_spin_center=%s"
+                            % (fam, block.get("n_cells"), loss_v, charge_v,
+                               block.get("n_same_spin_center"))))
+    fam_total = sum(int((family.get(name) or {}).get("n_cells") or 0)
+                    for name in ("cyclic_carbonate", "linear_carbonate", "phosphate"))
+    checks.append(check("week16.part_b_family_cells_sum_to_32", fam_total == 32,
+                        "cyclic_carbonate + linear_carbonate + phosphate = %d" % fam_total))
+
+    by_state = identity.get("by_state") or {}
+    anion = by_state.get("anion") or {}
+    cation = by_state.get("cation") or {}
+    checks.append(check("week16.part_b_by_state_16_each_and_spin_center_split",
+                        anion.get("n_cells") == 16 and cation.get("n_cells") == 16
+                        and anion.get("n_same_spin_center") == 16
+                        and cation.get("n_same_spin_center") == 5,
+                        "by_state.anion: n_cells=%s n_same_spin_center=%s; "
+                        "by_state.cation: n_cells=%s n_same_spin_center=%s"
+                        % (anion.get("n_cells"), anion.get("n_same_spin_center"),
+                           cation.get("n_cells"), cation.get("n_same_spin_center"))))
+
+    n_geom = sum(1 for cell in cells_list if cell.get("geometry_identical") is True)
+    checks.append(check("week16.part_b_geometry_qc_32_of_32",
+                        len(cells_list) == 32 and n_geom == 32,
+                        "%d/32 cells with identical CARTESIAN COORDINATES "
+                        "(stage17_solution_identity.csv geometry_identical)" % n_geom))
+
+    checks.append(check("week16.figures_present",
+                        (wdir / "artifacts" / "F32_stage17_contamination.png").exists()
+                        and (wdir / "artifacts"
+                             / "F33_stage17_solution_identity.png").exists(),
+                        "artifacts/ F32 + F33"))
+    checks.append(check("week16.report_present",
+                        (wdir / "week16_report_full.md").exists(),
+                        "week16_report_full.md"))
+    return checks
+
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
                   9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks,
-                  13: week13_checks, 14: week14_checks, 15: week15_checks}
+                  13: week13_checks, 14: week14_checks, 15: week15_checks,
+                  16: week16_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -2987,13 +3264,14 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week12/               Stage 13（介电极限与 ORCA 能量账本）
     ├── week13/               Stage 14（畸变项归因与 EMC 离群点诊断）
     ├── week14/               Stage 15（双初猜协议、电子弥散度描述符与溶液锚点扫描）
-    └── week15/               Stage 16（全核心集双初猜目录与事前预警规则）
+    ├── week15/               Stage 16（全核心集双初猜目录与事前预警规则）
+    └── week16/               Stage 17（亚稳态污染上限与两个 SCF 解的电子结构身份）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F31 中属于该周的部分）
+    ├── artifacts/            图（F0–F33 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -3020,6 +3298,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 | week14 | Stage 15（双初猜协议 + 弥散度描述符 + 锚点扫描） | 90 点双初猜里 12 点超 1 meV 且**全部为负**、反向 0 次（最大惩罚 0.2860 eV）；EMC 还原轴九点 Born R2 0.6788 -> 0.9556、符号变化 4 -> 0、偶极粗糙度 1.99 -> 0.08；eps = 200 -> 1000 只走 11.3 meV 而六点缺口 +33.2 -> -30.8 meV（**没有变小**）；`D_anion` 最佳留一 R2 0.162 -> 0.556（`spin_maxfrac`，rho = +0.811），中性/阳离子 `delta_loo = 0`；31 行锚点 4 行可裁定、3 改 1 确认 | Gate 0 CLOSED |
 | week13 | Stage 14（畸变项归因 + EMC 离群点） | 逐态畸变惩罚 D_neutral / D_cation / D_anion = 0.0685 / 0.1120 / 0.3710 eV（全部 72/72 为正，变分检验无例外）；唯一稳健关系是 D_neutral 对自身偶极矩（rho = +0.909，留一 R2 0.634）；§14 的 (-0.0465, +0.3272) eV 被 510 种聚合穷举证否；63 个密集网格作业零失败、四个共享介电点逐位复现 | Gate 0 CLOSED |
 {w15_row}
+{w16_row}
 
 ## 如何复现
 ```powershell
@@ -3030,7 +3309,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -3080,7 +3359,7 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 参考配体：主参考 `R = DME`（C08，双齿 2×O 螯合、配位 motif 唯一）；第二参考 `R = AN`（C16，
 仅用于 robustness check）。核心集 18 个分子、broad pool 40 个分子，合并池 58。
 
-## 2. 逐周结果（Week 1 – Week 13）
+## 2. 逐周结果（Week 1 – Week 16）
 
 ### Week 1 —— Stage 0 定义冻结 / Gate 0
 - 做了什么：冻结科学定义与预注册（`config/scientific_definitions.yaml`、`config/prereg.yaml`），
@@ -3163,6 +3442,9 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 15 —— Stage 16（全核心集双初猜目录与事前预警规则）
 {w15_summary}
 
+### Week 16 —— Stage 17（亚稳态污染上限与两个 SCF 解的电子结构身份）
+{w16_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -3214,7 +3496,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F29）
+## 5. 图表索引（F0–F33）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -3249,6 +3531,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f29_row}
 {f30_row}
 {f31_row}
+{f32_row}
+{f33_row}
 
 ## 6. 复现命令
 ```powershell
@@ -3301,6 +3585,7 @@ $env:PYTHONIOENCODING = "utf-8"
 13. {w13_summary_limit}
 14. {w14_summary_limit}
 15. {w15_summary_limit}
+16. {w16_summary_limit}
 """
 
 
@@ -4571,6 +4856,45 @@ W14_TABLE_ROWS = (
 )
 
 
+#: Stage 17 (Week 16): the contamination ceiling and the two-solution identity.
+W16_SMD_PATH = REPO / "outputs" / "week16" / "stage17_smd_moread.json"
+W16_P2_SUMMARY_PATH = (REPO / "outputs" / "week16"
+                       / "p2_summary_moread_smd_acetonitrile.json")
+W16_CONTAMINATION_PATH = REPO / "outputs" / "week16" / "stage17_contamination.json"
+W16_IDENTITY_PATH = REPO / "outputs" / "week16" / "stage17_solution_identity.json"
+F32_NOTE_PRESENT = ("Stage 17 Part A（污染上限）：(a) 18 分子 x 2 轴的 "
+                    "delta = p2_moread - p2_default，参考带 = 材料阈值 1 meV；"
+                    "(b) 排序稳定性对照（两轴两臂 tau_b 与 95% CI，两轴 CI 重叠）；"
+                    "(c) 决策量 default vs moread 与 6 个超阈值格子")
+F32_NOTE_ABSENT = "预留给 Stage 17 Part A（污染上限）；week16 尚未产出"
+F33_NOTE_PRESENT = ("Stage 17 Part B（两个 SCF 解的电子结构身份）：(d) 代表性逐原子自旋剖面；"
+                    "(e) 三个家族的 loss_in_pr 均值；(f) 32 格的 delta<S^2>（参考 0.75）；"
+                    "(g) 三个家族的 charge_l1 vs spin_l1")
+F33_NOTE_ABSENT = "预留给 Stage 17 Part B（解的电子结构身份）；week16 尚未产出"
+W16_AXIS_SHORT = (("oxidation", "氧化轴"), ("reduction", "还原轴"))
+W16_ARM_SHORT = (("default", "default"), ("moread", "moread"))
+W16_TABLE_ROWS = (
+    ("\x60stage17_smd_moread.json\x60",
+     "Part A 运行台账：54 格计数、复用/新算、G1 几何审计、初猜协议原文"),
+    ("\x60stage17_smd_moread_plan.json\x60", "Part A 运行前的作业计划（18 分子 x 3 态）"),
+    ("\x60stage17_contamination.json\x60",
+     "Part A 全部分析（逐轴对照、delta_stats、符号检验、scenario verdict、CI 重叠）"),
+    ("\x60stage17_contamination_cells.csv\x60",
+     "Part A 逐分子表（P1 与两臂 P2 的原始能量、逐态 delta）"),
+    ("\x60stage17_contamination_ladder.csv\x60",
+     "Part A 四行 (臂, 轴) 指标表（含 published 列与 delta 列）"),
+    ("\x60stage17_contamination_summary.md\x60", "Part A 的中文小结"),
+    ("\x60stage17_solution_identity.json\x60",
+     "Part B 聚合产物（census / by_state / by_family / aggregates）"),
+    ("\x60stage17_solution_identity.csv\x60",
+     "Part B 逐格表（两臂 .out 路径、<S^2>、自旋中心、PR、L1、几何 QC）"),
+    ("\x60stage17_solution_identity_by_molecule.csv\x60", "Part B 按 (分子, 态) 汇总表"),
+    ("\x60stage17_solution_identity_summary.md\x60", "Part B 的中文小结"),
+    ("\x60p2_core_set_moread_smd_acetonitrile.csv\x60 / "
+     "\x60p2_summary_moread_smd_acetonitrile.json\x60",
+     "Part A 的原始能量表与逐层汇总（SMD(乙腈) moread 臂）"),
+)
+
 def week13_blocks(attribution, outlier):
     """Render the week-13 (Stage 14 / distortion attribution + EMC outlier) blocks.
 
@@ -5566,6 +5890,262 @@ def week15_blocks(analysis, predictor):
             "table_block": table_block}
 
 
+def week16_blocks(smd, contamination, identity):
+    """Week 16 / Stage 17 narrative blocks.
+
+    Every number is read back out of stage17_contamination.json,
+    stage17_solution_identity.json and stage17_smd_moread.json so the distilled
+    report cannot drift away from the artifacts it summarises.
+    """
+
+    keys = ("did", "metric", "qc", "limit", "summary", "protocol_block",
+            "verdict_block", "cells_block", "identity_block", "family_block",
+            "table_block")
+    if contamination is None:
+        text = "（\x60stage17_contamination.json\x60 不存在）"
+        return {key: text for key in keys}
+
+    smd = smd or {}
+    identity = identity or {}
+    per_axis = contamination.get("per_axis") or {}
+    published = contamination.get("published_comparison") or {}
+    delta = (contamination.get("delta_stats") or {}).get("cells_54") or {}
+    sign = (contamination.get("sign_test") or {}).get("cells_54") or {}
+    verdict = contamination.get("verdict") or {}
+    changed = contamination.get("cells_changed") or []
+    ci_overlap = contamination.get("ci_overlap") or {}
+    layers = smd.get("layers") or []
+    layer = layers[0] if layers else {}
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def signed(value, digits=4):
+        text = _w8_num(value, digits)
+        if text == "\u2014":
+            return text
+        return text if text.startswith("-") else "+" + text
+
+    def ci_block(block):
+        low = block.get("tau_b_ci_low")
+        high = block.get("tau_b_ci_high")
+        if low is None or high is None:
+            return "\u2014"
+        return "[%.3f, %.3f]" % (low, high)
+
+    def ci_pair(pair):
+        if not pair or len(pair) < 2 or pair[0] is None or pair[1] is None:
+            return "\u2014"
+        return "[%.3f, %.3f]" % (pair[0], pair[1])
+
+    protocol_block = "\n".join([
+        "### 协议与规模",
+        "",
+        "- **Part A（防守）**：把 Week 9「五级台阶」第 2 级 \x60P1 -> P2\x60 的 **P2 腿**"
+        "（SMD(乙腈) 层）从 ORCA 自带初猜换成 \x60! MORead\x60 + 气相 \x60%%moinp\x60 重算；"
+        "18 个分子 x 3 态 = **54 格**，\x60n_ok = %s\x60、\x60n_failed = %s\x60、"
+        "\x60n_computed = %s\x60、\x60n_reused = %s\x60。"
+        % (smd.get("n_ok"), smd.get("n_failed"), layer.get("n_computed"),
+           layer.get("n_reused")),
+        "- 参照表：\x60outputs/week4/p2_core_set_smd_acetonitrile.csv\x60（default 臂，"
+        "Week 4 冻结）；零格缺参照（\x60n_cells_without_reference = %s\x60）。"
+        % smd.get("n_cells_without_reference"),
+        "- 几何审计：18 个分子逐一比对参照的 xyz，全部 \x60all_identical = True\x60——"
+        "这就是「单腿替换许可证」：被替换的只有初猜这一个变量。",
+        "- 调度：\x60--jobs %s --nprocs %s\x60（本机 16 逻辑核），与既有各层协议相同。"
+        % (smd.get("jobs"), smd.get("nprocs")),
+        "- **Part B（机制）**：不新开任何量化作业，只读既有 \x60.out\x60，对 Stage 16 目录里 "
+        "\x60delta_ev < -1 meV\x60 的 **%s 个配对格**比较两条解的 \x60<S^2>\x60、自旋中心、"
+        "轨道标签、参与率 PR 与 Mulliken 电荷 / 自旋的 L1 差。"
+        % (identity.get("n_cells") or 0),
+    ])
+
+    axis_table = ["| 轴 | 臂 | n | tau_b | tau_b 95% CI | O_20% | f_unresolved(after) | "
+                  "f_robust_inv | sigma 中位(eV) |",
+                  "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+    for axis, axis_label in W16_AXIS_SHORT:
+        pub = (published.get(axis) or {}).get("published") or {}
+        axis_table.append(
+            "| %s | **published** | %s | %s | %s | %s | %s | %s | %s |"
+            % (axis_label, pub.get("n"), num(pub.get("kendall_tau_b")),
+               ci_block(pub), num(pub.get("overlap_20")),
+               num(pub.get("f_unresolved_after")), num(pub.get("f_robust_inv")),
+               num(pub.get("sigma_median_ev"))))
+        for arm, _label in W16_ARM_SHORT:
+            block = (per_axis.get(axis) or {}).get(arm) or {}
+            axis_table.append(
+                "| %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+                % (axis_label, arm, block.get("n"),
+                   num(block.get("kendall_tau_b")), ci_block(block),
+                   num(block.get("overlap_20")), num(block.get("f_unresolved_after")),
+                   num(block.get("f_robust_inv")), num(block.get("sigma_median_ev"))))
+
+    ci_rows = ["| 轴 | default 95% CI | moread 95% CI | 是否重叠 |",
+               "| --- | --- | --- | --- |"]
+    for axis, axis_label in W16_AXIS_SHORT:
+        entry = ci_overlap.get(axis) or {}
+        ci_rows.append("| %s | %s | %s | %s |"
+                       % (axis_label, ci_pair(entry.get("default_ci")),
+                          ci_pair(entry.get("moread_ci")),
+                          "是" if entry.get("overlap") else "否"))
+
+    verdict_block = "\n".join([
+        "### Part A 逐轴对照（published / default / moread）",
+        "",
+        "\n".join(axis_table),
+        "",
+        "> 来源：\x60stage17_contamination.json\x60 的 \x60published_comparison.<轴>.published\x60"
+        "（published 行）与 \x60per_axis.<轴>.<臂>\x60（default / moread 行）；default 臂在逐项上"
+        "**精确复原** published 值（\x60default_matches_published_max_abs_ev\x60 = 0），"
+        "所以 delta 只反映 moread 这一条腿。",
+        "",
+        "**两臂 tau_b 的 95% CI 全部重叠**（污染被区间估计吸收）：",
+        "",
+        "\n".join(ci_rows),
+        "",
+        "- 产物判定：\x60any_published_conclusion_rewritten = %s\x60、"
+        "\x60tau_b_ci_overlap_both_axes = %s\x60——**没有任何一条 published 结论被改写**。"
+        % (verdict.get("any_published_conclusion_rewritten"),
+           verdict.get("tau_b_ci_overlap_both_axes")),
+        "- **结构性引理（一句话）**：在本周的估计量下（\x60sigma = abs(d0 - d1)/sqrt(2)\x60，"
+        "\x60z_primary = 1.0\x60），两条 resolved 条件分别等价于 "
+        "\x60(sqrt(2)-1)|d0| >= |d1|\x60 与 \x60(sqrt(2)-1)|d1| >= |d0|\x60；"
+        "相乘要求 \x601 <= (sqrt(2)-1)^2 = 0.1716\x60，矛盾——所以「反号且两臂都 resolved」的 "
+        "pair 集合**恒为空集**，\x60f_robust_inv\x60 从 0 变非 0 是结构性不可能，"
+        "不是「本周恰好看不到」。",
+    ])
+
+    cell_rows = ["| 分子 | 态 | delta (eV) | 所属轴 |", "| --- | --- | --- | --- |"]
+    for entry in changed:
+        cell_rows.append("| %s | %s | %s | %s |"
+                         % (entry.get("molecule"), entry.get("state"),
+                            signed(entry.get("delta_ev"), 6),
+                            ", ".join(entry.get("axes") or [])))
+    cells_block = "\n".join([
+        "### 被改变的格子（|delta| > 1 meV）",
+        "",
+        "共 **%s** 个格子：" % contamination.get("cells_changed_count"),
+        "",
+        "\n".join(cell_rows),
+        "",
+        "- 六个格里五个是 moread **更低**（\x60delta < 0\x60），只有 **EC / anion 是 "
+        "+0.0923 eV**——moread 反而更高；这条正向残差原样保留。",
+        "- 54 格符号检验：正 **%s** / 负 **%s** / 零 **%s**，双侧 p = **%.6f**——"
+        "在符号层面不显著。"
+        % (sign.get("n_positive"), sign.get("n_negative"), sign.get("n_zero"),
+           sign.get("p_two_sided") or 0.0),
+        "- 最坏 \x60|delta|\x60 = %.6f eV（%s），最大正残差 = %.6f eV（%s）。"
+        % (delta.get("max_abs_ev") or 0.0, delta.get("argmin") or "",
+           delta.get("max_ev") or 0.0, delta.get("argmax") or ""),
+    ])
+
+    cells_list = identity.get("cells") or []
+    n_spin_pure = sum(1 for cell in cells_list
+                      if 0.74 <= (cell.get("s2_default") or 0.0) <= 0.76
+                      and 0.74 <= (cell.get("s2_moread") or 0.0) <= 0.76)
+    by_state = identity.get("by_state") or {}
+    anion = by_state.get("anion") or {}
+    cation = by_state.get("cation") or {}
+    identity_block = "\n".join([
+        "### Part B：两个 SCF 解都是自旋纯双重态",
+        "",
+        "- 受影响 **%s** 格的两个解都是**自旋纯双重态**：两臂 \x60<S^2>\x60 全部落在 0.75±0.01，"
+        "**%d/%d**；多重度逐格都是 2、电荷 -1 / +1。所以这**不是**破缺对称性 / 自旋污染伪影，"
+        "而是同一自旋量子数下的两个不同 SCF 驻点。"
+        % (identity.get("n_cells"), n_spin_pure, len(cells_list)),
+        "- 差异的主轴是**电荷重组**而不只是自旋重排（\x60charge_l1\x60 与 \x60spin_l1\x60 量级相当）。",
+        "",
+        "| 态 | 格子 | 自旋中心相同 | 轨道标签相同 |",
+        "| --- | --- | --- | --- |",
+        "| anion | %s | %s/%s | %s/%s |"
+        % (anion.get("n_cells"), anion.get("n_same_spin_center"), anion.get("n_cells"),
+           anion.get("n_same_orbital_label"), anion.get("n_cells")),
+        "| cation | %s | %s/%s | %s/%s |"
+        % (cation.get("n_cells"), cation.get("n_same_spin_center"), cation.get("n_cells"),
+           cation.get("n_same_orbital_label"), cation.get("n_cells")),
+        "",
+        "- **空穴比电子更难安放**：阴离子的自旋中心在两臂**完全一致**（16/16），"
+        "阳离子只有 **5/16**——默认初猜把多余电子放在哪里基本可复现，把空穴放在哪里高度依赖初猜。",
+        "- 几何 QC：两臂 \x60.out\x60 的 CARTESIAN COORDINATES 逐位相同的格子 **32/32**，"
+        "所以上面的差异只能来自 SCF 解本身。",
+    ])
+
+    family = identity.get("by_family") or {}
+    fam_rows = ["| 家族 | 分子 | n_cells | loss_in_pr 均值 | charge_l1 均值 | "
+                "自旋中心相同 | 轨道标签相同 |",
+                "| --- | --- | --- | --- | --- | --- | --- |"]
+    for name in ("cyclic_carbonate", "linear_carbonate", "phosphate"):
+        block = family.get(name) or {}
+        fam_rows.append("| %s | %s | %s | %s | %s | %s/%s | %s/%s |"
+                        % (name, ", ".join(block.get("molecules") or []),
+                           block.get("n_cells"), num(block.get("loss_in_pr_mean"), 4),
+                           num(block.get("charge_l1_mean"), 4),
+                           block.get("n_same_spin_center"), block.get("n_cells"),
+                           block.get("n_same_orbital_label"), block.get("n_cells")))
+    fam_total = sum(int((family.get(name) or {}).get("n_cells") or 0)
+                    for name in ("cyclic_carbonate", "linear_carbonate", "phosphate"))
+    family_block = "\n".join([
+        "### Part B：按分子家族",
+        "",
+        "\n".join(fam_rows),
+        "",
+        "- 三族格数 %s + %s + %s = **%d**。"
+        % ((family.get("cyclic_carbonate") or {}).get("n_cells", 0),
+           (family.get("linear_carbonate") or {}).get("n_cells", 0),
+           (family.get("phosphate") or {}).get("n_cells", 0), fam_total),
+        "- 家族分裂比电荷态更锋利：cyclic_carbonate 的 \x60loss_in_pr\x60 为负（moread 更定域）"
+        "而 linear_carbonate 为正（moread 更离域），两条方向相反；linear 的 \x60charge_l1\x60 "
+        "是 cyclic 的约 3.9 倍。",
+        "- phosphate（TMP）的自旋中心 0/10 全部翻转——这是**近简并表观、不能当判据**（见限制）。",
+    ])
+
+    table_block = "\n".join(["### 本周产物", "", "| 文件 | 说明 |", "| --- | --- |"]
+                             + ["| %s | %s |" % (name, note)
+                                for name, note in W16_TABLE_ROWS])
+
+    did = ("把 Week 9「五级台阶」第 2 级 \x60P1 -> P2\x60 的 P2 腿（SMD(乙腈) 层）从 ORCA "
+           "自带初猜换成 moread 初猜重算（18 分子 x 3 态 = 54 格，全部 ok、零复用），"
+           "并只读既有 \x60.out\x60 对 32 个「漏解」配对格的两个 SCF 解做电子结构身份对照"
+           "（<S^2> / 自旋中心 / 轨道标签 / 参与率 PR / Mulliken L1 差）。")
+    metric = ("54 格上两臂的 tau_b / O_20%% / f_unresolved / f_robust_inv 无一条被改写："
+              "oxidation tau_b %s -> %s（Delta %s）、reduction tau_b %s -> %s（Delta %s），"
+              "两臂 tau_b 的 95%% CI 在两条轴上都重叠；f_robust_inv 从 0 变非 0 在该估计量下"
+              "结构性不可能。Part B：32 格的两个 SCF 解都是自旋纯双重态"
+              "（<S^2> 全落 0.75±0.01，32/32）；阴离子自旋中心两臂一致 16/16、阳离子仅 5/16。"
+              % (num((published.get("oxidation") or {}).get("published", {})
+                     .get("kendall_tau_b")),
+                 num((per_axis.get("oxidation") or {}).get("moread", {})
+                     .get("kendall_tau_b")),
+                 signed((published.get("oxidation") or {})
+                        .get("moread_minus_published", {}).get("kendall_tau_b")),
+                 num((published.get("reduction") or {}).get("published", {})
+                     .get("kendall_tau_b")),
+                 num((per_axis.get("reduction") or {}).get("moread", {})
+                     .get("kendall_tau_b")),
+                 signed((published.get("reduction") or {})
+                        .get("moread_minus_published", {}).get("kendall_tau_b"))))
+    qc = ("核心 QC：54/54 作业成功、零缺失参照、几何审计 18/18 逐位一致；"
+          "四组 (轴, 臂) 的 n = 18、f_robust_inv 全为 0；"
+          "32 格 <S^2> 全落 0.75±0.01、几何 QC 32/32 一致、census.unresolved 为空。"
+          "逐项实测值见本目录 verification.json 的 checks。")
+    limit = ("Part A 只在 native 18 分子的 SMD(乙腈) P2 层上做**单腿替换**，不是整条台阶重算；"
+             "f_robust_inv ≡ 0 是估计量（z_primary = 1.0 + 两条 realization）的结构后果，"
+             "不是物理结论——换 ddof、补第三条 realization 或抬高 z 都会改变它。"
+             "Part B 只有 32 格 / 5 分子 / 2 个电荷态，判据 delta_ev < -1 meV 继承 Stage 16、"
+             "本周未重标定；「主贡献轨道」是 reduced-orbital SPIN 子块里 |值| 最大的原子-轨道，"
+             "在弥散基组下常落在弥散 s 通道，故「轨道标签相同 11/32」不能读成 pi* 身份相同。"
+             "**TMP 的自旋近简并**：三个磷酸氧上的自旋几乎均摊，其「自旋中心翻转」（0/10）是"
+             "近简并表观、不能当稳健判据。")
+    summary = " ".join([did, metric])
+
+    return {"did": did, "metric": metric, "qc": qc, "limit": limit,
+            "summary": summary, "protocol_block": protocol_block,
+            "verdict_block": verdict_block, "cells_block": cells_block,
+            "identity_block": identity_block, "family_block": family_block,
+            "table_block": table_block}
+
+
+
 REPORT_TEMPLATES[14] = """# Week 14 成果小结 —— Stage 15（双初猜协议、电子弥散度描述符与溶液锚点扫描）
 
 ## 0. 一页结论
@@ -5631,6 +6211,47 @@ REPORT_TEMPLATES[15] = """# Week 15 成果小结 —— Stage 16（全核心集�
 {artifact_list}
 
 ## 8. 源文件缺失
+{missing_list}
+"""
+
+
+REPORT_TEMPLATES[16] = """# Week 16 成果小结 —— Stage 17（亚稳态污染上限与两个 SCF 解的电子结构身份）
+
+## 0. 一页结论
+- 做了什么：{w16_did}
+- 关键数字：{w16_metric}
+- 质检：{w16_qc}
+- 限制：{w16_limit}
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 \x60week16_report_full.md\x60。
+
+## 1. 协议与规模
+{w16_protocol_block}
+
+## 2. Part A：污染上限（P1 -> P2 第 2 级的 P2 腿单腿替换）
+{w16_verdict_block}
+
+## 3. Part A：哪些格子被改变
+{w16_cells_block}
+
+## 4. Part B：两个 SCF 解的电子结构身份
+{w16_identity_block}
+
+## 5. Part B：按分子家族
+{w16_family_block}
+
+## 6. 图表
+- \x60artifacts/F32_stage17_contamination.png\x60 —— Stage 17 Part A（污染上限）三面板。
+- \x60artifacts/F33_stage17_solution_identity.png\x60 —— Stage 17 Part B（两个 SCF 解的电子结构身份）四面板。
+- 面板组成的权威说明：\x60artifacts/figure_manifest_week16_stage17.md\x60。
+
+## 7. 产物与口径
+{w16_table_block}
+
+## 8. 产物清单
+{artifact_list}
+
+## 9. 源文件缺失
 {missing_list}
 """
 
@@ -6068,8 +6689,8 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",
-                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15)")
+    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16",
+                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -6196,6 +6817,24 @@ def main(argv=None):
                        + "10 点阶梯下 %d/%d 个分子被判定存在漏解 | Gate 0 CLOSED |"
                          % (w15_counts.get("ladder10", 0),
                             w15_analysis.get("n_discovery_molecules") or 0))
+        w16_all = week16_blocks(load_json(W16_SMD_PATH),
+                                load_json(W16_CONTAMINATION_PATH),
+                                load_json(W16_IDENTITY_PATH))
+        w16_note = w16_all["summary"]
+        w16_cont = load_json(W16_CONTAMINATION_PATH) or {}
+        w16_delta = (w16_cont.get("delta_stats") or {}).get("cells_54") or {}
+        if not W16_CONTAMINATION_PATH.exists():
+            w16_row = ("| week16 | Stage 17（亚稳态污染上限 + 两个 SCF 解的电子结构身份） | "
+                       "未生成（等待 stage17_contamination.json） | —— |")
+        else:
+            w16_row = ("| week16 | Stage 17（亚稳态污染上限 + 两个 SCF 解的电子结构身份） | "
+                       + "54 格单腿替换：%d 个格子 |delta| > 1 meV（最坏 %.4f eV）；"
+                         "两臂 tau_b 的 95%% CI 两轴均重叠、published 结论 0 条被改写；"
+                         "32 个漏解格里两个 SCF 解都是自旋纯双重态（<S^2> 32/32 落 0.75±0.01）"
+                         % (w16_cont.get("cells_changed_count") or 0,
+                            w16_delta.get("max_abs_ev") or 0.0)
+                       + " | Gate 0 CLOSED |")
+
         f30_figure = REPO / "outputs" / "figures" / "F30_two_guess_catalogue.png"
         if f30_figure.exists():
             f30_row = "| F30 | `F30_two_guess_catalogue.png` | " + F30_NOTE_PRESENT + " | week15 |"
@@ -6206,6 +6845,19 @@ def main(argv=None):
             f31_row = "| F31 | `F31_apriori_warning_rule.png` | " + F31_NOTE_PRESENT + " | week15 |"
         else:
             f31_row = "| F31 | 未生成 | " + F31_NOTE_ABSENT + " | —— |"
+        f32_figure = REPO / "outputs" / "figures" / "F32_stage17_contamination.png"
+        if f32_figure.exists():
+            f32_row = ("| F32 | \x60F32_stage17_contamination.png\x60 | " + F32_NOTE_PRESENT
+                       + " | week16 |")
+        else:
+            f32_row = "| F32 | 未生成 | " + F32_NOTE_ABSENT + " | —— |"
+        f33_figure = REPO / "outputs" / "figures" / "F33_stage17_solution_identity.png"
+        if f33_figure.exists():
+            f33_row = ("| F33 | \x60F33_stage17_solution_identity.png\x60 | " + F33_NOTE_PRESENT
+                       + " | week16 |")
+        else:
+            f33_row = "| F33 | 未生成 | " + F33_NOTE_ABSENT + " | —— |"
+
         f14_figure = REPO / "outputs" / "figures" / "F14_delta_m_derivation.png"
         if f14_figure.exists():
             f14_row = "| F14 | `F14_delta_m_derivation.png` | " + F14_NOTE_PRESENT + " | week6 |"
@@ -6329,7 +6981,12 @@ def main(argv=None):
                        ("{w15_summary_limit}", w15_all["limit"]),
                        ("{w15_row}", w15_row),
                        ("{f30_row}", f30_row),
-                       ("{f31_row}", f31_row))
+                       ("{f31_row}", f31_row),
+                       ("{w16_summary}", w16_note),
+                       ("{w16_summary_limit}", w16_all["limit"]),
+                       ("{w16_row}", w16_row),
+                       ("{f32_row}", f32_row),
+                       ("{f33_row}", f33_row))
         for key, value in placeholders:
             summary = summary.replace(key, value)
         readme = README_TEMPLATE
