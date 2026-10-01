@@ -326,3 +326,36 @@ def test_grid_check_keeps_the_boundary_a_statement_not_a_grid_artifact(grid):
     assert shifts
     assert max(shifts) > 0.0
     assert max(shifts) <= grid["analysis"]["step_ev"]
+
+
+# ------------------------------------------------------------------------ figures
+
+FIGURES = REPO_ROOT / "outputs" / "figures"
+F43 = FIGURES / "F43_dielectric_limit_check.png"
+F44 = FIGURES / "F44_neb_refinement.png"
+MANIFEST = FIGURES / "figure_manifest_week22_stage23.md"
+
+
+def test_figures_f43_and_f44_exist_and_are_pngs():
+    """Every other stage module pins its own figures; stage 23 was missing this."""
+    for path in (F43, F44):
+        assert path.exists(), path
+        assert path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n", path
+        assert path.stat().st_size > 100000, path
+
+
+def test_figure_manifest_lists_both_figures_and_their_sha256():
+    import hashlib
+
+    text = MANIFEST.read_text(encoding="utf-8")
+    assert "F43_dielectric_limit_check.png" in text
+    assert "F44_neb_refinement.png" in text
+    assert "One-line caption (verbatim, for the terminal site):" in text
+    for path in (F43, F44):
+        assert hashlib.sha256(path.read_bytes()).hexdigest() in text, path
+
+
+def test_figure_manifest_pins_both_stage_23_inputs_and_the_generator():
+    text = MANIFEST.read_text(encoding="utf-8")
+    for name in ("dielectric_limit.json", "neb_refinement.json", "make_stage23_figure.py"):
+        assert name in text, name
