@@ -307,6 +307,21 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "tests/test_week21_report.py",
     "docs/32_*.md",
     "outputs/week21/**/*",
+    # Stage 23 (Week 22): batch B of the external review -- the xTB thermal-correction
+    # sample (R9, 24 `--ohess` jobs), the added conductor limit (R4b, 54 bare-CPCM
+    # single points at eps = 1e6 on top of the already-frozen higher-eps grids), the
+    # NEB refinement of the three Stage 19 borderline cells (R11), and the week-21
+    # grid-resolution adversary check.  Geometry is the frozen G1 in every job.
+    "scripts/run_thermal_correction_sample.py",
+    "scripts/analyze_dielectric_limit.py",
+    "scripts/analyze_neb_refinement.py",
+    "scripts/check_sigma_boundary_resolution.py",
+    "scripts/make_stage23_figure.py",
+    "scripts/gen_week22_report.py",
+    "tests/test_stage23_analysis.py",
+    "tests/test_week22_report.py",
+    "docs/33_*.md",
+    "outputs/week22/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large

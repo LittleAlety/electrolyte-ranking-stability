@@ -152,7 +152,14 @@ def main(argv=None) -> int:
                 cached = json.loads(stored.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 cached = None
-            if cached is not None and cached.get("status") in ("ok", "not_run"):
+            # A cached "not_run" record only stands in for a job that was itself a
+            # dry run. Reusing it in a real run would silently skip the ORCA call and
+            # still report ok (observed: a --dry-run into a live outdir poisoned the
+            # subsequent real run with 54/54 "ok" and zero .out files).
+            if cached is not None and (
+                cached.get("status") == "ok"
+                or (cached.get("status") == "not_run" and args.dry_run)
+            ):
                 result = cached.get("result") or {}
                 return {**common, "status": cached.get("status"),
                         "final_energy_eh": result.get("final_energy_eh"),

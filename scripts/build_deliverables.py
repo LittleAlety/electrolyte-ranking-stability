@@ -796,6 +796,36 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 21",
         ],
     },
+    22: {
+        "topic": "Stage 23（批次 B：热修正抽样 + 导体极限诊断 + NEB 精修）",
+        "sources": [
+            ("outputs/week22/thermal_correction_sample.json", None, True),
+            ("outputs/week22/thermal_correction_sample.csv", None, True),
+            ("outputs/week22/thermal_correction_sample.md", None, True),
+            ("outputs/week22/dielectric_limit.json", None, True),
+            ("outputs/week22/dielectric_limit.csv", None, True),
+            ("outputs/week22/dielectric_limit.md", None, True),
+            ("outputs/week22/neb_refinement.json", None, True),
+            ("outputs/week22/neb_refinement.csv", None, True),
+            ("outputs/week22/neb_refinement.md", None, True),
+            ("outputs/week22/sigma_boundary_resolution.json", None, True),
+            ("outputs/week22/sigma_boundary_resolution.md", None, True),
+            ("docs/33_week22_report.md", "week22_report_full.md", True),
+            ("outputs/figures/figure_manifest_week22_stage23.md",
+             "artifacts/figure_manifest_week22_stage23.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F43_*.png", "outputs/figures/F44_*.png"],
+        "commands": [
+            "python scripts/run_thermal_correction_sample.py",
+            "python scripts/analyze_dielectric_limit.py",
+            "python scripts/analyze_neb_refinement.py",
+            "python scripts/check_sigma_boundary_resolution.py",
+            "python scripts/make_stage23_figure.py",
+            "python scripts/gen_week22_report.py",
+            "python scripts/build_deliverables.py --weeks 22",
+        ],
+    },
 }
 
 
@@ -1084,6 +1114,18 @@ def render_report(week, wdir, missing, excluded):
                        ("{w21_phase_block}", w21["phase_block"]),
                        ("{w21_prospective_block}", w21["prospective_block"]),
                        ("{w21_table_block}", w21["table_block"])):
+        text = text.replace(key, value)
+    w22 = week22_blocks(load_json(W22_THERMAL_JSON), load_json(W22_DIELECTRIC_JSON),
+                        load_json(W22_NEB_JSON), load_json(W22_GRID_JSON))
+    for key, value in (("{w22_did}", w22["did"]),
+                       ("{w22_metric}", w22["metric"]),
+                       ("{w22_qc}", w22["qc"]),
+                       ("{w22_limit}", w22["limit"]),
+                       ("{w22_r9_block}", w22["r9_block"]),
+                       ("{w22_r4b_block}", w22["r4b_block"]),
+                       ("{w22_r11_block}", w22["r11_block"]),
+                       ("{w22_grid_block}", w22["grid_block"]),
+                       ("{w22_table_block}", w22["table_block"])):
         text = text.replace(key, value)
     w19 = week19_blocks(load_json(W19_RUNG_PATH), load_json(W19_ARMS_PATH),
                         load_json(W19_ARMS_ANALYSIS_PATH))
@@ -3781,12 +3823,298 @@ def week21_checks(wdir: Path):
     return checks
 
 
+def week22_blocks(thermal, dielectric, neb, grid):
+    """Render the week-22 (Stage 23 batch B) narrative blocks.
+
+    Every number is read back out of ``outputs/week22/``'s four JSONs, so the
+    distilled report cannot drift from the artefacts it summarises.
+    """
+
+    keys = ("did", "metric", "qc", "limit", "summary", "r9_block", "r4b_block",
+            "r11_block", "grid_block", "table_block")
+    if thermal is None or dielectric is None or neb is None:
+        text = "（`outputs/week22/` 的产物不齐：thermal / dielectric / neb 至少缺一个）"
+        return {key: text for key in keys}
+    grid = grid or {}
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def signed(value, digits=4):
+        if value is None:
+            return "n/a"
+        return "%+.*f" % (digits, float(value))
+
+    spread = thermal.get("spread") or {}
+    delta_m = thermal.get("delta_m") or {}
+    ox = (spread.get("oxidation") or {}).get("thermal_G") or {}
+    red = (spread.get("reduction") or {}).get("thermal_G") or {}
+    ox_share = 100.0 * float(ox.get("std_ev") or 0.0) / float(delta_m.get("oxidation_ev") or 1.0)
+    red_share = 100.0 * float(red.get("std_ev") or 0.0) / float(delta_m.get("reduction_ev") or 1.0)
+
+    law = dielectric.get("power_law") or {}
+    consts = [entry["mean_x_epsilon_mev"] for label, entry in law.items()
+              if label != "1e6" and entry.get("n", 0) >= 12]
+    prefactor = (sum(consts) / len(consts) / 1000.0) if consts else 0.0
+    worst = dielectric.get("worst_vs_200") or {}
+    pairs = dielectric.get("pairs") or {}
+    pair_200 = pairs.get("200") or {}
+    pair_1000 = pairs.get("1000") or {}
+    dm_mev = dielectric.get("delta_m_mev") or {}
+    worst_share = (100.0 * float(pair_200.get("max_abs_mev") or 0.0)
+                   / float(dm_mev.get("oxidation") or 1.0))
+    offenders = dielectric.get("nonmonotone_rows") or []
+
+    cells = neb.get("cells") or []
+    by_cell = {cell.get("cell"): cell for cell in cells}
+    fragile = by_cell.get("EC/cation/5") or {}
+    n_conflicts = neb.get("n_conflicts_with_stage19")
+    both_basin = [cell["cell"] for cell in cells if cell.get("verdict") == "one_basin"]
+
+    axes = ((grid.get("analysis") or {}).get("axes") or {})
+    entries = [record for axis in axes.values() for record in axis.values()]
+    worst_shift = max([abs(record.get("shift_ev") or 0.0) for record in entries] or [0.0])
+    worst_steps = max([abs(record.get("shift_in_grid_steps") or 0.0) for record in entries] or [0.0])
+
+    did = ("R9：8 个分子 x 3 个电荷态的 GFN2-xTB `--ohess` 热修正抽样（%s 个作业，几何一律复用"
+           "冻结 G1，不重新优化）。R4b：18 分子 x 3 态、eps = 1e6 的裸 CPCM 单点（%s 行）补齐导体极限，"
+           "与既有的 eps = 5/7/10/14/20/28/40/80/200/1000 网格合成一条扫描。"
+           "R11：Stage 19 三格临界格的真 NEB 精修（端点不重优化，峰高取自 ORCA 的 "
+           "`<stem>.final.interp`）。另加一项对 Week 21 σ 相图 6 条边界的一步长方格分辨率复核"
+           "（零新增计算）。"
+           % (thermal.get("n_jobs"), dielectric.get("n_rows")))
+    metric = ("R9 的热修正分子间离散度 std 是 %s / %s eV，只有同轴 delta_m 的 **%s%% / %s%%**；"
+              "R4b 把「介电层免费」量化成 `abs(dE) x eps = %s-%s meV` 的幂律（prefactor 约 %s eV/eps），"
+              "eps = 200 的残余最大 %s meV（%s / %s），是氧化轴 delta_m 的 **%s%%**；"
+              "R11 用真 NEB 读到 EC/cation/5 的峰高只有 **%s eV**，是直线界 %s eV 的 1/%s，"
+              "比 k_B T = %s eV 小 %s 倍——%s 个取得判决的格子全部落在 1 kT 以下，"
+              "与 Stage 19 的 RMSD 判决冲突 %s 格。"
+              % (num(ox.get("std_ev"), 4), num(red.get("std_ev"), 4),
+                 num(ox_share, 1), num(red_share, 1),
+                 num(min(consts) if consts else 0.0, 0), num(max(consts) if consts else 0.0, 0),
+                 num(prefactor, 2),
+                 num(pair_200.get("max_abs_mev"), 2), worst.get("name"), worst.get("state"),
+                 num(worst_share, 2),
+                 num(fragile.get("barrier_ev"), 6),
+                 num(fragile.get("linear_barrier_ev"), 5),
+                 num((float(fragile.get("bound_ratio") or 0.0)), 1),
+                 num(neb.get("thermal_ev"), 4),
+                 num(float(neb.get("thermal_ev") or 0.0) / float(fragile.get("barrier_ev") or 1.0), 0),
+                 len(both_basin), n_conflicts))
+    qc = ("R9：%s/%s 个 `--ohess` 作业完成；R4b：%s/%s 个 eps = 1e6 单点 TERMINATED NORMALLY、"
+          "无一个未收敛；R11：%s/%s 格拿到收敛路径，峰高由 `.final.interp` 读出并与 `.out` 的 "
+          "HEI 块交叉校验；网格复核：%s/%s 条边界复现源陈述。"
+          % (thermal.get("n_jobs"), thermal.get("n_jobs"),
+             dielectric.get("n_rows"), dielectric.get("n_rows"),
+             neb.get("n_ok"), neb.get("n_cells"),
+             sum(1 for record in entries if record.get("reproduces_source")), len(entries)))
+    limit = ("**限制**：R9 的带电态 Hessian 取在**中性 G1 几何**上（%s 个带电作业里 %s 个报出虚频），"
+             "所以它给出的是「被略去的热修正有多大」的量级上界，不是热化学可观测量；"
+             "R4b 的 eps = 80/200/1000/1e6 全部**不属预注册扫描集**，不参与任何冻结量，"
+             "且 eps = 1e6 是「近似导体」而非严格导体边界条件；R11 是 **regular NEB（climbing : no）**，"
+             "峰高只作「有没有峰」的判读，且阈值**不回溯改写** Stage 19 的判决。"
+             % (2 * (thermal.get("n_molecules") or 0), thermal.get("n_imaginary_charged")))
+    summary_text = ("R9 把「没算过热修正」变成「算过且有界」：8 分子 x 3 态的 xTB 热修正离散度只有 "
+                    "delta_m 的 %s%% / %s%%，整项略去不改变任何排序结论。R4b 把「介电层免费」"
+                    "量化成一条可以提前使用的幂律 `abs(dE) ~ %s eV / eps`，eps = 200 的残余只剩 "
+                    "%s meV（delta_m 的 %s%%）。R11 用真 NEB 把 Stage 19 那个 0.02 A 的几何阈值判反的 "
+                    "EC/阳离子/eps=5 一格救回来：峰高 %s eV，比 k_B T 还小 %s 倍——"
+                    "**同一个盆地被判成了两个解**。"
+                    % (num(ox_share, 1), num(red_share, 1), num(prefactor, 2),
+                       num(pair_200.get("max_abs_mev"), 2), num(worst_share, 2),
+                       num(fragile.get("barrier_ev"), 6),
+                       num(float(neb.get("thermal_ev") or 0.0) / float(fragile.get("barrier_ev") or 1.0), 0)))
+
+    r9_block = "\n".join(
+        ["| 轴 | mean thermal_G (eV) | std | min | max | max abs | mean thermal_H (eV) | 相对 delta_m |",
+         "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+        + ["| %s | %s | **%s** | %s | %s | %s | %s | %s%% |"
+           % (label, num(block.get("mean_ev"), 4), num(block.get("std_ev"), 4),
+              num(block.get("min_ev"), 4), num(block.get("max_ev"), 4),
+              num(block.get("max_abs_ev"), 4),
+              num((spread.get(axis) or {}).get("thermal_H", {}).get("mean_ev"), 4),
+              num(100.0 * float(block.get("std_ev") or 0.0)
+                  / float(delta_m.get(axis + "_ev") or 1.0), 1))
+           for axis, label, block in (("oxidation", "氧化", ox), ("reduction", "还原", red))]
+        + ["",
+           "对照冻结的 **delta_m**（`outputs/week6/delta_m_frozen.json`）：氧化 %s eV、还原 %s eV。"
+           % (num(delta_m.get("oxidation_ev"), 3), num(delta_m.get("reduction_ev"), 3))])
+
+    r4b_block = "\n".join(
+        ["| eps | 平均 abs(dE) vs eps=1e6 (meV) | abs(dE) x eps (meV) |",
+         "| --- | --- | --- |"]
+        + ["| %s | %s | %s |" % (label, num(law[label].get("mean_abs_mev"), 2),
+                                 num(law[label].get("mean_x_epsilon_mev"), 0))
+           for label in ("5", "7", "10", "14", "20", "28", "40", "80", "200", "1000")
+           if label in law]
+        + ["",
+           "相对 **eps = 200**：%s 个 (分子, 电荷态) 组合，`|dE|` 最大 **%s meV**（%s / %s）、平均 %s meV，"
+           "是氧化轴 delta_m 的 **%s%%**；相对 **eps = 1000** 最大只剩 **%s meV**。"
+           % (pair_200.get("n"), num(pair_200.get("max_abs_mev"), 2),
+              worst.get("name"), worst.get("state"), num(pair_200.get("mean_abs_mev"), 2),
+              num(worst_share, 2), num(pair_1000.get("max_abs_mev"), 3))]
+        + ([("逐分子一致性：%s 个组合的 `dE` 随 eps 单调下降，例外是 %s（最大回跳 %s meV），"
+            "属阴离子 SCF 在不同 eps 上落到不同解分支的求解器伪迹，不是介电残差。"
+            % (dielectric.get("n_rows_monotone"),
+               "、".join("%s / %s" % (item.get("name"), item.get("state")) for item in offenders),
+               num(max([item.get("max_backstep_mev") or 0.0 for item in offenders] or [0.0]), 1)))]
+           if offenders else
+           ["逐分子一致性：全部 %s 个组合的 `dE` 都随 eps 单调下降。"
+            % dielectric.get("n_rows_monotone")]))
+
+    r11_block = "\n".join(
+        ["| 格 | Stage 19 (RMSD) | RMSD (A) | 直线界 (eV) | **NEB 峰高 (eV)** | 直线/NEB | NEB 判决 | 与 Stage 19 |",
+         "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+        + ["| %s | %s | %s | %s | **%s** | %s | %s | %s |"
+           % (cell.get("cell"), cell.get("stage19_verdict") or "n/a",
+              num(cell.get("rmsd_a_stage19"), 3),
+              num(cell.get("linear_barrier_ev"), 5) if cell.get("linear_barrier_ev") else "n/a",
+              num(cell.get("barrier_ev"), 6) if cell.get("barrier_ev") else "未收敛",
+              num(cell.get("bound_ratio"), 2) if cell.get("bound_ratio") else "-",
+              cell.get("verdict"),
+              {True: "一致", False: "**冲突**", None: "-"}[cell.get("agrees_with_stage19")])
+           for cell in cells]
+        + ["",
+           "判据（Stage 21 内部双侧口径，**不回溯改写 Stage 19**）：`<= 1 kT = %s eV` -> `one_basin`，"
+           "`>= 1 kcal/mol = %s eV` -> `separated`，之间 `inconclusive`。"
+           % (num(neb.get("thermal_ev"), 4), num(neb.get("kcal_ev"), 6))])
+
+    r4b_shift = num(0.0, 0)
+    grid_block = "\n".join(
+        ["| 轴 | 指标 | 阈值 | 源陈述 (eV) | 插值 (eV) | 偏差 (eV) | 偏差 / 网格步长 |",
+         "| --- | --- | --- | --- | --- | --- | --- |"]
+        + ["| %s | %s | %s | %s | %s | %s | %s |"
+           % (axis, record.get("metric"), record.get("threshold"),
+              num(record.get("grid"), 4), num(record.get("interpolated"), 4),
+              signed(record.get("shift_ev"), 4), num(record.get("shift_in_grid_steps"), 2))
+           for axis in ("oxidation", "reduction")
+           for record in (axes.get(axis) or {}).values()]
+        + ["",
+           "网格步长 %s eV；%s 条边界全部 `reproduces_source = True`，最大偏差 %s eV = %s 个网格步长。"
+           "结论：Week 21 的边界是「一步长」级的陈述，但没有变成网格假象；引用时应写成 +- %s eV。"
+           % (num((grid.get("analysis") or {}).get("step_ev"), 2), len(entries),
+              num(worst_shift, 4), num(worst_steps, 2),
+              num((grid.get("analysis") or {}).get("step_ev"), 2))])
+
+    table_block = "\n".join(
+        ["| 文件 | 内容 |", "| --- | --- |"]
+        + ["| %s | %s |" % (name, note) for name, note in W22_TABLE_ROWS])
+
+    return {"did": did, "metric": metric, "qc": qc, "limit": limit,
+            "summary": summary_text, "r9_block": r9_block, "r4b_block": r4b_block,
+            "r11_block": r11_block, "grid_block": grid_block, "table_block": table_block}
+
+
+def week22_checks(wdir: Path):
+    """QC for week 22 (Stage 23 batch B: thermal sample, conductor limit, NEB).
+
+    Every number is read back out of ``thermal_correction_sample.json``,
+    ``dielectric_limit.json``, ``neb_refinement.json`` and
+    ``sigma_boundary_resolution.json``.
+    """
+
+    checks = []
+    thermal = load_json(wdir / "thermal_correction_sample.json")
+    dielectric = load_json(wdir / "dielectric_limit.json")
+    neb = load_json(wdir / "neb_refinement.json")
+    grid = load_json(wdir / "sigma_boundary_resolution.json")
+    for name, data in (("thermal_correction_sample", thermal),
+                       ("dielectric_limit", dielectric),
+                       ("neb_refinement", neb),
+                       ("sigma_boundary_resolution", grid)):
+        if data is None:
+            checks.append(check(name + ".present", None, "source not found"))
+            return checks
+        checks.append(check(name + ".present", True, name + ".json present"))
+
+    def near(value, expected, tol):
+        return value is not None and abs(float(value) - expected) < tol
+
+    spread = thermal.get("spread") or {}
+    delta_m = thermal.get("delta_m") or {}
+    checks.append(check("week22.thermal_sample_shape",
+                        thermal.get("n_molecules") == 8 and thermal.get("n_jobs") == 24
+                        and len(thermal.get("per_molecule") or []) == 8,
+                        "molecules=%s jobs=%s rows=%s"
+                        % (thermal.get("n_molecules"), thermal.get("n_jobs"),
+                           len(thermal.get("per_molecule") or []))))
+    checks.append(check("week22.thermal_spread_under_delta_m",
+                        float((spread.get("oxidation") or {}).get("thermal_G", {}).get("std_ev") or 1.0)
+                        < 0.10 * float(delta_m.get("oxidation_ev") or 0.0)
+                        and float((spread.get("reduction") or {}).get("thermal_G", {})
+                                  .get("std_ev") or 1.0)
+                        < 0.06 * float(delta_m.get("reduction_ev") or 0.0),
+                        "std_ox=%s std_red=%s"
+                        % ((spread.get("oxidation") or {}).get("thermal_G", {}).get("std_ev"),
+                           (spread.get("reduction") or {}).get("thermal_G", {}).get("std_ev"))))
+    checks.append(check("week22.thermal_charged_hessian_caveat",
+                        thermal.get("n_imaginary_charged") == 2
+                        and "imaginary" in ((thermal.get("definition") or {}).get("caveat") or ""),
+                        "n_imaginary_charged=%s" % thermal.get("n_imaginary_charged")))
+
+    law = dielectric.get("power_law") or {}
+    settled = [entry["mean_x_epsilon_mev"] for label, entry in law.items()
+               if label in ("20", "28", "40", "80", "200", "1000")]
+    checks.append(check("week22.dielectric_one_over_epsilon_law",
+                        len(settled) == 6
+                        and max(settled) / min(settled) < 1.02
+                        and all(2000.0 < value < 2250.0 for value in settled),
+                        "products=%s" % [round(value, 1) for value in settled]))
+    worst = dielectric.get("worst_vs_200") or {}
+    dm_mev = dielectric.get("delta_m_mev") or {}
+    checks.append(check("week22.dielectric_conductor_limit_negligible",
+                        near(worst.get("delta_200_mev"), 19.617119019423267, 1e-9)
+                        and worst.get("delta_200_mev")
+                        <= 0.03 * float(dm_mev.get("oxidation") or 0.0),
+                        "worst_200=%s name=%s/%s"
+                        % (worst.get("delta_200_mev"), worst.get("name"), worst.get("state"))))
+    checks.append(check("week22.dielectric_nonmonotone_is_flagged",
+                        dielectric.get("n_rows_monotone") is not None
+                        and len(dielectric.get("nonmonotone_rows") or []) <= 2
+                        and (dielectric.get("pairs") or {}).get("200", {}).get("min_signed_mev", -1) > 0,
+                        "monotone=%s flagged=%s"
+                        % (dielectric.get("n_rows_monotone"),
+                           [row.get("name") for row in dielectric.get("nonmonotone_rows") or []])))
+
+    cells = {cell.get("cell"): cell for cell in (neb.get("cells") or [])}
+    fragile = cells.get("EC/cation/5") or {}
+    checks.append(check("week22.neb_shape",
+                        neb.get("n_cells") == 3 and neb.get("n_ok") == 2,
+                        "n_ok=%s/%s" % (neb.get("n_ok"), neb.get("n_cells"))))
+    checks.append(check("week22.neb_fragile_cell_is_one_basin",
+                        fragile.get("verdict") == "one_basin"
+                        and near(fragile.get("barrier_ev"), 0.0001414992084791376, 1e-18),
+                        "verdict=%s barrier=%s" % (fragile.get("verdict"),
+                                                   fragile.get("barrier_ev"))))
+    checks.append(check("week22.neb_conflicts_with_stage19",
+                        neb.get("n_conflicts_with_stage19") == 1
+                        and fragile.get("agrees_with_stage19") is False,
+                        "conflicts=%s" % neb.get("n_conflicts_with_stage19")))
+    checks.append(check("week22.neb_thresholds_declared",
+                        near(neb.get("thermal_ev"), 0.0257, 1e-9)
+                        and near(neb.get("kcal_ev"), 0.043364, 1e-9)
+                        and "not back-applied" in (neb.get("criterion_note") or ""),
+                        "1kT=%s 1kcal=%s" % (neb.get("thermal_ev"), neb.get("kcal_ev"))))
+
+    entries = [record for axis in ((grid.get("analysis") or {}).get("axes") or {}).values()
+               for record in axis.values()]
+    step = (grid.get("analysis") or {}).get("step_ev")
+    checks.append(check("week22.grid_resolution_reproduces_source",
+                        len(entries) == 6
+                        and all(record.get("reproduces_source") is True for record in entries)
+                        and all(abs(record.get("shift_in_grid_steps") or 99.0) <= 1.0
+                                for record in entries)
+                        and near(step, 0.05, 1e-12),
+                        "n=%s step=%s" % (len(entries), step)))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
                   9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks,
                   13: week13_checks, 14: week14_checks, 15: week15_checks,
                   16: week16_checks, 17: week17_checks, 18: week18_checks,
-                  19: week19_checks, 20: week20_checks, 21: week21_checks}
+                  19: week19_checks, 20: week20_checks, 21: week21_checks, 22: week22_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -3888,6 +4216,72 @@ Week 21 执行 `docs/31_plan_revision_expert_review.md` 的批次 A：**R1（含
 {artifact_list}
 
 ## 9. 缺失源
+
+{missing_list}
+"""
+
+
+REPORT_TEMPLATES[22] = """# Week 22 成果小结 —— Stage 23（批次 B：热修正抽样 + 导体极限诊断 + NEB 精修）
+
+Week 22 执行 `docs/31_plan_revision_expert_review.md` 的批次 B：**R9、R4b、R11**，
+外加一项对 Week 21 σ 相图边界的网格分辨率复核。与批次 A 不同，本周**有新增电子结构**：
+24 个 GFN2-xTB `--ohess`、54 个 eps = 1e6 的裸 CPCM 单点、以及三格真 NEB；
+几何一律复用冻结 G1 或 Stage 19 的弛豫终点，**没有任何一步重新优化几何**。
+
+> 周内最不可回避的一条更正是能量尺子对几何尺子的：R11 用真 NEB 取代直线插值之后，
+> Stage 19 用 0.02 A 的 RMSD 阈值判成「两个独立解」的 EC/阳离子/eps=5 一格，
+> 其最小能量路径上的峰高只有 **0.141 meV**——比 k_B T 小 182 倍，两端点就是**同一个盆地**。
+> 直线插值给出的 4.245 meV 已经只是上界，几何阈值则连方向都判错了。
+
+完整版本见 `week22_report_full.md`。
+
+## 1. 本周做了什么
+
+{w22_did}
+
+## 2. 关键数字
+
+{w22_metric}
+
+## 3. R9：把「没算过热修正」变成「算过、且有界」
+
+{w22_r9_block}
+
+> 结论不是「热修正很小」，而是「热修正的**分子间离散度**比同一轴的 delta_m 低一个数量级，
+> 所以整项略去不会改变任何排序结论」。限制与数字同时引用：带电态 Hessian 取在中性 G1 几何上。
+
+## 4. R4b：裸 CPCM 的导体极限（附加诊断）
+
+{w22_r4b_block}
+
+> **不属预注册扫描集**（预注册网格是 `[5, 10, 20, 40]`）；它既不改 `rank`，也不改 `delta_m` / `sigma`。
+> 它给出的是一条可以提前使用的量：`abs(dE(eps)) ~ 2.1 eV / eps`。
+
+## 5. R11：真 NEB 取代直线插值上界
+
+{w22_r11_block}
+
+> 阈值沿用 Stage 21 的内部双侧判据，**不回溯改写** Stage 19 的既有判决；
+> 本轮 NEB 是 regular（`climbing : no`）而非 climbing-image，峰高只作「有没有峰」的判读。
+
+## 6. Week 21 边界的网格分辨率复核
+
+{w22_grid_block}
+
+## 7. 文件清单
+
+{w22_table_block}
+
+## 8. QC 与限制
+
+- {w22_qc}
+- {w22_limit}
+
+## 9. 本周产物
+
+{artifact_list}
+
+## 10. 缺失源
 
 {missing_list}
 """
@@ -4598,7 +4992,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F42 中属于该周的部分）
+    ├── artifacts/            图（F0–F44 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -4631,6 +5025,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 {w19_row}
 {w20_row}
 {w21_row}
+{w22_row}
 
 ## 如何复现
 ```powershell
@@ -4641,7 +5036,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -4792,6 +5187,9 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 21 成果小结 · Stage 22（批次 A）
 {w21_summary}
 
+### Week 22 成果小结 · Stage 23（批次 B：热修正抽样 + 导体极限诊断 + NEB 精修）
+{w22_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -4843,7 +5241,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F42）
+## 5. 图表索引（F0–F44）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -4889,6 +5287,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f40_row}
 {f41_row}
 {f42_row}
+{f43_row}
+{f44_row}
 
 ## 6. 复现命令
 ```powershell
@@ -4947,6 +5347,7 @@ $env:PYTHONIOENCODING = "utf-8"
 19. {w19_summary_limit}
 20. {w20_summary_limit}
 21. {w21_summary_limit}
+22. {w22_summary_limit}
 """
 
 
@@ -6421,6 +6822,35 @@ W21_TABLE_ROWS = (
     ("`outputs/week4/p1_anchor_comparison.json`（新增 `arm_alignment` / `tau_b_reference`）",
      "R1 + R10：三条臂对齐到同一批 10 个分子后的 tau_b、配对 Delta tau_b 的 CI 与精确置换 p，"
      "以及两类 tau_b 的分列口径。"),
+)
+
+
+W22_THERMAL_JSON = REPO / "outputs" / "week22" / "thermal_correction_sample.json"
+W22_DIELECTRIC_JSON = REPO / "outputs" / "week22" / "dielectric_limit.json"
+W22_NEB_JSON = REPO / "outputs" / "week22" / "neb_refinement.json"
+W22_GRID_JSON = REPO / "outputs" / "week22" / "sigma_boundary_resolution.json"
+F43_NOTE_PRESENT = (
+    "Stage 23 R4b（附加诊断）：18 分子 x 3 态的裸 CPCM 单点补齐到 eps = 1e6，与既有 "
+    "eps = 5..1000 网格合成一条扫描——残余不是饱和而是几乎严格的 1/eps 幂律"
+    "（abs(dE) x eps = 2057-2178 meV，prefactor 约 2.1 eV/eps），eps = 200 时最大残余 19.62 meV"
+    "（PC/anion），只有氧化轴 delta_m 的 2.80%。")
+F43_NOTE_ABSENT = "（Stage 23 R4b 导体极限诊断尚未产出；week22 尚未生成）"
+F44_NOTE_PRESENT = (
+    "Stage 23 R11：Stage 19 三格临界格的真 NEB 精修（端点不重优化，峰高取自 ORCA 的 "
+    "<stem>.final.interp）。EC/cation/eps=5 的峰高 0.000141 eV，是直线界 0.00424 eV 的 1/30、"
+    "k_B T 的 0.6%：两端点其实是同一个盆地，Stage 19 的 0.02 A RMSD 阈值在该格过度判定。")
+F44_NOTE_ABSENT = "（Stage 23 R11 NEB 精修尚未产出；week22 尚未生成）"
+W22_TABLE_ROWS = (
+    ("`thermal_correction_sample.json` / `.csv` / `.md`",
+     "R9：8 分子 x 3 电荷态的 GFN2-xTB `--ohess` 热修正抽样（24 个作业，几何复用冻结 G1），"
+     "含逐分子 dH / dG / dZPE 与两轴的 mean / std / max abs。"),
+    ("`dielectric_limit.json` / `.csv` / `.md`",
+     "R4b：裸 CPCM 的导体极限诊断（eps = 5..1e6，54 个单点；含 1/eps 幂律、与 delta_m 的比值、"
+     "逐分子单调性例外清单）。"),
+    ("`neb_refinement.json` / `.csv` / `.md`",
+     "R11：三格 NEB 精修的收敛路径、峰高、直线/真路径比值、两侧判据下的一致/冲突清单。"),
+    ("`sigma_boundary_resolution.json` / `.md`",
+     "Week 21 σ 相图 6 条边界的一步长方格分辨率复核（零新增计算）。"),
 )
 
 
@@ -9177,9 +9607,9 @@ def parse_args(argv=None):
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
     parser.add_argument("--weeks",
-                        default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
+                        default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22",
                         help="comma-separated week numbers "
-                             "(default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21)")
+                             "(default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -9726,6 +10156,65 @@ def main(argv=None):
         placeholders += (("{w21_summary}", w21_note),
                          ("{w21_summary_limit}", w21_all["limit"]),
                          ("{w21_row}", w21_row))
+        f43_figure = REPO / "outputs" / "figures" / "F43_dielectric_limit_check.png"
+        if f43_figure.exists():
+            f43_row = ("| F43 | `F43_dielectric_limit_check.png` | " + F43_NOTE_PRESENT
+                       + " | week22 |")
+        else:
+            f43_row = "| F43 | 未生成 | " + F43_NOTE_ABSENT + " | —— |"
+        f44_figure = REPO / "outputs" / "figures" / "F44_neb_refinement.png"
+        if f44_figure.exists():
+            f44_row = ("| F44 | `F44_neb_refinement.png` | " + F44_NOTE_PRESENT
+                       + " | week22 |")
+        else:
+            f44_row = "| F44 | 未生成 | " + F44_NOTE_ABSENT + " | —— |"
+        w22_all = week22_blocks(load_json(W22_THERMAL_JSON), load_json(W22_DIELECTRIC_JSON),
+                                load_json(W22_NEB_JSON), load_json(W22_GRID_JSON))
+        w22_note = w22_all["summary"]
+        w22_thermal = load_json(W22_THERMAL_JSON) or {}
+        w22_diel = load_json(W22_DIELECTRIC_JSON) or {}
+        w22_neb = load_json(W22_NEB_JSON) or {}
+        w22_law = w22_diel.get("power_law") or {}
+        w22_consts = [entry["mean_x_epsilon_mev"] for label, entry in w22_law.items()
+                      if label != "1e6" and entry.get("n", 0) >= 12]
+        w22_spread = w22_thermal.get("spread") or {}
+        w22_delta_m = w22_thermal.get("delta_m") or {}
+        w22_cells = {cell.get("cell"): cell for cell in (w22_neb.get("cells") or [])}
+        w22_fragile = w22_cells.get("EC/cation/5") or {}
+        if not W22_THERMAL_JSON.exists() or not W22_DIELECTRIC_JSON.exists():
+            w22_row = ("| week22 | Stage 23（批次 B：热修正 + 导体极限 + NEB 精修） | "
+                       "（缺 `thermal_correction_sample.json` / `dielectric_limit.json`） | —— |")
+        else:
+            w22_row = ("| week22 | Stage 23（批次 B：热修正 + 导体极限 + NEB 精修） | "
+                       "R9 的热修正分子间离散度只有同轴 delta_m 的 %s%% / %s%%（整项略去不改排序）；"
+                       "R4b 把「介电层免费」量化成 `abs(dE) x eps = %s-%s meV` 的幂律"
+                       "（eps = 200 的残余最大 %s meV，是氧化轴 delta_m 的 %s%%）；"
+                       "R11 用真 NEB 读到 EC/cation/eps=5 的峰高只有 %s eV（直线界 %s eV 的 1/%s），"
+                       "Stage 19 的 0.02 A RMSD 阈值在该格**过度判定**，与 RMSD 判决冲突 %s 格"
+                       % (_fnum(100.0 * float((w22_spread.get("oxidation") or {})
+                                                     .get("thermal_G", {}).get("std_ev") or 0.0)
+                                       / float(w22_delta_m.get("oxidation_ev") or 1.0), 1),
+                          _fnum(100.0 * float((w22_spread.get("reduction") or {})
+                                                     .get("thermal_G", {}).get("std_ev") or 0.0)
+                                       / float(w22_delta_m.get("reduction_ev") or 1.0), 1),
+                          _fnum(min(w22_consts) if w22_consts else 0.0, 0),
+                          _fnum(max(w22_consts) if w22_consts else 0.0, 0),
+                          _fnum((w22_diel.get("pairs") or {}).get("200", {})
+                                       .get("max_abs_mev"), 2),
+                          _fnum(100.0 * float((w22_diel.get("pairs") or {}).get("200", {})
+                                                     .get("max_abs_mev") or 0.0)
+                                       / float((w22_diel.get("delta_m_mev") or {})
+                                               .get("oxidation") or 1.0), 2),
+                          _fnum(w22_fragile.get("barrier_ev"), 6),
+                          _fnum(w22_fragile.get("linear_barrier_ev"), 5),
+                          _fnum(float(w22_fragile.get("bound_ratio") or 0.0), 1),
+                          w22_neb.get("n_conflicts_with_stage19"))
+                       + " | Gate 0 CLOSED |")
+        placeholders += (("{w22_summary}", w22_note),
+                         ("{w22_summary_limit}", w22_all["limit"]),
+                         ("{w22_row}", w22_row),
+                         ("{f43_row}", f43_row),
+                         ("{f44_row}", f44_row))
         for key, value in placeholders:
             summary = summary.replace(key, value)
         readme = README_TEMPLATE
