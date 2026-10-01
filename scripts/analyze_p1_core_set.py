@@ -29,7 +29,10 @@ differently under the method change.
 Outputs
 -------
 outputs/week4/p1_core_set_derived.csv        one row per molecule, all arms
-outputs/week4/p1_anchor_comparison.json      value + rank comparison per arm
+outputs/week4/p1_anchor_comparison.json      value + rank comparison per arm,
+                                             plus the R1 aligned-subset block:
+                                             one molecule set, paired bootstrap and
+                                             exact paired permutation on Delta tau_b
 outputs/week4/p1_decision_stability.json/md  the decision numbers
 outputs/figures/F4..F7*.png                  the figures (English labels)
 outputs/figures/figure_manifest_week4.md     figure -> input digests
@@ -41,9 +44,12 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import statistics
 import sys
 from pathlib import Path
+
+import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -857,6 +863,252 @@ def write_report(path, derived, comparison, ox, red, figures, family_table) -> P
     return path
 
 
+#: The aligned arm comparison (docs/31 R1) needs a paired randomisation test on
+#: the *difference* between two arms.  With n molecules the arm-swap null has
+#: exactly 2**n assignments, which stays enumerable while 2**n <= this limit;
+#: above it a frozen-seed sample is drawn and the result is flagged inexact.
+#: At n = 10 that is 1024 assignments, so the reported p-value is exact.
+PERMUTATION_LIMIT = 200000
+PERMUTATION_SEED = 0xC0FFEE
+
+
+def k_abs_table(n: int) -> dict:
+    """The frozen shortlist-size rule, evaluated for a pool of ``n`` molecules.
+
+    ``config/prereg.yaml`` freezes the *rule* ``k_abs = max(1, floor(frac*N +
+    0.5))`` together with the 10 / 20 / 30 % fractions, and states that when the
+    pool changes size ``k`` is recomputed with the same formula while the
+    fractions stay put.  The core set is N = 18 (k = 2 / 4 / 5); the aligned arm
+    subset is N = 10 and the same formula returns 1 / 2 / 3.  That is an
+    interpolation *inside* the frozen rule, not a new criterion.
+
+    ``ranking._resolve_k`` implements ``round(frac * N)`` instead of
+    ``floor(frac * N + 0.5)``; the Week 7 review flagged that deviation.  Both
+    agree at N = 18 and at N = 10 for all three frozen fractions, so the aligned
+    table does not depend on which of the two is used -- and the table reports
+    that check per entry rather than asking the reader to trust it.
+    """
+
+    table = {}
+    for fraction in TOP_K_FRACTIONS:
+        prereg = max(1, math.floor(fraction * n + 0.5))
+        implementation = ranking._resolve_k(fraction, n)
+        table["k=%.2f" % fraction] = {
+            "fraction": fraction,
+            "k_prereg_formula": prereg,
+            "k_current_implementation": implementation,
+            "formulas_agree": prereg == implementation,
+        }
+    return table
+
+
+def arm_swap_p_value(x, y, reference, *, limit=PERMUTATION_LIMIT, seed=PERMUTATION_SEED) -> dict:
+    """Exact paired permutation test over per-molecule arm swaps.
+
+    The null is that the two arms are interchangeable molecule by molecule: for
+    each molecule the pairing is either ``(a_i, b_i)`` or ``(b_i, a_i)`` and the
+    reference is untouched.  Under that null the two rank agreements can differ
+    only by the luck of which molecule was assigned which arm.  Every one of the
+    ``2**n`` relabellings is enumerated while that count stays under ``limit``
+    (n = 10 -> 1024, so the p-value is exact); otherwise ``limit`` relabellings
+    are drawn from a frozen seed and ``exact`` is ``False``.  Smoothing is the
+    usual ``(hits + 1) / (total + 1)``.
+    """
+
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    reference = np.asarray(reference, dtype=float)
+    n = len(x)
+    total = 2 ** n
+    observed = ranking.kendall_tau_b(x, reference) - ranking.kendall_tau_b(y, reference)
+
+    if total <= limit:
+        seen = total
+        exact = True
+        swaps = (
+            np.array([(mask >> bit) & 1 for bit in range(n)], dtype=bool)
+            for mask in range(total)
+        )
+    else:
+        seen = limit
+        exact = False
+        rng = np.random.default_rng(seed)
+        swaps = (row.astype(bool) for row in rng.integers(0, 2, size=(limit, n)))
+
+    hits = 0
+    for swap in swaps:
+        u = np.where(swap, y, x)
+        v = np.where(swap, x, y)
+        difference = ranking.kendall_tau_b(u, reference) - ranking.kendall_tau_b(v, reference)
+        if abs(difference) >= abs(observed) - 1e-12:
+            hits += 1
+    return {
+        "observed_delta_tau_b": observed,
+        "p_value": (hits + 1) / (seen + 1),
+        "n_assignments": seen,
+        "total_assignments": total,
+        "exact": exact,
+    }
+
+
+def paired_tau_b_difference(computed_a, computed_b, reference) -> dict:
+    """Is ``tau_b(arm A) - tau_b(arm B)`` distinguishable from 0?
+
+    Two independent bootstrap intervals answer "is each tau_b distinguishable
+    from 0", *not* "do the two arms differ" -- and with n = 10 the intervals are
+    wide enough to overlap almost by construction.  This is the paired question.
+    It is paired twice over: both arms score the same molecules against the same
+    reference, so one resampling unit carries both terms at once.
+
+    Returns the observed difference, its paired percentile bootstrap interval
+    (the same 20-seed x 2000-replicate discipline as every other interval in the
+    project) and the exact paired permutation p-value.
+    """
+
+    x = np.asarray(computed_a, dtype=float)
+    y = np.asarray(computed_b, dtype=float)
+    ref = np.asarray(reference, dtype=float)
+    n = len(x)
+    observed = ranking.kendall_tau_b(x, ref) - ranking.kendall_tau_b(y, ref)
+
+    lows, highs = [], []
+    for seed in BOOTSTRAP_SEEDS:
+        rng = np.random.default_rng(seed)
+        draws = np.empty(BOOTSTRAP_REPETITIONS, dtype=float)
+        for index in range(BOOTSTRAP_REPETITIONS):
+            pick = rng.integers(0, n, n)
+            draws[index] = (
+                ranking.kendall_tau_b(x[pick], ref[pick])
+                - ranking.kendall_tau_b(y[pick], ref[pick])
+            )
+        lows.append(float(np.percentile(draws, 100.0 * BOOTSTRAP_ALPHA / 2.0)))
+        highs.append(float(np.percentile(draws, 100.0 * (1.0 - BOOTSTRAP_ALPHA / 2.0))))
+    low = float(statistics.median(lows))
+    high = float(statistics.median(highs))
+    return {
+        "observed_delta_tau_b": observed,
+        "paired_ci95": [low, high],
+        "paired_ci95_crosses_zero": bool(low <= 0.0 <= high),
+        "bootstrap_seeds": len(BOOTSTRAP_SEEDS),
+        "bootstrap_repetitions": BOOTSTRAP_REPETITIONS,
+        "permutation": arm_swap_p_value(x, y, ref),
+    }
+
+
+def arm_alignment_block(derived, xtb_audit) -> dict:
+    """R1: compare the three arms on one molecule set, then test the difference.
+
+    The Week 4 table compares arms that were scored on *different* molecules
+    (n = 12 / 10 / 12), which makes the headline "Delta-SCF keeps the best
+    ranking" a possible subset artefact -- VC and MA are dropped by exactly the
+    arm that wins it.  This block (a) names the molecules each arm loses and
+    why, (b) recomputes the values on the common subset with the same estimator,
+    and (c) replaces "do the independent intervals overlap?" with the paired
+    test the question actually needs.  The n = 12 numbers stay untouched beside
+    it: this is an additional reading, not a replacement.
+    """
+
+    arms = (
+        ("P0_koopmans_xTB", "ip_koopmans_ev", "GFN2-xTB Koopmans -eps_HOMO"),
+        ("GFN2_dSCF_xTB", "ip_xtb_dscf_ev", "GFN2-xTB Delta-SCF vertical IP"),
+        ("P1_r2scan3c", "ip_r2scan3c_ev", "r2SCAN-3c vertical IP"),
+    )
+    with_anchor = [row for row in derived if row["anchor_ip_ev"] is not None]
+    audit_names = sorted(xtb_audit)
+    audit_set = set(audit_names)
+    coverage = {
+        "arm": "GFN2_dSCF_xTB",
+        "source": "outputs/week2/method_audit_xtb.csv",
+        "n_molecules_in_source": len(audit_names),
+        "molecules_in_source": audit_names,
+        "core_set_molecules_absent_from_source": [
+            row["name"] for row in derived if row["name"] not in audit_set
+        ],
+        "note": (
+            "The GFN2-xTB Delta-SCF arm exists only for the molecules of the Stage 1 "
+            "method audit.  A molecule missing here was never submitted to that arm: "
+            "this is a coverage gap of the audit, not an SCF failure and not the "
+            "unbound_anion QC flag (which is an electron-affinity-side flag)."
+        ),
+    }
+
+    missing = {}
+    for name, key, _label in arms:
+        names = [row["name"] for row in with_anchor if row[key] is None]
+        if names:
+            missing[name] = {"molecules": names, "reason": coverage["note"]}
+
+    common = [
+        row for row in with_anchor
+        if all(row[key] is not None for _name, key, _label in arms)
+    ]
+    labels = [row["name"] for row in common]
+    reference = [row["anchor_ip_ev"] for row in common]
+
+    per_arm = {}
+    values = {}
+    for name, key, label in arms:
+        values[name] = [row[key] for row in common]
+        entry = compare_arm(values[name], reference, labels)
+        entry["arm_label"] = label
+        entry["tau_b_reference"] = "anchor-referenced (gas-phase experimental IP)"
+        per_arm[name] = entry
+
+    paired = {
+        "GFN2_dSCF_xTB_minus_P1_r2scan3c": paired_tau_b_difference(
+            values["GFN2_dSCF_xTB"], values["P1_r2scan3c"], reference
+        ),
+        "GFN2_dSCF_xTB_minus_P0_koopmans_xTB": paired_tau_b_difference(
+            values["GFN2_dSCF_xTB"], values["P0_koopmans_xTB"], reference
+        ),
+        "P1_r2scan3c_minus_P0_koopmans_xTB": paired_tau_b_difference(
+            values["P1_r2scan3c"], values["P0_koopmans_xTB"], reference
+        ),
+    }
+    headline_test = paired["GFN2_dSCF_xTB_minus_P1_r2scan3c"]
+    all_tests_unresolved = all(
+        entry["paired_ci95_crosses_zero"] for entry in paired.values()
+    )
+    return {
+        "why": (
+            "The three arms in the Week 4 table are not scored on the same molecules "
+            "(n = 12 / 10 / 12), so their tau_b values are not comparable as printed. "
+            "This block aligns them before comparing them (docs/31 R1)."
+        ),
+        "n_with_anchor": len(with_anchor),
+        "n_common_subset": len(common),
+        "common_subset": labels,
+        "excluded_from_common_subset": missing,
+        "arm_coverage": coverage,
+        "arms_on_common_subset": per_arm,
+        "paired_delta_tau_b": paired,
+        "k_abs": {
+            "rule": "config/prereg.yaml k_abs = max(1, floor(frac * N + 0.5))",
+            "n_core_set": 18,
+            "n_aligned": len(common),
+            "core_set": k_abs_table(18),
+            "aligned": k_abs_table(len(common)),
+            "note": (
+                "k is recomputed from the frozen rule because the pool changed size; "
+                "the fractions stay frozen.  Formula interpolation, not a new criterion."
+            ),
+        },
+        "verdict": {
+            "test": "GFN2_dSCF_xTB minus P1_r2scan3c",
+            "delta_tau_b": headline_test["observed_delta_tau_b"],
+            "paired_ci95": headline_test["paired_ci95"],
+            "permutation_p": headline_test["permutation"]["p_value"],
+            "permutation_exact": headline_test["permutation"]["exact"],
+            "status": "not_significant" if headline_test["paired_ci95_crosses_zero"] else "significant",
+            "all_three_pairwise_tests_unresolved": all_tests_unresolved,
+            "note": (
+                "docs/31 R1 acceptance: when the paired 95% CI crosses 0 the headline "
+                "must read 'the ranking difference is not established'."
+            ),
+        },
+    }
+
+
 def main(argv=None) -> int:
     args = parse_args(argv)
     if not args.p1.exists():
@@ -911,9 +1163,7 @@ def main(argv=None) -> int:
     }
     family_table = shift_by_family(derived)
     comparison["shift_by_family"] = family_table
-    (args.outdir / "p1_anchor_comparison.json").write_text(
-        json.dumps(comparison, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
-    )
+    comparison["arm_alignment"] = arm_alignment_block(derived, xtb)
 
     labels = [row["name"] for row in derived]
     ox = layer_stability(
@@ -926,6 +1176,44 @@ def main(argv=None) -> int:
         json.dumps({"oxidation": ox, "reduction": red}, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
         newline="\n",
+    )
+
+    # Every tau_b in this report must carry its reference object: the anchor table
+    # and the target model are two different questions (docs/31 R1, point 4).
+    aligned = comparison["arm_alignment"]["arms_on_common_subset"]
+    comparison["tau_b_reference"] = {
+        "anchor_referenced": {
+            "definition": (
+                "Kendall tau_b between an arm's vertical IP and the gas-phase experimental "
+                "IP anchors (data/anchors/gas_phase_anchors.csv, property=IP).  Every tau_b "
+                "in the Week 4 table belongs to this family; the n differs per arm."
+            ),
+            "carriers": {
+                "P0_koopmans_xTB": comparison["P0_koopmans_xTB"].get("kendall_tau_b"),
+                "GFN2_dSCF_xTB": comparison["GFN2_dSCF_xTB"].get("kendall_tau_b"),
+                "P1_r2scan3c": comparison["P1_r2SCAN3c"].get("kendall_tau_b"),
+                "P0_koopmans_xTB__common_subset": aligned["P0_koopmans_xTB"].get("kendall_tau_b"),
+                "GFN2_dSCF_xTB__common_subset": aligned["GFN2_dSCF_xTB"].get("kendall_tau_b"),
+                "P1_r2scan3c__common_subset": aligned["P1_r2scan3c"].get("kendall_tau_b"),
+                "n_of_common_subset": comparison["arm_alignment"]["n_common_subset"],
+            },
+        },
+        "target_model_referenced": {
+            "definition": (
+                "Kendall tau_b between the cheap arm P0 and the target model P1 on the same "
+                "molecules, with no external reference -- the decision-layer number of "
+                "p1_decision_stability.json.  Semantically different from the family above "
+                "and never to be quoted as if it were the same quantity."
+            ),
+            "carriers": {
+                "P0_vs_P1_oxidation": ox.get("kendall_tau_b"),
+                "P0_vs_P1_reduction": red.get("kendall_tau_b"),
+                "n": ox.get("n"),
+            },
+        },
+    }
+    (args.outdir / "p1_anchor_comparison.json").write_text(
+        json.dumps(comparison, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
     )
 
     figures = [
@@ -960,6 +1248,11 @@ def main(argv=None) -> int:
         },
         "oxidation": {"tau_b": ox.get("kendall_tau_b"), "overlap_20": ox.get("top_k", {}).get("k=0.20", {}).get("overlap")},
         "reduction": {"tau_b": red.get("kendall_tau_b"), "overlap_20": red.get("top_k", {}).get("k=0.20", {}).get("overlap")},
+        "arm_alignment": {
+            "n_common": comparison["arm_alignment"]["n_common_subset"],
+            "common_subset": comparison["arm_alignment"]["common_subset"],
+            "verdict": comparison["arm_alignment"]["verdict"],
+        },
         "derived_csv": derived_path.relative_to(REPO_ROOT).as_posix(),
         "report": report.relative_to(REPO_ROOT).as_posix(),
         "manifest": manifest.relative_to(REPO_ROOT).as_posix(),

@@ -295,6 +295,18 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "docs/30_*.md",
     "docs/31_*.md",
     "outputs/week20/**/*",
+    # Stage 22 (Week 21): batch A of the external review -- the aligned three-arm
+    # comparison with its paired test (R1+R10), the synthetic phase diagram that
+    # replaces the five-rung correlation (R2), the freeze-then-score prospective
+    # test (R3), and the scope rewrites (R6, R4a).  No new electronic structure.
+    "scripts/analyze_sigma_synthetic.py",
+    "scripts/analyze_sigma_prospective.py",
+    "scripts/gen_week21_report.py",
+    "tests/test_sigma_synthetic.py",
+    "tests/test_sigma_prospective.py",
+    "tests/test_week21_report.py",
+    "docs/32_*.md",
+    "outputs/week21/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large

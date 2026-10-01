@@ -776,6 +776,26 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 20",
         ],
     },
+    21: {
+        "topic": "Stage 22（批次 A：三臂对齐配对检验 + σ 相图 + 前瞻检验）",
+        "sources": [
+            ("outputs/week21/sigma_synthetic.json", None, True),
+            ("outputs/week21/sigma_prospective.json", None, True),
+            ("outputs/week21/sigma_prospective_frozen.json", None, True),
+            ("outputs/week21/sigma_prospective.md", None, True),
+            ("docs/32_week21_report.md", "week21_report_full.md", True),
+            ("outputs/figures/figure_manifest_week21.md",
+             "artifacts/figure_manifest_week21.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F42_*.png"],
+        "commands": [
+            "python scripts/analyze_sigma_synthetic.py",
+            "python scripts/analyze_sigma_prospective.py",
+            "python scripts/gen_week21_report.py",
+            "python scripts/build_deliverables.py --weeks 21",
+        ],
+    },
 }
 
 
@@ -1053,6 +1073,17 @@ def render_report(week, wdir, missing, excluded):
                        ("{w20_shell_block}", w20["shell_block"]),
                        ("{w20_refill_block}", w20["refill_block"]),
                        ("{w20_table_block}", w20["table_block"])):
+        text = text.replace(key, value)
+    w21 = week21_blocks(load_json(W21_PHASE_JSON), load_json(W21_PROSPECTIVE_JSON),
+                        load_json(W21_FROZEN_JSON), load_json(W21_ANCHOR_JSON))
+    for key, value in (("{w21_did}", w21["did"]),
+                       ("{w21_metric}", w21["metric"]),
+                       ("{w21_qc}", w21["qc"]),
+                       ("{w21_limit}", w21["limit"]),
+                       ("{w21_alignment_block}", w21["alignment_block"]),
+                       ("{w21_phase_block}", w21["phase_block"]),
+                       ("{w21_prospective_block}", w21["prospective_block"]),
+                       ("{w21_table_block}", w21["table_block"])):
         text = text.replace(key, value)
     w19 = week19_blocks(load_json(W19_RUNG_PATH), load_json(W19_ARMS_PATH),
                         load_json(W19_ARMS_ANALYSIS_PATH))
@@ -3476,12 +3507,286 @@ def week20_checks(wdir: Path):
     return checks
 
 
+def week21_blocks(phase, prospective, frozen, anchor):
+    """Render the week-21 (Stage 22 batch A) narrative blocks.
+
+    Every number is read back out of ``outputs/week21/sigma_synthetic.json``,
+    ``outputs/week21/sigma_prospective.json`` (plus its frozen copy) and the
+    ``arm_alignment`` block of ``outputs/week4/p1_anchor_comparison.json``, so the
+    distilled report cannot drift away from the artefacts it summarises.
+    """
+
+    keys = ("did", "metric", "qc", "limit", "alignment_block", "phase_block",
+            "prospective_block", "table_block", "summary")
+    if phase is None or prospective is None or frozen is None:
+        text = ("（`sigma_synthetic.json` / `sigma_prospective.json` / "
+                "`sigma_prospective_frozen.json` 缺失，无法回读）")
+        return {key: text for key in keys}
+    anchor = anchor or {}
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def signed(value, digits=4):
+        if value is None:
+            return "n/a"
+        return "%+.*f" % (digits, float(value))
+
+    def cell(flag):
+        return "**改写**" if flag else "保留"
+
+    def short(value):
+        return (str(value)[:12] + "…") if value else "n/a"
+
+    inv = phase.get("mean_invariance") or {}
+    syn = phase.get("synthetic_correlations") or {}
+    meas = phase.get("measured_correlations") or {}
+    grid = phase.get("grid") or {}
+    bounds = phase.get("boundaries") or {}
+    ox_b = bounds.get("oxidation") or {}
+    red_b = bounds.get("reduction") or {}
+    sens = phase.get("subset_sensitivity") or {}
+    native = sens.get("native") or {}
+    common = sens.get("common10") or {}
+
+    scoring = prospective.get("scoring") or {}
+    rows = scoring.get("rows") or []
+    rule = frozen.get("frozen_rule") or {}
+    s_rule = rule.get("signed_rule") or {}
+    n_rule = rule.get("naive_rule") or {}
+
+    arm = anchor.get("arm_alignment") or {}
+    arms = arm.get("arms_on_common_subset") or {}
+    paired = arm.get("paired_delta_tau_b") or {}
+    verdict = arm.get("verdict") or {}
+    n_common = arm.get("n_common_subset")
+    excluded = arm.get("excluded_from_common_subset") or {}
+    missing_dscf = (excluded.get("GFN2_dSCF_xTB") or {}).get("molecules") or []
+
+    did = ("批次 A 是纯分析、纯措辞的一轮（零新增电子结构、零冻结件改动）：R1（含 R10）把 Week 4 的"
+           "三条臂对齐到同一批 %s 个分子之后再做配对检验；R2 用合成的（均值, 离散度）相图取代 Week 9 的 "
+           "rho(std, tau_b) = -0.851；R3 把 Week 10 的判据先在发现集上冻结、再到留出集上打分；"
+           "R6 / R4(a) 只改措辞。" % n_common)
+    metric = ("对齐后（n = %s）：P0 Koopmans MAE %s eV、tau_b %s；GFN2 Delta-SCF MAE %s eV、tau_b %s；"
+              "P1 r2SCAN-3c MAE %s eV、tau_b %s。配对 Delta tau_b（GFN2 - P1）= %s，95%% CI [%s, %s]，"
+              "精确配对置换 p = %s，CI 跨 0 ⇒ 三条臂两两之间全部 unresolved。相图：max abs Delta tau_b"
+              "（均值平移）= %s、合成 rho(std, tau_b) = %s、合成 rho(abs(mean), tau_b) = %s、"
+              "实测 rho(std, tau_b) = %s。前瞻：带符号规则命中 %s/%s、朴素规则命中 %s/%s。"
+              % (n_common,
+                 num((arms.get("P0_koopmans_xTB") or {}).get("mae_ev"), 3),
+                 num((arms.get("P0_koopmans_xTB") or {}).get("kendall_tau_b"), 4),
+                 num((arms.get("GFN2_dSCF_xTB") or {}).get("mae_ev"), 3),
+                 num((arms.get("GFN2_dSCF_xTB") or {}).get("kendall_tau_b"), 4),
+                 num((arms.get("P1_r2scan3c") or {}).get("mae_ev"), 3),
+                 num((arms.get("P1_r2scan3c") or {}).get("kendall_tau_b"), 4),
+                 signed(verdict.get("delta_tau_b"), 4),
+                 num((verdict.get("paired_ci95") or [None, None])[0], 3),
+                 num((verdict.get("paired_ci95") or [None, None])[1], 3),
+                 num(verdict.get("permutation_p"), 4),
+                 num(inv.get("max_abs_tau_b_difference_vs_mean_0"), 3),
+                 num(syn.get("spearman_shift_std_vs_tau_b"), 3),
+                 num(syn.get("spearman_abs_shift_mean_vs_tau_b"), 3),
+                 num(meas.get("spearman_shift_std_vs_tau_b"), 4),
+                 scoring.get("signed_rule_hits"), scoring.get("n_predictions"),
+                 scoring.get("naive_rule_hits"), scoring.get("n_predictions")))
+    qc = ("QC：三个新脚本都可 `--check` 复跑（相图 2000 次重复的产物重跑逐字节相同）；"
+          "`sigma_prospective_frozen.json` 在打分之前落盘并取 SHA256（%s），打分文件回写同一摘要（%s）；"
+          "R1 的精确置换把 2^10 = %s 种赋值全部枚举；全量测试全绿；Gate 0 CLOSED，"
+          "Gate 1 仍只有「31 行溶液锚点仍是 est」这一个 blocker。"
+          % (short(frozen.get("frozen_sha256")), short(prospective.get("frozen_sha256")),
+             ((paired.get("GFN2_dSCF_xTB_minus_P1_r2scan3c") or {})
+              .get("permutation") or {}).get("total_assignments")))
+    limit = ("边界：(1) R2 的相图是合成模型（delta_i = mean + std * z_i，z 在每个 replicate 内标准化），"
+             "它证明的是「在这个模型里排序只由离散度决定」，不是「真实体系里只有离散度有影响」；"
+             "(2) R1 的配对检验只有 n = %s，虽然精确置换把 2^10 种赋值全部枚举过，但 %s 这 %s 个分子"
+             "从未进入 GFN2 Delta-SCF 臂，任何跨臂结论都只在这 10 个分子上成立；"
+             "(3) R3 的留出集只有 %s 个预测，带符号规则 %s/%s、朴素规则 %s/%s 都落在"
+             "「4 次里错 1-2 次」的噪声带内，不构成「规则更优」的证据。"
+             % (n_common, "、".join(missing_dscf), len(missing_dscf),
+                scoring.get("n_predictions"), scoring.get("signed_rule_hits"),
+                scoring.get("n_predictions"), scoring.get("naive_rule_hits"),
+                scoring.get("n_predictions")))
+
+    alignment_block = "\n".join(
+        ["| 臂 | n | MAE (eV) | bias (eV) | tau_b |",
+         "| --- | --- | --- | --- | --- |"]
+        + ["| %s | %s | %s | %s | %s |"
+           % (label, (arms.get(key) or {}).get("n"),
+              num((arms.get(key) or {}).get("mae_ev"), 4),
+              signed((arms.get(key) or {}).get("bias_ev"), 4),
+              num((arms.get(key) or {}).get("kendall_tau_b"), 4))
+           for key, label in (("P0_koopmans_xTB", "P0 Koopmans（GFN2-xTB）"),
+                              ("GFN2_dSCF_xTB", "GFN2 Delta-SCF（xTB）"),
+                              ("P1_r2scan3c", "P1 r2SCAN-3c（ORCA）"))]
+        + ["",
+           "| 配对（A - B） | Delta tau_b | 配对 95% CI | 精确置换 p | 跨 0 |",
+           "| --- | --- | --- | --- | --- |"]
+        + ["| %s | %s | [%s, %s] | %s | %s |"
+           % (pair_key.replace("_minus_", " - "),
+              signed((paired.get(pair_key) or {}).get("observed_delta_tau_b"), 4),
+              num(((paired.get(pair_key) or {}).get("paired_ci95") or [None, None])[0], 3),
+              num(((paired.get(pair_key) or {}).get("paired_ci95") or [None, None])[1], 3),
+              num(((paired.get(pair_key) or {}).get("permutation") or {}).get("p_value"), 4),
+              "是" if (paired.get(pair_key) or {}).get("paired_ci95_crosses_zero") else "否")
+           for pair_key in ("GFN2_dSCF_xTB_minus_P1_r2scan3c",
+                            "GFN2_dSCF_xTB_minus_P0_koopmans_xTB",
+                            "P1_r2scan3c_minus_P0_koopmans_xTB")])
+    phase_block = "\n".join([
+        "| 量 | 值 |",
+        "| --- | --- |",
+        "| 网格 | 均值 %s 格 x 离散度 %s 格，每格 %s 次重复（曲线 %s 次） |"
+        % (len(grid.get("mean_ev") or []), len(grid.get("std_ev") or []),
+           grid.get("replicates_per_cell"), grid.get("curve_replicates")),
+        "| max abs Delta tau_b（均值平移 vs mean = 0） | %s |"
+        % num(inv.get("max_abs_tau_b_difference_vs_mean_0"), 4),
+        "| 合成 rho(std, tau_b) / rho(abs(mean), tau_b) | %s / %s |"
+        % (num(syn.get("spearman_shift_std_vs_tau_b"), 3),
+           num(syn.get("spearman_abs_shift_mean_vs_tau_b"), 3)),
+        "| 实测 rho(std, tau_b)（native %s） | %s |"
+        % (num(native.get("spearman_shift_std_vs_tau_b"), 4),
+           num(meas.get("spearman_shift_std_vs_tau_b"), 4)),
+        "| 实测 rho(abs(mean), tau_b) | %s |"
+        % num(meas.get("spearman_abs_shift_mean_vs_tau_b"), 4),
+        "| 实测 rho(std, f_unresolved) | %s |"
+        % num(meas.get("spearman_shift_std_vs_f_unresolved"), 4),
+        "| 实测 rho(abs(mean), std) | %s |"
+        % num(meas.get("spearman_abs_shift_mean_vs_shift_std"), 4),
+        "| 临界 std：氧化 tau_b 跌破 0.8 / 0.5、overlap 跌破 1（eV） | %s / %s / %s |"
+        % (num(ox_b.get("std_where_mean_tau_b_below_0p8"), 2),
+           num(ox_b.get("std_where_mean_tau_b_below_0p5"), 2),
+           num(ox_b.get("std_where_mean_overlap_below_1"), 2)),
+        "| 临界 std：还原 tau_b 跌破 0.8 / 0.5、overlap 跌破 1（eV） | %s / %s / %s |"
+        % (num(red_b.get("std_where_mean_tau_b_below_0p8"), 2),
+           num(red_b.get("std_where_mean_tau_b_below_0p5"), 2),
+           num(red_b.get("std_where_mean_overlap_below_1"), 2)),
+        "| 子集敏感性同向 / 实测点数 / 台阶数 | %s / %s / %s |"
+        % ("是" if sens.get("same_direction") else "否",
+           meas.get("n_points"), meas.get("n_rungs")),
+    ])
+    prospective_block = "\n".join(
+        ["| 预测集 | 轴 | n | k | sd(delta) (eV) | OLS 斜率 b | 带符号判 | 朴素判 | 实测 | 重叠 |",
+         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+        + ["| %s | %s | %s | %s | %s | %s | %s | %s | **%s** | %s |"
+           % (row.get("set"), row.get("axis"), row.get("n"), row.get("k"),
+              num(row.get("delta_sd_ev"), 3), signed(row.get("ols_slope_b"), 3),
+              cell(row.get("predicted_signed")), cell(row.get("predicted_naive")),
+              "改写" if row.get("observed_rewritten") else "保留",
+              num(row.get("observed_overlap"), 2))
+           for row in rows]
+        + ["",
+           "阈值都在 10 个发现点上拟合、先冻结后打分：带符号斜率 b <= %s 判「改写」（低 = 危险），"
+           "朴素 sd(delta) >= %s eV 判「改写」（高 = 危险）；命中带符号 %s/%s、朴素 %s/%s。"
+           % (signed(s_rule.get("threshold"), 4), num(n_rule.get("threshold"), 4),
+              scoring.get("signed_rule_hits"), scoring.get("n_predictions"),
+              scoring.get("naive_rule_hits"), scoring.get("n_predictions"))])
+    table_block = "\n".join(
+        ["| 文件 | 内容 |", "| --- | --- |"]
+        + ["| %s | %s |" % (name, note) for name, note in W21_TABLE_ROWS])
+
+    return {"did": did, "metric": metric, "qc": qc, "limit": limit,
+            "summary": metric, "alignment_block": alignment_block,
+            "phase_block": phase_block, "prospective_block": prospective_block,
+            "table_block": table_block}
+
+
+def week21_checks(wdir: Path):
+    """QC for week 21 (Stage 22 batch A: arm alignment, phase diagram, prospective).
+
+    Every number is read back out of ``sigma_synthetic.json``,
+    ``sigma_prospective.json``, ``sigma_prospective_frozen.json`` and the
+    ``arm_alignment`` block of ``outputs/week4/p1_anchor_comparison.json``.
+    """
+
+    checks = []
+    phase = load_json(wdir / "sigma_synthetic.json")
+    prospective = load_json(wdir / "sigma_prospective.json")
+    frozen = load_json(wdir / "sigma_prospective_frozen.json")
+    for name, data in (("sigma_synthetic", phase), ("sigma_prospective", prospective),
+                       ("sigma_prospective_frozen", frozen)):
+        if data is None:
+            checks.append(check(name + ".present", None, "source not found"))
+            return checks
+        checks.append(check(name + ".present", True, name + ".json present"))
+
+    def near(value, expected, tol):
+        return value is not None and abs(float(value) - expected) < tol
+
+    inv = phase.get("mean_invariance") or {}
+    syn = phase.get("synthetic_correlations") or {}
+    meas = phase.get("measured_correlations") or {}
+    sens = phase.get("subset_sensitivity") or {}
+    bounds = phase.get("boundaries") or {}
+    scoring = prospective.get("scoring") or {}
+    checks.append(check("week21.phase_mean_invariance",
+                        near(inv.get("max_abs_tau_b_difference_vs_mean_0"), 0.0, 1e-12),
+                        "max_abs_delta_tau_b=%s"
+                        % inv.get("max_abs_tau_b_difference_vs_mean_0")))
+    checks.append(check("week21.phase_synthetic_correlations",
+                        near(syn.get("spearman_shift_std_vs_tau_b"), -1.0, 1e-9)
+                        and near(syn.get("spearman_abs_shift_mean_vs_tau_b"), 0.0, 1e-9),
+                        "rho(std,tau_b)=%s rho(abs(mean),tau_b)=%s"
+                        % (syn.get("spearman_shift_std_vs_tau_b"),
+                           syn.get("spearman_abs_shift_mean_vs_tau_b"))))
+    checks.append(check("week21.phase_measured_correlations",
+                        near(meas.get("spearman_shift_std_vs_tau_b"), -0.8510677611520904, 1e-9)
+                        and near(meas.get("spearman_abs_shift_mean_vs_tau_b"),
+                                 -0.5349568784384569, 1e-9)
+                        and meas.get("n_points") == 10 and meas.get("n_rungs") == 5,
+                        "rho(std,tau_b)=%s rho(abs(mean),tau_b)=%s n=%s"
+                        % (meas.get("spearman_shift_std_vs_tau_b"),
+                           meas.get("spearman_abs_shift_mean_vs_tau_b"),
+                           meas.get("n_points"))))
+    checks.append(check("week21.phase_subset_sensitivity_same_direction",
+                        sens.get("same_direction") is True
+                        and near((sens.get("common10") or {}).get("spearman_shift_std_vs_tau_b"),
+                                 -0.8510677611520904, 1e-9),
+                        "native=%s common10=%s same_direction=%s"
+                        % ((sens.get("native") or {}).get("spearman_shift_std_vs_tau_b"),
+                           (sens.get("common10") or {}).get("spearman_shift_std_vs_tau_b"),
+                           sens.get("same_direction"))))
+    checks.append(check("week21.phase_boundaries",
+                        near((bounds.get("oxidation") or {})
+                             .get("std_where_mean_tau_b_below_0p8"), 0.45, 1e-9)
+                        and near((bounds.get("reduction") or {})
+                                 .get("std_where_mean_tau_b_below_0p8"), 0.25, 1e-9)
+                        and near((bounds.get("oxidation") or {})
+                                 .get("std_where_mean_overlap_below_1"), 0.25, 1e-9),
+                        "ox_0p8=%s red_0p8=%s ox_overlap=%s"
+                        % ((bounds.get("oxidation") or {}).get("std_where_mean_tau_b_below_0p8"),
+                           (bounds.get("reduction") or {}).get("std_where_mean_tau_b_below_0p8"),
+                           (bounds.get("oxidation") or {}).get("std_where_mean_overlap_below_1"))))
+    checks.append(check("week21.prospective_frozen_digest",
+                        frozen.get("frozen_sha256") is not None
+                        and prospective.get("frozen_sha256") == frozen.get("frozen_sha256"),
+                        "frozen=%s scoring=%s"
+                        % (str(frozen.get("frozen_sha256"))[:12],
+                           str(prospective.get("frozen_sha256"))[:12])))
+    checks.append(check("week21.prospective_accuracy",
+                        scoring.get("n_predictions") == 4
+                        and scoring.get("signed_rule_hits") == 3
+                        and scoring.get("naive_rule_hits") == 2
+                        and near(scoring.get("signed_rule_accuracy"), 0.75, 1e-9),
+                        "signed=%s/%s naive=%s/%s"
+                        % (scoring.get("signed_rule_hits"), scoring.get("n_predictions"),
+                           scoring.get("naive_rule_hits"), scoring.get("n_predictions"))))
+    anchor = (load_json(W21_ANCHOR_JSON) or {}).get("arm_alignment") or {}
+    checks.append(check("week21.arm_alignment_verdict",
+                        anchor.get("n_common_subset") == 10
+                        and (anchor.get("verdict") or {})
+                        .get("all_three_pairwise_tests_unresolved") is True,
+                        "n_common=%s unresolved=%s"
+                        % (anchor.get("n_common_subset"),
+                           (anchor.get("verdict") or {})
+                           .get("all_three_pairwise_tests_unresolved"))))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
                   9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks,
                   13: week13_checks, 14: week14_checks, 15: week15_checks,
                   16: week16_checks, 17: week17_checks, 18: week18_checks,
-                  19: week19_checks, 20: week20_checks}
+                  19: week19_checks, 20: week20_checks, 21: week21_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -3526,6 +3831,67 @@ TEGDME/anion/eps=20 的鼓包是原子互穿的假象。
 
 {table_block}
 """
+
+REPORT_TEMPLATES[21] = """# Week 21 成果小结 —— Stage 22（批次 A：三臂对齐 + σ 相图 + 前瞻检验）
+
+Week 21 执行 `docs/31_plan_revision_expert_review.md` 的批次 A：**R1（含 R10）、R2、R3、R6、R4(a)**。
+全部是纯分析与纯措辞，零新增电子结构、零冻结件改动——所以本周没有一条新的 SCF / Opt 记录，
+所有结论都来自已有产物的重新组织与前一轮判据的留出检验。
+
+> 周内最不可回避的一条更正是口径上的：Week 4 那张表里的三条臂并不在同一批分子上评分
+> （n = 12 / 10 / 12），所以它们印在一起的 `tau_b` 本来不可比。本周先把三条臂对齐到同一批 10 个分子，
+> 再谈谁高谁低；对齐之后，三对配对检验的 95% CI **全部跨 0**。
+
+完整版本见 `week21_report_full.md`。
+
+## 1. 本周做了什么
+
+{w21_did}
+
+## 2. 关键数字
+
+{w21_metric}
+
+## 3. R1 + R10：三臂对齐到同一批分子之后，排序差异并不显著
+
+{w21_alignment_block}
+
+> 从本周起，项目对外只能说「MAE 的排序与 `tau_b` 的排序不一致」，不能说「Delta-SCF 的排序显著更好」：
+> 观测到的 Delta tau_b = +0.1333 落在 95% CI [-0.200, +0.550] 内，精确配对置换 p = 0.805。
+
+## 4. R2：把 rho = -0.851 换成一张可以直接读的相图
+
+{w21_phase_block}
+
+> 相图给出的机制判读是：排序的存亡由位移的离散度决定，均值只负责把整条轴平移。
+> 实测点上的 rho(abs(mean), tau_b) = -0.535 是共线性（rho(abs(mean), std) = +0.758）的假象，
+> 不是一条独立的效应。
+
+## 5. R3：先冻结判据，再到留出集上打分
+
+{w21_prospective_block}
+
+> 带符号规则 3/4、朴素规则 2/4——4 个预测的样本量不足以宣称任何一条规则更优，
+> 这是本周主动写进限制里的结论。
+
+## 6. 文件清单
+
+{w21_table_block}
+
+## 7. QC 与限制
+
+- {w21_qc}
+- {w21_limit}
+
+## 8. 本周产物
+
+{artifact_list}
+
+## 9. 缺失源
+
+{missing_list}
+"""
+
 
 REPORT_TEMPLATES[1] = """# Week 1 成果小结 —— Stage 0 定义冻结 / Gate 0
 
@@ -4232,7 +4598,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F39 中属于该周的部分）
+    ├── artifacts/            图（F0–F42 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -4264,6 +4630,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 {w18_row}
 {w19_row}
 {w20_row}
+{w21_row}
 
 ## 如何复现
 ```powershell
@@ -4274,7 +4641,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -4419,6 +4786,12 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 19 —— Stage 20（第六级台阶与第二解的跨方法存亡）
 {w19_summary}
 
+### Week 20 成果小结 · Stage 21
+{w20_summary}
+
+### Week 21 成果小结 · Stage 22（批次 A）
+{w21_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -4470,7 +4843,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F39）
+## 5. 图表索引（F0–F42）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -4515,6 +4888,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f39_row}
 {f40_row}
 {f41_row}
+{f42_row}
 
 ## 6. 复现命令
 ```powershell
@@ -4571,6 +4945,8 @@ $env:PYTHONIOENCODING = "utf-8"
 17. {w17_summary_limit}
 18. {w18_summary_limit}
 19. {w19_summary_limit}
+20. {w20_summary_limit}
+21. {w21_summary_limit}
 """
 
 
@@ -6022,6 +6398,32 @@ W20_TABLE_ROWS = (
 
 
 
+W21_PHASE_JSON = REPO / "outputs" / "week21" / "sigma_synthetic.json"
+W21_PROSPECTIVE_JSON = REPO / "outputs" / "week21" / "sigma_prospective.json"
+W21_FROZEN_JSON = REPO / "outputs" / "week21" / "sigma_prospective_frozen.json"
+W21_ANCHOR_JSON = REPO / "outputs" / "week4" / "p1_anchor_comparison.json"
+F42_NOTE_PRESENT = (
+    "Stage 22 R2：把 Week 9 的 10 个（台阶, 轴）实测点放进合成的（均值, 离散度）相图——"
+    "每个格子固定 sigma、只平移均值，每格 2000 次重复。tau_b 只随 std 变（rho(std, tau_b) = -1.000），"
+    "均值平移严格不动排序（max abs Delta tau_b = 0.000）；实测点的 rho(abs(mean), tau_b) = -0.535 "
+    "是 abs(mean) 与 std 共线（rho = +0.758）造成的假象。四个面板：tau_b 相图、f_unresolved 相图、"
+    "tau_b-vs-std 曲线（叠 10 个实测点）、overlap 相图。")
+F42_NOTE_ABSENT = "（Stage 22 R2 相图尚未产出；week21 尚未生成）"
+W21_TABLE_ROWS = (
+    ("`sigma_synthetic.json`",
+     "R2：33 x 41 的（均值, 离散度）网格，每格 2000 次重复的 tau_b / f_unresolved / overlap 相图，"
+     "外加均值不变性、实测相关性、临界 std 边界与子集敏感性。"),
+    ("`sigma_prospective_frozen.json`",
+     "R3：在任何留出结果出现之前先落盘并取 SHA256 的冻结判据（带符号 OLS 斜率与朴素 sd(delta) 两条规则、"
+     "各自的阈值与 10 个发现点）。"),
+    ("`sigma_prospective.json` / `sigma_prospective.md`",
+     "R3：4 个留出预测的命中率（带符号 3/4、朴素 2/4）与逐条观测结果。"),
+    ("`outputs/week4/p1_anchor_comparison.json`（新增 `arm_alignment` / `tau_b_reference`）",
+     "R1 + R10：三条臂对齐到同一批 10 个分子后的 tau_b、配对 Delta tau_b 的 CI 与精确置换 p，"
+     "以及两类 tau_b 的分列口径。"),
+)
+
+
 def week13_blocks(attribution, outlier):
     """Render the week-13 (Stage 14 / distortion attribution + EMC outlier) blocks.
 
@@ -7138,8 +7540,9 @@ def week16_blocks(smd, contamination, identity):
         "\x60z_primary = 1.0\x60），两条 resolved 条件分别等价于 "
         "\x60(sqrt(2)-1)|d0| >= |d1|\x60 与 \x60(sqrt(2)-1)|d1| >= |d0|\x60；"
         "相乘要求 \x601 <= (sqrt(2)-1)^2 = 0.1716\x60，矛盾——所以「反号且两臂都 resolved」的 "
-        "pair 集合**恒为空集**，\x60f_robust_inv\x60 从 0 变非 0 是结构性不可能，"
-        "不是「本周恰好看不到」。",
+        "pair 集合**恒为空集**，\x60f_robust_inv\x60 从 0 变非 0 在本项目这条具体流水线、"
+        "这批格子、这套估计量下是结构性不可能（**不是普适定理**：换 \x60z\x60、换 \x60sigma\x60 的定义、"
+        "或补进第三条 realization 都会解除），不是「本周恰好看不到」。",
     ])
 
     cell_rows = ["| 分子 | 态 | delta (eV) | 所属轴 |", "| --- | --- | --- | --- |"]
@@ -7236,8 +7639,8 @@ def week16_blocks(smd, contamination, identity):
            "（<S^2> / 自旋中心 / 轨道标签 / 参与率 PR / Mulliken L1 差）。")
     metric = ("54 格上两臂的 tau_b / O_20%% / f_unresolved / f_robust_inv 无一条被改写："
               "oxidation tau_b %s -> %s（Delta %s）、reduction tau_b %s -> %s（Delta %s），"
-              "两臂 tau_b 的 95%% CI 在两条轴上都重叠；f_robust_inv 从 0 变非 0 在该估计量下"
-              "结构性不可能。Part B：32 格的两个 SCF 解都是自旋纯双重态"
+              "两臂 tau_b 的 95%% CI 在两条轴上都重叠；f_robust_inv 从 0 变非 0 在本项目这条具体流水线、"
+              "这批格子、这套估计量下结构性不可能（**不是普适定理**）。Part B：32 格的两个 SCF 解都是自旋纯双重态"
               "（<S^2> 全落 0.75±0.01，32/32）；阴离子自旋中心两臂一致 16/16、阳离子仅 5/16。"
               % (num((published.get("oxidation") or {}).get("published", {})
                      .get("kendall_tau_b")),
@@ -8774,9 +9177,9 @@ def parse_args(argv=None):
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
     parser.add_argument("--weeks",
-                        default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
+                        default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
                         help="comma-separated week numbers "
-                             "(default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20)")
+                             "(default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -9057,6 +9460,12 @@ def main(argv=None):
                        + " | week20 |")
         else:
             f40_row = "| F40 | 未生成 | " + F40_NOTE_ABSENT + " | —— |"
+        f42_figure = REPO / "outputs" / "figures" / "F42_sigma_synthetic_phase_diagram.png"
+        if f42_figure.exists():
+            f42_row = ("| F42 | `F42_sigma_synthetic_phase_diagram.png` | "
+                       + F42_NOTE_PRESENT + " | week21 |")
+        else:
+            f42_row = "| F42 | " + F42_NOTE_ABSENT + " | .. |"
         f41_figure = REPO / "outputs" / "figures" / "F41_stage21_shell_redox.png"
         if f41_figure.exists():
             f41_row = ("| F41 | `F41_stage21_shell_redox.png` | " + F41_NOTE_PRESENT
@@ -9230,6 +9639,7 @@ def main(argv=None):
                        ("{f39_row}", f39_row),
                        ("{f40_row}", f40_row),
                        ("{f41_row}", f41_row),
+                       ("{f42_row}", f42_row),
                        ("{w19_summary}", w19_note),
                        ("{w19_summary_limit}", w19_all["limit"]),
                        ("{w19_row}", w19_row))
@@ -9278,6 +9688,44 @@ def main(argv=None):
         placeholders += (("{w20_summary}", w20_note),
                          ("{w20_summary_limit}", w20_all["limit"]),
                          ("{w20_row}", w20_row))
+        w21_all = week21_blocks(load_json(W21_PHASE_JSON), load_json(W21_PROSPECTIVE_JSON),
+                                load_json(W21_FROZEN_JSON), load_json(W21_ANCHOR_JSON))
+        w21_note = w21_all["summary"]
+        w21_phase = load_json(W21_PHASE_JSON) or {}
+        w21_pro = load_json(W21_PROSPECTIVE_JSON) or {}
+        w21_anchor = (load_json(W21_ANCHOR_JSON) or {}).get("arm_alignment") or {}
+        w21_arms = w21_anchor.get("arms_on_common_subset") or {}
+        w21_verdict = w21_anchor.get("verdict") or {}
+        w21_scoring = w21_pro.get("scoring") or {}
+        if not W21_PHASE_JSON.exists() or not W21_PROSPECTIVE_JSON.exists():
+            w21_row = ("| week21 | Stage 22（批次 A：三臂对齐 + σ 相图 + 前瞻检验） | "
+                       "（缺 `sigma_synthetic.json` / `sigma_prospective.json`） | —— |")
+        else:
+            w21_row = ("| week21 | Stage 22（批次 A：三臂对齐 + σ 相图 + 前瞻检验） | "
+                       + "三条臂对齐到同一批 %s 个分子之后，GFN2 Delta-SCF 的 tau_b 仍是三者最高"
+                         "（%s vs P1 %s、P0 %s），但配对 Delta tau_b = %s 的 95%% CI 是"
+                         " [%s, %s]、精确置换 p = %s，三对检验全部跨 0；"
+                         "σ 相图把 Week 9 的 rho(std, tau_b) = -0.851 换成一条机制判读"
+                         "（合成 rho = %s、均值平移严格不动排序，max abs Delta tau_b = %s）；"
+                         "前瞻检验里带符号规则 %s/%s、朴素规则 %s/%s。"
+                       % (w21_anchor.get("n_common_subset"),
+                          (w21_arms.get("GFN2_dSCF_xTB") or {}).get("kendall_tau_b"),
+                          (w21_arms.get("P1_r2scan3c") or {}).get("kendall_tau_b"),
+                          (w21_arms.get("P0_koopmans_xTB") or {}).get("kendall_tau_b"),
+                          w21_verdict.get("delta_tau_b"),
+                          (w21_verdict.get("paired_ci95") or [None, None])[0],
+                          (w21_verdict.get("paired_ci95") or [None, None])[1],
+                          w21_verdict.get("permutation_p"),
+                          (w21_phase.get("synthetic_correlations") or {})
+                          .get("spearman_shift_std_vs_tau_b"),
+                          (w21_phase.get("mean_invariance") or {})
+                          .get("max_abs_tau_b_difference_vs_mean_0"),
+                          w21_scoring.get("signed_rule_hits"), w21_scoring.get("n_predictions"),
+                          w21_scoring.get("naive_rule_hits"), w21_scoring.get("n_predictions"))
+                       + " | Gate 0 CLOSED |")
+        placeholders += (("{w21_summary}", w21_note),
+                         ("{w21_summary_limit}", w21_all["limit"]),
+                         ("{w21_row}", w21_row))
         for key, value in placeholders:
             summary = summary.replace(key, value)
         readme = README_TEMPLATE

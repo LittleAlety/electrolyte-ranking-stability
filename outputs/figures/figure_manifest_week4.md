@@ -23,7 +23,7 @@ inputs it was drawn from, so a figure cannot silently drift from its numbers.
 
 | file | sha256 |
 | --- | --- |
-| F4_rank_migration_p0_to_p1.png | e40957bf65eb0efc82258b299b05fdf6c556cd621f3f763cef24538d099967b9 |
-| F5_reduction_axis_koopmans_vs_dscf.png | aa423fd0951805a38b8a275d1c4284dd974d32c6785ca6a456aeefa473a8a2d9 |
-| F6_decision_stability_indicators.png | 812827792a328a0639a034c073fb1a3012e6d458ca7b0d164a0000bc15e4224e |
-| F7_shift_structure.png | a83b97ce0baf5a876209979e2f85c5762071b972ed360fb61daa3a07a02d6361 |
+| F4_rank_migration_p0_to_p1.png | e0229c751f41f4e57e734528365e148f5e1e6aec91d3d46fcbdf819f1e96d41a |
+| F5_reduction_axis_koopmans_vs_dscf.png | 74a134d994e807d87d390a26fd9fc289970440d23a7201d6e045fa97f82ab58b |
+| F6_decision_stability_indicators.png | 3519cb88070371195773c1fb3e3caa9df67de751a6c04cdad46d560c72fe8156 |
+| F7_shift_structure.png | fdfa314deff705f49f27a1eb2461fac65ddef7813fda46d3af4fe56213d314ff |
