@@ -268,6 +268,75 @@ CAPTION = (
 )
 
 
+#: Panel (c) is the crowded one: five of the ten measured points live inside a
+#: 0.25 eV x 0.19 window, so the old fixed (4, -9) offset printed four labels on
+#: top of each other and dropped a fifth onto the legend.  The labels are now
+#: placed by a deterministic greedy search over the fixed candidate ring below,
+#: run against the real axes geometry.  The character metric is fixed arithmetic
+#: rather than a renderer measurement, which keeps the run reproducible.
+LABEL_FONTSIZE = 6.5
+LINE_LABEL = "$\\tau_b$ = 0.8"
+#: the threshold line sits at 0.8, so its label is centred a text height above it
+LINE_LABEL_Y = 0.856
+LINE_FONTSIZE = 8.0
+LABEL_CANDIDATES = tuple(
+    (dx, dy, ha)
+    for dy in (3, -13, -29, -45, 19, 35, -61, 51)
+    for dx, ha in ((5, "left"), (13, "left"), (-5, "right"), (-13, "right"), (21, "left"), (-21, "right"))
+)
+
+
+def _window_box(bbox) -> tuple:
+    """matplotlib's (x0, y0, width, height) as (x0, y0, x1, y1)."""
+    x0, y0, width, height = bbox.bounds
+    return (x0, y0, x0 + width, y0 + height)
+
+
+def _label_box(anchor, text, offset, fontsize, dpi) -> tuple:
+    """(x0, y0, x1, y1) in pixels for ``text`` drawn ``offset`` px from ``anchor``."""
+    wide = sum(0.62 if char.isalnum() else 0.34 for char in text)
+    width = wide * fontsize * dpi / 72.0
+    height = 1.16 * fontsize * dpi / 72.0
+    x0 = anchor[0] + offset[0] - (width if offset[2] == "right" else 0.0)
+    return (x0, anchor[1] + offset[1] - height / 2.0, x0 + width, anchor[1] + offset[1] + height / 2.0)
+
+
+def _overlaps(box, others, pad=2.0) -> bool:
+    return any(
+        not (box[2] + pad <= other[0] or other[2] + pad <= box[0]
+             or box[3] + pad <= other[1] or other[3] + pad <= box[1])
+        for other in others
+    )
+
+
+def assign_label_offsets(anchors, labels, reserved, bounds=None, fontsize=LABEL_FONTSIZE, dpi=100.0) -> list:
+    """Fan the labels out over the candidate ring; returns ``(index, (dx, dy, ha))``.
+
+    Deterministic by construction: the crowding order is a plain sort and the
+    candidates are tried in a fixed order, so the same numbers give the same
+    layout and the same bytes.
+    """
+    taken = list(reserved)
+    chosen = []
+    order = sorted(range(len(labels)), key=lambda index: (-anchors[index][1], anchors[index][0], labels[index]))
+    for index in order:
+        anchor = anchors[index]
+        for offset in LABEL_CANDIDATES:
+            box = _label_box(anchor, labels[index], offset, fontsize, dpi)
+            if bounds is not None and (
+                box[0] < bounds[0] or box[1] < bounds[1] or box[2] > bounds[2] or box[3] > bounds[3]
+            ):
+                continue
+            if not _overlaps(box, taken):
+                break
+        else:
+            offset = LABEL_CANDIDATES[0]
+            box = _label_box(anchor, labels[index], offset, fontsize, dpi)
+        taken.append(box)
+        chosen.append((index, offset))
+    return chosen
+
+
 def figure(grid, curves, observed, figdir: Path, digests: dict) -> list:
     import matplotlib
 
@@ -305,23 +374,44 @@ def figure(grid, curves, observed, figdir: Path, digests: dict) -> list:
                       label="5-95% over shift realisations")
     axis.plot(stds, means, "-", color="#1d4ed8", linewidth=2.0, label="mean $\\tau_b$ (mean = 0)")
     axis.axhline(0.8, color="#111827", linestyle=":", linewidth=1.0)
-    axis.text(0.02, 0.815, "$\\tau_b$ = 0.8", fontsize=8, color="#111827")
     axis.plot([p["shift_std_ev"] for p in observed], [p["kendall_tau_b"] for p in observed],
               "o", color="#ef4444", markersize=6, label="the 10 measured (rung, axis) points")
-    for point in observed:
-        axis.annotate(point["label"], (point["shift_std_ev"], point["kendall_tau_b"]),
-                      textcoords="offset points", xytext=(4, -9), fontsize=6.5)
     axis.set_xlabel("shift std (eV)")
     axis.set_ylabel("Kendall $\\tau_b$ vs the target ordering")
-    axis.set_ylim(-0.6, 1.05)
+    axis.set_xlim(-0.15, 2.45)
+    axis.set_ylim(-0.62, 1.06)
     axis.set_title("(c) $\\tau_b$ falls monotonically with shift std; the measured points track it", fontsize=11)
     axis.grid(alpha=0.25)
-    axis.legend(fontsize=8, loc="lower left")
+    axis.legend(fontsize=8, loc="lower right")
 
     fig.suptitle(
         "R2: the shift/std phase diagram -- the mean is free, the dispersion is what costs", fontsize=12.5,
     )
+    # The panel-(c) labels are laid out after tight_layout, because the de-collision
+    # search needs the final axes geometry.  Offsets are emitted in points, so the
+    # 200-dpi file keeps the relative layout measured on this 100-dpi canvas.
     fig.tight_layout(rect=(0, 0, 1, 0.96))
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    reserved = [_window_box(axis.get_legend().get_window_extent(renderer=renderer))]
+    line_anchor = axis.transData.transform((axis.get_xlim()[1] - 0.03, LINE_LABEL_Y))
+    reserved.append(_label_box(line_anchor, LINE_LABEL, (0.0, 0.0, "right"), LINE_FONTSIZE, fig.dpi))
+    anchors = [axis.transData.transform((p["shift_std_ev"], p["kendall_tau_b"])) for p in observed]
+    labels = [p["label"] for p in observed]
+    for index, offset in assign_label_offsets(
+        anchors, labels, reserved,
+        bounds=_window_box(axis.get_window_extent(renderer=renderer)), dpi=fig.dpi,
+    ):
+        axis.annotate(
+            labels[index], (observed[index]["shift_std_ev"], observed[index]["kendall_tau_b"]),
+            textcoords="offset points",
+            xytext=(offset[0] * 72.0 / fig.dpi, offset[1] * 72.0 / fig.dpi), ha=offset[2], va="center",
+            fontsize=LABEL_FONTSIZE,
+            arrowprops=dict(arrowstyle="-", color="#9ca3af", linewidth=0.5, shrinkA=1.0, shrinkB=3.0)
+            if abs(offset[0]) > 15 or abs(offset[1]) > 15 else None,
+        )
+    axis.text(axis.get_xlim()[1] - 0.03, LINE_LABEL_Y, LINE_LABEL, fontsize=LINE_FONTSIZE,
+              color="#111827", ha="right", va="center")
     path = figdir / F42
     fig.savefig(path, dpi=200)
     plt.close(fig)

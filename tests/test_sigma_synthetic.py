@@ -125,3 +125,42 @@ def test_figure_manifest_pins_the_figure_and_the_inputs():
     assert "One-line caption (verbatim, for the terminal site):" in text
     assert "outputs/week9/stage10_ladder.json" in text
     assert "outputs/week4/p1_core_set_derived.csv" in text
+
+
+# --- the panel-(c) label layout ------------------------------------------------
+
+CROWDED_LABELS = (
+    "G1_to_G2/oxi", "P1_to_P2/oxi", "G1_to_G2/red", "C1_to_C2/oxi", "P1_to_P2/red",
+)
+
+
+def test_crowded_label_cluster_is_resolved_without_overlap():
+    """Five measured points sit inside 0.25 eV x 0.19, so the old fixed offset
+    printed four labels on top of each other.  The placement must hand back
+    disjoint boxes even for a deliberately tight cluster."""
+    anchors = [(120.0 + 18.0 * index, 424.0 - 8.0 * index) for index in range(len(CROWDED_LABELS))]
+    placed = m.assign_label_offsets(anchors, list(CROWDED_LABELS), reserved=[], dpi=100.0)
+    assert len(placed) == len(CROWDED_LABELS)
+    assert sorted(index for index, _offset in placed) == list(range(len(CROWDED_LABELS)))
+    boxes = [m._label_box(anchors[index], CROWDED_LABELS[index], offset, m.LABEL_FONTSIZE, 100.0)
+             for index, offset in placed]
+    for first in range(len(boxes)):
+        for second in range(first + 1, len(boxes)):
+            assert not m._overlaps(boxes[first], [boxes[second]], pad=0.0), (first, second)
+
+
+def test_label_placement_respects_the_axes_bounds_and_the_reserved_boxes():
+    bounds = (80.0, 60.0, 670.0, 450.0)
+    reserved = [(620.0, 330.0, 668.0, 452.0)]  # stands in for the legend
+    anchors = [(120.0 + 55.0 * index, 430.0 - 25.0 * index) for index in range(len(CROWDED_LABELS))]
+    for index, offset in m.assign_label_offsets(anchors, list(CROWDED_LABELS), reserved,
+                                                bounds=bounds, dpi=100.0):
+        box = m._label_box(anchors[index], CROWDED_LABELS[index], offset, m.LABEL_FONTSIZE, 100.0)
+        assert bounds[0] <= box[0] and box[2] <= bounds[2], box
+        assert bounds[1] <= box[1] and box[3] <= bounds[3], box
+        assert not m._overlaps(box, reserved, pad=0.0), box
+
+
+def test_threshold_label_is_centred_above_the_threshold_line():
+    assert m.LINE_LABEL.startswith("$\\tau_b$")
+    assert 0.8 < m.LINE_LABEL_Y <= 0.9

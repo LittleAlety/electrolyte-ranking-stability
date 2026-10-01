@@ -588,6 +588,20 @@ def freeze(
     return results
 
 
+def is_excluded_scratch(name: str, suffixes: tuple[str, ...] = STAGE2_EXCLUDED_SUFFIXES) -> bool:
+    """True when ``name`` belongs to one of the excluded scratch families.
+
+    The match is on the stem after the last dot, not on the whole suffix, because
+    ORCA numbers its scratch files: ``.gbw`` also ships as ``.gbw0`` and ``.bas``
+    as ``.bas0``..``.bas5``, and an exact suffix test let those through.
+    """
+
+    if "." not in name:
+        return False
+    tail = name.rsplit(".", 1)[1].lower()
+    return any(tail.startswith(suffix.lstrip(".")) for suffix in suffixes)
+
+
 def stage2_artefacts(root: Path = REPO_ROOT) -> list[str]:
     """Stage 2 artefact names, discovered by pattern (the stage grows while it runs)."""
 
@@ -596,7 +610,7 @@ def stage2_artefacts(root: Path = REPO_ROOT) -> list[str]:
         for path in sorted(root.glob(pattern)):
             if not path.is_file():
                 continue
-            if path.suffix.lower() in STAGE2_EXCLUDED_SUFFIXES:
+            if is_excluded_scratch(path.name):
                 continue
             if path.name in STAGE2_EXCLUDED_NAMES:
                 continue

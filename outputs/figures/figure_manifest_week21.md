@@ -2,7 +2,7 @@
 
 | figure | sha256 | size |
 | --- | --- | --- |
-| `F42_sigma_synthetic_phase_diagram.png` | `dec8d1d6dfbffea99d017d083511c82273cfd4043980fb035d8feb7adef24fe0` | 277440 B |
+| `F42_sigma_synthetic_phase_diagram.png` | `8340040fd88184a87940add309111816c7f7242636ea98ecbaf40d06993c7208` | 278010 B |
 
 | input | sha256 |
 | --- | --- |

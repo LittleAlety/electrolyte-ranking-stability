@@ -7,7 +7,7 @@ window.HB = {
   "orca_out": 1535,
   "scripts": 103,
   "test_files": 54,
-  "tests_passed": 1145
+  "tests_passed": 1148
  },
  "pipeline": [
   {
@@ -975,8 +975,8 @@ window.HB = {
    "file": "F42_sigma_synthetic_phase_diagram.png",
    "week": 21,
    "caption": "R2：把 Week 9 的 rho(shift std, tau_b) = -0.851（10 点 / 5 台阶）从 headline 降级为现象示意，改用合成数据相图回答同一个问题——固定靶排序 t，令逐分子位移 delta_i = mean + std * z_i 并把 z 在每个 replicate 内标准化（使 delta 的样本 sd 恰为 std），在 mean 属于 [-8, +8] eV、std 属于 [0, 2] eV 的网格上每格 2000 组重抽样。(a)(b)(d) 三张相图沿 mean 轴**严格常数**（tau_b 的最大绝对差 0.00e+00）：给每个分子加同一个常数既不能换序也不能改变任何 pair 差，所以 Week 9 那个 rho(|mean|, tau_b) = -0.535 只能是共线性伪影——实测点上 rho(|mean|, std) = +0.758，而相图里两者按构造独立、同一相关系数为 0.000。(c) 换到 std 轴，tau_b 单调下降且相图的秩相关为 -1.000：氧化靶轴上 tau_b 均值跌破 0.8 于 std = 0.45 eV、跌破 0.5 于 1.20 eV（还原靶轴 0.25 / 0.70 eV），即**排序的代价只由位移的离散度支付**；实测 10 点多数贴着曲线，但两个例外各有明确的物理身份——P0->P1/还原（std = 2.25 eV，tau_b = +0.60）在曲线**之上**，因为它的位移几乎平行于靶轴；C1->C2/还原（std = 0.335 eV，tau_b = +0.29）在曲线**之下**，因为那一级的还原是 Li 中心而非分子中心（state-identity 改变），纯离散度模型按定义看不见这件事。",
-   "sha": "dec8d1d6dfbffea99d017d083511c82273cfd4043980fb035d8feb7adef24fe0",
-   "bytes": 277440,
+   "sha": "8340040fd88184a87940add309111816c7f7242636ea98ecbaf40d06993c7208",
+   "bytes": 278010,
    "w": 2680,
    "h": 1880
   },
