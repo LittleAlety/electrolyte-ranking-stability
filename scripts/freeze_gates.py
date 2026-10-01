@@ -276,6 +276,25 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "tests/test_stage20_xtb_arms.py",
     "docs/29_*.md",
     "outputs/week19/**/*",
+    # Stage 21 (Week 20): four parts -- the frozen straight-line path across the
+    # fragile band (Part A), the charge_l1 identity criterion turned into a
+    # run-book pre-check (Part B), the 1:2 solvent shell relaxed in both redox
+    # states (Part C), and the genuine P2-leg back-fill (Part D).
+    "scripts/run_stage21_path.py",
+    "scripts/analyze_stage21_path.py",
+    "scripts/analyze_stage21_protocol.py",
+    "scripts/run_stage21_shell_redox.py",
+    "scripts/analyze_stage21_shell_redox.py",
+    "scripts/analyze_stage21_refill.py",
+    "scripts/make_stage21_figure.py",
+    "scripts/gen_week20_report.py",
+    "tests/test_stage21_path.py",
+    "tests/test_stage21_protocol.py",
+    "tests/test_stage21_shell_redox.py",
+    "tests/test_stage21_refill.py",
+    "docs/30_*.md",
+    "docs/31_*.md",
+    "outputs/week20/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large

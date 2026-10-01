@@ -175,6 +175,19 @@ def test_run_orca_keeps_input_output_and_artifacts_and_clears_scratch(tmp_path: 
     assert "%pal" in kept
 
 
+def test_run_orca_live_log_mirrors_the_run_into_a_file(tmp_path: Path) -> None:
+    log = tmp_path / "EC.live.log"
+
+    result = _run_orca(tmp_path, ORCA_SAMPLE, live_log=log)
+
+    assert result.final_energy_eh == pytest.approx(-412.345678901)
+    written = log.read_text(encoding="utf-8")
+    persisted = (tmp_path / "EC.out").read_text(encoding="utf-8")
+    assert "FINAL SINGLE POINT ENERGY  -412.345678901" in written
+    # the live log and the persisted .out carry the identical run text
+    assert written.splitlines() == persisted.splitlines()
+
+
 def test_run_orca_auto_nprocs_is_derived_from_the_machine_and_capped(tmp_path: Path) -> None:
     result = _run_orca(tmp_path, ORCA_SAMPLE)
 
@@ -405,6 +418,37 @@ def test_cli_dry_run_defaults_to_gas_phase_and_needs_no_orca(tmp_path: Path) -> 
     record = json.loads((tmp_path / "DMC_orca.json").read_text(encoding="utf-8"))
     assert record["provenance"]["solvent_model"] == "gas-phase"
     assert "%cpcm" not in record["input"]
+
+
+def test_cli_help_renders_without_argparse_percent_errors() -> None:
+    # A bare ``%`` in a help string makes argparse raise at format time, which used
+    # to kill ``--help`` outright (e.g. ``--nprocs`` saying ``%pal``).  Keep it honest.
+    completed = _run_cli("--help")
+
+    assert completed.returncode == 0, completed.stderr
+    assert "--live-log" in completed.stdout
+    assert "%pal" in completed.stdout
+    assert "%maxcore" in completed.stdout
+
+
+def test_cli_accepts_live_log_and_still_needs_no_orca(tmp_path: Path) -> None:
+    environ = dict(os.environ)
+    environ["PATH"] = ""
+    environ.pop("ELECTROLYTE_ORCA", None)
+    environ["ELECTROLYTE_TOOLCHAIN_ROOT"] = str(tmp_path / "no_such_toolchain")
+    log = tmp_path / "live.log"
+
+    completed = _run_cli(
+        "--name", "DMC",
+        "--smiles", "COC(=O)OC",
+        "--outdir", str(tmp_path),
+        "--dry-run",
+        "--live-log", str(log),
+        environ=environ,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "not_run" in completed.stdout
 
 
 def test_cli_without_orca_and_without_dry_run_explains_the_install(tmp_path: Path) -> None:

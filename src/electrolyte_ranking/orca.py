@@ -482,6 +482,7 @@ def run_orca(
     timeout_seconds: float | None = None,
     extra_keywords: Sequence[str] = (),
     moinp: str | Path | None = None,
+    live_log: str | Path | None = None,
     backend=run_command,
     environment: Mapping[str, str] | None = None,
     required: Sequence[str] = ORCA_REQUIRED_FIELDS,
@@ -503,6 +504,10 @@ def run_orca(
     msmpi MPI launcher cannot handle such a path), and :func:`resolve_scratch_root`
     relocates the scratch directory to an ASCII root when the output directory is
     not ASCII-safe.
+    ``live_log`` names a file that ORCA's text is mirrored into *while the job
+    runs* (ORCA normally runs in a scratch directory that is deleted afterwards,
+    so nothing is readable there), which is what makes a multi-hour job watchable.
+
     ``timeout_seconds``, a non-zero exit code, or an empty output all raise
     :class:`ORCAExecutionError` when ``raise_on_failure`` is set. ``backend`` may
     be a :class:`~electrolyte_ranking.toolchain.DryRunBackend`.
@@ -555,6 +560,9 @@ def run_orca(
     (scratch / input_name).write_text(input_text, encoding="utf-8", newline="\n")
 
     arguments = build_orca_arguments(input_name)
+    # Only hand ``live_log`` to the backend when it was actually requested, so the
+    # dry-run and test backends keep receiving their exact original call.
+    streaming = {} if live_log is None else {"live_log": live_log}
     try:
         completed = backend(
             executable,
@@ -563,6 +571,7 @@ def run_orca(
             timeout_seconds=timeout_seconds,
             environment=environment,
             input_text=None,
+            **streaming,
         )
     except subprocess.TimeoutExpired as exc:
         partial = exc.stdout if exc.stdout is not None else b""

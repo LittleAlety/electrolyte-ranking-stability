@@ -737,6 +737,45 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 19",
         ],
     },
+    20: {
+        "topic": "Stage 21（临界带的能量裁决 + 判据预检 + 溶剂壳氧化还原 + 真回填）",
+        "sources": [
+            ("outputs/week20/stage21_path.json", None, True),
+            ("outputs/week20/stage21_path_plan.json", None, True),
+            ("outputs/week20/stage21_path_cells.csv", None, True),
+            ("outputs/week20/stage21_path_analysis.csv", None, True),
+            ("outputs/week20/stage21_path_analysis.json", None, True),
+            ("outputs/week20/stage21_path_summary.md", None, True),
+            ("outputs/week20/stage21_protocol.json", None, True),
+            ("outputs/week20/stage21_protocol_borderline.csv", None, True),
+            ("outputs/week20/stage21_protocol_summary.md", None, True),
+            ("outputs/week20/stage21_shell_redox.json", None, True),
+            ("outputs/week20/stage21_shell_redox_plan.json", None, True),
+            ("outputs/week20/stage21_shell_redox_cells.csv", None, True),
+            ("outputs/week20/stage21_shell_redox_analysis.csv", None, True),
+            ("outputs/week20/stage21_shell_redox_analysis.json", None, True),
+            ("outputs/week20/stage21_shell_redox_summary.md", None, True),
+            ("outputs/week20/stage21_refill.json", None, True),
+            ("outputs/week20/stage21_refill_cells.csv", None, True),
+            ("outputs/week20/stage21_refill_summary.md", None, True),
+            ("docs/30_week20_report.md", "week20_report_full.md", True),
+            ("outputs/figures/figure_manifest_week20_stage21.md",
+             "artifacts/figure_manifest_week20_stage21.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F40_*.png", "outputs/figures/F41_*.png"],
+        "commands": [
+            "python scripts/run_stage21_path.py --images 21 --jobs 8 --nprocs 2",
+            "python scripts/run_stage21_shell_redox.py --jobs 4 --nprocs 3",
+            "python scripts/analyze_stage21_path.py",
+            "python scripts/analyze_stage21_protocol.py",
+            "python scripts/analyze_stage21_shell_redox.py",
+            "python scripts/analyze_stage21_refill.py",
+            "python scripts/make_stage21_figure.py",
+            "python scripts/gen_week20_report.py",
+            "python scripts/build_deliverables.py --weeks 20",
+        ],
+    },
 }
 
 
@@ -1002,6 +1041,18 @@ def render_report(week, wdir, missing, excluded):
                        ("{w18_verdict_block}", w18["verdict_block"]),
                        ("{w18_geometry_block}", w18["geometry_block"]),
                        ("{w18_table_block}", w18["table_block"])):
+        text = text.replace(key, value)
+    w20 = week20_blocks(load_json(W20_PATH_JSON), load_json(W20_PROTOCOL_JSON),
+                        load_json(W20_SHELL_JSON), load_json(W20_REFILL_JSON))
+    for key, value in (("{w20_did}", w20["did"]),
+                       ("{w20_metric}", w20["metric"]),
+                       ("{w20_qc}", w20["qc"]),
+                       ("{w20_limit}", w20["limit"]),
+                       ("{w20_protocol_block}", w20["protocol_block"]),
+                       ("{w20_path_block}", w20["path_block"]),
+                       ("{w20_shell_block}", w20["shell_block"]),
+                       ("{w20_refill_block}", w20["refill_block"]),
+                       ("{w20_table_block}", w20["table_block"])):
         text = text.replace(key, value)
     w19 = week19_blocks(load_json(W19_RUNG_PATH), load_json(W19_ARMS_PATH),
                         load_json(W19_ARMS_ANALYSIS_PATH))
@@ -3138,14 +3189,343 @@ def week19_checks(wdir: Path):
     return checks
 
 
+def week20_blocks(path_analysis, protocol, shell_analysis, refill):
+    """Week 20 / Stage 21 narrative blocks.
+
+    Every number is read back out of the four Stage 21 products, so the distilled
+    report cannot drift away from the artifacts it summarises.
+    """
+
+    keys = ("did", "metric", "qc", "limit", "summary", "protocol_block",
+            "path_block", "shell_block", "refill_block", "table_block")
+    if path_analysis is None or refill is None:
+        text = ("（`stage21_path_analysis.json` 或 `stage21_refill.json` 不存在）")
+        return {key: text for key in keys}
+
+    protocol = protocol or {}
+    shell_analysis = shell_analysis or {}
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    def signed(value, digits=4):
+        if value is None:
+            return "n/a"
+        return ("%+.*f" % (digits, float(value)))
+
+    cells = {cell["cell"]: cell for cell in (path_analysis.get("cells") or [])}
+    fragile = cells.get("EC/cation/5") or {}
+    same_cell = cells.get("EC/cation/20") or {}
+    control = cells.get("TEGDME/anion/20") or {}
+
+    counts = protocol.get("verdict_counts") or {}
+    threshold = protocol.get("threshold") or {}
+    derivation = threshold.get("derivation") or {}
+    cross = (protocol.get("cross_tabs") or {})
+    strict = cross.get("binary_vs_rule_strict") or {}
+    lenient = cross.get("binary_vs_rule_lenient") or {}
+    borderline = protocol.get("borderline") or []
+    probe = ((protocol.get("closed_shell_probe") or {}).get("summary") or {})
+    reach = protocol.get("reach") or {}
+
+    axes = {row.get("axis"): row for row in (shell_analysis.get("axes") or [])}
+    oxidation = axes.get("oxidation") or {}
+    reduction = axes.get("reduction") or {}
+
+    coverage = refill.get("coverage") or {}
+    strict_leg = coverage.get("strict_p2_leg") or {}
+    dielectric = coverage.get("dielectric_sub_leg") or {}
+    refill_verdict = (refill.get("verdict") or {}).get("per_axis") or {}
+
+    did = ("Part A：在 Stage 19 两条弛豫终点之间做直线内插、每点一个冻结 r2SCAN-3c 单点"
+           "（3 格 x %s 帧 = %s 个）。Part B：把 `charge_l1` 身份判据做成运行手册预检"
+           "（零新增计算，全 %s 格）。Part C：12 个 `[Li(M)2]+` 的氧化态与还原态各做一次 "
+           "r2SCAN-3c `Opt`（%s 个作业）。Part D：把 Stage 10 第 2 级台阶的 P2 腿真正换成"
+           "弛豫后能量再合成一次（零新增计算）。"
+           % (path_analysis.get("images"), path_analysis.get("n_jobs"),
+              protocol.get("n_cells"), shell_analysis.get("n_jobs")))
+    metric = ("EC/cation/eps=5 被判 `distinct_lower`，但内插路径相对弦最大只抬升 %s eV"
+              "（k_B T = %s eV 的 %s%%），判据**过度判定**；%s/%s 格与 Stage 19 的 RMSD 裁决一致。"
+              "Part B 阈值重导为 %s（空档宽 %s，无数据点），borderline %s 格；闭壳层反例探针"
+              "%s 格越阈。Part C 氧化轴修正 %s +- %s eV、ρ=%s；还原轴修正 %s +- %s eV、ρ=%s，"
+              "排除 %s 格。Part D 严格 P2 腿 %s/%s 可回填，氧化轴排序被改写（Top-10%% 重叠 %s）、"
+              "还原轴未被改写。"
+              % (num(fragile.get("barrier_chord_ev"), 5),
+                 num(path_analysis.get("thermal_ev"), 4),
+                 num(100.0 * float(fragile.get("barrier_chord_ev") or 0.0)
+                     / float(path_analysis.get("thermal_ev") or 1.0), 1),
+                 path_analysis.get("n_agree_with_stage19"), path_analysis.get("n_cells"),
+                 num(threshold.get("value"), 6), num(derivation.get("gap_width"), 6),
+                 len(borderline), probe.get("n_exceeding_threshold"),
+                 signed(oxidation.get("correction_mean_ev"), 4),
+                 num(oxidation.get("correction_std_ev"), 4),
+                 num(oxidation.get("spearman_frozen_vs_relaxed"), 3),
+                 signed(reduction.get("correction_mean_ev"), 4),
+                 num(reduction.get("correction_std_ev"), 4),
+                 num(reduction.get("spearman_frozen_vs_relaxed"), 3),
+                 shell_analysis.get("n_excluded"),
+                 strict_leg.get("n_refillable"), strict_leg.get("n_cells"),
+                 num((refill_verdict.get("oxidation") or {}).get("top10_overlap"), 3)))
+    qc = ("核心 QC：Part A 的 %s 个单点全部 SCF 收敛（all_converged=%s），"
+          "每格的端点冻结单点差必须逐位等于 Stage 19 的弛豫能量差；Part B 的阈值由 discovery 臂"
+          "空档中点现算、`gap_empty=%s`，交叉表与闭壳层探针逐格写入 verification.json 的 checks；"
+          "Part C 的 %s 个 Opt 逐格做结构 QC（父几何共价键完好 / 弛豫后单一碎片 / Li 同时配位"
+          "两个配体），不合格者排除而不是计入均值；Part D 直接 import "
+          "`analyze_stage10_synthesis` 的合成函数，只替换 P1_to_P2 的 P2 端点。"
+          % (path_analysis.get("n_jobs"), path_analysis.get("all_converged"),
+             derivation.get("gap_empty"), shell_analysis.get("n_jobs")))
+    limit = ("Part A **不是抽样**：只走 3 格，选格标准是夹住 Stage 19 的 0.02 A 阈值；"
+             "临界带里还有 EC/cation/eps=7 与 eps=10 两格未走。内插路径是**笛卡尔直线、"
+             "不是最小能量路径**，所以鼓包只是**上界**："
+             "TEGDME/anion/eps=20 的 %s eV 是原子互穿的假象，只证明两条腿确实分立。"
+             "可以引用的是反方向的结论——「直线全程不抬升 ⇒ 同一个盆地」。"
+             "Part B 的阈值是**经验阈值**，换方法 / 基组 / 溶剂层都可能让空档消失；"
+             "`unmeasurable` 的 %s 格（%.1f%%）**不可**计入灵敏度分母。"
+             "Part C 只覆盖 1:2 一个化学计量与 m1/m2 两个 motif，结构 QC 只说「结构没散」、"
+             "不说「电子结构没变」。Part D 的可回填格全部来自**裸 CPCM** 层而不是 SMD 层，"
+             "所以它回答的是「把 CPCM 上量到的弛豫修正搬到 SMD 层，排序会不会动」——"
+             "这是一个**转移假设**；且氧化轴只有 3 个分子，τ 是枚举不是统计推断。"
+             % (num(control.get("barrier_chord_ev"), 1), reach.get("n_unmeasurable"),
+                100.0 * float(reach.get("unmeasurable_share") or 0.0)))
+    summary_text = " ".join([did, metric])
+
+    path_block = ("\n".join(
+        ["| 格 | Stage 19 RMSD (A) | Stage 19 裁决 | 路径长 (A) | 弦上鼓包 (eV) | "
+         "弛豫后差 (eV) | 本周裁决 | 一致 |",
+         "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+        + ["| `%s` | %s | `%s` | %s | %s | %s | `%s` | %s |"
+           % (cell.get("cell"), num(cell.get("rmsd_a_stage19"), 4),
+              cell.get("stage19_verdict"), num(cell.get("path_length_a"), 4),
+              num(cell.get("barrier_chord_ev"), 6),
+              signed(cell.get("relax_span_ev"), 5),
+              cell.get("verdict"), "是" if cell.get("agrees_with_stage19") else "**否**")
+           for cell in (path_analysis.get("cells") or [])]))
+    shell_block = ("\n".join(
+        ["| 壳 | 轴 | 冻结位移 (eV) | 弛豫位移 (eV) | 弛豫修正 (eV) | 可用 | QC |",
+         "| --- | --- | --- | --- | --- | --- | --- |"]
+        + ["| %s | %s | %s | %s | %s | %s | %s |"
+           % (row.get("shell_label"), row.get("state"),
+              num(row.get("shell_shift_frozen_ev"), 3),
+              num(row.get("shell_shift_relaxed_ev"), 3),
+              signed(row.get("relaxation_correction_ev"), 4),
+              "是" if row.get("usable") else "**否**", row.get("qc_flags") or "")
+           for row in (shell_analysis.get("shells") or [])]))
+    refill_block = ("\n".join(
+        ["| 轴 | n | 回填前排序 | 回填后排序 | rho | tau | Top-10% 重叠 | 是否改写排序 |",
+         "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+        + ["| %s | %s | %s | %s | %s | %s | %s | **%s** |"
+           % (label, (refill_verdict.get(axis) or {}).get("n"),
+              " > ".join((refill_verdict.get(axis) or {}).get("order_before") or []),
+              " > ".join((refill_verdict.get(axis) or {}).get("order_after") or []),
+              num((refill_verdict.get(axis) or {}).get("spearman_rho"), 4),
+              num((refill_verdict.get(axis) or {}).get("kendall_tau_b"), 4),
+              num((refill_verdict.get(axis) or {}).get("top10_overlap"), 3),
+              "是" if (refill_verdict.get(axis) or {}).get("ranking_rewritten") else "否")
+           for axis, label in (("oxidation", "氧化轴"), ("reduction", "还原轴"))]))
+    protocol_block = ("阈值 **%s**（%s；空档 (%s, %s) 宽 %s 且 `gap_empty=%s`）；"
+                      "coincident %s / borderline %s / differs %s / unmeasurable %s；"
+                      "严格口径 TP %s / FN %s / FP %s / TN %s（灵敏度 %s），"
+                      "宽松口径 TP %s / FN %s / FP %s / TN %s（灵敏度 %s）。"
+                      "需要预检的格子：%s。"
+                      % (num(threshold.get("value"), 6), derivation.get("basis"),
+                         num(derivation.get("gap_lower"), 6),
+                         num(derivation.get("gap_upper"), 6),
+                         num(derivation.get("gap_width"), 6), derivation.get("gap_empty"),
+                         counts.get("coincident"), counts.get("borderline"),
+                         counts.get("differs"), counts.get("unmeasurable"),
+                         strict.get("tp"), strict.get("fn"), strict.get("fp"),
+                         strict.get("tn"), num(strict.get("sensitivity"), 4),
+                         lenient.get("tp"), lenient.get("fn"), lenient.get("fp"),
+                         lenient.get("tn"), num(lenient.get("sensitivity"), 4),
+                         "、".join("%s/%s/eps=%g" % (row.get("name"), row.get("state"),
+                                                       float(row.get("epsilon") or 0))
+                                   for row in borderline) or "无"))
+    table_block = "\n".join(
+        ["| 文件 | 内容 |", "| --- | --- |"]
+        + ["| %s | %s |" % (name, note) for name, note in W20_TABLE_ROWS])
+
+    return {"did": did, "metric": metric, "qc": qc, "limit": limit,
+            "summary": summary_text, "protocol_block": protocol_block,
+            "path_block": path_block, "shell_block": shell_block,
+            "refill_block": refill_block, "table_block": table_block}
+
+
+def week20_checks(wdir: Path):
+    """QC for week 20 (Stage 21: four independent parts).
+
+    Every number is read back out of ``stage21_path_analysis.json``,
+    ``stage21_protocol.json``, ``stage21_shell_redox_analysis.json`` and
+    ``stage21_refill.json``.
+    """
+
+    checks = []
+    path_analysis = load_json(wdir / "stage21_path_analysis.json")
+    protocol = load_json(wdir / "stage21_protocol.json")
+    shell_analysis = load_json(wdir / "stage21_shell_redox_analysis.json")
+    refill = load_json(wdir / "stage21_refill.json")
+    for name, data in (("stage21_path_analysis", path_analysis),
+                       ("stage21_protocol", protocol),
+                       ("stage21_shell_redox_analysis", shell_analysis),
+                       ("stage21_refill", refill)):
+        if data is None:
+            checks.append(check(name + ".present", None, "source not found"))
+            return checks
+        checks.append(check(name + ".present", True, name + ".json present"))
+
+    def near(value, expected, tol):
+        return value is not None and abs(float(value) - expected) < tol
+
+    cells = {cell["cell"]: cell for cell in (path_analysis.get("cells") or [])}
+    fragile = cells.get("EC/cation/5") or {}
+    checks.append(check("week20.path_shape",
+                        path_analysis.get("n_cells") == 3
+                        and path_analysis.get("n_jobs") == 63
+                        and path_analysis.get("all_converged") is True,
+                        "n_cells=%s n_jobs=%s all_converged=%s"
+                        % (path_analysis.get("n_cells"), path_analysis.get("n_jobs"),
+                           path_analysis.get("all_converged"))))
+    checks.append(check(
+        "week20.path_fragile_cell_is_one_basin",
+        fragile.get("stage19_verdict") == "distinct_lower"
+        and fragile.get("verdict") == "one_basin"
+        and fragile.get("agrees_with_stage19") is False
+        and near(fragile.get("barrier_chord_ev"), 0.00424, 5e-4),
+        "stage19=%s verdict=%s hump=%s"
+        % (fragile.get("stage19_verdict"), fragile.get("verdict"),
+           fragile.get("barrier_chord_ev"))))
+    checks.append(check("week20.path_agreement_count",
+                        path_analysis.get("n_agree_with_stage19") == 2
+                        and path_analysis.get("n_one_basin") == 2
+                        and path_analysis.get("n_separated") == 1,
+                        "agree=%s one_basin=%s separated=%s"
+                        % (path_analysis.get("n_agree_with_stage19"),
+                           path_analysis.get("n_one_basin"),
+                           path_analysis.get("n_separated"))))
+
+    threshold = protocol.get("threshold") or {}
+    derivation = threshold.get("derivation") or {}
+    counts = protocol.get("verdict_counts") or {}
+    checks.append(check("week20.protocol_threshold_rederived",
+                        near(threshold.get("value"), 0.038946, 1e-5)
+                        and derivation.get("gap_empty") is True
+                        and near(derivation.get("gap_width"), 0.000874, 1e-5),
+                        "threshold=%s gap_empty=%s gap_width=%s"
+                        % (threshold.get("value"), derivation.get("gap_empty"),
+                           derivation.get("gap_width"))))
+    checks.append(check("week20.protocol_counts",
+                        protocol.get("n_cells") == 414
+                        and counts.get("coincident") == 237
+                        and counts.get("borderline") == 3
+                        and counts.get("differs") == 36
+                        and counts.get("unmeasurable") == 138,
+                        "n_cells=%s counts=%s" % (protocol.get("n_cells"), counts)))
+    probe = ((protocol.get("closed_shell_probe") or {}).get("summary") or {})
+    checks.append(check("week20.protocol_closed_shell_counterexample_empty",
+                        probe.get("n_cells") == 138
+                        and probe.get("n_exceeding_threshold") == 0
+                        and near(probe.get("max_charge_l1"), 0.006743, 1e-5),
+                        "n_read=%s n_exceeding=%s max=%s"
+                        % (probe.get("n_read"), probe.get("n_exceeding_threshold"),
+                           probe.get("max_charge_l1"))))
+
+    checks.append(check("week20.shell_shape",
+                        shell_analysis.get("n_shells") == 12
+                        and shell_analysis.get("n_jobs") == 24
+                        and shell_analysis.get("n_ok") == 24,
+                        "n_shells=%s n_jobs=%s n_ok=%s"
+                        % (shell_analysis.get("n_shells"), shell_analysis.get("n_jobs"),
+                           shell_analysis.get("n_ok"))))
+    axes = {row.get("axis"): row for row in (shell_analysis.get("axes") or [])}
+    oxidation = axes.get("oxidation") or {}
+    reduction = axes.get("reduction") or {}
+    checks.append(check("week20.shell_every_frame_survived",
+                        shell_analysis.get("n_excluded") == 0
+                        and oxidation.get("n") == 12
+                        and reduction.get("n") == 12,
+                        "n_excluded=%s ox_n=%s red_n=%s"
+                        % (shell_analysis.get("n_excluded"), oxidation.get("n"),
+                           reduction.get("n"))))
+    # Variational, not sign-of-a-mean: the frozen frame *is* a point on the relaxed
+    # state's own surface, so relaxing it can only lower the energy.  A shell whose
+    # relaxed energy came out above its frozen single point would mean the Opt left
+    # the surface or the SCF fell into a different solution.
+    checks.append(check("week20.shell_correction_nonpositive",
+                        (oxidation.get("n_correction_positive") or 0) == 0
+                        and (reduction.get("n_correction_positive") or 0) == 0,
+                        "ox_positive=%s red_positive=%s (both must be 0)"
+                        % (oxidation.get("n_correction_positive"),
+                           reduction.get("n_correction_positive"))))
+
+    strict_leg = (refill.get("coverage") or {}).get("strict_p2_leg") or {}
+    dielectric = (refill.get("coverage") or {}).get("dielectric_sub_leg") or {}
+    per_axis = (refill.get("verdict") or {}).get("per_axis") or {}
+    checks.append(check("week20.refill_coverage",
+                        strict_leg.get("n_cells") == 54
+                        and strict_leg.get("n_refillable") == 7
+                        and dielectric.get("n_cells") == 414
+                        and dielectric.get("n_refillable") == 37,
+                        "strict=%s/%s dielectric=%s/%s"
+                        % (strict_leg.get("n_refillable"), strict_leg.get("n_cells"),
+                           dielectric.get("n_refillable"), dielectric.get("n_cells"))))
+    checks.append(check("week20.refill_oxidation_rewritten",
+                        (per_axis.get("oxidation") or {}).get("ranking_rewritten") is True
+                        and (per_axis.get("reduction") or {}).get("ranking_rewritten") is False,
+                        "ox_rewritten=%s red_rewritten=%s"
+                        % ((per_axis.get("oxidation") or {}).get("ranking_rewritten"),
+                           (per_axis.get("reduction") or {}).get("ranking_rewritten"))))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
                   9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks,
                   13: week13_checks, 14: week14_checks, 15: week15_checks,
-                  16: week16_checks, 17: week17_checks, 18: week18_checks, 19: week19_checks}
+                  16: week16_checks, 17: week17_checks, 18: week18_checks,
+                  19: week19_checks, 20: week20_checks}
 
 
 REPORT_TEMPLATES = {}
+
+REPORT_TEMPLATES[20] = """# Week 20 成果小结 —— Stage 21（临界带的能量裁决 + 判据预检 + 溶剂壳氧化还原 + 真回填）
+
+## 0. 一页结论
+- 做了什么：{w20_did}
+- 关键数字：{w20_metric}
+- 质检：{w20_qc}
+- 限制：{w20_limit}
+
+本文可独立阅读；逐项细节、物理机制与需裁决项见同目录 `week20_report_full.md`。
+
+## 1. Part A —— 临界带的能量裁决
+
+{path_block}
+
+内插路径是**笛卡尔直线、不是最小能量路径**，所以鼓包只是**上界**；反过来说「直线全程不抬升」
+是强证据：一条从不抬升的直线不可能藏着一个势垒。三个 panel 各自纵轴、**不可互比**：对照组
+TEGDME/anion/eps=20 的鼓包是原子互穿的假象。
+
+## 2. Part B —— `charge_l1` 判据的运行手册预检（零新增计算）
+
+{protocol_block}
+
+## 3. Part C —— 第一溶剂壳在氧化还原下的弛豫
+
+{shell_block}
+
+> 还原态是中性自由基，复合物可能在弛豫中丢掉一个配体；本周的 QC（父几何共价键完好 /
+> 弛豫后单一碎片 / Li 仍同时配位两个配体）逐格判定，不合格的格子**排除**而不是计入均值。
+
+## 4. Part D —— P2 腿的真回填（零新增计算）
+
+{refill_block}
+
+> 严格 P2 腿是 SMD(乙腈) 层，而 Stage 19/20 的弛豫格全部落在**裸 CPCM** 层，所以真回填靠的是
+> 「弛豫修正是一个态内量」的**转移假设**（Week 19 量到它的 epsilon 依赖性很小）。
+
+## 5. 产物清单
+
+{table_block}
+"""
 
 REPORT_TEMPLATES[1] = """# Week 1 成果小结 —— Stage 0 定义冻结 / Gate 0
 
@@ -3883,6 +4263,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 {w17_row}
 {w18_row}
 {w19_row}
+{w20_row}
 
 ## 如何复现
 ```powershell
@@ -4132,6 +4513,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f37_row}
 {f38_row}
 {f39_row}
+{f40_row}
+{f41_row}
 
 ## 6. 复现命令
 ```powershell
@@ -5596,6 +5979,45 @@ W19_TABLE_ROWS = (
      "by_epsilon + by_arm_set）"),
     ("`stage20_xtb_arms_cells_analysis.csv` / `_by_*.csv`", "Part 2 逐格裁决表与四张分组汇总表"),
     ("`stage20_xtb_arms_summary.md`", "Part 2 的中文小结"),
+)
+
+
+#: Stage 21 (Week 20): four independent parts, all four products of the week.  Part A
+#: walks a straight Cartesian line between the two Stage 19 relaxed endpoints and runs
+#: one frozen single point per point (63 jobs); Part B turns the ``charge_l1`` identity
+#: threshold into a runtime pre-check (zero jobs); Part C relaxes both redox states of
+#: the twelve 1:2 solvent shells (24 ``Opt`` jobs); Part D really replaces the P2 end of
+#: the Stage 10 rung with relaxed energies and re-synthesises the ladder (zero jobs).
+W20_PATH_JSON = REPO / "outputs" / "week20" / "stage21_path_analysis.json"
+W20_PROTOCOL_JSON = REPO / "outputs" / "week20" / "stage21_protocol.json"
+W20_SHELL_JSON = REPO / "outputs" / "week20" / "stage21_shell_redox_analysis.json"
+W20_REFILL_JSON = REPO / "outputs" / "week20" / "stage21_refill.json"
+F40_NOTE_PRESENT = (
+    "Stage 21 Part A 临界带的能量裁决：三个内插格（EC/cation/eps=5、EC/cation/eps=20、"
+    "TEGDME/anion/eps=20）在两条 Stage 19 弛豫终点之间做直线内插，每点一个冻结 r2SCAN-3c 单点"
+    "（21 帧 x 3 格 = 63 个，全部收敛）；每格独立纵轴。EC/cation/eps=5 被判 distinct_lower，"
+    "但路径相对弦最大只抬升 0.00424 eV（k_B T 的 16.5%），实为同一个平坦盆地")
+F40_NOTE_ABSENT = "预留给 Stage 21 Part A（临界带的能量裁决）；week20 尚未产出"
+F41_NOTE_PRESENT = (
+    "Stage 21 Part C 第一溶剂壳在氧化还原下的弛豫：12 个 [Li(M)2]+ 的氧化态（+2/二重态）与"
+    "还原态（0/二重态）各做一次 r2SCAN-3c Opt（24 个作业），起点是同一张冻结 G2Li2 几何；"
+    "(a)(b) 逐壳冻结位移（空心）对弛豫位移（实心），连线长度即弛豫修正；"
+    "(c) 冻结 vs 弛豫散点与 y=x。结构 QC（父键完好 / 单一碎片 / Li 同时配位两配体）逐格判定，"
+    "不合格的格子画成灰叉并排除在所有统计之外")
+F41_NOTE_ABSENT = "预留给 Stage 21 Part C（溶剂壳氧化还原）；week20 尚未产出"
+W20_TABLE_ROWS = (
+    ("`stage21_path.json` / `_plan.json` / `_cells.csv`",
+     "Part A 作业台账（63 个冻结单点，3 格 x 21 帧）"),
+    ("`stage21_path_analysis.json` / `_analysis.csv` / `_summary.md`",
+     "Part A 裁决（路径长、弦上鼓包、SCF 噪声底、弛豫前后差、逐格 one_basin/separated）"),
+    ("`stage21_protocol.json` / `_borderline.csv` / `_summary.md`",
+     "Part B 预检（阈值从空档中点重导、三分类计数、交叉表、闭壳层反例探针、适用条件）"),
+    ("`stage21_shell_redox.json` / `_plan.json` / `_cells.csv`",
+     "Part C 作业台账（24 个 Opt，含结构 QC 列）"),
+    ("`stage21_shell_redox_analysis.json` / `_analysis.csv` / `_summary.md`",
+     "Part C 分析（逐壳冻结/弛豫位移、弛豫修正、两轴排序统计、排除清单）"),
+    ("`stage21_refill.json` / `_cells.csv` / `_summary.md`",
+     "Part D 真回填（覆盖率、逐轴排序变化、三种 Δ 估计量的稳健性、位移定义原文）"),
 )
 
 
@@ -8351,8 +8773,10 @@ def parse_args(argv=None):
         description="Build the distilled deliverables bundle under 成果输出/.")
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
-    parser.add_argument("--weeks", default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19",
-                        help="comma-separated week numbers (default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19)")
+    parser.add_argument("--weeks",
+                        default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
+                        help="comma-separated week numbers "
+                             "(default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -8627,6 +9051,19 @@ def main(argv=None):
         else:
             f39_row = "| F39 | 未生成 | " + F39_NOTE_ABSENT + " | —— |"
 
+        f40_figure = REPO / "outputs" / "figures" / "F40_stage21_path_profiles.png"
+        if f40_figure.exists():
+            f40_row = ("| F40 | `F40_stage21_path_profiles.png` | " + F40_NOTE_PRESENT
+                       + " | week20 |")
+        else:
+            f40_row = "| F40 | 未生成 | " + F40_NOTE_ABSENT + " | —— |"
+        f41_figure = REPO / "outputs" / "figures" / "F41_stage21_shell_redox.png"
+        if f41_figure.exists():
+            f41_row = ("| F41 | `F41_stage21_shell_redox.png` | " + F41_NOTE_PRESENT
+                       + " | week20 |")
+        else:
+            f41_row = "| F41 | 未生成 | " + F41_NOTE_ABSENT + " | —— |"
+
         f30_figure = REPO / "outputs" / "figures" / "F30_two_guess_catalogue.png"
         if f30_figure.exists():
             f30_row = "| F30 | `F30_two_guess_catalogue.png` | " + F30_NOTE_PRESENT + " | week15 |"
@@ -8791,9 +9228,56 @@ def main(argv=None):
                        ("{w18_row}", w18_row),
                        ("{f38_row}", f38_row),
                        ("{f39_row}", f39_row),
+                       ("{f40_row}", f40_row),
+                       ("{f41_row}", f41_row),
                        ("{w19_summary}", w19_note),
                        ("{w19_summary_limit}", w19_all["limit"]),
                        ("{w19_row}", w19_row))
+        w20_all = week20_blocks(load_json(W20_PATH_JSON), load_json(W20_PROTOCOL_JSON),
+                                load_json(W20_SHELL_JSON), load_json(W20_REFILL_JSON))
+        w20_note = w20_all["summary"]
+        w20_path = load_json(W20_PATH_JSON) or {}
+        w20_protocol = load_json(W20_PROTOCOL_JSON) or {}
+        w20_shell = load_json(W20_SHELL_JSON) or {}
+        w20_refill = load_json(W20_REFILL_JSON) or {}
+        w20_fragile = {cell.get("cell"): cell
+                       for cell in (w20_path.get("cells") or [])}.get("EC/cation/5") or {}
+        w20_counts = w20_protocol.get("verdict_counts") or {}
+        w20_axes = {row.get("axis"): row for row in (w20_shell.get("axes") or [])}
+        w20_ox = w20_axes.get("oxidation") or {}
+        w20_strict = (w20_refill.get("coverage") or {}).get("strict_p2_leg") or {}
+        w20_refill_axes = (w20_refill.get("verdict") or {}).get("per_axis") or {}
+        if not W20_PATH_JSON.exists() or not W20_REFILL_JSON.exists():
+            w20_row = ("| week20 | Stage 21（临界带能量裁决 + 判据预检 + 溶剂壳氧化还原 + 真回填） | "
+                       "未生成（等待 stage21_path_analysis.json / stage21_refill.json 等四个产物） "
+                       "| —— |")
+        else:
+            w20_row = ("| week20 | Stage 21（临界带能量裁决 + 判据预检 + 溶剂壳氧化还原 + 真回填） | "
+                       + "Part A：3 格 x 21 帧 = %s 个冻结单点，EC/cation/eps=5 弦上鼓包只有 %.5f eV"
+                         "（k_B T 的 %.1f%%），Stage 19 的 `distinct_lower` 属过度判定，"
+                         "%s/%s 格与 RMSP 裁决一致；"
+                         "Part B：阈值重导 %.6f、borderline %s 格、闭壳层反例 %s 格越阈；"
+                         "Part C：24 个 Opt 全部结构 QC 通过，氧化轴弛豫修正 %+.4f eV、rho=%.3f；"
+                         "Part D：严格 P2 腿 %s/%s 可回填，氧化轴排序被改写（Top-10%% 重叠 %.3f）、"
+                         "还原轴未被改写"
+                         % (w20_path.get("n_jobs"),
+                            float(w20_fragile.get("barrier_chord_ev") or 0.0),
+                            100.0 * float(w20_fragile.get("barrier_chord_ev") or 0.0)
+                            / float(w20_path.get("thermal_ev") or 1.0),
+                            w20_path.get("n_agree_with_stage19"), w20_path.get("n_cells"),
+                            ((w20_protocol.get("threshold") or {}).get("value") or 0.0),
+                            w20_counts.get("borderline"),
+                            ((w20_protocol.get("closed_shell_probe") or {})
+                             .get("summary") or {}).get("n_exceeding_threshold"),
+                            float(w20_ox.get("correction_mean_ev") or 0.0),
+                            float(w20_ox.get("spearman_frozen_vs_relaxed") or 0.0),
+                            w20_strict.get("n_refillable"), w20_strict.get("n_cells"),
+                            float((w20_refill_axes.get("oxidation") or {})
+                                  .get("top10_overlap") or 0.0))
+                       + " | Gate 0 CLOSED |")
+        placeholders += (("{w20_summary}", w20_note),
+                         ("{w20_summary_limit}", w20_all["limit"]),
+                         ("{w20_row}", w20_row))
         for key, value in placeholders:
             summary = summary.replace(key, value)
         readme = README_TEMPLATE

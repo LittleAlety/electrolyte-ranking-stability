@@ -28,6 +28,7 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -264,22 +265,113 @@ def run_command(
     timeout_seconds: float | None = PROBE_TIMEOUT_SECONDS,
     environment: Mapping[str, str] | None = None,
     input_text: str | None = None,
+    live_log: str | os.PathLike[str] | None = None,
 ) -> subprocess.CompletedProcess:
-    """Run an engine with captured text output. Never raises on a bad exit code."""
+    """Run an engine with captured text output. Never raises on a bad exit code.
+
+    ``live_log`` mirrors the child's merged stdout/stderr into that file *as it is
+    produced*, so a long ORCA job can be watched while it runs (``Get-Content
+    <file> -Wait`` / ``tail -f``).  The same text is still returned in the
+    ``CompletedProcess``, so callers parse exactly what they parsed before; the
+    file is opened in append mode and flushed after every line.
+    """
 
     command = [str(executable), *(str(argument) for argument in arguments)]
-    return subprocess.run(
+    if live_log is None:
+        return subprocess.run(
+            command,
+            cwd=None if cwd is None else str(cwd),
+            env=None if environment is None else dict(environment),
+            input=input_text,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_seconds,
+            check=False,
+        )
+    return _run_command_streaming(
+        command,
+        cwd=cwd,
+        timeout_seconds=timeout_seconds,
+        environment=environment,
+        input_text=input_text,
+        live_log=live_log,
+    )
+
+
+def _run_command_streaming(
+    command: list[str],
+    *,
+    cwd: str | os.PathLike[str] | None,
+    timeout_seconds: float | None,
+    environment: Mapping[str, str] | None,
+    input_text: str | None,
+    live_log: str | os.PathLike[str],
+) -> subprocess.CompletedProcess:
+    """The ``live_log`` branch of :func:`run_command`.
+
+    ``subprocess.run`` cannot hand out output before the child exits, so this goes
+    through ``Popen`` and mirrors every line into ``live_log`` as it arrives.
+    stderr is folded into stdout, which is exactly what :func:`combined_output`
+    reconstructs from the two pipes on the default path.  A watchdog thread kills
+    the child on timeout and the text seen so far is attached to the raised
+    :class:`subprocess.TimeoutExpired`, so the caller that catches it (see
+    :func:`electrolyte_ranking.orca.run_orca`) still finds partial output.
+    """
+
+    log_path = Path(live_log)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    process = subprocess.Popen(
         command,
         cwd=None if cwd is None else str(cwd),
         env=None if environment is None else dict(environment),
-        input=input_text,
-        capture_output=True,
+        stdin=subprocess.PIPE if input_text is not None else None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
         encoding="utf-8",
         errors="replace",
-        timeout=timeout_seconds,
-        check=False,
+        bufsize=1,
     )
+
+    timed_out = False
+
+    def _kill_on_timeout() -> None:
+        nonlocal timed_out
+        timed_out = True
+        process.kill()
+
+    watchdog: threading.Timer | None = None
+    if timeout_seconds is not None:
+        watchdog = threading.Timer(timeout_seconds, _kill_on_timeout)
+        watchdog.daemon = True
+        watchdog.start()
+
+    chunks: list[str] = []
+    try:
+        if input_text is not None and process.stdin is not None:
+            try:
+                process.stdin.write(input_text)
+            finally:
+                process.stdin.close()
+        with log_path.open("a", encoding="utf-8", newline="") as handle:
+            if process.stdout is not None:
+                for line in process.stdout:
+                    chunks.append(line)
+                    handle.write(line)
+                    handle.flush()
+    finally:
+        if watchdog is not None:
+            watchdog.cancel()
+        if process.stdout is not None:
+            process.stdout.close()
+
+    returncode = process.wait()
+    text = "".join(chunks)
+    if timed_out:
+        raise subprocess.TimeoutExpired(command, timeout_seconds, output=text)
+    return subprocess.CompletedProcess(command, returncode, text, "")
 
 
 def read_version(
@@ -399,6 +491,7 @@ class DryRunBackend:
         timeout_seconds: float | None = None,
         environment: Mapping[str, str] | None = None,
         input_text: str | None = None,
+        live_log: str | os.PathLike[str] | None = None,
     ) -> subprocess.CompletedProcess:
         command = [str(executable), *(str(argument) for argument in arguments)]
         self.calls.append(command)
@@ -410,4 +503,9 @@ class DryRunBackend:
             )
         )
         stdout = self.outputs.pop(0) if self.outputs else self.default_output
+        if live_log is not None:
+            log_path = Path(live_log)
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with log_path.open("a", encoding="utf-8", newline="") as handle:
+                handle.write(stdout)
         return subprocess.CompletedProcess(command, self.returncode, stdout, "")

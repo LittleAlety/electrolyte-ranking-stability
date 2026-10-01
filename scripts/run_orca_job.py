@@ -170,6 +170,7 @@ def run_job(
     moinp: Path | None = None,
     dry_run: bool = False,
     scratch_root: Path | None = None,
+    live_log: Path | None = None,
 ) -> dict:
     """Run the full chain and return the persisted record."""
 
@@ -255,6 +256,7 @@ def run_job(
                 timeout_seconds=timeout_seconds,
                 required=(),
                 scratch_root=scratch_root,
+                live_log=live_log,
             )
         except orca.ORCAExecutionError as exc:
             record["status"] = "execution_failed"
@@ -315,8 +317,8 @@ def main(argv: list[str] | None = None) -> int:
     environment.add_argument("--epsilon", type=float, default=None, help="bare CPCM dielectric")
     parser.add_argument("--outdir", type=Path, required=True)
     parser.add_argument("--timeout", type=float, default=3600.0, help="seconds (default 3600)")
-    parser.add_argument("--nprocs", type=int, default=None, help="%pal nprocs (default: auto, capped)")
-    parser.add_argument("--maxcore", type=int, default=None, help="%maxcore in MB per core")
+    parser.add_argument("--nprocs", type=int, default=None, help="%%pal nprocs (default: auto, capped)")
+    parser.add_argument("--maxcore", type=int, default=None, help="%%maxcore in MB per core")
     parser.add_argument(
         "--scratch-root",
         type=Path,
@@ -325,6 +327,16 @@ def main(argv: list[str] | None = None) -> int:
             "directory ORCA runs in; needed only when the output directory is not "
             "ASCII-safe (this repository lives under a Chinese name, so the default "
             "falls back to %%TEMP%%\\electrolyte_orca_scratch)"
+        ),
+    )
+    parser.add_argument(
+        "--live-log",
+        type=Path,
+        default=None,
+        help=(
+            "mirror ORCA's output into this file while the job runs (append mode) "
+            "so a long run can be watched with Get-Content <file> -Wait; the .out "
+            "file is only written once the job finishes"
         ),
     )
     parser.add_argument("--seed", type=lambda value: int(value, 0), default=0xC0FFEE)
@@ -352,6 +364,7 @@ def main(argv: list[str] | None = None) -> int:
             maxcore_mb=arguments.maxcore,
             dry_run=arguments.dry_run,
             scratch_root=arguments.scratch_root,
+            live_log=arguments.live_log,
         )
     except (ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)

@@ -160,7 +160,14 @@ $env:ELECTROLYTE_ORCA = "D:\path\to\orca\orca.exe"
 | `--nprocs` | 显式指定 `%pal nprocs`；不给则自动（见下） |
 | `--maxcore` | 每核内存 MB，写进 `%maxcore`；不给则不写 |
 | `--scratch-root` | ORCA 实际运行的 scratch 目录；仅在输出目录非 ASCII 安全时才需要（本仓库在中文路径下，默认回退到 `%TEMP%\electrolyte_orca_scratch`） |
+| `--live-log` | 把 ORCA 的输出**边跑边**镜像到这个文件（追加模式），长作业可用 `Get-Content <文件> -Wait` 实时看；`.out` 仍是作业结束后才写 |
 | `--dry-run` | 只生成输入文件 + `status="not_run"` 记录，**不需要 ORCA** |
+
+**为什么需要 `--live-log`：** ORCA 的 stdout 在 `toolchain.run_command` 里是**被 Python 捕获**的
+（`capture_output=True`），要等进程结束才由 `run_orca` 一次性写成 `<name>.out`；而 ORCA 又是在一个
+**跑完就删掉**的 scratch 目录里运行。结果是**作业期间磁盘上没有任何可读的输出**。
+`--live-log` 走的是流式分支（`toolchain._run_command_streaming`，底层是 `Popen` + 行缓冲 flush）：
+每一行既写进日志文件、又照旧返回给调用方解析，所以它**不改变任何解析结果**，只是让长作业变得可观察。
 
 **几何来源与 RDKit：** `--smiles` 走的是与 xTB 臂**相同**的建几何函数
 （`run_xtb_job.build_geometry` / 自写 `write_xyz`）。之所以不用 RDKit 自带的

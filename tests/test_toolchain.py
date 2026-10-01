@@ -186,6 +186,62 @@ def test_run_command_executes_a_real_process() -> None:
     assert "hello from child" in completed.stdout
 
 
+def test_run_command_live_log_mirrors_output_into_a_file(tmp_path: Path) -> None:
+    log = tmp_path / "live.log"
+
+    completed = run_command(
+        sys.executable,
+        ["-c", "print('first line'); print('second line')"],
+        live_log=log,
+    )
+
+    assert completed.returncode == 0
+    written = log.read_text(encoding="utf-8")
+    assert written.splitlines() == ["first line", "second line"]
+    # the mirrored file is a copy, not a replacement: callers still parse stdout
+    assert completed.stdout == written
+    assert completed.stderr == ""
+
+
+def test_run_command_live_log_folds_stderr_into_the_same_file(tmp_path: Path) -> None:
+    log = tmp_path / "live.log"
+
+    completed = run_command(
+        sys.executable,
+        ["-c", "import sys; print('to stdout'); print('to stderr', file=sys.stderr)"],
+        live_log=log,
+    )
+
+    written = log.read_text(encoding="utf-8")
+    assert "to stdout" in written
+    assert "to stderr" in written
+    assert completed.stdout == written
+
+
+def test_run_command_live_log_appends_instead_of_truncating(tmp_path: Path) -> None:
+    log = tmp_path / "live.log"
+    log.write_text("an earlier run\n", encoding="utf-8")
+
+    run_command(sys.executable, ["-c", "print('a later run')"], live_log=log)
+
+    assert log.read_text(encoding="utf-8").splitlines() == ["an earlier run", "a later run"]
+
+
+def test_run_command_live_log_keeps_what_was_seen_before_a_timeout(tmp_path: Path) -> None:
+    log = tmp_path / "live.log"
+
+    with pytest.raises(subprocess.TimeoutExpired) as caught:
+        run_command(
+            sys.executable,
+            ["-c", "import time; print('before the wait', flush=True); time.sleep(30)"],
+            timeout_seconds=2.0,
+            live_log=log,
+        )
+
+    assert "before the wait" in log.read_text(encoding="utf-8")
+    assert "before the wait" in (caught.value.stdout or "")
+
+
 # --------------------------------------------------------------------------- #
 # toolchain: dry-run backend
 # --------------------------------------------------------------------------- #
