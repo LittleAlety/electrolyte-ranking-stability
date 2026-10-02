@@ -528,12 +528,12 @@ Itkis 的 `p(C)` 群体分布（原文无群体分布，只有"值得考虑的 n
 ## 7. 本文档的来源与可复现性
 
 - 依据文献（6 篇 PDF，位于 `核心文件/文献/`）：
-  - `c8ee01286e.pdf` — Peljo & Girault, *Energy Environ. Sci.* 2018, 11, 2306–2309, DOI `10.1039/C8EE01286E`
-  - `c4cp01572j.pdf` — Marenich, Ho, Coote, Cramer & Truhlar, *Phys. Chem. Chem. Phys.* 2014, 16, 15068–15106, DOI `10.1039/C4CP01572J`
-  - `d1cp01454d.pdf` — Itkis, Cavallo, Yashina & Minenkov, *Phys. Chem. Chem. Phys.* 2021, 23, 16077–16088, DOI `10.1039/D1CP01454D`
-  - `1-s2.0-S2451910318302035-main.pdf` — Borodin, *Curr. Opin. Electrochem.* 2019, 13, 86–93, DOI `10.1016/j.coelec.2018.10.015`
-  - `1-s2.0-S2468606925003296-main.pdf` — Yang et al., *Mater. Today Energy* 2025, 54, 102121, DOI `10.1016/j.mtener.2025.102121`
-  - `c4cp04338c.pdf` — Husch, Yilmazer, Balducci & Korth, *Phys. Chem. Chem. Phys.* 2015, 17, 3394–3401, DOI `10.1039/C4CP04338C`
+  - `M2-Peljo-Girault-2018-HOMO-LUMO.pdf` — Peljo & Girault, *Energy Environ. Sci.* 2018, 11, 2306–2309, DOI `10.1039/C8EE01286E`
+  - `M3-Marenich-2014-liquid-phase-reduction-potentials.pdf` — Marenich, Ho, Coote, Cramer & Truhlar, *Phys. Chem. Chem. Phys.* 2014, 16, 15068–15106, DOI `10.1039/C4CP01572J`
+  - `M4-Itkis-2021-Li-solvation-ambiguities.pdf` — Itkis, Cavallo, Yashina & Minenkov, *Phys. Chem. Chem. Phys.* 2021, 23, 16077–16088, DOI `10.1039/D1CP01454D`
+  - `M5-Borodin-2019-electrolyte-stability-window.pdf` — Borodin, *Curr. Opin. Electrochem.* 2019, 13, 86–93, DOI `10.1016/j.coelec.2018.10.015`
+  - `M6-Yang-2025-Li-coordination-ML.pdf` — Yang et al., *Mater. Today Energy* 2025, 54, 102121, DOI `10.1016/j.mtener.2025.102121`
+  - `M7-Husch-2015-high-throughput-screening.pdf` — Husch, Yilmazer, Balducci & Korth, *Phys. Chem. Chem. Phys.* 2015, 17, 3394–3401, DOI `10.1039/C4CP04338C`
 - M1（Bard / Faulkner / White 教材）未提供 PDF，相关条目仅作概念性回答，并已逐条标注。
 - 抽取文本副本：`outputs/_week7_scratch/lit/*.txt`（`pymupdf`，每页以 `===== PAGE n =====` 分隔）；
   抽取脚本 `outputs/_week7_scratch/extract.py`。抽取造成的符号损坏见 §0.1。

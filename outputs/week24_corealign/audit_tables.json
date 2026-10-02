@@ -1,0 +1,1491 @@
+{
+  "stage": "Week 24 (W24-C) -- core-file audit tables",
+  "generated_by": "scripts/analyze_w24_audit.py",
+  "discipline": "只读既有产物与文档；零新增电子结构计算；未确证的映射标 待确认；只统计真实存在的字段。",
+  "tables": {
+    "stage_ladder_map": {
+      "title": "核心文件 §19 Stage 0–9 ↔ 论文十级台阶映射",
+      "columns": [
+        "核心文件 Stage",
+        "实际计算内容",
+        "对应论文台阶",
+        "产物路径",
+        "证据强度(确证/待确认)"
+      ],
+      "rows": [
+        {
+          "stage": "Stage 0\n冻结科学定义与 metadata",
+          "content": "冻结目标量方向、Top-k 比例（10/20/30%）、δ 确定规则、reference ligand R=DME、anchor 搜集规则；建立 core set（18）与 broad pool（40）的 chemical-space metadata；Gate 0 CLOSED。",
+          "rung": "不产生台阶（定义冻结层）",
+          "artifacts": "config/scientific_definitions.yaml；config/prereg.yaml；outputs/week1/gate0_record.md；data/metadata/core_set.csv",
+          "scripts": "scripts/build_metadata.py；scripts/freeze_gates.py",
+          "evidence": [
+            {
+              "path": "电解液溶剂HB-Code/docs/00_stage0_definitions.md",
+              "ok": true,
+              "detail": "contains 'Gate 0'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/docs/11_plan_alignment.md",
+              "ok": true,
+              "detail": "contains 'Stage 0 定义冻结'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week1/gate0_record.md",
+              "ok": true,
+              "detail": "contains 'CLOSED'"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "stage": "Stage 1\n方法审计与 external anchors",
+          "content": "12 个 method-audit 分子的 GFN2-xTB 三态审计（Koopmans vs ΔSCF）；气相 anchor 对照；31 行溶液锚点逐条审计（全部 method=est，0 exp / 0 calc）；production protocol DRAFT-FROZEN；Gate 1 NOT CLOSED。",
+          "rung": "方法审计（不产生台阶；其 τ_b / MAE 用于解释 P0→P1）",
+          "artifacts": "outputs/week2/method_audit_xtb.csv；outputs/week2/method_audit_xtb_summary.json；outputs/week2/solution_anchor_audit.json；outputs/week2/gate1_record.md",
+          "scripts": "scripts/run_method_audit_xtb.py；scripts/audit_solution_anchors.py；scripts/run_diffuse_control.py",
+          "evidence": [
+            {
+              "path": "电解液溶剂HB-Code/docs/02_stage1_method_audit.md",
+              "ok": true,
+              "detail": "contains 'Stage 1'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week2/method_audit_xtb_summary.json",
+              "ok": true,
+              "detail": "n_molecules=12 (want 12)"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week2/gate1_record.md",
+              "ok": true,
+              "detail": "contains 'NOT CLOSED'"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "stage": "Stage 2\nBroad cheap pool",
+          "content": "canonical 结构 + RDKit descriptors + CREST/GFN2-xTB 单构象优化，得到 X(0) 与 P0 标量代理；broad pool 40/40 + core 18/18 = 58/58 收敛、0 失败。",
+          "rung": "P0 起点臂（十级台阶的起始层，本身不单独成台阶）",
+          "artifacts": "outputs/week3/p0_broad_pool.csv；outputs/week3/p0_core_set.csv；outputs/week3/p0_summary.json",
+          "scripts": "scripts/run_broad_pool_p0.py；scripts/build_conformers.py",
+          "evidence": [
+            {
+              "path": "电解液溶剂HB-Code/docs/09_week3_report.md",
+              "ok": true,
+              "detail": "contains 'Stage 2'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/docs/11_plan_alignment.md",
+              "ok": true,
+              "detail": "contains 'Stage 2 broad pool'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week3/p0_core_set.csv",
+              "ok": true,
+              "detail": "exists"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week3/p0_broad_pool.csv",
+              "ok": true,
+              "detail": "exists"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "stage": "Stage 3\nCore free-molecule electronic structure",
+          "content": "core 18 分子三态 r2SCAN-3c 垂直 P1@G1（54/54，独立复核 0 分歧）；同一 12 分子子集做 G2 = r2SCAN-3c Opt+Freq（12 + 36 作业，0 失败）；unbound-anion QC。",
+          "rung": "P0→P1（氧化/还原）与 G1→G2（氧化/还原）两个物理台阶",
+          "artifacts": "outputs/week4/p1_core_set.csv；outputs/week4/p1_core_set_audit.json；outputs/week4/p1_decision_stability.json；outputs/week4/t2_opt_freq_summary.json",
+          "scripts": "scripts/run_core_set_p1.py；scripts/audit_p1_core_set.py；scripts/run_t2_opt_freq.py",
+          "evidence": [
+            {
+              "path": "电解液溶剂HB-Code/docs/10_week4_report.md",
+              "ok": true,
+              "detail": "contains 'P0 -> P1'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week4/p1_core_set_audit.json",
+              "ok": true,
+              "detail": "n_records=54 (want 54)"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week4/p1_core_set_audit.json",
+              "ok": true,
+              "detail": "n_molecules=18 (want 18)"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week4/t2_opt_freq_summary.json",
+              "ok": true,
+              "detail": "n_molecules=12 (want 12)"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week4/p1_decision_stability.json",
+              "ok": true,
+              "detail": "exists"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "stage": "Stage 4\nFixed-background continuum",
+          "content": "全部 core N=18 使用同一 production 连续介质设置（CPCM / SMD，乙腈 ε=35.688）得到 P2；12 分子审计子集做 dielectric-only 扫描（bare CPCM ε=5/10/20/40，144/144）。",
+          "rung": "P1→P2（氧化/还原）",
+          "artifacts": "outputs/week4/p2_core_set_smd_acetonitrile.csv；outputs/week4/p2_decision_stability.json；outputs/week4/t3_cpcm_eps_scan_summary.json",
+          "scripts": "scripts/run_core_set_p2.py；scripts/analyze_p2_environment.py；scripts/analyze_cpcm_eps_scan.py",
+          "evidence": [
+            {
+              "path": "电解液溶剂HB-Code/docs/10_week4_report.md",
+              "ok": true,
+              "detail": "contains '环境层（P2）'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week4/p2_summary_smd_acetonitrile.json",
+              "ok": true,
+              "detail": "n_ok=54 (want 54)"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week4/t3_cpcm_eps_scan_summary.json",
+              "ok": true,
+              "detail": "n_jobs=144 (want 144)"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week4/p2_decision_stability.json",
+              "ok": true,
+              "detail": "exists"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "stage": "Stage 5\nConditional Li+ coordination",
+          "content": "donor/motif 枚举（46 候选 -> 12 motif）；xTB 预筛；10 分子 C1 = [LiM]+ 三态 r2SCAN-3c（92 作业）；state-identity QC；ΔΔG_coord 与相对 ligand-exchange ΔΔG_bind。",
+          "rung": "C0→C1（氧化/还原）",
+          "artifacts": "outputs/week5/li_motif_generation.json；outputs/week5/c1_li_coordination.csv；outputs/week5/c1_decision_stability.json；outputs/week5/c1_state_identity.json",
+          "scripts": "scripts/build_li_motifs.py；scripts/run_c1_li_coordination.py；scripts/analyze_c1_coordination.py；scripts/analyze_c1_state_identity.py",
+          "evidence": [
+            {
+              "path": "电解液溶剂HB-Code/docs/12_week5_report.md",
+              "ok": true,
+              "detail": "contains 'Stage 5'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week5/li_motif_generation.json",
+              "ok": true,
+              "detail": "n_kept_motifs=12 (want 12)"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week5/c1_li_coordination_summary.json",
+              "ok": true,
+              "detail": "n_jobs=92 (want 92)"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week5/c1_decision_stability.json",
+              "ok": true,
+              "detail": "exists"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "stage": "Stage 6\nUncertainty-aware ranking analysis",
+          "content": "Kendall τ_b / f_unresolved / robust-inversion / Top-k / selection regret + bootstrap；δ_m 组装（T6 构象系综、T7 C1 虚频、T8 δ_m、T9 三口径决策稳定性）。",
+          "rung": "不产生新台阶（对全部十级台阶产出统计量，即论文表 2）",
+          "artifacts": "outputs/week6/delta_m_frozen.json；outputs/week6/stage6_decision_stability.json；outputs/week6/t7_c1_freq_check.json；outputs/week9/stage10_ladder.json（论文表 2 取数源）",
+          "scripts": "scripts/analyze_stage6.py；scripts/analyze_delta_m.py；scripts/analyze_stage10_synthesis.py",
+          "evidence": [
+            {
+              "path": "电解液溶剂HB-Code/docs/13_week6_report.md",
+              "ok": true,
+              "detail": "contains 'Stage 6'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week6/stage6_decision_stability.json",
+              "ok": true,
+              "detail": "stage='T9 (Stage 6)' (want 'T9 (Stage 6)')"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week9/stage10_ladder.json",
+              "ok": true,
+              "detail": "stage='Stage10-five-rung-ladder-synthesis' (want 'Stage10-five-rung-ladder-synthesis')"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week6/delta_m_frozen.json",
+              "ok": true,
+              "detail": "exists"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "stage": "Stage 7\nMechanism analysis + Δ-learning",
+          "content": "X(0)/X(1)/X(2) 特征成本分级；6 模型复杂度阶梯；random/group/LOFO 三拆分；direct vs Δ-learning；robust inversion 结构机制；X(2) 仅作 post hoc 解释。",
+          "rung": "不产生台阶（机制/学习层；论文 v2 命中 0，W24 计划补入 §3.13）",
+          "artifacts": "outputs/week7/feature_manifest.json；outputs/week7/stage7_ml_results.json（288 行）；outputs/week7/stage7_ml_predictions.csv",
+          "scripts": "scripts/run_stage7_ml.py；scripts/build_ml_features.py",
+          "evidence": [
+            {
+              "path": "电解液溶剂HB-Code/docs/15_week7_report.md",
+              "ok": true,
+              "detail": "contains 'Stage 7'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week7/stage7_ml_results.json",
+              "ok": true,
+              "detail": "exists"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week7/feature_manifest.json",
+              "ok": true,
+              "detail": "feature_cost_levels={'X0': ['mw', 'donor_count', 'n_heavy', 'rotatable_bonds', 'tpsa', 'is_cyclic', 'has_fluorine', 'p0_ox_ev', 'p0_red_ev', 'hl_gap_ev', 'dipole_debye', 'aux_alpha_bohr3'], 'X1': ['p1_ox_ev', 'p1_red_ev', 'p2_ox_ev', 'p2_red_ev', 'env_d_ox_ev', 'env_d_red_ev'], 'X2': ['x2_dgdg_bind_ev', 'x2_li_min_distance_a', 'x2_li_contacts_n', 'x2_motif_switch']}"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "stage": "Stage 8\nActive-learning replay",
+          "content": "random / diversity / uncertainty / ranking-aware 四采集函数；20 组种子重复；n_T -> τ_b / O_k / R_k 曲线与最小昂贵信息预算。",
+          "rung": "不产生台阶（主动学习层；论文 v2 命中 0，W24 计划补入 §3.14）",
+          "artifacts": "outputs/week7/stage8_al_curves.csv（296 行，含 2.5/97.5 分位）；outputs/week7/stage8_al_results.json；outputs/week7/stage8_al_runs.csv",
+          "scripts": "scripts/run_stage8_al.py",
+          "evidence": [
+            {
+              "path": "电解液溶剂HB-Code/docs/15_week7_report.md",
+              "ok": true,
+              "detail": "contains 'Stage 8'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week7/stage8_al_curves.csv",
+              "ok": true,
+              "detail": "contains 'baseline'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week7/stage7_ml_results.json",
+              "ok": true,
+              "detail": "exists"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "stage": "Stage 9\nOptional explicit-microsolvation validation",
+          "content": "只对 12 个关键 motif 做 targeted check：homoleptic [Li(M)2]+ 第一溶剂壳（xTB 刚体放置 -> xTB 单点打分 -> DFT Opt + 三态单点 36 作业），给出 C1 vs C2 排序稳定性。",
+          "rung": "C1→C2（氧化/还原）",
+          "artifacts": "outputs/week8/ms_shell_generation.json；outputs/week8/stage9_results.json；outputs/week8/stage9_shell_shifts.csv；outputs/week8/stage9_decision_stability.csv",
+          "scripts": "scripts/build_microsolvation_shells.py；scripts/run_stage9_microsolvation.py；scripts/analyze_stage9_microsolvation.py",
+          "evidence": [
+            {
+              "path": "电解液溶剂HB-Code/docs/18_week8_report.md",
+              "ok": true,
+              "detail": "contains 'Stage 9'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week8/ms_shell_generation.json",
+              "ok": true,
+              "detail": "n_selected=12 (want 12)"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week8/stage9_results.json",
+              "ok": true,
+              "detail": "motifs_with_shell2=12 (want 12)"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week8/stage9_results.json",
+              "ok": true,
+              "detail": "exists"
+            }
+          ],
+          "strength": "确证"
+        }
+      ],
+      "note": "论文的“十级台阶”= 5 个物理台阶（P0→P1、P1→P2、G1→G2、C0→C1、C1→C2）× 2 条轴（氧化/还原）。项目内部 Stage 编号在 0–9 与核心文件 §19 一致（`成果输出/数据结果汇总.md` §2），10–24 为超出核心文件的扩展（Stage 10 五级台阶合成 … Stage 24 R8 靶向双腿）。论文表 2 的取数源为 `outputs/week9/stage10_ladder.json`（Stage 10 合成，投影自 Stage 3/4/5/9 产物）。核心文件 §19 没有独立的“几何”Stage，G1→G2 归属 Stage 3 是项目文档（`docs/11` §2 把 T2 记在 Stage 3 下）的归档口径。"
+    },
+    "qc_ledger": {
+      "title": "QC 状态机台账（核心文件 §20 九类异常 + 全部现存 warning/flag 字段）",
+      "columns": [
+        "状态/异常",
+        "含义",
+        "发生数/总数",
+        "发生率",
+        "证据文件",
+        "论文中的处置"
+      ],
+      "rows": [
+        {
+          "status": "scf_failed",
+          "meaning": "自洽场求解失败（字面字段，与“多解 / 漏解”是两件事）",
+          "layers": [
+            {
+              "label": "P1 core（54 记录）",
+              "count": 0,
+              "total": 54,
+              "rate": 0.0
+            },
+            {
+              "label": "C1 配位态（92 作业）",
+              "count": 0,
+              "total": 92,
+              "rate": 0.0
+            },
+            {
+              "label": "Stage 9 壳层（12 壳）",
+              "count": 0,
+              "total": 12,
+              "rate": 0.0
+            }
+          ],
+          "evidence": [
+            "outputs/week4/p1_core_set_audit.json:flag_counts.scf_failed",
+            "outputs/week5/c1_li_coordination_summary.json:qc_flag_counts.scf_failed",
+            "outputs/week8/ms_shell_generation.json:qc_flag_counts.scf_failed"
+          ],
+          "paper": "论文未报告字面 scf_failed 计数（关键词命中 0）；§3.8 讨论的是“自洽场多解 / 漏解”，与该字段计数为 0 不矛盾。",
+          "paper_keys": [
+            "scf_failed"
+          ],
+          "paper_hits": {
+            "scf_failed": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "自洽场多解：默认初猜漏解",
+          "meaning": "默认初猜落到能量偏高的亚稳态；与 moread 初猜配对普查（Stage 16 目录）",
+          "layers": [
+            {
+              "label": "12 分子 x 3 态 x 10 个 ε = 360 格",
+              "count": 32,
+              "total": 360,
+              "rate": 0.08888888888888889
+            }
+          ],
+          "evidence": [
+            "outputs/week15/stage16_catalogue_analysis.json:n_material_differences / n_cells"
+          ],
+          "paper": "§3.8 全量报告（328/360 一致、32 更低、0 更高、最大缺陷 −0.285961 eV）。",
+          "paper_keys": [
+            "自洽场多解",
+            "漏解"
+          ],
+          "paper_hits": {
+            "自洽场多解": 3,
+            "漏解": 9
+          },
+          "paper_reported": true
+        },
+        {
+          "status": "自洽场多解：第二解弛豫存亡",
+          "meaning": "第二个 SCF 解在几何弛豫后是否仍是更低的那个（Stage 19）",
+          "layers": [
+            {
+              "label": "37 个差异格",
+              "count": 5,
+              "total": 37,
+              "rate": 0.13513513513513514
+            }
+          ],
+          "evidence": [
+            "outputs/week18/stage19_relax_analysis.json:aggregates.all.all.outcomes.distinct_lower / n_cells"
+          ],
+          "paper": "论文未报告（关键词命中 0）——建议随本台账补入 §3.8 附录。",
+          "paper_keys": [
+            "弛豫",
+            "distinct_lower"
+          ],
+          "paper_hits": {
+            "弛豫": 0,
+            "distinct_lower": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "自洽场多解：跨引擎存亡",
+          "meaning": "同一批第二解在 xTB 级弛豫后是否仍更低（Stage 20，跨方法）",
+          "layers": [
+            {
+              "label": "37 个差异格",
+              "count": 15,
+              "total": 37,
+              "rate": 0.40540540540540543
+            }
+          ],
+          "evidence": [
+            "outputs/week19/stage20_xtb_arms_analysis.json:aggregates.all.all.outcomes.distinct_lower / n_cells"
+          ],
+          "paper": "论文未报告（关键词命中 0）——建议随本台账补入 §3.8 附录。",
+          "paper_keys": [
+            "跨引擎"
+          ],
+          "paper_hits": {
+            "跨引擎": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "漏解引起的 pair 翻转（R8 靶向双腿）",
+          "meaning": "漏解真实改写的分子对；安全阈值 A_axis = 单格最大效应量",
+          "layers": [
+            {
+              "label": "氧化轴（660 对）",
+              "count": 19,
+              "total": 660,
+              "rate": 0.02878787878787879
+            },
+            {
+              "label": "还原轴（660 对）",
+              "count": 21,
+              "total": 660,
+              "rate": 0.031818181818181815
+            }
+          ],
+          "evidence": [
+            "outputs/week23/targeted_two_guess.json:axes.*.n_flips / n_pairs",
+            "outputs/week22_hardening/allowance_factor2.json:axes.*.two_times_A_axis_ev"
+          ],
+          "paper": "§3.8 表 3 报告（氧化 19 次 / 还原 21 次，靶向漏 0）；严格上界为 2·A_axis（0.3045 / 0.5719 eV，见 allowance_factor2.json）。",
+          "paper_keys": [
+            "漏解",
+            "Aaxis"
+          ],
+          "paper_hits": {
+            "漏解": 9,
+            "Aaxis": 8
+          },
+          "paper_reported": true
+        },
+        {
+          "status": "unbound_anion",
+          "meaning": "气相阴离子不束缚（带负电荷态出现正 HOMO）",
+          "layers": [
+            {
+              "label": "P1 core（18 分子）",
+              "count": 18,
+              "total": 18,
+              "rate": 1.0
+            },
+            {
+              "label": "C1 配位态（92 作业）",
+              "count": 0,
+              "total": 92,
+              "rate": 0.0
+            }
+          ],
+          "evidence": [
+            "outputs/week4/p1_core_set_audit.json:flag_counts.unbound_anion",
+            "outputs/week5/c1_li_coordination_summary.json:qc_flag_counts.unbound_anion"
+          ],
+          "paper": "§2.3 / §3.3 报告 18/18 并说明气相 EA 只在趋势上有意义，定量比较需溶剂化或弥散基组（T5 弥散对照 24 作业）。",
+          "paper_keys": [
+            "不束缚"
+          ],
+          "paper_hits": {
+            "不束缚": 3
+          },
+          "paper_reported": true
+        },
+        {
+          "status": "motif_switch",
+          "meaning": "配位 motif 改变（放置 / 优化后与实际接触模式不一致）",
+          "layers": [
+            {
+              "label": "Li motif 枚举（46 候选）",
+              "count": 32,
+              "total": 46,
+              "rate": 0.6956521739130435
+            },
+            {
+              "label": "保留 12 motif 的行",
+              "count": 9,
+              "total": 12,
+              "rate": 0.75
+            },
+            {
+              "label": "Stage 9 壳层 shell1（12 motif）",
+              "count": 9,
+              "total": 12,
+              "rate": 0.75
+            }
+          ],
+          "evidence": [
+            "outputs/week5/li_motif_generation.json:qc_flag_counts.motif_switch",
+            "outputs/week8/stage9_results.json:shifts[].qc_flags = shell1:motif_switch"
+          ],
+          "paper": "论文未报告（motif 关键词命中 0）——建议随本台账补入附录。",
+          "paper_keys": [
+            "motif"
+          ],
+          "paper_hits": {
+            "motif": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "no_intact_minimum_found",
+          "meaning": "优化后 Li–M 最小接触消失（几何优先于电子标签）",
+          "layers": [
+            {
+              "label": "Li motif 枚举（46 候选）",
+              "count": 1,
+              "total": 46,
+              "rate": 0.021739130434782608
+            },
+            {
+              "label": "C1 扫描（92 作业）",
+              "count": 4,
+              "total": 92,
+              "rate": 0.043478260869565216
+            },
+            {
+              "label": "C1 态身份：dication（12 行）",
+              "count": 4,
+              "total": 12,
+              "rate": 0.3333333333333333
+            },
+            {
+              "label": "C1 态身份（24 行）",
+              "count": 4,
+              "total": 24,
+              "rate": 0.16666666666666666
+            }
+          ],
+          "evidence": [
+            "outputs/week5/li_motif_generation.json:qc_flag_counts.no_intact_minimum_found",
+            "outputs/week5/c1_li_coordination_summary.json:qc_flag_counts.no_intact_minimum_found",
+            "outputs/week5/c1_state_identity.json:per_redox_state.dication.labels"
+          ],
+          "paper": "§3.5 用了态身份分析（还原态 11/12 电子落在 Li 上），但未单列本 QC 计数。",
+          "paper_keys": [
+            "态身份"
+          ],
+          "paper_hits": {
+            "态身份": 6
+          },
+          "paper_reported": true
+        },
+        {
+          "status": "geometry_failed",
+          "meaning": "几何优化失败（唯一一例为 SL/m1 dication，ORCA 超时被 kill）",
+          "layers": [
+            {
+              "label": "C1 扫描（92 作业）",
+              "count": 1,
+              "total": 92,
+              "rate": 0.010869565217391304
+            },
+            {
+              "label": "Li motif 枚举（46 候选）",
+              "count": 0,
+              "total": 46,
+              "rate": 0.0
+            }
+          ],
+          "evidence": [
+            "outputs/week5/c1_li_coordination_summary.json:qc_flag_counts.geometry_failed"
+          ],
+          "paper": "论文未报告（geometry_failed 关键词命中 0）。",
+          "paper_keys": [
+            "geometry_failed"
+          ],
+          "paper_hits": {
+            "geometry_failed": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "虚频 imaginary_mode_unresolved",
+          "meaning": "驻点 Hessian 存在虚频（不是局部极小）",
+          "layers": [
+            {
+              "label": "T2 几何台阶（12 分子 Opt+Freq）",
+              "count": 2,
+              "total": 12,
+              "rate": 0.16666666666666666
+            },
+            {
+              "label": "T7 C1 [LiM]+ Freq（10 分子）",
+              "count": 1,
+              "total": 10,
+              "rate": 0.1
+            }
+          ],
+          "evidence": [
+            "outputs/week4/t2_opt_freq_summary.json:n_imaginary_unresolved / n_opt_jobs",
+            "outputs/week6/t7_c1_freq_check.json:n_imaginary / n_molecules"
+          ],
+          "paper": "论文未报告（虚频 关键词命中 0）——EC 的 [LiEC]+ 在 −80.4 cm⁻¹ 有虚频，其 C0→C1 位移系鞍点测量，应写入局限。",
+          "paper_keys": [
+            "虚频"
+          ],
+          "paper_hits": {
+            "虚频": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "dissociated_optimized_product",
+          "meaning": "优化后母体连接断裂（解离产物）",
+          "layers": [
+            {
+              "label": "Li motif 枚举（46 候选）",
+              "count": 1,
+              "total": 46,
+              "rate": 0.021739130434782608
+            },
+            {
+              "label": "C1 扫描（92 作业）",
+              "count": 0,
+              "total": 92,
+              "rate": 0.0
+            },
+            {
+              "label": "Stage 9 壳层（12 壳）",
+              "count": 0,
+              "total": 12,
+              "rate": 0.0
+            }
+          ],
+          "evidence": [
+            "outputs/week5/li_motif_generation.json:qc_flag_counts.dissociated_optimized_product",
+            "outputs/week5/c1_li_coordination_summary.json:qc_flag_counts.dissociated_optimized_product"
+          ],
+          "paper": "论文未报告（关键词命中 0）；Stage 9 的 12 壳层 second_ligand_intact 全 True。",
+          "paper_keys": [
+            "dissociated"
+          ],
+          "paper_hits": {
+            "dissociated": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "state_identity_ambiguous",
+          "meaning": "态身份指标冲突（无法判定电子落在 Li 还是分子）",
+          "layers": [
+            {
+              "label": "C1 扫描（92 作业）",
+              "count": 0,
+              "total": 92,
+              "rate": 0.0
+            }
+          ],
+          "evidence": [
+            "outputs/week5/c1_li_coordination_summary.json:qc_flag_counts.state_identity_ambiguous"
+          ],
+          "paper": "§3.5 报告态身份分类（11/12 Li-centered），本字段计数为 0。",
+          "paper_keys": [
+            "态身份"
+          ],
+          "paper_hits": {
+            "态身份": 6
+          },
+          "paper_reported": true
+        },
+        {
+          "status": "spin_contamination_flag",
+          "meaning": "自旋污染（<S²> 偏离）",
+          "layers": [
+            {
+              "label": "P1 core（54 记录）",
+              "count": 0,
+              "total": 54,
+              "rate": 0.0
+            },
+            {
+              "label": "C1 扫描（92 作业）",
+              "count": 0,
+              "total": 92,
+              "rate": 0.0
+            }
+          ],
+          "evidence": [
+            "outputs/week4/p1_core_set_audit.json:flag_counts.spin_contamination_flag",
+            "outputs/week5/c1_li_coordination_summary.json:qc_flag_counts.spin_contamination_flag"
+          ],
+          "paper": "论文未报告（关键词命中 0）；交付层断言 p1_audit.spin_contamination_flag==0 通过。",
+          "paper_keys": [
+            "spin_contamination"
+          ],
+          "paper_hits": {
+            "spin_contamination": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "electron_count_mismatch",
+          "meaning": "电子数不一致",
+          "layers": [
+            {
+              "label": "C1 扫描（92 作业）",
+              "count": 0,
+              "total": 92,
+              "rate": 0.0
+            }
+          ],
+          "evidence": [
+            "outputs/week5/c1_li_coordination_summary.json:qc_flag_counts.electron_count_mismatch"
+          ],
+          "paper": "论文未报告（关键词命中 0）。",
+          "paper_keys": [
+            "electron_count"
+          ],
+          "paper_hits": {
+            "electron_count": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "execution_failed",
+          "meaning": "作业级执行失败（非物理失败）",
+          "layers": [
+            {
+              "label": "C1 扫描（92 作业）",
+              "count": 1,
+              "total": 92,
+              "rate": 0.010869565217391304
+            }
+          ],
+          "evidence": [
+            "outputs/week5/c1_li_coordination_summary.json:status_counts.execution_failed"
+          ],
+          "paper": "论文未报告（关键词命中 0）；该例同时是 geometry_failed（SL/m1 dication 超时）。",
+          "paper_keys": [
+            "execution_failed"
+          ],
+          "paper_hits": {
+            "execution_failed": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "abnormal_termination / energy_mismatch / missing_output",
+          "meaning": "ORCA 输出异常终止 / 能量解析不一致 / 输出缺失",
+          "layers": [
+            {
+              "label": "P1 core abnormal_termination（54 记录）",
+              "count": 0,
+              "total": 54,
+              "rate": 0.0
+            },
+            {
+              "label": "P1 core energy_mismatch（54 记录）",
+              "count": 0,
+              "total": 54,
+              "rate": 0.0
+            },
+            {
+              "label": "P1 core missing_output（54 记录）",
+              "count": 0,
+              "total": 54,
+              "rate": 0.0
+            }
+          ],
+          "evidence": [
+            "outputs/week4/p1_core_set_audit.json:flag_counts.abnormal_termination / energy_mismatch / missing_output"
+          ],
+          "paper": "论文未报告（关键词命中 0）；交付层三条断言全部通过。",
+          "paper_keys": [
+            "abnormal_termination"
+          ],
+          "paper_hits": {
+            "abnormal_termination": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "placement_clash_start",
+          "meaning": "壳层放置回退（起点与 Li+ 球面冲突，按事前规则放宽并记录）",
+          "layers": [
+            {
+              "label": "Stage 9 壳层（12 壳）",
+              "count": 2,
+              "total": 12,
+              "rate": 0.16666666666666666
+            }
+          ],
+          "evidence": [
+            "outputs/week8/ms_shell_generation.json:shells[].qc_flags = placement_clash_start"
+          ],
+          "paper": "论文未报告（关键词命中 0）；涉及 DMC/m2 与 TMP/m2，几何完好（Li 接触数 4 与 6）。",
+          "paper_keys": [
+            "placement_clash"
+          ],
+          "paper_hits": {
+            "placement_clash": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "warning（Stage 21 refill）",
+          "meaning": "记录型警示字符串（非计数型异常）",
+          "layers": [
+            {
+              "label": "Stage 21 refill 警示条数",
+              "count": 1,
+              "total": 1,
+              "rate": 1.0
+            }
+          ],
+          "evidence": [
+            "outputs/week20/stage21_refill.json:coverage.warning"
+          ],
+          "paper": "论文未报告（关键词命中 0）；内容为“严格 P2 腿（SMD）的弛豫覆盖为 0”，属过程警示。",
+          "paper_keys": [
+            "预警",
+            "warning"
+          ],
+          "paper_hits": {
+            "预警": 0,
+            "warning": 0
+          },
+          "paper_reported": false
+        },
+        {
+          "status": "交付包 verification.json 断言",
+          "meaning": "交付层自动断言（含文件 SHA256 与现场取数核对），23 个交付包",
+          "layers": [
+            {
+              "label": "checks 通过 / 总数",
+              "count": 372,
+              "total": 372,
+              "rate": 1.0
+            }
+          ],
+          "evidence": [
+            "成果输出/week1/verification.json（13 checks）",
+            "成果输出/week10/verification.json（22 checks）",
+            "成果输出/week11/verification.json（26 checks）",
+            "成果输出/week12/verification.json（17 checks）",
+            "成果输出/week13/verification.json（17 checks）",
+            "..."
+          ],
+          "paper": "论文 §2.6 声明“可用 --check 逐字节复核”；交付层 0 条断言失败。",
+          "paper_keys": [
+            "--check"
+          ],
+          "paper_hits": {
+            "--check": 1
+          },
+          "paper_reported": true
+        }
+      ],
+      "note": "口径：发生数/总数 逐层给出，分母取该 JSON 自己的分母字段（n_records / n_jobs / n_candidates / n_molecules / n_rows / n_cells / n_selected）。只登记真实存在的字段；缺字段的层不出现。“论文未报告 / 命中 0”按关键词字符串检索计，非逐字段核对。核心集 P1 唯一的高发异常是 unbound_anion（18/18，结构性）；C1 层最值得报告的是 T7 虚频（EC，−80.4 cm⁻¹）与 no_intact_minimum_found（dication 4/12）。"
+    },
+    "phase1_not_done": {
+      "title": "第一阶段显式“不做”声明表（四项条款）",
+      "columns": [
+        "条款",
+        "是否做",
+        "为什么不做（核心文件 §2.3 纪律 + 论文局限章）",
+        "建议在论文哪一节声明为 Phase II",
+        "证据强度"
+      ],
+      "rows": [
+        {
+          "clause": "§16.2 真实配位 population（{p_s}: M / [LiM]+ / [LiM2]+ / [LiMmA]…）",
+          "done": "否（只做 1:1 条件态 C1 与同配体、同化学计量的 1:2 targeted check，不是 population）",
+          "why": "核心文件 §16.2 自己写明“这属于 Phase II/III，而不是 MVP 中通过强制 1:1 complex 偷偷替代”；§2.3 纪律不允许把 [LiM]+ 的 redox quantity 当作实际浓度电解液的有效 redox potential；§27 Phase II 要求明确浓度与组成，Phase III 才用 MD/AIMD 取真实 coordination distribution。论文 §4 局限承认 Li+ 条件态结论只在 10 分子上得到、普适性待更大配位基元库检验。",
+          "where": "§5.1 分支/边界认领表（W24 新增），或 §4 局限；并在 §2.2 台阶设计处加一句“C1/C2 是条件态、非 speciation”。",
+          "evidence": [
+            {
+              "path": "核心文件/ranking-electrolyte-materials-v2.md",
+              "ok": true,
+              "detail": "contains '这属于 Phase II/III，而不是 MVP'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/docs/16_branch_abcd_qa.md",
+              "ok": true,
+              "detail": "contains 'C1 是**条件态（conditional state）**'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/docs/18_week8_report.md",
+              "ok": true,
+              "detail": "contains 'p(C|bulk)'"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "clause": "§18 多目标 Pareto / 武断“综合电解液分数”",
+          "done": "否（未构造 S=Σw_iP_i，也未做 Pareto front 数值；只并列报告氧化/还原两轴，并把 ΔΔG_bind 当 mechanistic descriptor）",
+          "why": "核心文件 §18 规定：ΔΔG_bind 不默认设为 maximize 目标；若做多目标展示，用 Pareto front 或明确 target window，而不是缺乏物理依据的综合分数。本项目全文检索 Pareto / target_window / 加权和 = 0（仅文献讨论中出现），属“遵守纪律而未做”，不是遗漏。",
+          "where": "§2.4 决策量定义（两条轴分别定义方向）+ §2.6 预注册；若 W24 新增 §5.1，可在其中声明 Pareto 留待 Phase II。",
+          "evidence": [
+            {
+              "path": "核心文件/ranking-electrolyte-materials-v2.md",
+              "ok": true,
+              "detail": "contains '这种缺乏物理依据的综合分数'"
+            },
+            {
+              "path": "核心文件/ranking-electrolyte-materials-v2.md",
+              "ok": true,
+              "detail": "contains 'Pareto front'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week4/p1_decision_stability.json",
+              "ok": true,
+              "detail": "exists"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "clause": "§10.3 threshold-based decision error（需外部设计要求阈值）",
+          "done": "否（记为 not_applicable）",
+          "why": "核心文件 §10.3 规定：只有当阈值 T 来自外部设计要求、实验基准或事先定义的工程标准时才使用，且不允许看完数据后人为挑一个最有利阈值。`config/prereg.yaml` 的 `threshold_decisions.if_unavailable` 禁止用数据分位数临时替代；本项目不存在合规外部阈值来源，故 Stage 6 如实记 not_applicable。论文 §4 局限（液相锚点未封闭、无实验基准阈值）与此一致。",
+          "where": "§2.4/§2.6 加一条脚注（记 not_applicable 及原因），并在 §5.1 声明为 Phase II；本项目落点：outputs/week6/stage6_decision_stability.md §5。",
+          "evidence": [
+            {
+              "path": "核心文件/ranking-electrolyte-materials-v2.md",
+              "ok": true,
+              "detail": "contains '不允许看完数据后人为挑一个最有利阈值'"
+            },
+            {
+              "path": "核心文件/ranking-electrolyte-materials-v2.md",
+              "ok": true,
+              "detail": "contains '只有当阈值'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/outputs/week6/stage6_decision_stability.json",
+              "ok": true,
+              "detail": "stage='T9 (Stage 6)' (want 'T9 (Stage 6)')"
+            },
+            {
+              "path": "电解液溶剂HB-Code/docs/13_week6_report.md",
+              "ok": true,
+              "detail": "contains 'not_applicable'"
+            }
+          ],
+          "strength": "确证"
+        },
+        {
+          "clause": "§3.3 R_env（环境 / 电极界面、EDL 参考层）",
+          "done": "否（data/anchors/ 无 R_env 数值文件；论文 §3.5 只对 Yang 2025 已发表趋势做定性对照，可视为 R_env 的弱形式，但未落盘为 anchor）",
+          "why": "核心文件 §3.3 明说第一阶段不要求这一层完整覆盖全部候选；docs/01 §5 记录“data/anchors/ 当前没有 R_env 数值文件”，并禁止把 R_gas/R_sol 结论外推到 C1。§2.3 纪律不允许把条件态 proxy 说成真实电化学窗口；§27 Phase IV 需 electrode potential / surface / EDL composition / charge transfer 才进入真实 electrochemical stability。论文 §4 局限（液相锚点绝对标定未封闭）。",
+          "where": "§2.3（外部参考层）或 §4 局限明确写为 Phase IV/II 边界；若保留 Yang 2025 那句定性对照，应注明“定性趋势、非 R_env anchor”。",
+          "evidence": [
+            {
+              "path": "核心文件/ranking-electrolyte-materials-v2.md",
+              "ok": true,
+              "detail": "contains '第一阶段不要求这一层完整覆盖全部候选'"
+            },
+            {
+              "path": "电解液溶剂HB-Code/docs/01_stage1_external_anchors.md",
+              "ok": true,
+              "detail": "contains '当前没有** `R_env` 数值文件'"
+            },
+            {
+              "path": "核心文件/ranking-electrolyte-materials-v2.md",
+              "ok": true,
+              "detail": "contains 'electrode potential'"
+            }
+          ],
+          "strength": "确证"
+        }
+      ],
+      "note": "口径：是否做 以项目产物与文档为准；“论文命中 0”按关键词字符串检索计，非逐字段核对。四项都可直接写进方法节/附录，把“没做”说明成“按纪律不做”。"
+    }
+  },
+  "inputs": [
+    {
+      "path": "核心文件/ranking-electrolyte-materials-v2.md",
+      "exists": true,
+      "sha256": "e55c1b07a127ef7d0bb2f25302ac39f0640f24f45c0547bb482a63b1f4f17c0e"
+    },
+    {
+      "path": "论文/_dossier/_fulltext_w22.txt",
+      "exists": true,
+      "sha256": "19a84d45c20101056549536774275cdbb20f86d186a355f03887a5de5c29b6df"
+    },
+    {
+      "path": "论文/build_paper_docx.py",
+      "exists": true,
+      "sha256": "b87361044664e7e16e525fb470e87151dea5a94bb3480e69d18575025f04b77c"
+    },
+    {
+      "path": "成果输出/数据结果汇总.md",
+      "exists": true,
+      "sha256": "e3341e3cb2274446c77ea7573a569499485197e72c1c1c0ced75b0ddbe2f9158"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/00_stage0_definitions.md",
+      "exists": true,
+      "sha256": "4372a4bb8ed3a552cb91bccdeb543d45d9699ffa3d84a555150481dd4b984d1a"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/01_stage1_external_anchors.md",
+      "exists": true,
+      "sha256": "5656882885cc4b70ee24020762fecc90b1b6d7aa365573cd04ecbeed76b82250"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/02_stage1_method_audit.md",
+      "exists": true,
+      "sha256": "1acf6b547eebfea94595f19bcadc78989bd944fa721b3d2cdabd75d4292d9edb"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/04_stage1_xtb_audit_result.md",
+      "exists": true,
+      "sha256": "e9117051e156a51256b1808ebd0404bec7ab575e62e7d3ad317f89ef17ab347d"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/05_stage2_broad_pool_p0.md",
+      "exists": true,
+      "sha256": "89f19a6778511869345fdb0ca39becf55b6971d518adb9ce5d8971a9cda855c2"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/06_stage1_solution_anchor_audit.md",
+      "exists": true,
+      "sha256": "9e5dfc80e0d40f516140b7f75c6b3146165e088b2d29ae2b8a71b34d58c68e5c"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/08_stage2_production_protocol.md",
+      "exists": true,
+      "sha256": "19cc0b390ef8944d645559972b469b3aea707eb60a6887cb6e3dc95cbec59715"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/09_week3_report.md",
+      "exists": true,
+      "sha256": "22bdc620d1b24693e9319538d8b6631c2b45700eba7c0a7b51cbcaedeb4804b9"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/10_week4_report.md",
+      "exists": true,
+      "sha256": "b296c9b0565d2105f4d8857a7162f6c5569b4e591b440dd42d422c199d5807f4"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/11_plan_alignment.md",
+      "exists": true,
+      "sha256": "5b7a2bcc15d90c07c72d8e13b7a35b38af82034cd49ce32f793d273b88b9e215"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/12_week5_report.md",
+      "exists": true,
+      "sha256": "40f2dc26386777afc93c627e1b9539a8ac4a95ff257afcead70ff52a5018e509"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/13_week6_report.md",
+      "exists": true,
+      "sha256": "ca0f0e35a7ac46a7fd9cebed03a80912d06325ab39c83548aaeb4ff692a7c965"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/15_week7_report.md",
+      "exists": true,
+      "sha256": "5b96e4273fc6be0812d927e28fdc5e16a8cd4dcbe6fea1f4ef081f87a5b1794c"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/16_branch_abcd_qa.md",
+      "exists": true,
+      "sha256": "a8cbfd6d310136decf388e4c0a796edd941fef81ba2da26787b9eb98a21b7565"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/18_week8_report.md",
+      "exists": true,
+      "sha256": "cae2ba95220f9dbd37594e8de8a1033d66057eab39148f10e348d7894ae349e7"
+    },
+    {
+      "path": "电解液溶剂HB-Code/docs/19_week9_report.md",
+      "exists": true,
+      "sha256": "1a44c281b1ef252b63755514f85cfc8706ab33ed9f743f1c540f94ba2dd0e592"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/run_method_audit_xtb.py",
+      "exists": true,
+      "sha256": "f1102602f476bbd3b9aa60dec0e3af491d09922a614ce92c776886d8d21b0827"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/audit_solution_anchors.py",
+      "exists": true,
+      "sha256": "d8258e07ca72925de898af5f0fb8c356d5da89f58df6b26c347e88c822f124c8"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/build_metadata.py",
+      "exists": true,
+      "sha256": "7b57913fd1f2003c87a04ff82079f00f0d002712a01f59dcf2a1b0e15e979b1a"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/run_broad_pool_p0.py",
+      "exists": true,
+      "sha256": "736c91001d995d544a82d12a0934fd276d91755d46dd198b4ed28616335dd015"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/run_core_set_p1.py",
+      "exists": true,
+      "sha256": "9c0f00283b8a3ddbb8d109fc4f1c68803c6cea4bb99742b41f8bb70723caad77"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/audit_p1_core_set.py",
+      "exists": true,
+      "sha256": "42673f3afef2e0c53951e9a18c53d78aad5593bbccd2639bff22ea90c72274e9"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/run_t2_opt_freq.py",
+      "exists": true,
+      "sha256": "ec893780a6e61c037acbdfc298296c430ac9bc062f6a4ba31272f1d807eeb596"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/run_core_set_p2.py",
+      "exists": true,
+      "sha256": "c8c542f5f7c440615d93f45401879b65df70e2ca79c3c70b227d73bd55afd3eb"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/analyze_cpcm_eps_scan.py",
+      "exists": true,
+      "sha256": "0b60834cdd1ad4efd4f1fbacc4875eede06cfc946b06be50279d8627c777cfbe"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/build_li_motifs.py",
+      "exists": true,
+      "sha256": "99856179e6b65e0f3feed03c6b7c098cd4251438c47a0b951f238d954abf5d78"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/run_c1_li_coordination.py",
+      "exists": true,
+      "sha256": "d852400dc0a63e0bae83b79f9954ea40d79570427ed0496b11abf9fd82a81757"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/analyze_c1_state_identity.py",
+      "exists": true,
+      "sha256": "b258658ece437c31c0db10fda3692ebb9729222686256c7748ec2b11a04321e5"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/analyze_stage6.py",
+      "exists": true,
+      "sha256": "c3b28e3fc3346505318ccdd828dc1cb8a3905249877f12984a8686fa8c087019"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/analyze_delta_m.py",
+      "exists": true,
+      "sha256": "f8f8b7604f4c0f38fc2f969fce56849738201635e1d98fa38599dd95fbf74db3"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/analyze_stage10_synthesis.py",
+      "exists": true,
+      "sha256": "d68791b9c6f519b40742926c6d0523d2ef2c2eee0b3dba845576ce81d9bea0c3"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/run_stage7_ml.py",
+      "exists": true,
+      "sha256": "f1bc3fb02559bdc87f5929d184a16642bffb793bda9c88824d1662afe2e43712"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/build_ml_features.py",
+      "exists": true,
+      "sha256": "49f39880ccc50ddb2327d50a890dffda24b32d14e72dd2b4a0ac4b11da2b21d5"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/run_stage8_al.py",
+      "exists": true,
+      "sha256": "e3206904aa58e501359775ee873627b82c76ead9cae4a58544558aee6b27e626"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/build_microsolvation_shells.py",
+      "exists": true,
+      "sha256": "a5b075a5eee058ec520ad2f94b55e02397225c478ba570519fb9d403a32a7b0a"
+    },
+    {
+      "path": "电解液溶剂HB-Code/scripts/run_stage9_microsolvation.py",
+      "exists": true,
+      "sha256": "eef81a8f6171d8b730e36c80139cd22c5892f02a25cd1d00f1829f851571c6f0"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week1/gate0_record.md",
+      "exists": true,
+      "sha256": "36591ea9c1f615a7783509bb72a5c60fd926bf1ac2913fd62b8613652f6bcd80"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week2/gate1_record.md",
+      "exists": true,
+      "sha256": "fe5738f27cb56934effa70a05b9121196f2de583fe88fffd5000f1a18c05a0b6"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week2/method_audit_xtb_summary.json",
+      "exists": true,
+      "sha256": "e6bdf6217f71e2d01e26ee181ee9b71b12fd58558054c82a093fc27678d5ad76"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week2/solution_anchor_audit.json",
+      "exists": true,
+      "sha256": "bec6f71270fac92066cfe1cc9239e012d2e595f48c84fa1ec233d3b111e34719"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week3/p0_broad_pool.csv",
+      "exists": true,
+      "sha256": "363f67eca29afa0a986e5e48964447f9e821a2c0669c2517397f74f5cc25b2aa"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week3/p0_core_set.csv",
+      "exists": true,
+      "sha256": "8001accb7066b18bdc8b622466163f796ba0b7c527f394d585ff3bdfab5b1cb3"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week4/p1_core_set.csv",
+      "exists": true,
+      "sha256": "a872f359d93d64ccd97ded9561cf21b6a66917c4d10cfb9b893442c4f067caaa"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week4/p1_core_set_audit.json",
+      "exists": true,
+      "sha256": "d796fcfd4477ec7be9cdcf6951f2980a2b9c3252e4a08a5346f32c7088809a48"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week4/p1_decision_stability.json",
+      "exists": true,
+      "sha256": "9fa78cd9f5d81485235981ec750ade9c25cb7eec305f154df43294f73d08b085"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week4/t2_opt_freq_summary.json",
+      "exists": true,
+      "sha256": "eb383c6c1760cd04ae5d84807de660e518c032d16e65778051df88bca7f23b17"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week4/p2_summary_smd_acetonitrile.json",
+      "exists": true,
+      "sha256": "b39720c91180ce116eb3edb13d718f7a31f78ce3ca2a8ac8435db70746688cea"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week4/p2_decision_stability.json",
+      "exists": true,
+      "sha256": "38eb6af12228a52016a6e20af6768336d1fa6693cff9422a56cebe83f9df2108"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week4/t3_cpcm_eps_scan_summary.json",
+      "exists": true,
+      "sha256": "ce04777bf324683526183ef783177073cb70512f94d623b7bd559391706a28d4"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week5/li_motif_generation.json",
+      "exists": true,
+      "sha256": "5a87805098a2cf4e884e9a79537e0a2a1ad227ea3ed45207258e92f29ea3de2f"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week5/c1_li_coordination_summary.json",
+      "exists": true,
+      "sha256": "772d35d250312382829a74fc6b07dd8fa980a88eaffb392fe750d5038f1a5022"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week5/c1_state_identity.json",
+      "exists": true,
+      "sha256": "b7672afcb48594c3e0950a70091a87ff340dae9e6131759ecfa96eeed96199d0"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week5/c1_decision_stability.json",
+      "exists": true,
+      "sha256": "da9df806884640d4ac23a9b074b858d306bfeee216ff516c0d526571b56993cb"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week6/delta_m_frozen.json",
+      "exists": true,
+      "sha256": "eda08587448aec62ed251e6f95b2463b5a25e7911a8e3aba08a2915d5f190402"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week6/stage6_decision_stability.json",
+      "exists": true,
+      "sha256": "3e9864cd9427ed1b59a8526b0c8443f0f1b865008f6a9ab4b7839340f07d2df0"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week6/t7_c1_freq_check.json",
+      "exists": true,
+      "sha256": "425d03c5987db9cb11512e1c6851247e40b14272d8112871af3eefb5dae8c95f"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week7/stage7_ml_results.json",
+      "exists": true,
+      "sha256": "5b134864b66b7567fc57050d5eb56b4ea81ec4e7302bb8696c0e2d2516b7c10f"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week7/stage8_al_curves.csv",
+      "exists": true,
+      "sha256": "cddf05f9d899fcda8524a2dabaceec9218cf8970267208ab48860960df93632c"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week7/feature_manifest.json",
+      "exists": true,
+      "sha256": "c020bf93269fbe9011a043b94454b62b44fae74448d322c3d5cd799ac2d60cc3"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week8/ms_shell_generation.json",
+      "exists": true,
+      "sha256": "4b95587eb1c4c8423693601851f2b27f9b2f26b4bd13617875af8b2f4f7061b2"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week8/stage9_results.json",
+      "exists": true,
+      "sha256": "f783b564b1b8a42dfdb2e02a633ce80e7c660e9b6a23f98f22959377c536b012"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week9/stage10_ladder.json",
+      "exists": true,
+      "sha256": "3eb6b36d5622ec0e3147dd827a6437aabac2ea38c53936fddc974e85376ac3cf"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week15/stage16_catalogue_analysis.json",
+      "exists": true,
+      "sha256": "f0a4ef2db120f10f8ddf075b6602c43548d5c9cb772471ccb8ed699a84afbb9c"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week18/stage19_relax_analysis.json",
+      "exists": true,
+      "sha256": "90757ca1169e0e1136f58f0395a19298a91379049a0ab7cfd0f5f7f2a099b198"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week19/stage20_xtb_arms_analysis.json",
+      "exists": true,
+      "sha256": "30042094148ee0a0c37c3eafb3aa12405ce44d23142caf3a65f381fb4415c9fc"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week20/stage21_refill.json",
+      "exists": true,
+      "sha256": "bb424fee1e0c01e9a71609fb1b3bf9a93ee27d7e38a014ec37c8f9199ce06cd4"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week22_hardening/allowance_factor2.json",
+      "exists": true,
+      "sha256": "8ddee883b4f0362f357da740bfbdd4129678b2c872d23be96778ec60d19ff2ce"
+    },
+    {
+      "path": "电解液溶剂HB-Code/outputs/week23/targeted_two_guess.json",
+      "exists": true,
+      "sha256": "c6ca4fbbdd50c79e82a9251a69916c75cd29e288f9f571971da8ebf22b14756a"
+    },
+    {
+      "path": "成果输出/week1/verification.json",
+      "exists": true,
+      "sha256": "3e91826b365de3a888782dfc0970ba2c1dc4b49fc6af891de427dd16864ff456"
+    },
+    {
+      "path": "成果输出/week10/verification.json",
+      "exists": true,
+      "sha256": "4de5897c2a695f7046aa584dd0bc7df7e6841a11bdb06a1707f23e15a97755f4"
+    },
+    {
+      "path": "成果输出/week11/verification.json",
+      "exists": true,
+      "sha256": "a2733ba55546f93028e43558ab963e45eee21964c9b4a111cd6aa7f835b72cf9"
+    },
+    {
+      "path": "成果输出/week12/verification.json",
+      "exists": true,
+      "sha256": "6806f3aa3ab17f8c23225ef98059b38d09227e97209a2ee8c377baf2b71809df"
+    },
+    {
+      "path": "成果输出/week13/verification.json",
+      "exists": true,
+      "sha256": "680dcb90320c13039b6ad0b4cb9d6ee59c44f0c3775aa8af6b8b03a87579b4a0"
+    },
+    {
+      "path": "成果输出/week14/verification.json",
+      "exists": true,
+      "sha256": "ec9d53a83c0ab46fcff2d9546abef5660a8ed9ef7386b99dadc6012da790eabb"
+    },
+    {
+      "path": "成果输出/week15/verification.json",
+      "exists": true,
+      "sha256": "3369363b7fdc1db051c89219d71f5fed478fb7beaf3f54335c7ba4bf282899e4"
+    },
+    {
+      "path": "成果输出/week16/verification.json",
+      "exists": true,
+      "sha256": "06edb758cb32f355aa17f07536e36e8e1ab64eeea08f659e8db5e563d015013a"
+    },
+    {
+      "path": "成果输出/week17/verification.json",
+      "exists": true,
+      "sha256": "dfc9b9fa5c01d06e9a078e47d6d2d9c6f386179d649e94bcd4b13171d60ff83f"
+    },
+    {
+      "path": "成果输出/week18/verification.json",
+      "exists": true,
+      "sha256": "d93b670729dfb813e299baa133f45a35fdc64653efd19f7c6114ed6c34e3f978"
+    },
+    {
+      "path": "成果输出/week19/verification.json",
+      "exists": true,
+      "sha256": "7b4dcd2c322f4b9d754e493c49c3eccfdb60192f3ca4fd2ac9fc76521cee6b3f"
+    },
+    {
+      "path": "成果输出/week2/verification.json",
+      "exists": true,
+      "sha256": "c2fce4bd48d5d55da8d155c340e555cf42130e64f1c2d580276e13c9337ac1a9"
+    },
+    {
+      "path": "成果输出/week20/verification.json",
+      "exists": true,
+      "sha256": "4fea2eb4f70817cbcff1e6c038b66e526368c6a9fd9e8bd34ebd434e773e4fb9"
+    },
+    {
+      "path": "成果输出/week21/verification.json",
+      "exists": true,
+      "sha256": "a83e8f117612ef45a046322660bf0b735729597390bac6265df9d2cb2c73a1bc"
+    },
+    {
+      "path": "成果输出/week22/verification.json",
+      "exists": true,
+      "sha256": "66e899023cd2045c8dcc1bd945a0fd22a4ea5561c8279dc40bd562806420d40c"
+    },
+    {
+      "path": "成果输出/week23/verification.json",
+      "exists": true,
+      "sha256": "5db400d9a8a8d69e4c5eb4342fd376fb594da460ef845beaa09daad8037feaa8"
+    },
+    {
+      "path": "成果输出/week3/verification.json",
+      "exists": true,
+      "sha256": "4278e6404137141aa52dbca5f371df225203f9d6d8ff86ae41902c546804a90c"
+    },
+    {
+      "path": "成果输出/week4/verification.json",
+      "exists": true,
+      "sha256": "7b7c1b2a2125549638c22a65e7b9546134ff1a081089f1308a879c73766b3510"
+    },
+    {
+      "path": "成果输出/week5/verification.json",
+      "exists": true,
+      "sha256": "1f2b4002fc2d7b0e55afc0e5cd910edb524e0d66e7f4856d49a3b20bbd1efcb6"
+    },
+    {
+      "path": "成果输出/week6/verification.json",
+      "exists": true,
+      "sha256": "cd861687758bc9ef1cc3c55bc9b5fa1f83b82c4a12d3e5ff5636dd291f442a01"
+    },
+    {
+      "path": "成果输出/week7/verification.json",
+      "exists": true,
+      "sha256": "cd7475073d943861fbcfe316d14f17106871f2e49d02f9f12d0eb503b622088f"
+    },
+    {
+      "path": "成果输出/week8/verification.json",
+      "exists": true,
+      "sha256": "9376fbf1a3d5986a72d45d3d2b94093c3d9ca6923f592e8f88565bf28d30b48c"
+    },
+    {
+      "path": "成果输出/week9/verification.json",
+      "exists": true,
+      "sha256": "491f2f7e96b9d31051db2d99f8b405d5e8a9976d383f6c1d8187f0391456c325"
+    }
+  ],
+  "counts": {
+    "stage_rows": 10,
+    "stage_pending_confirmation": 0,
+    "stage_pending_rows": [],
+    "qc_rows": 19,
+    "qc_rows_not_in_paper": 13,
+    "qc_rows_not_in_paper_list": [
+      "scf_failed",
+      "自洽场多解：第二解弛豫存亡",
+      "自洽场多解：跨引擎存亡",
+      "motif_switch",
+      "geometry_failed",
+      "虚频 imaginary_mode_unresolved",
+      "dissociated_optimized_product",
+      "spin_contamination_flag",
+      "electron_count_mismatch",
+      "execution_failed",
+      "abnormal_termination / energy_mismatch / missing_output",
+      "placement_clash_start",
+      "warning（Stage 21 refill）"
+    ],
+    "phase1_not_done_rows": 4,
+    "phase1_rows_pending_confirmation": [],
+    "delivery_checks_total": 372
+  }
+}

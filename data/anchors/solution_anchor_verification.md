@@ -144,11 +144,11 @@
 `核心文件/文献/新建文件夹/` 6 篇）全文抽出，逐篇检索是否存在**同源多溶剂氧化/还原电位数值表**。
 结论：**没有**。命中最接近的两篇是
 
-- `1-s2.0-S2451910318302035-main.pdf` = **Borodin 2019 综述**（*Challenges with prediction of
+- `M5-Borodin-2019-electrolyte-stability-window.pdf` = **Borodin 2019 综述**（*Challenges with prediction of
   battery electrolyte electrochemical stability window and guiding the electrode–electrolyte
   stabilization*）—— 只讨论 EC / SL / FEC / Li-SL 的分解路径与「HOMO–LUMO ≠ 窗口」，
   未给多溶剂数值表；
-- `nz1c02425.pdf` = Cheng et al., *ACS Energy Lett.* 2022, 7, 490−513（溶剂化结构综述）——
+- `C2-solvation-structure-interface-2022.pdf` = Cheng et al., *ACS Energy Lett.* 2022, 7, 490−513（溶剂化结构综述）——
   该文出现的数字是配位数/摩尔比（如 Li⁺[PC]₁₂.₆、Li⁺[TEGDME]₄.₄₆），**不是**氧化电位。
 
 因此**本轮的 within-series 数值表在本地与线上都取不到**。
