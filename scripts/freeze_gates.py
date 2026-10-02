@@ -12,9 +12,18 @@ by eye.  This script
 2. records a SHA256 digest of every frozen artefact;
 3. writes the two gate records under outputs/week1 and outputs/week2.
 
-Gate 1 is reported as **not closed** while the quantum-chemistry binaries are
-absent or while the solution-phase anchors are still unverified estimates; the
-record says so explicitly instead of implying a green light.
+Gate 1 has been **two-tiered since R7** (``docs/31_plan_revision_expert_review.md``):
+
+* the *absolute-calibration* level of the solution anchors -- the 31 rows of
+  ``data/anchors/solution_redox_anchors.csv`` traced to condition-matched primary
+  measurements -- is reported as a standing **limitation**, never as a blocker;
+  the core file only asks for a "solution trend" (``docs/31`` section 8.1);
+* the *ordering-consistency* level -- that trend: the within-series relative
+  ordering must be reproduced by the target model -- is what actually closes the
+  gate, evaluated deterministically by ``scripts/check_series_rel_ordering.py``.
+
+The record says so explicitly instead of implying a green light while the
+quantum-chemistry binaries are absent or the ordering tier is open.
 """
 
 from __future__ import annotations
@@ -69,6 +78,14 @@ STAGE1_ARTEFACTS: tuple[str, ...] = (
     "tests/test_bundled_toolchain.py",
     "outputs/week2/solution_anchor_audit.csv",
     "outputs/week2/solution_anchor_audit.json",
+    #: R7 (Week 22): the ordering-consistency tier of Gate 1.  The within-series
+    #: table is a frozen artefact like the anchors themselves.  It ships with its
+    #: header and no rows on purpose: the 2026-10-02 verification parsed the
+    #: metadata of all four clues but could not retrieve a single within-series
+    #: value (see data/anchors/solution_anchor_verification.md section 4.3).
+    "data/anchors/within_series_ordering.csv",
+    "scripts/check_series_rel_ordering.py",
+    "outputs/week2/series_rel_ordering_check.json",
 )
 
 # Stage 2 (Weeks 3-4) has no gate of its own; its artefacts are still digested so
@@ -322,6 +339,10 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "tests/test_week22_report.py",
     "docs/33_*.md",
     "outputs/week22/**/*",
+    # Gate 1 ordering-consistency tier (R7, Week 22).  Only the test is new here:
+    # the evaluator and the within-series table are Stage 1 artefacts and are
+    # digested by STAGE1_ARTEFACTS.
+    "tests/test_series_rel_ordering.py",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large
@@ -476,19 +497,37 @@ def evaluate_stage1(root: Path = REPO_ROOT) -> GateResult:
     result.add("anchors:validate_anchors", anchors_ok, "PASS" if anchors_ok else "FAIL")
     result.closed &= anchors_ok
 
+    # --- level 1: absolute calibration (a limitation, never a blocker) -------
+    # docs/31 section 8.1: the core file asks Gate 1 only for a *solution trend*,
+    # so an unreached absolute calibration is recorded as a standing limitation
+    # instead of freezing the gate.  It is still reported as a failed check.
     estimated = count_estimated_solution_rows(root / "data" / "anchors" / "solution_redox_anchors.csv")
     if estimated:
-        result.add(
-            "anchors:solution_verified",
-            False,
-            str(estimated) + " solution rows are still method=est (needs primary-source check)",
-        )
-        result.closed = False
-        result.blockers.append(
-            "solution_redox_anchors.csv: " + str(estimated) + " rows are estimates without a verified DOI"
+        absolute_detail = (
+            str(estimated) + " solution rows are still method=est; absolute-calibration level "
+            "recorded as a limitation, not a blocker (docs/31 R7; "
+            "data/anchors/solution_anchor_verification.md 4.4)"
         )
     else:
-        result.add("anchors:solution_verified", True, "no estimated rows")
+        absolute_detail = "every solution row traces to a source-backed determination"
+    result.add("anchors:solution_absolute_calibration", estimated == 0, absolute_detail)
+
+    # --- level 2: ordering consistency (the blocker that actually gates) -----
+    ordering = _run(root, ["scripts/check_series_rel_ordering.py", "--json"])
+    ordering_ok = False
+    ordering_detail = "ordering check could not be evaluated (exit " + str(ordering.returncode) + ")"
+    if ordering.returncode == 0 and ordering.stdout.strip():
+        try:
+            ordering_payload = json.loads(ordering.stdout)
+        except json.JSONDecodeError:
+            ordering_payload = None
+        if isinstance(ordering_payload, dict):
+            ordering_ok = bool(ordering_payload.get("ok"))
+            ordering_detail = str(ordering_payload.get("detail") or ordering_detail)
+    result.add("anchors:series_rel_ordering", ordering_ok, ordering_detail)
+    if not ordering_ok:
+        result.closed = False
+        result.blockers.append("Gate 1 ordering-consistency tier (R7): " + ordering_detail)
 
     environment = _run(root, ["scripts/check_environment.py", "--json"])
     tools: list[dict] = []

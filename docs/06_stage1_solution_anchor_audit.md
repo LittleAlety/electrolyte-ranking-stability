@@ -116,3 +116,19 @@ CAPTCHA 拦截；`www.osti.gov`、`www.ncbi.nlm.nih.gov` TLS 连接失败；`www
 .venv\Scripts\python.exe scripts\build_metadata.py --check
 ```
 
+## 8. 后续修订（2026-10-02）：Gate 1 两级化
+
+> 本节是**后补记录**，不改写 §4–§6 在 2026-09-29 的结论。
+
+- §5 里写的 `anchors:solution_verified` 这个检查名**已不存在**。按 `docs/31` R7，Gate 1 拆成两级：
+  - **绝对标定级** `anchors:solution_absolute_calibration`：31 行仍为 `est`，检查仍为 `NO`，
+    但按 R7 **只记为 limitation，不再计入 blocker**。依据 `docs/31` §8.1：核心文件 §19 对 Gate 1
+    只要求「solution trend 没有明显系统性失败」，原实现「零条 `est`」严于核心文件。
+  - **排序一致性级** `anchors:series_rel_ordering`：由 `scripts/check_series_rel_ordering.py`
+    确定性判定，这是现在**唯一**的 Gate 1 blocker。
+- 同日完成的 batch C 核验（四条线索 → 6 个 DOI）见 `data/anchors/solution_anchor_verification.md` §4。
+  结论是**数值一条都没取到**，因此 `n_pairs = 0 < 18`，**Gate 1 依旧 NOT CLOSED** ——
+  两级化没有、也不能让 Gate 1 变绿。
+- 新增冻结件：`data/anchors/within_series_ordering.csv`（仅表头）、
+  `scripts/check_series_rel_ordering.py`、`outputs/week2/series_rel_ordering_check.json`。
+  因此 `outputs/week2/SHA256SUMS` 与 `gate1_record.md` 已重录（冻结件 27 → 30）。

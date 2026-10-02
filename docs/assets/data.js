@@ -5,9 +5,9 @@ window.HB = {
   "weeks": 22,
   "figures": 45,
   "orca_out": 1535,
-  "scripts": 103,
-  "test_files": 54,
-  "tests_passed": 1151
+  "scripts": 104,
+  "test_files": 55,
+  "tests_passed": 1165
  },
  "pipeline": [
   {
@@ -68,7 +68,7 @@ window.HB = {
    "name": "Gate 1 - 外部锚点与工具链",
    "status": "NOT CLOSED",
    "blockers": [
-    "solution_redox_anchors.csv: 31 rows are estimates without a verified DOI"
+    "Gate 1 ordering-consistency tier (R7): no verified within-series values on file (n_pairs=0); the absolute-calibration level is recorded as a limitation and this tier stays open"
    ],
    "checks": [
     {
@@ -77,9 +77,14 @@ window.HB = {
      "detail": "PASS"
     },
     {
-     "name": "anchors:solution_verified",
+     "name": "anchors:solution_absolute_calibration",
      "ok": false,
-     "detail": "31 solution rows are still method=est (needs primary-source check)"
+     "detail": "31 solution rows are still method=est; absolute-calibration level recorded as a limitation, not a blocker (docs/31 R7; data/anchors/solution_anchor_verification.md 4.4)"
+    },
+    {
+     "name": "anchors:series_rel_ordering",
+     "ok": false,
+     "detail": "no verified within-series values on file (n_pairs=0); the absolute-calibration level is recorded as a limitation and this tier stays open"
     },
     {
      "name": "toolchain:xtb",
@@ -995,10 +1000,10 @@ window.HB = {
    "file": "F44_neb_refinement.png",
    "week": 22,
    "caption": "**R11 —— 用真 NEB 取代直线插值上界。** 反应物/产物 = Stage 19 两条臂的弛豫终点（端点不重优化），regular (climbing : no)（中间像数：EC/cation/5 = 8，EC/cation/20 = 8，TEGDME/anion/20 = 4）。峰高从 ORCA 的 `<stem>.final.interp` 读，全精度。(a)-(c) 三条收敛路径，能量相对反应物，1 kT 与 1 kcal/mol 画成横线；(d) 直线界 vs 真 NEB 的对数柱状图。EC/cation/5：直线 0.00424 eV -> NEB **0.000141 eV**（one_basin，直线/NEB = 30.00） EC/cation/20：直线 0.00001 eV -> NEB **0.000053 eV**（one_basin，直线/NEB = 0.15） TEGDME/anion/20（未收敛，不给判决）2 格落在 1 kT 以下（`one_basin`）：EC/cation/5、EC/cation/20；1 格没有可用判决：TEGDME/anion/20。直线插值确实只是上界，最松的一格把峰高放大了 30.0 倍。与 Stage 19 的 RMSD 判决**冲突**的格子：EC/cation/5。",
-   "sha": "48bcc944023db892d9f17c030f02a42faea19348df40cb387c2c7424e080d3eb",
-   "bytes": 215544,
+   "sha": "ec1168040689d8ddd92655a9c39584dd4c0446af5329e2f7ab019088dd97b25b",
+   "bytes": 291239,
    "w": 2552,
-   "h": 1202
+   "h": 1232
   }
  ]
 };

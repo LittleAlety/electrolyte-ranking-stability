@@ -4079,7 +4079,7 @@ def week22_checks(wdir: Path):
     cells = {cell.get("cell"): cell for cell in (neb.get("cells") or [])}
     fragile = cells.get("EC/cation/5") or {}
     checks.append(check("week22.neb_shape",
-                        neb.get("n_cells") == 3 and neb.get("n_ok") == 2,
+                        neb.get("n_cells") == 3 and neb.get("n_ok") == 3,
                         "n_ok=%s/%s" % (neb.get("n_ok"), neb.get("n_cells"))))
     checks.append(check("week22.neb_fragile_cell_is_one_basin",
                         fragile.get("verdict") == "one_basin"
@@ -4095,6 +4095,15 @@ def week22_checks(wdir: Path):
                         and near(neb.get("kcal_ev"), 0.043364, 1e-9)
                         and "not back-applied" in (neb.get("criterion_note") or ""),
                         "1kT=%s 1kcal=%s" % (neb.get("thermal_ev"), neb.get("kcal_ev"))))
+    tegdme = cells.get("TEGDME/anion/20") or {}
+    checks.append(check("week22.neb_unconverged_cell_is_flagged",
+                        tegdme.get("rms_fp_converged") is False
+                        and tegdme.get("max_fp_converged") is False
+                        and tegdme.get("rms_fp_final") is not None
+                        and tegdme.get("max_fp_final") is not None,
+                        "RMS(Fp)=%s target=%s; MAX(|Fp|)=%s target=%s"
+                        % (tegdme.get("rms_fp_final"), tegdme.get("rms_fp_target"),
+                           tegdme.get("max_fp_final"), tegdme.get("max_fp_target"))))
 
     entries = [record for axis in ((grid.get("analysis") or {}).get("axes") or {}).values()
                for record in axis.values()]
@@ -4362,8 +4371,9 @@ REPORT_TEMPLATES[2] = """# Week 2 成果小结 —— Stage 1 方法审计与外
 能升级为 `exp` 或 `calc`。
 
 ## 3. 质量与复核（QC）
-- Gate 1 检查中 `anchors:validate_anchors` 与两条 toolchain 检查通过；`anchors:solution_verified`
-  未通过（31 行仍为 `est`）。
+- Gate 1 检查中 `anchors:validate_anchors` 与两条 toolchain 检查通过；绝对标定级
+  `anchors:solution_absolute_calibration` 未通过（31 行仍为 `est`），按 R7 记为 limitation；
+  排序一致性级 `anchors:series_rel_ordering` 亦未通过（`n_pairs = 0`，低于预注册下限 18）。
 - 方法审计与溶液锚点审计的数字均从本目录 JSON 现场解析，见 `verification.json`。
 - 关键限制由锚点审计显式记录，而不是被静默吸收。
 
@@ -4371,7 +4381,8 @@ REPORT_TEMPLATES[2] = """# Week 2 成果小结 —— Stage 1 方法审计与外
 {artifact_list}
 
 ## 5. 已知限制
-- **Gate 1 未关闭**：唯一 blocker 是溶液相锚点 31 行全为 `est`，缺少可核验的原始文献值。
+- **Gate 1 未关闭**：blocker 是排序一致性级 —— within-series 锚点对 `n_pairs = 0`，低于预注册下限 18
+  （`scripts/check_series_rel_ordering.py`）；绝对标定级（31 行 `est`）按 R7 记为 limitation，不再单列 blocker。
 - 因此 week2 之后的所有 P1/P2 结果都以**气相锚点**为主判据，溶液相只作定性对照。
 - xTB scratch（`xtbrestart` / `xtbtopo.mol` / `xtboptok` / `wbo` / `charges`）按约定不进入交付包。
 

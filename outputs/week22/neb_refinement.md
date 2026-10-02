@@ -2,7 +2,7 @@
 
 - 引擎：ORCA 6.1.1，`! r2SCAN-3c`，`%cpcm epsilon <eps>`
 - 反应物 = Stage 19 `default` 臂弛豫终点，产物 = Stage 19 `moread` 臂弛豫终点，**端点不重新优化**
-- 中间像数（取自各格 ORCA 输入）：EC/cation/5 = 8，EC/cation/20 = 8，TEGDME/anion/20 = 4；加 2 个端点即该格的镜像总数；方法类型 **regular (climbing : no)**
+- 中间像数（取自各格 ORCA 输入）：EC/cation/5 = 8，EC/cation/20 = 8，TEGDME/anion/20 = 2；加 2 个端点即该格的镜像总数；方法类型 **regular (climbing : no)**
 - 峰高来源：ORCA 自带的收敛路径文件 `<stem>.final.interp`（列 `lambda / distance(Bohr) / E-E(reactant)(Eh)`），
   它是全精度且在运行末尾写出，不受 stdout 重定向截断影响；`.out` 的 `INFORMATION ABOUT HIGHEST ENERGY IMAGE` 块作独立交叉校验
 - 判据：沿用 Stage 21 内部判据（`<= 1 kT = 0.0257 eV` -> `one_basin`；`>= 1 kcal/mol = 0.043364 eV` -> `separated`；之间 `inconclusive`），
@@ -14,7 +14,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | EC/cation/5 | distinct_lower | 0.100 | 0.00424 | **0.000141** | 30.0x | one_basin | one_basin | **与 Stage 19 冲突** |
 | EC/cation/20 | same_higher | 0.021 | 0.00001 | **0.000053** | 0.2x | one_basin | one_basin | 与 Stage 19 一致 |
-| TEGDME/anion/20 | n/a | n/a | n/a | **n/a** | n/a | unavailable | n/a | n/a |
+| TEGDME/anion/20 | distinct_lower | 2.214 | 66.14456 | **0.679417** | 97.4x | separated | separated | 与 Stage 19 一致 |
 
 `直线高估` = 直线插值峰高 / NEB 峰高。直线不是最低能路径，所以它给的是上界，这一列量的是上界有多松。
 
@@ -34,17 +34,19 @@
 - **峰高 = 0.000053 eV** = 0.21% of 1 kT；直线插值给的是 0.00001 eV，**高估 0.2 倍**
 - 沿路径能量单调下降：**否**（首 0.000000 eV -> 末 0.000052 eV）
 - 交叉校验：该次运行的 `.out` 被 stdout 重定向截断，无 HEI 块可比（路径文件不受影响）
+- 收敛：该次运行的 `.out` 被 stdout 重定向截断，力表不可读（`log_barriers_eh` 共 0 次）
 
-### TEGDME/anion/20 -- missing_path_file
+### TEGDME/anion/20
 
-路径文件缺失或为空，未纳入结论。
-
-- **旁证（不是判决）**：同目录保留了 `outputs/week22/neb_TEGDME_anion_eps20/neb_TEGDME_anion_cpcm_20.NEB.log.stopped10img`（10 个中间像的第 0 次迭代记录），峰高 **3.4888 eV**（0.128211 Eh）。
-  这是**未弛豫的内插路径上界**（regular NEB 的第 0 次迭代），只说明「这一格有峰」的量级，**不构成 NEB 判决**，也不计入上面的一致 / 冲突统计。
+- 路径长度 **14.527 A**（32 个路径点，4 个镜像）
+- **峰高 = 0.679417 eV** = 2643.65% of 1 kT；直线插值给的是 66.14456 eV，**高估 97.4 倍**
+- 沿路径能量单调下降：**否**（首 0.000000 eV -> 末 -0.064895 eV）
+- 交叉校验：`.out` 的 HEI 块给 0.301614 eV，与路径文件差 3.78e-01 eV
+- **未收敛**：撞到 `MaxIter` 后正常终止（`.out` 里没有 `converged successfully` 行）。最后一次力表给出 `RMS(Fp) = 1.0081e-03`（目标 5.0e-04，判 NO）、`MAX(|Fp|) = 5.3259e-03`（目标 1.0e-03，判 NO）；迭代历史共 19 次，见 `log_barriers_eh`。
 
 ## 与 Stage 19 的一致 / 冲突清单
 
-- 一致（1 格）：EC/cation/20
+- 一致（2 格）：EC/cation/20、TEGDME/anion/20
 - 冲突（1 格）：EC/cation/5
 
 **冲突：EC/cation/5** -- Stage 19 判 `distinct_lower`（RMSD 0.100 A，越过 0.02 A 阈值），
@@ -60,8 +62,7 @@
    足够回答「有没有峰」这一级别的问题，但不足以给势垒高度定标。
 3. **端点不重新优化**：直接用 Stage 19 两条臂的弛豫终点，所以本轮比较的正是 Stage 19 判决所依据的那两个终点。
 4. **只精修 3 格（抽样）**：5 个 EC/阳离子临界格里只扫了 eps = 5 与 20 两端，eps = 7/10/14 三格仍是 Stage 19 的旧判决。
-5. **有一格没有拿到收敛路径**：TEGDME/anion/20。它的 37 个原子让一次迭代就要十几分钟，在本轮预算内没有跑完；报告里只登记已经收敛的格子，未收敛的那一格**不给判决**（旁证见上，且不参与统计）。
 
 ---
 
-生成时间（UTC）：2026-10-01T18:22:57.915402+00:00
+生成时间（UTC）：2026-10-02T02:10:50.102935+00:00

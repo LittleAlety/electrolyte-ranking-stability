@@ -159,8 +159,17 @@ def figure_f43(outdir: Path, payload: dict, inputs: list) -> Path:
 
 def figure_f44(outdir: Path, payload: dict, inputs: list) -> Path:
     cells = payload.get("cells") or []
-    fig = plt.figure(figsize=(13.2, 7.6))
-    grid = fig.add_gridspec(2, 3, height_ratios=[1.0, 1.0], hspace=0.52, wspace=0.28)
+    fig = plt.figure(figsize=(13.2, 7.8))
+    grid = fig.add_gridspec(2, 3, height_ratios=[1.0, 1.0], hspace=0.58, wspace=0.26)
+
+    def force_state(cell):
+        """ORCA's own NEB force verdict.  Never inferred from the barrier."""
+
+        if cell.get("converged"):
+            return "met"
+        if cell.get("rms_fp_final") is not None:
+            return "NOT met"
+        return "unreadable"
 
     for index, cell in enumerate(cells[:3]):
         ax = fig.add_subplot(grid[0, index])
@@ -178,55 +187,100 @@ def figure_f44(outdir: Path, payload: dict, inputs: list) -> Path:
         energy = [row["rel_energy_ev"] * 1000.0 for row in profile]
         ax.plot(distance, energy, "-", color=ACCENT, lw=1.8)
         top = max(range(len(energy)), key=lambda i: energy[i])
-        ax.plot([distance[top]], [energy[top]], "o", color=WARN, ms=7, zorder=5,
-                label="highest energy image (%.4f eV)" % (energy[top] / 1000.0))
-        ax.axhline(THERMAL_MEV, color=OK, lw=1.3, ls="--",
-                   label="1 kT (25.7 meV)")
-        ax.axhline(KCAL_MEV, color=WARN, lw=1.1, ls=":", label="1 kcal/mol (43.4 meV)")
+
+        # The two thresholds are labelled inline at the right edge: a legend box would
+        # land on top of the curve in the one panel that actually has a hump.
+        blended = ax.get_yaxis_transform()
+        ax.axhline(THERMAL_MEV, color=OK, lw=1.3, ls="--")
+        ax.axhline(KCAL_MEV, color=WARN, lw=1.1, ls=":")
+        ax.text(0.995, THERMAL_MEV, "1 kT ", transform=blended, ha="right", va="bottom",
+                fontsize=6.5, color=OK)
+        ax.text(0.995, KCAL_MEV, "1 kcal/mol ", transform=blended, ha="right", va="bottom",
+                fontsize=6.5, color=WARN)
+
         span = max(max(energy), KCAL_MEV)
         ax.set_ylim(min(min(energy) - 0.05 * span, -0.02 * span), span * 1.28)
+        ax.plot([distance[top]], [energy[top]], "o", color=WARN, ms=7, zorder=5)
+        # The profile maximum is ORCA's own interpolation.  On a coarse band it can sit
+        # well above the highest image, so calling it the highest energy image would be
+        # a mislabel; the image energy is quoted separately whenever the two disagree.
+        low, high = min(distance), max(distance)
+        right_side = (distance[top] - low) > 0.6 * (high - low)
+        ax.annotate("path max %.4f eV" % (energy[top] / 1000.0),
+                    xy=(distance[top], energy[top]),
+                    xytext=(-9 if right_side else 9, 5), textcoords="offset points",
+                    ha="right" if right_side else "left", va="bottom",
+                    fontsize=7, color=WARN, zorder=6)
         ax.set_xlabel("path distance (Angstrom)", fontsize=8, color=INK)
         ax.set_ylabel("E - E(reactant)  (meV)", fontsize=8, color=INK)
         ax.set_title("(%s) %s   ->  NEB: %s" % ("abc"[index], cell["cell"],
                                                 cell.get("verdict", "n/a")),
                      fontsize=9.5, color=INK, loc="left")
-        ax.text(0.02, 0.96,
-                "Stage 19: %s (RMSD %.3f A)\nStage 21 line: %s (%.5f eV)"
-                % (cell.get("stage19_verdict"), cell.get("rmsd_a_stage19") or float("nan"),
-                   cell.get("linear_verdict"), cell.get("linear_barrier_ev") or float("nan")),
-                transform=ax.transAxes, va="top", fontsize=7, color=INK)
-        ax.legend(fontsize=6.5, frameon=False, loc="center right")
+        # The provenance block stays inside the axes but is deliberately narrow: at one
+        # short fact per line it never reaches the middle of the panel, which is where the
+        # path-maximum label sits in the one cell that has a hump.  An in-axes legend was
+        # dropped for the same reason.
+        detail = ["Stage 19: %s" % cell.get("stage19_verdict"),
+                  "RMSD %.3f A" % (cell.get("rmsd_a_stage19") or float("nan")),
+                  "Stage 21: %s" % cell.get("linear_verdict"),
+                  "%.5f eV" % (cell.get("linear_barrier_ev") or float("nan"))]
+        if cell.get("barrier_from_out_ev") is not None:
+            detail.append("HEI: %.4f eV" % cell["barrier_from_out_ev"])
+        detail.append("force: %s" % force_state(cell))
+        ax.text(0.02, 0.965, "\n".join(detail), transform=ax.transAxes, va="top",
+                ha="left", fontsize=6.5, color=INK)
 
     ax = fig.add_subplot(grid[1, :])
     _style(ax)
     labels = [cell["cell"] for cell in cells]
-    linear = [cell.get("linear_barrier_ev") for cell in cells]
-    neb = [cell.get("barrier_ev") for cell in cells]
     positions = np.arange(len(labels), dtype=float)
     width = 0.36
-    linear_plot = [v * 1000.0 if v is not None else np.nan for v in linear]
-    neb_plot = [v * 1000.0 if v is not None else np.nan for v in neb]
-    ax.bar(positions - width / 2, linear_plot, width, color=GRID,
-           edgecolor=INK, linewidth=0.6, label="Stage 21 straight-line chord bound")
-    ax.bar(positions + width / 2, neb_plot, width, color=ACCENT,
-           label="NEB barrier (this work)")
+    linear_plot = [None if cell.get("linear_barrier_ev") is None
+                   else cell["linear_barrier_ev"] * 1000.0 for cell in cells]
+    neb_plot = [None if cell.get("barrier_ev") is None
+                else cell["barrier_ev"] * 1000.0 for cell in cells]
+    for index, cell in enumerate(cells):
+        left = positions[index] - width / 2
+        right = positions[index] + width / 2
+        if linear_plot[index] is not None:
+            ax.bar(left, linear_plot[index], width, color=GRID, edgecolor=INK, linewidth=0.6,
+                   label="Stage 21 straight-line chord bound" if index == 0 else None)
+        if neb_plot[index] is not None:
+            unmet = cell.get("rms_fp_final") is not None and not cell.get("converged")
+            ax.bar(right, neb_plot[index], width, color=ACCENT, edgecolor=INK, linewidth=0.6,
+                   hatch="//" if unmet else None,
+                   label="NEB barrier (this work)" if index == 0 else None)
+        for position, value in ((left, linear_plot[index]), (right, neb_plot[index])):
+            if value is None:
+                continue
+            ax.text(position, value * 1.3, "%.3f meV" % value, ha="center",
+                    fontsize=7, color=INK)
     ax.set_yscale("log")
     ax.axhline(THERMAL_MEV, color=OK, lw=1.3, ls="--", label="1 kT (25.7 meV)")
     ax.axhline(KCAL_MEV, color=WARN, lw=1.1, ls=":", label="1 kcal/mol (43.4 meV)")
     ax.set_xticks(positions)
     ax.set_xticklabels(labels, fontsize=9, color=INK)
     ax.set_ylabel("barrier (meV, log)", fontsize=9, color=INK)
-    ax.set_title("(d) the straight line was an upper bound, and a loose one\n"
-                 "(all three cells land far below 1 kT once the path is relaxed)",
-                 fontsize=10, color=INK, loc="left")
-    ax.legend(fontsize=7.5, frameon=False, loc="upper right", ncol=2)
-    for position, value, other in zip(positions, neb_plot, linear_plot):
-        if np.isnan(value) or np.isnan(other):
-            continue
-        ax.text(position + width / 2, value * 1.25, "%.3f meV" % value,
-                ha="center", fontsize=7, color=INK)
-        ax.text(position - width / 2, other * 1.25, "%.3f meV" % other,
-                ha="center", fontsize=7, color=INK)
+    finite = [value for value in linear_plot + neb_plot if value]
+    if finite:
+        ax.set_ylim(top=max(finite) * 40.0)
+    by_verdict = {}
+    for cell in cells:
+        by_verdict.setdefault(cell.get("verdict"), []).append(cell["cell"])
+    subtitle = []
+    if by_verdict.get("one_basin"):
+        subtitle.append("%d below 1 kT (%s)" % (len(by_verdict["one_basin"]),
+                                                ", ".join(by_verdict["one_basin"])))
+    if by_verdict.get("separated"):
+        subtitle.append("%d above 1 kcal/mol (%s)" % (len(by_verdict["separated"]),
+                                                      ", ".join(by_verdict["separated"])))
+    unmet = [cell["cell"] for cell in cells
+             if cell.get("rms_fp_final") is not None and not cell.get("converged")]
+    if unmet:
+        subtitle.append("hatched = NEB force criterion not met (%s)" % ", ".join(unmet))
+    ax.set_title("(d) straight-line chord bound vs the relaxed NEB path\n"
+                 + "; ".join(subtitle), fontsize=10, color=INK, loc="left")
+    ax.legend(fontsize=7.5, frameon=False, loc="upper left", ncol=2)
 
     images = (payload.get("n_images_by_cell") or {})
     note = " / ".join("%s=%s" % (cell, images[cell]) for cell in images if images.get(cell))
@@ -320,13 +374,29 @@ def caption_f44(payload: dict) -> str:
         if undecided:
             tail.append("%d 格没有可用判决：%s" % (len(undecided), "、".join(undecided)))
     text = "；".join(tail) + "。"
-    over = [ratio for ratio in ratios if ratio >= 1.0]
+    over = [cell for cell in cells
+            if cell.get("barrier_ev") is not None and (cell.get("bound_ratio") or 0.0) >= 1.0]
     if over:
-        text += "直线插值确实只是上界，最松的一格把峰高放大了 %.1f 倍。" % max(over)
+        loose = max(over, key=lambda cell: cell["bound_ratio"])
+        text += ("直线界把峰高放大了最多 %.1f 倍（%s）"
+                 % (loose["bound_ratio"], loose["cell"]))
+        tiny = [cell["cell"] for cell in cells
+                if cell.get("barrier_ev") is not None and (cell.get("bound_ratio") or 0.0) < 1.0]
+        if tiny:
+            text += ("；%s 的直线界与 NEB 峰高两侧都落在 ~1e-5 eV 的噪声底，比值没有判别意义"
+                     % "、".join(tiny))
+        text += "。"
     elif ratios:
         text += "直线插值确实只是上界；在已收敛的格子上它并没有比真 NEB 高。"
     if conflicts:
         text += ("与 Stage 19 的 RMSD 判决**冲突**的格子：%s。" % "、".join(conflicts))
+    unconverged = [cell["cell"] for cell in cells
+                   if cell.get("barrier_ev") is not None
+                   and cell.get("rms_fp_final") is not None
+                   and not cell.get("converged")]
+    if unconverged:
+        text += ("**力判据未达标**（撞 `MaxIter` 后正常终止，峰高只能按未收敛上界读）：%s。"
+                 % "、".join(unconverged))
     return head + " ".join(parts) + text
 
 

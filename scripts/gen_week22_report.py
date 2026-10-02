@@ -241,29 +241,56 @@ def render(data: Path = W22) -> str:
         "`>= 1 kcal/mol = %.6f eV` -> `separated`；之间 `inconclusive`），"
         "**不回溯改写 Stage 19 的既有判决**" % (neb["thermal_ev"], neb["kcal_ev"]))
     add("")
-    add("| 格 | Stage 19 (RMSD) | RMSD (A) | Stage 21 直线界 (eV) | NEB 峰高 (eV) | 直线高估 | NEB 判决 |")
-    add("| --- | --- | --- | --- | --- | --- | --- |")
+    def force_state(item):
+        """Did the band meet ORCA's own NEB force tolerance?  Never guess it."""
+
+        if item.get("converged"):
+            return "达标"
+        if item.get("rms_fp_final") is not None:
+            return "未达标"
+        return "未知"
+
+    add("| 格 | Stage 19 (RMSD) | RMSD (A) | Stage 21 直线界 (eV) | NEB 峰高 (eV) "
+        "| 直线高估 | NEB 判决 | 力判据 |")
+    add("| --- | --- | --- | --- | --- | --- | --- | --- |")
     for cell in cells:
         if cell.get("barrier_ev") is None:
-            add("| %s | %s | %s | %s | 未完成 | - | - |" % (
+            add("| %s | %s | %s | %s | 未完成 | - | - | %s |" % (
                 cell["cell"], cell.get("stage19_verdict") or "unavailable",
                 _fmt(cell.get("rmsd_a_stage19"), 3),
-                _fmt(cell.get("linear_barrier_ev"), 5)))
+                _fmt(cell.get("linear_barrier_ev"), 5), force_state(cell)))
             continue
-        add("| %s | %s | %s | %s | **%s** | %sx | %s |" % (
+        add("| %s | %s | %s | %s | **%s** | %sx | %s | %s |" % (
             cell["cell"], cell["stage19_verdict"], _fmt(cell["rmsd_a_stage19"], 3),
             _fmt(cell["linear_barrier_ev"], 5), _fmt(cell["barrier_ev"], 6),
-            _fmt(cell["bound_ratio"], 1), cell["verdict"]))
+            _fmt(cell["bound_ratio"], 1), cell["verdict"], force_state(cell)))
     add("")
     resolved = [cell for cell in cells if cell.get("barrier_ev") is not None]
     if resolved:
         worst_cell = max(resolved, key=lambda cell: cell["barrier_ev"])
-        add("三个格子里最高的一个峰是 **%s = %s eV**，仍比 1 kT（%.4f eV）低 **%.0f 倍**。"
-            "也就是说：两条臂的终点在能量上**全都是同一个盆地**，"
-            "直线插值确实只是上界，而且松了 %s 倍。"
-            % (worst_cell["cell"], _fmt(worst_cell["barrier_ev"], 6), neb["thermal_ev"],
-               neb["thermal_ev"] / worst_cell["barrier_ev"],
-               _fmt(min(cell["bound_ratio"] for cell in resolved), 0)))
+        lowest_cell = min(resolved, key=lambda cell: cell["barrier_ev"])
+        by_verdict = {}
+        for cell in resolved:
+            by_verdict.setdefault(cell["verdict"], []).append(cell["cell"])
+        add("最高的一格是 **%s = %s eV**（`%s`），最低的一格是 **%s = %s eV**（`%s`）；"
+            "判决计数：`one_basin` %d 格、`separated` %d 格、`inconclusive` %d 格。"
+            % (worst_cell["cell"], _fmt(worst_cell["barrier_ev"], 6), worst_cell["verdict"],
+               lowest_cell["cell"], _fmt(lowest_cell["barrier_ev"], 6), lowest_cell["verdict"],
+               len(by_verdict.get("one_basin", [])), len(by_verdict.get("separated", [])),
+               len(by_verdict.get("inconclusive", []))))
+        if by_verdict.get("one_basin"):
+            add("落在 1 kT（%.4f eV）以下的格子：%s —— 这些格子的两条臂终点在能量上就是同一个盆地。"
+                % (neb["thermal_ev"], "、".join(by_verdict["one_basin"])))
+        if by_verdict.get("separated"):
+            add("越过 1 kcal/mol（%.6f eV）的格子：%s —— 该格**不是**同一个盆地，"
+                "与 Stage 19 对该格的几何判决方向一致。"
+                % (neb["kcal_ev"], "、".join(by_verdict["separated"])))
+        comparable = [cell for cell in resolved if cell["barrier_ev"] > neb["thermal_ev"]]
+        if comparable:
+            loose = max(comparable, key=lambda cell: cell["bound_ratio"])
+            add("直线插值确实只是上界，但**松紧不是全局常数**：在高于 1 kT 的格子上，"
+                "直线界把峰高放大了 %s 倍（%s）。因此不能用某一个格子的直线计算外推别的格子。"
+                % (_fmt(loose["bound_ratio"], 1), loose["cell"]))
     add("")
     add("### 3.1 与 Stage 19 的一致 / 冲突清单")
     add("")
@@ -288,11 +315,19 @@ def render(data: Path = W22) -> str:
     add("")
     add("### 3.2 限制（必须与数字同时引用）")
     add("")
-    add("1. **regular NEB 不是 climbing-image**：常规弹性带会把尖峭鞍点抹圆，峰高因此是**偏乐观**方向的下界。"
-        "本轮每个判决都由数量级决定（都比 1 kT 小 2 个数量级以上），这个方向的误差不改变任何判决。")
+    add("1. **regular NEB 不是 climbing-image**：常规弹性带会把尖峭鞍点抹圆，峰高因此偏小。"
+        "判 `one_basin` 的两格，峰高比 1 kT 小 2 个数量级以上；判 `separated` 的一格，"
+        "峰高比 1 kcal/mol 高 1 个数量级以上。两个方向的误差都不改变判决。")
     add("2. **只精修 3 格（抽样）**：5 个 EC/阳离子临界格里只扫了 eps = 5 与 20 两端，"
         "eps = 7/10/14 三格**仍是 Stage 19 的旧判决**，报告不得暗示扫过。")
     add("3. **端点不重新优化**：这是刻意的——要让本轮判决直接对上 Stage 19 判决所依据的那两个终点。")
+    add("4. **TEGDME/anion/20 未达 ORCA 自己的 NEB 力判据**：该格在 `MaxIter` 处**正常终止**，"
+        "最后一次力表为 `RMS(Fp) = 1.0081e-03`（目标 5.0e-04，判 NO）、"
+        "`MAX(|Fp|) = 5.3259e-03`（目标 1.0e-03，判 NO），且迭代过程中峰高一直在下降"
+        "（迭代 0 的 3.204 eV 一路降到 0.30 eV 量级）。因此该格的峰高是**未收敛的上界**，"
+        "**不是**收敛峰高。两种读法——插值上界 0.679 eV、`HEI` 像能量 0.302 eV——"
+        "都仍比 1 kcal/mol（0.0434 eV）高 7 倍以上，所以 `separated` 这一**判决**稳健；"
+        "但**数值**不得当作收敛峰高引用。")
     add("")
     add("---")
     add("")

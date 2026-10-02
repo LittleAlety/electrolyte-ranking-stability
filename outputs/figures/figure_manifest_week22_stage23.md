@@ -3,12 +3,12 @@
 | figure | sha256 | size |
 | --- | --- | --- |
 | `F43_dielectric_limit_check.png` | `605a7a5ce54c2426a7a0bc7d5da6a745f8a65e806a8f2c5f9474f3f624ca49b2` | 179590 B |
-| `F44_neb_refinement.png` | `48bcc944023db892d9f17c030f02a42faea19348df40cb387c2c7424e080d3eb` | 215544 B |
+| `F44_neb_refinement.png` | `ec1168040689d8ddd92655a9c39584dd4c0446af5329e2f7ab019088dd97b25b` | 291239 B |
 
 | input | sha256 |
 | --- | --- |
 | `outputs/week22/dielectric_limit.json` | `bef5d38096beb2d2baa07dacaf5884090139d41af0e1042408a22b4d0f278002` |
-| `outputs/week22/neb_refinement.json` | `d64e2a0606e723d52988a33e5c766c13490ae78af397245ba4b0cf6b3d676e72` |
+| `outputs/week22/neb_refinement.json` | `c6e0db2dae40b4b52dddfa3aae7c80cca37b1a0807207a79344a819ffff5c17c` |
 
 Generate (from the repository root):
 
@@ -25,7 +25,7 @@ One-line caption (verbatim, for the terminal site): **R4b（附加诊断，不�
 
 ## F44 -- `F44_neb_refinement.png`
 
-One-line caption (verbatim, for the terminal site): **R11 —— 用真 NEB 取代直线插值上界。** 反应物/产物 = Stage 19 两条臂的弛豫终点（端点不重优化），regular (climbing : no)（中间像数：EC/cation/5 = 8，EC/cation/20 = 8，TEGDME/anion/20 = 4）。峰高从 ORCA 的 `<stem>.final.interp` 读，全精度。(a)-(c) 三条收敛路径，能量相对反应物，1 kT 与 1 kcal/mol 画成横线；(d) 直线界 vs 真 NEB 的对数柱状图。EC/cation/5：直线 0.00424 eV -> NEB **0.000141 eV**（one_basin，直线/NEB = 30.00） EC/cation/20：直线 0.00001 eV -> NEB **0.000053 eV**（one_basin，直线/NEB = 0.15） TEGDME/anion/20（未收敛，不给判决）2 格落在 1 kT 以下（`one_basin`）：EC/cation/5、EC/cation/20；1 格没有可用判决：TEGDME/anion/20。直线插值确实只是上界，最松的一格把峰高放大了 30.0 倍。与 Stage 19 的 RMSD 判决**冲突**的格子：EC/cation/5。
+One-line caption (verbatim, for the terminal site): **R11 —— 用真 NEB 取代直线插值上界。** 反应物/产物 = Stage 19 两条臂的弛豫终点（端点不重优化），regular (climbing : no)（中间像数：EC/cation/5 = 8，EC/cation/20 = 8，TEGDME/anion/20 = 2）。峰高从 ORCA 的 `<stem>.final.interp` 读，全精度。(a)-(c) 三条收敛路径，能量相对反应物，1 kT 与 1 kcal/mol 画成横线；(d) 直线界 vs 真 NEB 的对数柱状图。EC/cation/5：直线 0.00424 eV -> NEB **0.000141 eV**（one_basin，直线/NEB = 30.00） EC/cation/20：直线 0.00001 eV -> NEB **0.000053 eV**（one_basin，直线/NEB = 0.15） TEGDME/anion/20：直线 66.14456 eV -> NEB **0.679417 eV**（separated，直线/NEB = 97.35）2 格落在 1 kT 以下（`one_basin`）：EC/cation/5、EC/cation/20；1 格高于 1 kcal/mol（`separated`）：TEGDME/anion/20。直线界把峰高放大了最多 97.4 倍（TEGDME/anion/20）；EC/cation/20 的直线界与 NEB 峰高两侧都落在 ~1e-5 eV 的噪声底，比值没有判别意义。与 Stage 19 的 RMSD 判决**冲突**的格子：EC/cation/5。**力判据未达标**（撞 `MaxIter` 后正常终止，峰高只能按未收敛上界读）：TEGDME/anion/20。
 
 ## denominators
 
@@ -36,7 +36,7 @@ One-line caption (verbatim, for the terminal site): **R11 —— 用真 NEB 取�
   (``config/scientific_definitions.yaml``, ``STAGE0_ARTEFACTS``).
 - F44 panels (a)-(c): one row per **path point** actually written by ORCA to
   ``<stem>.final.interp``.  Intermediate images per cell (read from each
-  job's ORCA input): EC/cation/5 = 8，EC/cation/20 = 8，TEGDME/anion/20 = 4.
+  job's ORCA input): EC/cation/5 = 8，EC/cation/20 = 8，TEGDME/anion/20 = 2.
 - F44 panel (d): three cells, one bar pair each -- **3 cells**, not a
   population.  The cells were chosen by ``run_stage21_path.py``; five
   EC/cation borderline cells exist and only eps = 5 and 20 were walked.

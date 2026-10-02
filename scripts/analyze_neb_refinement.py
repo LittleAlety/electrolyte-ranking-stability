@@ -112,6 +112,16 @@ def parse_out(path: Path) -> dict:
         "n_iterations": None,
         "rms_fp": None,
         "max_fp": None,
+        #: Achieved / target pair from ORCA's NEB force table, recorded even when the
+        #: verdict is NO: "stopped at MaxIter, missed the tolerance by 2x" and "missed
+        #: it by 1000x" are different findings, and the table itself dies with the
+        #: scratch directory.
+        "rms_fp_final": None,
+        "rms_fp_target": None,
+        "rms_fp_converged": None,
+        "max_fp_final": None,
+        "max_fp_target": None,
+        "max_fp_converged": None,
         "hei_index": None,
         "hei_energy_eh": None,
         "out_bytes": len(text),
@@ -120,12 +130,22 @@ def parse_out(path: Path) -> dict:
     if match:
         record["converged"] = True
         record["n_iterations"] = int(match.group(1))
+    # ``rms_fp``/``max_fp`` keep their original meaning -- the achieved value only when
+    # it met the tolerance -- so an unconverged band can never look converged.
     match = RE_RMS.search(text)
-    if match and match.group(3) == "YES":
-        record["rms_fp"] = float(match.group(1))
+    if match:
+        record["rms_fp_final"] = float(match.group(1))
+        record["rms_fp_target"] = float(match.group(2))
+        record["rms_fp_converged"] = match.group(3) == "YES"
+        if match.group(3) == "YES":
+            record["rms_fp"] = float(match.group(1))
     match = RE_MAX.search(text)
-    if match and match.group(3) == "YES":
-        record["max_fp"] = float(match.group(1))
+    if match:
+        record["max_fp_final"] = float(match.group(1))
+        record["max_fp_target"] = float(match.group(2))
+        record["max_fp_converged"] = match.group(3) == "YES"
+        if match.group(3) == "YES":
+            record["max_fp"] = float(match.group(1))
     tail = text.partition("INFORMATION ABOUT HIGHEST ENERGY IMAGE")[2]
     if tail:
         match = RE_HEI.search(tail)
@@ -261,6 +281,8 @@ def build_cell(label: str, directory: str, stem: str, reference: dict, args) -> 
 
     out = parse_out(out_path) if out_path.exists() else {}
     for key in ("terminated_normally", "converged", "n_iterations", "rms_fp", "max_fp",
+                "rms_fp_final", "rms_fp_target", "rms_fp_converged",
+                "max_fp_final", "max_fp_target", "max_fp_converged",
                 "hei_index", "hei_energy_eh", "out_bytes"):
         record[key] = out.get(key)
 
@@ -303,6 +325,7 @@ def write_csv(path: Path, records: list) -> None:
                "bound_ratio", "linear_verdict", "stage19_verdict", "rmsd_a_stage19",
                "agrees_with_stage21", "agrees_with_stage19", "path_length_a",
                "path_points", "n_iterations", "n_images", "climbing", "rms_fp", "max_fp",
+               "rms_fp_final", "rms_fp_target", "max_fp_final", "max_fp_target",
                "hei_index", "job_dir"]
     with path.open("w", encoding="utf-8", newline="\n") as handle:
         writer = csv.DictWriter(handle, fieldnames=columns, extrasaction="ignore")
@@ -401,6 +424,15 @@ def build_markdown(payload: dict, records: list) -> str:
         if record.get("n_iterations") is not None:
             add("- 收敛：`%s` 轮，`RMS(Fp) = %.3e`（阈值 5.0e-04）、`MAX(|Fp|) = %.3e`（阈值 1.0e-03）" % (
                 record["n_iterations"], record["rms_fp"], record["max_fp"]))
+        elif record.get("rms_fp_final") is not None:
+            add("- **未收敛**：撞到 `MaxIter` 后正常终止（`.out` 里没有 `converged successfully` 行）。"
+                "最后一次力表给出 `RMS(Fp) = %.4e`（目标 %.1e，判 NO）、"
+                "`MAX(|Fp|) = %.4e`（目标 %.1e，判 NO）；迭代历史共 %d 次，见 `log_barriers_eh`。" % (
+                    record["rms_fp_final"], record["rms_fp_target"],
+                    record["max_fp_final"], record["max_fp_target"], record["n_log_blocks"]))
+        else:
+            add("- 收敛：该次运行的 `.out` 被 stdout 重定向截断，力表不可读（`log_barriers_eh` 共 %d 次）"
+                % record["n_log_blocks"])
         add("")
     add("## 与 Stage 19 的一致 / 冲突清单\n")
     conflicts = [r for r in records if r.get("agrees_with_stage19") is False]

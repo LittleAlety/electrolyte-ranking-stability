@@ -1,4 +1,4 @@
-﻿# External reference anchors （对应 v2 §3.3 Axis C / §15 / §19 Stage 1）
+# External reference anchors （对应 v2 §3.3 Axis C / §15 / §19 Stage 1）
 
 本目录保存 **外部参考锚点（external reference anchors）**，用于把「model-to-model 的排序保持」
 与「是否更接近真实可观测量」分开。
@@ -63,6 +63,21 @@
 - curated-literature：**30 行**（全部在 `gas_phase_anchors.csv`）
 - estimated：**31 行**（全部在 `solution_redox_anchors.csv`）
 - 待核 / 显式空缺：**9 行**（`gas_phase_anchors.csv`，值为空）
+
+### 1.4 `within_series_ordering.csv`（R7，2026-10-02 新增）
+
+- **当前为 0 行**（只有表头）。这不是遗漏，是核验结果。
+- 用途：Gate 1 的**排序一致性级**（`scripts/check_series_rel_ordering.py`）只从这张表取
+  within-series 锚点对。`solution_redox_anchors.csv` 的 31 行 `est` 不再直接当 blocker，
+  而是按 `docs/31` R7 记为 limitation。
+- 为什么是空的：2026-10-02 的 batch C 核验把 `docs/31` R7 的四条线索全部解析到了唯一 DOI
+  （见 `data/anchors/solution_anchor_verification.md` §4.1 与
+  `scripts/audit_solution_anchors.py` 的 `SOURCES`），但**没有一条能给出可逐条引用的
+  within-series 数值**：Okoshi 2015 与 Ue 1994/1997 的表都在 IOP 付费墙之后（本机被
+  Radware bot manager 拦截），唯一公开可取的同领域全文只覆盖 PC 单溶剂。
+  预注册判据要求 `n_pairs >= 18`，实际 `n_pairs = 0`。
+- 填表规则：一行 = 一个（来源序列, 物种, 性质）的已核验数值；`series_id` 相同的行才会互相配对，
+  `source_doi` 必须指向该序列本身（**禁止跨文献拼接绝对值**）。列定义见 §2.6。
 
 ---
 
@@ -143,6 +158,23 @@
 - `solution_redox_anchors.csv`：`doi` 允许为空（estimated 行必须为空）。
 
 ---
+
+### 2.6 `within_series_ordering.csv`
+
+| 列 | 含义 |
+| --- | --- |
+| `series_id` | 来源序列 ID；只有同 ID 的行会互相配对，「同源」要求由它保证 |
+| `source_doi` | 该序列本身的 DOI，必须形如 `10.…`；无源的估值不许写进这张表 |
+| `species` | 物种名，须与 `outputs/week4/p1_core_set_derived.csv` 的 `name` 一致 |
+| `property` | `oxidation_potential` 或 `reduction_potential` |
+| `value_V` | 该序列内的实测电位（同一序列内同一参比） |
+| `uncertainty_V` | 可选；本表判据不用它，但便于将来加权 |
+| `reference_electrode` | 可选；只作记录，不参与跨序列合并 |
+| `provenance` | 自由文本：装置 / 判据 / 表号 |
+| `verified_date` | 核验日期 |
+
+模型侧的排序键沿用全项目自 Week 4 起的 P1 口径（`p1_ox_ev` / `p1_red_ev`，越大越稳定），
+与实验电位的取向一致。
 
 ## 3. 物种命名与对照表
 

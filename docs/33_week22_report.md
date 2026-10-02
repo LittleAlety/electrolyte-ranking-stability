@@ -74,21 +74,24 @@ R11 用真 NEB 取代直线插值之后，Stage 19 判成「两个盆地」的 E
 ## 3. R11：NEB 精修（`docs/31` 批次 B 的最后一项）
 
 - 反应物 = Stage 19 `default` 臂弛豫终点，产物 = Stage 19 `moread` 臂弛豫终点，**端点不重新优化**（所以比较的正是 Stage 19 判决所依据的那两个终点）
-- 中间像数取自各格 ORCA 输入：EC/cation/5 = 8，EC/cation/20 = 8，TEGDME/anion/20 = 4（加 2 个端点即该格镜像总数）；**regular (climbing : no)**
+- 中间像数取自各格 ORCA 输入：EC/cation/5 = 8，EC/cation/20 = 8，TEGDME/anion/20 = 2（加 2 个端点即该格镜像总数）；**regular (climbing : no)**
 - 峰高从 ORCA 自带的收敛路径文件 `<stem>.final.interp` 读（能量相对反应物、全精度），`.out` 的 `INFORMATION ABOUT HIGHEST ENERGY IMAGE` 块作独立交叉校验
 - 判据沿用 Stage 21 的**双侧口径**（`<= 1 kT = 0.0257 eV` -> `one_basin`；`>= 1 kcal/mol = 0.043364 eV` -> `separated`；之间 `inconclusive`），**不回溯改写 Stage 19 的既有判决**
 
-| 格 | Stage 19 (RMSD) | RMSD (A) | Stage 21 直线界 (eV) | NEB 峰高 (eV) | 直线高估 | NEB 判决 |
-| --- | --- | --- | --- | --- | --- | --- |
-| EC/cation/5 | distinct_lower | 0.100 | 0.00424 | **0.000141** | 30.0x | one_basin |
-| EC/cation/20 | same_higher | 0.021 | 0.00001 | **0.000053** | 0.2x | one_basin |
-| TEGDME/anion/20 | unavailable | unavailable | unavailable | 未完成 | - | - |
+| 格 | Stage 19 (RMSD) | RMSD (A) | Stage 21 直线界 (eV) | NEB 峰高 (eV) | 直线高估 | NEB 判决 | 力判据 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| EC/cation/5 | distinct_lower | 0.100 | 0.00424 | **0.000141** | 30.0x | one_basin | 达标 |
+| EC/cation/20 | same_higher | 0.021 | 0.00001 | **0.000053** | 0.2x | one_basin | 未知 |
+| TEGDME/anion/20 | distinct_lower | 2.214 | 66.14456 | **0.679417** | 97.4x | separated | 未达标 |
 
-三个格子里最高的一个峰是 **EC/cation/5 = 0.000141 eV**，仍比 1 kT（0.0257 eV）低 **182 倍**。也就是说：两条臂的终点在能量上**全都是同一个盆地**，直线插值确实只是上界，而且松了 0 倍。
+最高的一格是 **TEGDME/anion/20 = 0.679417 eV**（`separated`），最低的一格是 **EC/cation/20 = 0.000053 eV**（`one_basin`）；判决计数：`one_basin` 2 格、`separated` 1 格、`inconclusive` 0 格。
+落在 1 kT（0.0257 eV）以下的格子：EC/cation/5、EC/cation/20 —— 这些格子的两条臂终点在能量上就是同一个盆地。
+越过 1 kcal/mol（0.043364 eV）的格子：TEGDME/anion/20 —— 该格**不是**同一个盆地，与 Stage 19 对该格的几何判决方向一致。
+直线插值确实只是上界，但**松紧不是全局常数**：在高于 1 kT 的格子上，直线界把峰高放大了 97.4 倍（TEGDME/anion/20）。因此不能用某一个格子的直线计算外推别的格子。
 
 ### 3.1 与 Stage 19 的一致 / 冲突清单
 
-- 一致（1 格）：EC/cation/20
+- 一致（2 格）：EC/cation/20、TEGDME/anion/20
 - 冲突（1 格）：EC/cation/5
 
 **冲突：EC/cation/5。** Stage 19 判 `distinct_lower`（RMSD 0.100 A，越过 0.02 A 阈值），但真 NEB 路径的峰高只有 **0.000141 eV**，比 1 kT 还小 182 倍，两端点**就是同一个盆地**。
@@ -96,13 +99,14 @@ R11 用真 NEB 取代直线插值之后，Stage 19 判成「两个盆地」的 E
 
 ![F44](figures/F44_neb_refinement.png)
 
-**R11 —— 用真 NEB 取代直线插值上界。** 反应物/产物 = Stage 19 两条臂的弛豫终点（端点不重优化），regular (climbing : no)（中间像数：EC/cation/5 = 8，EC/cation/20 = 8，TEGDME/anion/20 = 4）。峰高从 ORCA 的 `<stem>.final.interp` 读，全精度。(a)-(c) 三条收敛路径，能量相对反应物，1 kT 与 1 kcal/mol 画成横线；(d) 直线界 vs 真 NEB 的对数柱状图。EC/cation/5：直线 0.00424 eV -> NEB **0.000141 eV**（one_basin，直线/NEB = 30.00） EC/cation/20：直线 0.00001 eV -> NEB **0.000053 eV**（one_basin，直线/NEB = 0.15） TEGDME/anion/20（未收敛，不给判决）2 格落在 1 kT 以下（`one_basin`）：EC/cation/5、EC/cation/20；1 格没有可用判决：TEGDME/anion/20。直线插值确实只是上界，最松的一格把峰高放大了 30.0 倍。与 Stage 19 的 RMSD 判决**冲突**的格子：EC/cation/5。
+**R11 —— 用真 NEB 取代直线插值上界。** 反应物/产物 = Stage 19 两条臂的弛豫终点（端点不重优化），regular (climbing : no)（中间像数：EC/cation/5 = 8，EC/cation/20 = 8，TEGDME/anion/20 = 2）。峰高从 ORCA 的 `<stem>.final.interp` 读，全精度。(a)-(c) 三条收敛路径，能量相对反应物，1 kT 与 1 kcal/mol 画成横线；(d) 直线界 vs 真 NEB 的对数柱状图。EC/cation/5：直线 0.00424 eV -> NEB **0.000141 eV**（one_basin，直线/NEB = 30.00） EC/cation/20：直线 0.00001 eV -> NEB **0.000053 eV**（one_basin，直线/NEB = 0.15） TEGDME/anion/20：直线 66.14456 eV -> NEB **0.679417 eV**（separated，直线/NEB = 97.35）2 格落在 1 kT 以下（`one_basin`）：EC/cation/5、EC/cation/20；1 格高于 1 kcal/mol（`separated`）：TEGDME/anion/20。直线界把峰高放大了最多 97.4 倍（TEGDME/anion/20）；EC/cation/20 的直线界与 NEB 峰高两侧都落在 ~1e-5 eV 的噪声底，比值没有判别意义。与 Stage 19 的 RMSD 判决**冲突**的格子：EC/cation/5。**力判据未达标**（撞 `MaxIter` 后正常终止，峰高只能按未收敛上界读）：TEGDME/anion/20。
 
 ### 3.2 限制（必须与数字同时引用）
 
-1. **regular NEB 不是 climbing-image**：常规弹性带会把尖峭鞍点抹圆，峰高因此是**偏乐观**方向的下界。本轮每个判决都由数量级决定（都比 1 kT 小 2 个数量级以上），这个方向的误差不改变任何判决。
+1. **regular NEB 不是 climbing-image**：常规弹性带会把尖峭鞍点抹圆，峰高因此偏小。判 `one_basin` 的两格，峰高比 1 kT 小 2 个数量级以上；判 `separated` 的一格，峰高比 1 kcal/mol 高 1 个数量级以上。两个方向的误差都不改变判决。
 2. **只精修 3 格（抽样）**：5 个 EC/阳离子临界格里只扫了 eps = 5 与 20 两端，eps = 7/10/14 三格**仍是 Stage 19 的旧判决**，报告不得暗示扫过。
 3. **端点不重新优化**：这是刻意的——要让本轮判决直接对上 Stage 19 判决所依据的那两个终点。
+4. **TEGDME/anion/20 未达 ORCA 自己的 NEB 力判据**：该格在 `MaxIter` 处**正常终止**，最后一次力表为 `RMS(Fp) = 1.0081e-03`（目标 5.0e-04，判 NO）、`MAX(|Fp|) = 5.3259e-03`（目标 1.0e-03，判 NO），且迭代过程中峰高一直在下降（迭代 0 的 3.204 eV 一路降到 0.30 eV 量级）。因此该格的峰高是**未收敛的上界**，**不是**收敛峰高。两种读法——插值上界 0.679 eV、`HEI` 像能量 0.302 eV——都仍比 1 kcal/mol（0.0434 eV）高 7 倍以上，所以 `separated` 这一**判决**稳健；但**数值**不得当作收敛峰高引用。
 
 ---
 

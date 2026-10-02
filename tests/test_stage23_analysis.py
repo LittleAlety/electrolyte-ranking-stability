@@ -260,20 +260,83 @@ def test_r11_summary_counts_match_the_cell_table(neb):
     )
 
 
-def test_r11_unconverged_cell_is_labelled_and_carries_auxiliary_evidence(neb):
-    """A cell without a converged path must not be quoted as a verdict."""
-    unfinished = [cell for cell in neb["cells"] if cell["status"] != "ok"]
-    assert len(unfinished) <= 1
-    for cell in unfinished:
-        assert cell["verdict"] == "unavailable"
-        assert cell["profile"] == []
-        assert "barrier_ev" not in cell
-        aux = cell.get("auxiliary")
-        if aux is None:
+def test_r11_unconverged_cells_are_labelled_and_keep_the_force_table(neb):
+    """No cell may look converged when ORCA's own force table said NO.
+
+    A cell whose band stopped at ``MaxIter`` has to keep the achieved / target forces:
+    "missed the tolerance by 2x" and "missed it by 1000x" are different findings, and
+    the raw table dies with the scratch directory.
+    """
+
+    for cell in neb["cells"]:
+        if cell["status"] != "ok":
+            # No relaxed path at all: it must not be quoted as a verdict.
+            assert cell["verdict"] == "unavailable"
+            assert cell["profile"] == []
+            assert "barrier_ev" not in cell
+            aux = cell.get("auxiliary")
+            if aux is None:
+                continue
+            assert "not a converged" in aux["note"]
+            assert aux["n_images"] >= 1
+            assert aux["barrier_ev"] == pytest.approx(aux["barrier_eh"] * HARTREE_EV, rel=1e-9)
             continue
-        assert "not a converged" in aux["note"]
-        assert aux["n_images"] >= 1
-        assert aux["barrier_ev"] == pytest.approx(aux["barrier_eh"] * HARTREE_EV, rel=1e-9)
+        if cell["converged"]:
+            assert cell["rms_fp"] is not None and cell["max_fp"] is not None
+            assert cell["rms_fp_converged"] is True
+            assert cell["max_fp_converged"] is True
+            continue
+        # Not converged: ``rms_fp``/``max_fp`` must stay empty, and the achieved pair
+        # must still be there next to its target.
+        assert cell["rms_fp"] is None and cell["max_fp"] is None
+        if cell["rms_fp_final"] is None:
+            continue
+        assert cell["rms_fp_converged"] is False
+        assert cell["max_fp_converged"] is False
+        assert cell["rms_fp_final"] > cell["rms_fp_target"]
+        assert cell["max_fp_final"] > cell["max_fp_target"]
+
+
+def test_r11_every_cell_with_a_path_reports_a_verdict(neb):
+    decided = [cell for cell in neb["cells"] if cell["status"] == "ok"]
+    assert decided, "at least one cell must have a relaxed path"
+    for cell in decided:
+        assert cell["verdict"] in {"one_basin", "separated", "inconclusive"}
+        assert cell["barrier_ev"] is not None
+
+
+def test_parse_out_keeps_the_force_table_when_the_verdict_is_no(tmp_path):
+    import analyze_neb_refinement as nebmod
+
+    path = tmp_path / "probe_no.out"
+    path.write_text(
+        "          RMS(Fp)             0.0010080834            0.0005000000      NO\n"
+        "          MAX(|Fp|)           0.0053258941            0.0010000000      NO\n",
+        encoding="utf-8",
+    )
+    record = nebmod.parse_out(path)
+    assert record["rms_fp"] is None and record["max_fp"] is None
+    assert record["rms_fp_final"] == pytest.approx(0.0010080834)
+    assert record["rms_fp_target"] == pytest.approx(0.0005)
+    assert record["rms_fp_converged"] is False
+    assert record["max_fp_final"] == pytest.approx(0.0053258941)
+    assert record["max_fp_converged"] is False
+
+
+def test_parse_out_keeps_rms_fp_only_when_the_verdict_is_yes(tmp_path):
+    import analyze_neb_refinement as nebmod
+
+    path = tmp_path / "probe_yes.out"
+    path.write_text(
+        "          RMS(Fp)             0.0001373172            0.0005000000      YES\n"
+        "          MAX(|Fp|)           0.0007763815            0.0010000000      YES\n",
+        encoding="utf-8",
+    )
+    record = nebmod.parse_out(path)
+    assert record["rms_fp"] == pytest.approx(0.0001373172)
+    assert record["max_fp"] == pytest.approx(0.0007763815)
+    assert record["rms_fp_converged"] is True
+    assert record["max_fp_converged"] is True
 
 
 def test_r11_path_profiles_are_ordered_runs_ending_at_the_barrier(neb):
