@@ -144,7 +144,7 @@ R11 用真 NEB 取代直线插值之后，Stage 19 判成「两个盆地」的 E
 
 Gate 0 CLOSED、Gate 1 NOT CLOSED。
 
-Gate 0 保持 CLOSED 的理由与 Week 21 相同：本周只新增诊断与精修，没有一条改动落进目标量、family 定义、筛选方向、delta_m、k/N、种子集或 splits。Gate 1 的唯一 blocker 也仍然是 `data/anchors/solution_redox_anchors.csv` 的 31 行 `method=est`——那是 R7 的对象，而 R7 属批次 C，需**先完成文献核验 + PI 裁决**，本轮未执行。
+Gate 0 保持 CLOSED 的理由与 Week 21 相同：本周只新增诊断与精修，没有一条改动落进目标量、family 定义、筛选方向、delta_m、k/N、种子集或 splits。Gate 1 的 blocker 在本周由 R7 重新定义（PI 已裁决：within-series 排序一致性优先于绝对标定）：绝对标定层（`data/anchors/solution_redox_anchors.csv` 的 31 行 `method=est`）降级为**已记录的限制**，不再单独阻塞；现在唯一的 blocker 是**排序一致性层** —— `data/anchors/within_series_ordering.csv` 里没有任何已核验的 within-series 值（`n_pairs = 0`）。
 
 ## 7. 产物清单
 

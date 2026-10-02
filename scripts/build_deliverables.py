@@ -78,7 +78,7 @@ def check(name: str, ok, detail: str) -> dict:
     return {"name": name, "ok": ok, "detail": detail}
 
 
-GATE_STATUS = "Gate 0 CLOSED; Gate 1 NOT CLOSED (blocker: 溶液锚点 31 行仍为 est)"
+GATE_STATUS = ("Gate 0 CLOSED; Gate 1 NOT CLOSED (blocker: 排序一致性级 within-series 锚点对 n_pairs = 0；绝对标定级的 31 行 est 按 R7 记为 limitation)")
 
 T3_NOTE_PRESENT = ("**T3（CPCM ε 扫描）**：bare CPCM 介电常数扫描（ε = 5/10/20/40）× 12 分子 × 3 态 "
                    "= 144/144 作业成功，覆盖 core set 全部 8 个结构家族（含补跑的 SL、TMP），几何复用 G1、"
@@ -826,6 +826,31 @@ WEEKS = {
             "python scripts/build_deliverables.py --weeks 22",
         ],
     },
+    23: {
+        "topic": "Stage 24（批次 C+D：R5 措辞与 n=3 符号检验 + R8 靶向双腿 + R12 叙事重写）",
+        "sources": [
+            ("outputs/week23/targeted_two_guess.json", None, True),
+            ("outputs/week23/targeted_two_guess.csv", None, True),
+            ("outputs/week23/targeted_two_guess_pairs.csv", None, True),
+            ("outputs/week23/targeted_two_guess.md", None, True),
+            ("outputs/week23/shell3_xtb_sign_test.json", None, True),
+            ("outputs/week23/shell3_xtb_sign_test.csv", None, True),
+            ("outputs/week23/shell3_xtb_sign_test.md", None, True),
+            ("structures/microsolvation/EC_m1_shell3.xyz", None, True),
+            ("docs/34_week23_report.md", "week23_report_full.md", True),
+            ("outputs/figures/figure_manifest_week23_stage24.md",
+             "artifacts/figure_manifest_week23_stage24.md", True),
+        ],
+        "figures": [],
+        "figure_glob": ["outputs/figures/F45_*.png", "outputs/figures/F46_*.png"],
+        "commands": [
+            "python scripts/plan_targeted_two_guess.py",
+            "python scripts/run_shell3_xtb_sign_test.py",
+            "python scripts/make_stage24_figure.py",
+            "python scripts/gen_week23_report.py",
+            "python scripts/build_deliverables.py --weeks 23",
+        ],
+    },
 }
 
 
@@ -1126,6 +1151,16 @@ def render_report(week, wdir, missing, excluded):
                        ("{w22_r11_block}", w22["r11_block"]),
                        ("{w22_grid_block}", w22["grid_block"]),
                        ("{w22_table_block}", w22["table_block"])):
+        text = text.replace(key, value)
+    w23 = week23_blocks(load_json(W23_TARGETED_JSON), load_json(W23_SHELL3_JSON))
+    for key, value in (("{w23_did}", w23["did"]),
+                       ("{w23_metric}", w23["metric"]),
+                       ("{w23_qc}", w23["qc"]),
+                       ("{w23_limit}", w23["limit"]),
+                       ("{w23_r8_block}", w23["r8_block"]),
+                       ("{w23_r5_block}", w23["r5_block"]),
+                       ("{w23_r12_block}", w23["r12_block"]),
+                       ("{w23_table_block}", w23["table_block"])):
         text = text.replace(key, value)
     w19 = week19_blocks(load_json(W19_RUNG_PATH), load_json(W19_ARMS_PATH),
                         load_json(W19_ARMS_ANALYSIS_PATH))
@@ -3634,7 +3669,8 @@ def week21_blocks(phase, prospective, frozen, anchor):
     qc = ("QC：三个新脚本都可 `--check` 复跑（相图 2000 次重复的产物重跑逐字节相同）；"
           "`sigma_prospective_frozen.json` 在打分之前落盘并取 SHA256（%s），打分文件回写同一摘要（%s）；"
           "R1 的精确置换把 2^10 = %s 种赋值全部枚举；全量测试全绿；Gate 0 CLOSED，"
-          "Gate 1 仍只有「31 行溶液锚点仍是 est」这一个 blocker。"
+          "Gate 1 的唯一 blocker 是排序一致性级（within-series 锚点对 n_pairs = 0），"
+          "绝对标定级的 31 行 est 记为 limitation。"
           % (short(frozen.get("frozen_sha256")), short(prospective.get("frozen_sha256")),
              ((paired.get("GFN2_dSCF_xTB_minus_P1_r2scan3c") or {})
               .get("permutation") or {}).get("total_assignments")))
@@ -4118,12 +4154,159 @@ def week22_checks(wdir: Path):
     return checks
 
 
+def week23_checks(wdir: Path):
+    """QC for week 23 (Stage 24: R5 third shell, R8 targeted two-guess, R12).
+
+    Every number is read back out of ``targeted_two_guess.json`` and
+    ``shell3_xtb_sign_test.json``.
+    """
+
+    checks = []
+    targeted = load_json(wdir / "targeted_two_guess.json")
+    shell3 = load_json(wdir / "shell3_xtb_sign_test.json")
+    for name, data in (("targeted_two_guess", targeted),
+                       ("shell3_xtb_sign_test", shell3)):
+        if data is None:
+            checks.append(check("week23." + name + ".present", None, "source not found"))
+            return checks
+        checks.append(check("week23." + name + ".present", True, name + ".json present"))
+
+    def near(value, expected, tol):
+        return value is not None and abs(float(value) - expected) < tol
+
+    axes = targeted.get("axes") or {}
+    ox = axes.get("oxidation") or {}
+    red = axes.get("reduction") or {}
+    allow = targeted.get("allowance_ev") or {}
+    delta_m = targeted.get("delta_m_ev") or {}
+    detail = targeted.get("allowance_detail") or {}
+
+    checks.append(check("week23.convention_gap_under_2e-5",
+                        float(targeted.get("convention_gap_ev") or 1.0) < 2e-05,
+                        "gap=%s eV" % targeted.get("convention_gap_ev")))
+    checks.append(check("week23.allowance_is_per_axis_maximum",
+                        near(allow.get("oxidation"), (detail.get("oxidation") or {}).get("max_ev"), 1e-9)
+                        and near(allow.get("reduction"),
+                                 (detail.get("reduction") or {}).get("max_ev"), 1e-9)
+                        and (detail.get("oxidation") or {}).get("n_material_cells") == 16
+                        and (detail.get("reduction") or {}).get("n_material_cells") == 16,
+                        "ox=%s (%s cells) red=%s (%s cells)"
+                        % (allow.get("oxidation"),
+                           (detail.get("oxidation") or {}).get("n_material_cells"),
+                           allow.get("reduction"),
+                           (detail.get("reduction") or {}).get("n_material_cells"))))
+    checks.append(check("week23.allowance_under_delta_m",
+                        float(allow.get("oxidation") or 1.0) < float(delta_m.get("oxidation") or 0.0)
+                        and float(allow.get("reduction") or 1.0) < float(delta_m.get("reduction") or 0.0),
+                        "shares=%s%% / %s%%"
+                        % (round(100.0 * float(ox.get("allowance_over_delta_m") or 0.0), 1),
+                           round(100.0 * float(red.get("allowance_over_delta_m") or 0.0), 1))))
+
+    def rung(axis, kind):
+        for item in axis.get("ladder") or []:
+            if item.get("delta_kind") == kind:
+                return item
+        return {}
+
+    ox_allow = rung(ox, "allowance")
+    red_allow = rung(red, "allowance")
+    checks.append(check("week23.targeting_soundness_no_missed_flips",
+                        ox_allow.get("n_flips_missed") == 0 and red_allow.get("n_flips_missed") == 0
+                        and ox_allow.get("n_flips") == ox.get("n_flips")
+                        and red_allow.get("n_flips") == red.get("n_flips"),
+                        "ox missed=%s of %s flips; red missed=%s of %s"
+                        % (ox_allow.get("n_flips_missed"), ox.get("n_flips"),
+                           red_allow.get("n_flips_missed"), red.get("n_flips"))))
+    checks.append(check("week23.targeting_is_safe_but_not_cheap",
+                        float(ox_allow.get("savings_fraction") or 0.0) < 0.5
+                        and float(red_allow.get("savings_fraction") or 0.0) < 0.5,
+                        "savings=%s%% / %s%%"
+                        % (round(100.0 * float(ox_allow.get("savings_fraction") or 0.0), 1),
+                           round(100.0 * float(red_allow.get("savings_fraction") or 0.0), 1))))
+    ox_list = {item.get("k"): item for item in ox.get("list_variant") or []}
+    red_list = {item.get("k"): item for item in red.get("list_variant") or []}
+    checks.append(check("week23.list_only_variant_is_cheap",
+                        float((ox_list.get(2) or {}).get("boundary_savings") or 0.0) > 0.8
+                        and float((red_list.get(2) or {}).get("boundary_savings") or 0.0) > 0.8
+                        and len(ox_list) == 3 and len(red_list) == 3,
+                        "k=2 savings=%s%% / %s%%"
+                        % (round(100.0 * float((ox_list.get(2) or {}).get("boundary_savings") or 0.0), 1),
+                           round(100.0 * float((red_list.get(2) or {}).get("boundary_savings") or 0.0), 1))))
+
+    ox_prot = ox.get("protocol") or {}
+    red_prot = red.get("protocol") or {}
+    checks.append(check("week23.targeted_protocol_matches_full_two_guess",
+                        near(ox_prot.get("min_tau_b_vs_full"), 1.0, 1e-9)
+                        and near(red_prot.get("min_tau_b_vs_full"), 1.0, 1e-9)
+                        and all(near(value, 1.0, 1e-9)
+                                for value in (ox_prot.get("min_topk_overlap") or {}).values())
+                        and all(near(value, 1.0, 1e-9)
+                                for value in (red_prot.get("min_topk_overlap") or {}).values()),
+                        "min tau_b=%s / %s"
+                        % (ox_prot.get("min_tau_b_vs_full"), red_prot.get("min_tau_b_vs_full"))))
+    checks.append(check("week23.single_leg_does_move_the_ranking",
+                        float(ox_prot.get("min_tau_b_single_vs_full") or 1.0) < 0.95
+                        and float(red_prot.get("min_tau_b_single_vs_full") or 1.0) < 0.95,
+                        "single-leg min tau_b=%s / %s"
+                        % (ox_prot.get("min_tau_b_single_vs_full"),
+                           red_prot.get("min_tau_b_single_vs_full"))))
+    checks.append(check("week23.allowance_is_an_unregistered_term",
+                        (targeted.get("registration") or {}).get("registered") is False
+                        and len((targeted.get("registration") or {}).get("registered_sources") or []) == 5,
+                        "registered=%s sources=%s"
+                        % ((targeted.get("registration") or {}).get("registered"),
+                           len((targeted.get("registration") or {}).get("registered_sources") or []))))
+    fails = targeted.get("predictor_failures") or {}
+    disc = fails.get("discovery") or {}
+    hold = fails.get("holdout") or {}
+    multi = fails.get("multivariate_ceiling") or {}
+    checks.append(check("week23.predictor_failures_are_recorded",
+                        disc.get("beats_majority_baseline") is False
+                        and (hold.get("confusion") or {}).get("true_positive") == 0
+                        and float(multi.get("loo_auc") or 0.0) < 0.87,
+                        "discovery loo=%s vs baseline=%s; holdout tp=%s; multi auc=%s"
+                        % (disc.get("loo_accuracy"), disc.get("majority_baseline_accuracy"),
+                           (hold.get("confusion") or {}).get("true_positive"),
+                           multi.get("loo_auc"))))
+
+    rows = shell3.get("rows") or []
+    checks.append(check("week23.shell3_ladder_shape",
+                        shell3.get("n_jobs") == 14 and len(rows) == 4
+                        and [row.get("n") for row in sorted(rows, key=lambda r: r.get("n", 0))]
+                        == [0, 1, 2, 3],
+                        "jobs=%s rows=%s" % (shell3.get("n_jobs"), [row.get("n") for row in rows])))
+    inc = shell3.get("increments") or {}
+    checks.append(check("week23.shell3_sign_persists_and_magnitude_shrinks",
+                        all(bool(value) for value in (inc.get("sign_persists") or {}).values())
+                        and all(bool(value) for value in (inc.get("magnitude_shrinks") or {}).values())
+                        and near((inc.get("ratio") or {}).get("ip"), 0.384, 5e-3)
+                        and near((inc.get("ratio") or {}).get("ea"), 0.543, 5e-3),
+                        "sign=%s shrink=%s ratio=%s"
+                        % (inc.get("sign_persists"), inc.get("magnitude_shrinks"), inc.get("ratio"))))
+    checks.append(check("week23.shell3_verdict_is_consistent_with_saturation",
+                        (shell3.get("verdict") or {}).get("label") == "consistent_with_saturation",
+                        "label=%s" % (shell3.get("verdict") or {}).get("label")))
+    stage9 = shell3.get("stage9_reference") or {}
+    r2to1 = inc.get("ratio_2to1") or {}
+    checks.append(check("week23.shell3_cross_level_only_dimensionless",
+                        stage9.get("available") is True
+                        and near(stage9.get("ratio_ip"), -0.4080, 1e-3)
+                        and near(stage9.get("ratio_ea"), -0.2386, 1e-3)
+                        and near(r2to1.get("ip"), -0.4829, 1e-3)
+                        and near(r2to1.get("ea"), -0.0984, 1e-3),
+                        "r2scan=%s/%s xtb=%s/%s"
+                        % (stage9.get("ratio_ip"), stage9.get("ratio_ea"),
+                           r2to1.get("ip"), r2to1.get("ea"))))
+    return checks
+
+
 CHECK_BUILDERS = {1: week1_checks, 2: week2_checks, 3: week3_checks, 4: week4_checks,
                   5: week5_checks, 6: week6_checks, 7: week7_checks, 8: week8_checks,
                   9: week9_checks, 10: week10_checks, 11: week11_checks, 12: week12_checks,
                   13: week13_checks, 14: week14_checks, 15: week15_checks,
                   16: week16_checks, 17: week17_checks, 18: week18_checks,
-                  19: week19_checks, 20: week20_checks, 21: week21_checks, 22: week22_checks}
+                  19: week19_checks, 20: week20_checks, 21: week21_checks, 22: week22_checks,
+                  23: week23_checks}
 
 
 REPORT_TEMPLATES = {}
@@ -4291,6 +4474,70 @@ Week 22 执行 `docs/31_plan_revision_expert_review.md` 的批次 B：**R9、R4b
 {artifact_list}
 
 ## 10. 缺失源
+
+{missing_list}
+"""
+
+
+REPORT_TEMPLATES[23] = """# Week 23 成果小结 —— Stage 24（批次 C+D：R5 三次配位 + R8 靶向双腿 + R12 叙事）
+
+Week 23 收尾 `docs/31_plan_revision_expert_review.md` 的批次 C（**R5**）与批次 D（**R8、R12**）。
+本周只有**一个**新增电子结构（EC / m1 的第三配位壳），其余全部是纯分析：
+
+- **R5**：措辞修订（`docs/18` 新增 §5.5、`docs/12` 与 `docs/10` 各一处）把「次线性饱和」改写成
+  「与饱和一致的证据」，并补一个 n = 3 的 xTB 符号检验。
+- **R8**：把 Stage 16 的双初猜目录换算成一个可算的 missed-solution allowance，
+  给出靶向双腿规则的**安全性证明**、代价阶梯与协议校验（零新增电子结构）。
+- **R12**：把三条结论合并成对 v2「minimal information budget」的定性回答。
+
+> 周内最值得引用的一条是 R8 的**不等式**：翻转要求 `abs(d0 - d1) = abs(d0) + abs(d1) > abs(d0)`，
+> 而 `abs(d0 - d1) <= A_axis`，所以任何 `abs(d0) >= A_axis` 的 pair 都**不可能**被漏解翻转。
+> 靶向规则因此是**可证的充分超集**，不是启发式 —— 它的可靠性不依赖任何预报器。
+
+完整版本见 `week23_report_full.md`。
+
+## 1. 本周做了什么
+
+{w23_did}
+
+## 2. 关键数字
+
+{w23_metric}
+
+## 3. R8：漏解不是「翻倍」，是「框住」
+
+{w23_r8_block}
+
+> 靶向集在两个轴上都与全双腿**逐层等价**（tau_b = 1.0000），而「什么都不做」的单腿协议
+> 已经把排序改到 tau_b 0.9394 / 0.8788 —— 漏解确实动排序（不可忽略），
+> 但它们的活动范围被容许量框住（不必全局翻倍）。真正便宜的是只保护 Top-k 清单的变体。
+
+## 4. R5：第三个配位点，与饱和一致的证据
+
+{w23_r5_block}
+
+> 措辞纪律：本轮的证据只支持「与饱和一致（consistent with saturation）」，
+> **不写**「证明了饱和」；配位导致的位移必须用**条件态语言**描述
+> （M 与 [Li M]+ 是两个不同的化学物种），不得写成「更准」。
+
+## 5. R12：把算力瓶颈反转成「哪些层不用算」
+
+{w23_r12_block}
+
+## 6. 文件清单
+
+{w23_table_block}
+
+## 7. QC 与限制
+
+- {w23_qc}
+- {w23_limit}
+
+## 8. 本周产物
+
+{artifact_list}
+
+## 9. 缺失源
 
 {missing_list}
 """
@@ -4997,13 +5244,17 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week16/               Stage 17（亚稳态污染上限与两个 SCF 解的电子结构身份）
     ├── week17/               Stage 18（全目录电子身份普查与零成本自诊断）
     ├── week18/               Stage 19（几何弛豫检验：第二个 SCF 解能不能扛住弛豫）
-    └── week19/               Stage 20（第六级台阶与第二解的跨方法存亡）
+    ├── week19/               Stage 20（第六级台阶与第二解的跨方法存亡）
+    ├── week20/               Stage 21（临界带的能量裁决 + 溶剂壳氧化还原 + 真回填）
+    ├── week21/               Stage 22（批次 A：三臂对齐 + σ 相图 + 前瞻检验）
+    ├── week22/               Stage 23（批次 B：热修正抽样 + 导体极限 + NEB 精修）
+    └── week23/               Stage 24（批次 C+D：R5 三次配位 + R8 靶向双腿 + R12 叙事）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F44 中属于该周的部分）
+    ├── artifacts/            图（F0–F46 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -5037,6 +5288,7 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 {w20_row}
 {w21_row}
 {w22_row}
+{w23_row}
 
 ## 如何复现
 ```powershell
@@ -5047,7 +5299,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 - `--out`：输出根目录（默认 `E:\\Claude Code\\电解液溶剂-HB\\成果输出`）。
-- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22`。
+- `--weeks`：默认 `1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23`。
 - `--force`：覆盖已存在的**复制**文件（默认跳过已存在项）。
 - `--dry-run`：只打印计划，不写任何文件。
 
@@ -5201,6 +5453,9 @@ SUMMARY_TEMPLATE = r"""# 电解液溶剂氧化还原代理可审计性项目 —
 ### Week 22 成果小结 · Stage 23（批次 B：热修正抽样 + 导体极限诊断 + NEB 精修）
 {w22_summary}
 
+### Week 23 成果小结 · Stage 24（批次 C+D：R5 三次配位 + R8 靶向双腿 + R12 叙事）
+{w23_summary}
+
 ## 3. 核心科学结论
 
 ### 3.1 值误差 ≠ 排序误差
@@ -5245,14 +5500,18 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 误差棒（~0.1–0.2 eV）低两个数量级。结论是**方法适用域**：本方法不能裁断 0.01 eV 量级的阴离子
 束缚与否。氧化侧（IP）不受此限制，因为阳离子紧凑、不需要弥散函数。
 
+### 3.5 「哪些层可以不算」：三条结论合成的最简信息预算（R12）
+
+{w23_r12}
+
 ## 4. Gate 状态与 blocker
 | Gate | 状态 | 内容 |
 | --- | --- | --- |
 | Gate 0（定义冻结） | **CLOSED** | `config/scientific_definitions.yaml` + `config/prereg.yaml` + metadata 未被改动；`amendment_log` 为空 |
-| Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：溶液相锚点 **31 行**仍为 `est`，缺少可核验的原始文献值（ORCA 通路已由 week4 打通，不再是 blocker） |
+| Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：**排序一致性级** —— `data/anchors/within_series_ordering.csv` 没有任何已核验的 within-series 值（`n_pairs = 0`，低于预注册下限 18，见 `scripts/check_series_rel_ordering.py`）。**绝对标定级**（溶液相锚点 **31 行** `est`）按 Week 22 的 R7 裁决记为 **limitation**，不再单列 blocker（ORCA 通路已由 week4 打通） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F44）
+## 5. 图表索引（F0–F46）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -5300,6 +5559,8 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f42_row}
 {f43_row}
 {f44_row}
+{f45_row}
+{f46_row}
 
 ## 6. 复现命令
 ```powershell
@@ -6863,6 +7124,229 @@ W22_TABLE_ROWS = (
     ("`sigma_boundary_resolution.json` / `.md`",
      "Week 21 σ 相图 6 条边界的一步长方格分辨率复核（零新增计算）。"),
 )
+
+
+W23_TARGETED_JSON = REPO / "outputs" / "week23" / "targeted_two_guess.json"
+W23_SHELL3_JSON = REPO / "outputs" / "week23" / "shell3_xtb_sign_test.json"
+F45_NOTE_PRESENT = (
+    "Stage 24 R8：把「漏解」变成可算的容许量。两轴的实测效应量上界 A_axis = 0.1523 eV（氧化，"
+    "TMP@eps=5）/ 0.2860 eV（还原，EMC@eps=1000），是冻结 delta_m 的 21.7% / 13.8%；"
+    "安全定理「|d0| >= A_axis 的 pair 不可能翻转」在 660 对/轴的目录上抓住全部 19（氧化）/ 21（还原）次"
+    "真实翻转、漏 0；代价是靶向集占 86/120（省 28.3%）与 116/120（省 3.3%）—— 安全但不省钱，"
+    "真正便宜的是只保护 Top-k 清单的变体（k=1/2 时省 91.7% / 83.3%）。")
+F45_NOTE_ABSENT = "（Stage 24 R8 靶向双腿分析尚未产出；week23 尚未生成）"
+F46_NOTE_PRESENT = (
+    "Stage 24 R5：EC 的第三配位壳（GFN2-xTB 示意级）。n = 0 -> 3 的位移阶梯 dIP 0.000 / 3.897 / "
+    "2.015 / 1.292 eV、dEA 0.000 / 6.291 / 5.672 / 5.336 eV；增量 dd(2->1) 氧化 -1.882 / 还原 -0.619 "
+    "与 dd(3->2) 氧化 -0.723 / 还原 -0.336 同号且绝对值更小 —— 与饱和一致（consistent with "
+    "saturation），但只有 1 个分子 3 个点，不构成普查，且 xTB 绝对值不得与 r2SCAN-3c 阶梯并列。")
+F46_NOTE_ABSENT = "（Stage 24 R5 n=3 符号检验尚未产出；week23 尚未生成）"
+W23_TABLE_ROWS = (
+    ("`targeted_two_guess.json` / `.csv` / `_pairs.csv` / `.md`",
+     "R8：missed-solution allowance 的逐格估计、靶向规则的安全性与代价阶梯、协议校验"
+     "（靶向 vs 全双腿 vs 单腿）、只保护 Top-k 清单的变体、以及两次预报失败。"),
+    ("`shell3_xtb_sign_test.json` / `.csv` / `.md`",
+     "R5：EC / m1 的第三配位壳（n = 0..3）的 xTB 阶梯、增量的符号与大小、跨层级无量纲对照。"),
+    ("`structures/microsolvation/EC_m1_shell3.xyz`",
+     "R5：本轮唯一新增的电子结构（[Li(EC)3]+ 的确定性放置几何），供复用与复核。"),
+)
+
+
+def week23_blocks(targeted, shell3):
+    """Render the week-23 (Stage 24 / R5 + R8 + R12) narrative blocks.
+
+    Every number is read back out of ``outputs/week23/``'s two JSONs, so the
+    distilled report cannot drift from the artefacts it summarises.
+    """
+
+    keys = ("did", "metric", "qc", "limit", "summary", "r8_block", "r5_block",
+            "r12_block", "table_block")
+    if targeted is None or shell3 is None:
+        text = "（`outputs/week23/` 的产物不齐：targeted_two_guess / shell3_xtb_sign_test 至少缺一个）"
+        return {key: text for key in keys}
+
+    def num(value, digits=3):
+        return _w8_num(value, digits)
+
+    axes = targeted.get("axes") or {}
+    ox = axes.get("oxidation") or {}
+    red = axes.get("reduction") or {}
+    allow = targeted.get("allowance_ev") or {}
+    delta_m = targeted.get("delta_m_ev") or {}
+    detail = targeted.get("allowance_detail") or {}
+    reg = targeted.get("registration") or {}
+    fails = targeted.get("predictor_failures") or {}
+    disc = fails.get("discovery") or {}
+    hold = fails.get("holdout") or {}
+    multi = fails.get("multivariate_ceiling") or {}
+    hold_conf = hold.get("confusion") or {}
+
+    def rung(axis, kind):
+        for item in axis.get("ladder") or []:
+            if item.get("delta_kind") == kind:
+                return item
+        return {}
+
+    ox_allow = rung(ox, "allowance")
+    red_allow = rung(red, "allowance")
+    ox_dm = rung(ox, "delta_m")
+    red_dm = rung(red, "delta_m")
+    ox_prot = ox.get("protocol") or {}
+    red_prot = red.get("protocol") or {}
+    ox_list = {item.get("k"): item for item in ox.get("list_variant") or []}
+    red_list = {item.get("k"): item for item in red.get("list_variant") or []}
+
+    rows = shell3.get("rows") or []
+    inc = shell3.get("increments") or {}
+    dd_ip = inc.get("d_ip_ev") or {}
+    dd_ea = inc.get("d_ea_ev") or {}
+    ratio = inc.get("ratio") or {}
+    r2to1 = inc.get("ratio_2to1") or {}
+    stage9 = shell3.get("stage9_reference") or {}
+    verdict = shell3.get("verdict") or {}
+
+    def step(key, field):
+        return " / ".join(num((item.get(field) if item.get(field) is not None else 0.0), 3)
+                          for item in sorted(rows, key=lambda row: row.get(key, 0))
+                          if key == "n")
+
+    def ladder(field):
+        ordered = sorted(rows, key=lambda row: row.get("n", 0))
+        return " / ".join(num(row.get(field), 3) for row in ordered)
+
+    did = ("R5：对一个代表分子（EC / motif m1）补第三配位壳，GFN2-xTB 级示意，检验 "
+           "dd(3->2) 与 dd(2->1) 是否同号且 |dd(3->2)| < |dd(2->1)|（%s 个 xTB 作业）；"
+           "同时完成措辞修订（`docs/18` 新增 §5.5、`docs/12` 与 `docs/10` 各一处）。"
+           "R8：把 Stage 16 的双初猜目录（12 分子 x 10 电介质 = 120 格/轴、660 对/轴）"
+           "换算成一个可算的 missed-solution allowance，并给出靶向双腿规则的安全性证明、"
+           "代价阶梯与协议校验（零新增电子结构）。"
+           "R12：结题叙事重写，把闭式判据 + 介电层免费 + 配位饱和合并成对 v2「minimal "
+           "information budget」的定性回答。" % shell3.get("n_jobs"))
+
+    metric = ("R8：容许量 A_axis = %s eV（氧化，最坏 %s@eps=%s）/ %s eV（还原，最坏 %s@eps=%s），"
+              "为冻结 delta_m（%s / %s eV）的 %s%% / %s%%；靶向集 %s/%s（省 %s%%）与 %s/%s（省 %s%%），"
+              "两轴都在 660 对上抓住全部 %s / %s 次真实翻转、漏 0，且与全双腿逐层等价"
+              "（tau_b 最小值 %s / %s；对照单腿 %s / %s）。"
+              "R5：n = 0..3 的 dIP %s eV、dEA %s eV，dd(2->1) %s / %s、dd(3->2) %s / %s，"
+              "两轴同号且绝对值递减（判定 `%s`，比值 %s / %s）。"
+              % (num(allow.get("oxidation"), 4),
+                 (detail.get("oxidation") or {}).get("worst_cell", {}).get("name"),
+                 num((detail.get("oxidation") or {}).get("worst_cell", {}).get("epsilon"), 0),
+                 num(allow.get("reduction"), 4),
+                 (detail.get("reduction") or {}).get("worst_cell", {}).get("name"),
+                 num((detail.get("reduction") or {}).get("worst_cell", {}).get("epsilon"), 0),
+                 num(delta_m.get("oxidation"), 4), num(delta_m.get("reduction"), 4),
+                 num(100.0 * float(ox.get("allowance_over_delta_m") or 0.0), 1),
+                 num(100.0 * float(red.get("allowance_over_delta_m") or 0.0), 1),
+                 ox_allow.get("n_targeted_cells"), ox_allow.get("n_cells_total"),
+                 num(100.0 * float(ox_allow.get("savings_fraction") or 0.0), 1),
+                 red_allow.get("n_targeted_cells"), red_allow.get("n_cells_total"),
+                 num(100.0 * float(red_allow.get("savings_fraction") or 0.0), 1),
+                 ox.get("n_flips"), red.get("n_flips"),
+                 num(ox_prot.get("min_tau_b_vs_full"), 4), num(red_prot.get("min_tau_b_vs_full"), 4),
+                 num(ox_prot.get("min_tau_b_single_vs_full"), 4),
+                 num(red_prot.get("min_tau_b_single_vs_full"), 4),
+                 ladder("d_ip_ev"), ladder("d_ea_ev"),
+                 num(dd_ip.get("2")), num(dd_ea.get("2")),
+                 num(dd_ip.get("3")), num(dd_ea.get("3")),
+                 verdict.get("label"), num(ratio.get("ip"), 3), num(ratio.get("ea"), 3)))
+
+    qc = ("R8 的三条硬断言全部通过：逐格能量反推与 Stage 16 的 `delta_ev` 最大偏差 %s eV（< 2e-5）、"
+          "每轴 material 格子 16 个、`delta = A_axis` 的靶向漏掉 0 次翻转；"
+          "R5 的 %s 个 xTB 作业全部正常收尾；R12 不产生新数字。"
+          "missed-solution allowance 的登记状态为 `registered = %s`（见 `registration` 字段），"
+          "本报告一律按**非注册项**引用。"
+          % (num(targeted.get("convention_gap_ev"), 8),
+             shell3.get("n_jobs"), str(bool(reg.get("registered"))).lower()))
+
+    limit = ("1. allowance 是效应量上界而不是典型误差棒；2. `delta_star` 是事后量，只能当靶向比例的下界；"
+             "3. 靶向比例是这份 12 x 10 目录的实测值，不是普适定律；"
+             "4. R5 的 n = 3 只有 1 个分子 3 个点，且是 GFN2-xTB 层级，绝对值不得与 r2SCAN-3c 并列；"
+             "5. missed-solution allowance 是**非注册项**（`config/prereg.yaml` §3 只登记 5 项），"
+             "不得静默当成已登记的不确定度来源。")
+
+    summary = ("R8：漏解可以被**框住**而不必全局翻倍 —— 靶向规则安全（0 漏）但几乎不省钱"
+               "（氧化省 %s%%、还原省 %s%%），真正便宜的是只保护 Top-k 清单的变体"
+               "（k = 1/2 时省 %s%% / %s%%），而「什么都不做」的单腿协议实测已把排序改到 tau_b %s / %s，"
+               "所以漏解不能忽略。两次预报失败（发现集 LOO %s < 多数类基线 %s；留出臂真阳 %s）说明"
+               "策略只能是「事后靶向 + 容许量」，不是「事前预报」。"
+               "R5：第三个配位点没有换号，增量同号且绝对值更小，判定 `%s` —— "
+               "与饱和一致的证据，而不是「证明了饱和」。"
+               % (num(100.0 * float(ox_allow.get("savings_fraction") or 0.0), 1),
+                  num(100.0 * float(red_allow.get("savings_fraction") or 0.0), 1),
+                  num(100.0 * float((ox_list.get(2) or {}).get("boundary_savings") or 0.0), 1),
+                  num(100.0 * float((red_list.get(2) or {}).get("boundary_savings") or 0.0), 1),
+                  num(ox_prot.get("min_tau_b_single_vs_full"), 4),
+                  num(red_prot.get("min_tau_b_single_vs_full"), 4),
+                  num(disc.get("loo_accuracy"), 4), num(disc.get("majority_baseline_accuracy"), 4),
+                  hold_conf.get("true_positive"), verdict.get("label")))
+
+    r8_block = (
+        "| 轴 | 容许量 A_axis (eV) | 最坏格子 | A_axis / delta_m | 靶向格子 / 全部 | 省下 | 漏掉的翻转 |"
+        " 单腿对照 tau_b |\n"
+        "| --- | --- | --- | --- | --- | --- | --- | --- |\n"
+        "| 氧化 | **%s** | %s @ eps = %s | %s%% | %s / %s | %s%% | **%s** | %s |\n"
+        "| 还原 | **%s** | %s @ eps = %s | %s%% | %s / %s | %s%% | **%s** | %s |\n"
+        % (num(allow.get("oxidation"), 4),
+           (detail.get("oxidation") or {}).get("worst_cell", {}).get("name"),
+           num((detail.get("oxidation") or {}).get("worst_cell", {}).get("epsilon"), 0),
+           num(100.0 * float(ox.get("allowance_over_delta_m") or 0.0), 1),
+           ox_allow.get("n_targeted_cells"), ox_allow.get("n_cells_total"),
+           num(100.0 * float(ox_allow.get("savings_fraction") or 0.0), 1),
+           ox_allow.get("n_flips_missed"),
+           num(ox_prot.get("min_tau_b_single_vs_full"), 4),
+           num(allow.get("reduction"), 4),
+           (detail.get("reduction") or {}).get("worst_cell", {}).get("name"),
+           num((detail.get("reduction") or {}).get("worst_cell", {}).get("epsilon"), 0),
+           num(100.0 * float(red.get("allowance_over_delta_m") or 0.0), 1),
+           red_allow.get("n_targeted_cells"), red_allow.get("n_cells_total"),
+           num(100.0 * float(red_allow.get("savings_fraction") or 0.0), 1),
+           red_allow.get("n_flips_missed"),
+           num(red_prot.get("min_tau_b_single_vs_full"), 4)))
+
+    r5_block = (
+        "| n | 参考态 | IP (eV) | EA (eV) | dIP (eV) | dEA (eV) |\n"
+        "| --- | --- | --- | --- | --- | --- |\n"
+        + "\n".join("| %s | `%s` | %s | %s | %s | %s |"
+                    % (row.get("n"), row.get("reference_label"), num(row.get("ip_ev")),
+                       num(row.get("ea_ev")), num(row.get("d_ip_ev")), num(row.get("d_ea_ev")))
+                    for row in sorted(rows, key=lambda item: item.get("n", 0)))
+        + "\n\n增量 dd(n -> n-1)：氧化 %s（n=1）/ %s（n=2）/ %s（n=3），还原 %s / %s / %s；"
+          "两轴同号（%s / %s）且绝对值递减（%s / %s）。"
+          "跨层级无量纲对照 `dd(2->1)/dd(1->0)`：r2SCAN-3c 为 %s / %s（来自 `%s`），"
+          "GFN2-xTB 为 %s / %s —— 氧化轴接近、还原轴不接近（还原轴受 state-identity 影响，只能当提示）。"
+        % (num(dd_ip.get("1")), num(dd_ip.get("2")), num(dd_ip.get("3")),
+           num(dd_ea.get("1")), num(dd_ea.get("2")), num(dd_ea.get("3")),
+           inc.get("sign_persists", {}).get("ip"), inc.get("sign_persists", {}).get("ea"),
+           inc.get("magnitude_shrinks", {}).get("ip"), inc.get("magnitude_shrinks", {}).get("ea"),
+           num(stage9.get("ratio_ip"), 4), num(stage9.get("ratio_ea"), 4), stage9.get("source"),
+           num(r2to1.get("ip"), 4), num(r2to1.get("ea"), 4)))
+
+    r12_block = (
+        "把三条结论并起来，结题叙事能对 v2 的「minimal information budget」给一个**定性回答**："
+        "大规模筛选时，**哪几层可以不算**。\n\n"
+        "1. **闭式判据（可以在花钱之前预判）**：分辨率只由一条无量纲不等式决定 —— "
+        "`q_ij <= sqrt(2)/z`，其中 q 是位移相对目标轴的割线斜率。"
+        "它把「这一级台阶会不会把排序糊掉」变成开跑前的算术，不必先做完整扫描。\n"
+        "2. **介电层免费（自相似、平行于轴）**：环境位移落在 Born 单参数族里，"
+        "残余随电介质以 `|dE| x eps ~ 2.1 eV` 的幂律衰减，且位移几乎平行于目标轴 —— "
+        "所以介电点加密基本不改变排序（实测无稳健反转），这一层可以稀疏采样。\n"
+        "3. **配位饱和（次线性）**：第一溶剂壳从 1:1 加到 1:2 再到 1:3，增量同号且绝对值递减"
+        "（R5：dd(3->2)/dd(2->1) = %s / %s），说明继续加配体的边际信息在衰减；"
+        "真正需要算的是第一壳，而不是无限加壳。\n"
+        "4. **漏解层（靶向而非翻倍）**：漏解只能改变接近简并的 pair，"
+        "容许量 A_axis（%s / %s eV）把它框住；全序翻倍可以换成靶向（0 漏），"
+        "或者进一步只保护 Top-k 清单边界。\n\n"
+        "合成一句话：**先算第一壳的分子、用闭式判据筛台阶、介电层稀疏化、漏解只做靶向** —— "
+        "这就是「哪些层可以不算」的答案。"
+        % (num(r2to1.get("ip"), 3), num(r2to1.get("ea"), 3),
+           num(allow.get("oxidation"), 4), num(allow.get("reduction"), 4)))
+
+    table_block = "\n".join("- %s：%s" % (name, text) for name, text in W23_TABLE_ROWS)
+
+    return {"did": did, "metric": metric, "qc": qc, "limit": limit, "summary": summary,
+            "r8_block": r8_block, "r5_block": r5_block, "r12_block": r12_block,
+            "table_block": table_block}
 
 
 def week13_blocks(attribution, outlier):
@@ -9618,9 +10102,9 @@ def parse_args(argv=None):
     parser.add_argument("--out", default=str(DEFAULT_OUT),
                         help="output root (default: E:\\Claude Code\\电解液溶剂-HB\\成果输出)")
     parser.add_argument("--weeks",
-                        default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22",
+                        default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
                         help="comma-separated week numbers "
-                             "(default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22)")
+                             "(default: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite copied files that already exist")
     parser.add_argument("--dry-run", action="store_true", dest="dry_run",
@@ -10226,6 +10710,44 @@ def main(argv=None):
                          ("{w22_row}", w22_row),
                          ("{f43_row}", f43_row),
                          ("{f44_row}", f44_row))
+        w23_all = week23_blocks(load_json(W23_TARGETED_JSON), load_json(W23_SHELL3_JSON))
+        w23_note = w23_all["summary"]
+        w23_targeted = load_json(W23_TARGETED_JSON) or {}
+        w23_axes = w23_targeted.get("axes") or {}
+        w23_ox = w23_axes.get("oxidation") or {}
+        w23_red = w23_axes.get("reduction") or {}
+        w23_allow = w23_targeted.get("allowance_ev") or {}
+        w23_ox_prot = w23_ox.get("protocol") or {}
+        w23_red_prot = w23_red.get("protocol") or {}
+        if not W23_TARGETED_JSON.exists() or not W23_SHELL3_JSON.exists():
+            w23_row = ("| week23 | Stage 24（批次 C+D：R5 三次配位 + R8 靶向双腿 + R12 叙事） | "
+                       "（缺 `targeted_two_guess.json` / `shell3_xtb_sign_test.json`） | —— |")
+        else:
+            w23_row = ("| week23 | Stage 24（批次 C+D：R5 三次配位 + R8 靶向双腿 + R12 叙事） | "
+                       "R8 把漏解框成 A_axis = %s / %s eV（冻结 delta_m 的 %s%% / %s%%），"
+                       "靶向规则抓住全部 %s / %s 次真实翻转、漏 0，且与全双腿逐层等价"
+                       "（对照单腿 tau_b 降到 %s / %s）；R5 的第三个配位点在 xTB 层级上没有换号"
+                       "（增量同号且绝对值递减，判定「与饱和一致」）；R12 给出「哪些层可以不算」的定性回答 | "
+                       "Gate 0 CLOSED |"
+                       % (_fnum(w23_allow.get("oxidation"), 4), _fnum(w23_allow.get("reduction"), 4),
+                          _fnum(100.0 * float(w23_ox.get("allowance_over_delta_m") or 0.0), 1),
+                          _fnum(100.0 * float(w23_red.get("allowance_over_delta_m") or 0.0), 1),
+                          w23_ox.get("n_flips"), w23_red.get("n_flips"),
+                          _fnum(w23_ox_prot.get("min_tau_b_single_vs_full"), 4),
+                          _fnum(w23_red_prot.get("min_tau_b_single_vs_full"), 4)))
+        f45_figure = REPO / "outputs" / "figures" / "F45_targeted_two_guess.png"
+        f46_figure = REPO / "outputs" / "figures" / "F46_shell3_saturation.png"
+        f45_row = ("| F45 | `F45_targeted_two_guess.png` | " + F45_NOTE_PRESENT + " | week23 |"
+                   if f45_figure.exists() else
+                   "| F45 | 未生成 | " + F45_NOTE_ABSENT + " | —— |")
+        f46_row = ("| F46 | `F46_shell3_saturation.png` | " + F46_NOTE_PRESENT + " | week23 |"
+                   if f46_figure.exists() else
+                   "| F46 | 未生成 | " + F46_NOTE_ABSENT + " | —— |")
+        placeholders += (("{w23_summary}", w23_note),
+                         ("{w23_r12}", w23_all["r12_block"]),
+                         ("{w23_row}", w23_row),
+                         ("{f45_row}", f45_row),
+                         ("{f46_row}", f46_row))
         for key, value in placeholders:
             summary = summary.replace(key, value)
         readme = README_TEMPLATE

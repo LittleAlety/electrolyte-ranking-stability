@@ -343,6 +343,21 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     # the evaluator and the within-series table are Stage 1 artefacts and are
     # digested by STAGE1_ARTEFACTS.
     "tests/test_series_rel_ordering.py",
+    # Stage 24 (Week 23): batches C and D of the external review -- R5 (wording
+    # revision plus a third-shell GFN2-xTB sign check on EC/m1, whose geometry is
+    # the only new electronic structure this week), R8 (targeted two-guess: the
+    # missed-solution allowance, its soundness theorem and the protocol check; no
+    # new electronic structure at all), and R12 (narrative rewrite, no new
+    # numbers).  The xyz and the two figures are picked up by the existing
+    # structures/microsolvation and outputs/figures patterns above.
+    "scripts/plan_targeted_two_guess.py",
+    "scripts/run_shell3_xtb_sign_test.py",
+    "scripts/make_stage24_figure.py",
+    "scripts/gen_week23_report.py",
+    "tests/test_stage24_analysis.py",
+    "tests/test_week23_report.py",
+    "docs/34_*.md",
+    "outputs/week23/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large
