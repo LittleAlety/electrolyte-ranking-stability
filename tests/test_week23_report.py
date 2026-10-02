@@ -30,7 +30,7 @@ DATA_FILES = (
 SIBLINGS = (
     ("outputs/week22/dielectric_limit.json", "outputs/week22/dielectric_limit.json"),
     ("outputs/week10/stage11_sigma_anatomy.json", "outputs/week10/stage11_sigma_anatomy.json"),
-    ("data/anchors/within_series_ordering.csv", "data/anchors/within_series_ordering.csv"),
+    ("outputs/week2/series_rel_ordering_check.json", "outputs/week2/series_rel_ordering_check.json"),
     ("config/prereg.yaml", "config/prereg.yaml"),
     ("scripts/check_series_rel_ordering.py", "scripts/check_series_rel_ordering.py"),
 )

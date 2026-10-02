@@ -5533,7 +5533,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate | 状态 | 内容 |
 | --- | --- | --- |
 | Gate 0（定义冻结） | **CLOSED** | `config/scientific_definitions.yaml` + `config/prereg.yaml` + metadata 未被改动；`amendment_log` 为空 |
-| Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：**排序一致性级** —— `data/anchors/within_series_ordering.csv` 没有任何已核验的 within-series 值（`n_pairs = 0`，低于预注册下限 18，见 `scripts/check_series_rel_ordering.py`）。**绝对标定级**（溶液相锚点 **31 行** `est`）按 Week 22 的 R7 裁决记为 **limitation**，不再单列 blocker（ORCA 通路已由 week4 打通） |
+| Gate 1（方法 / 锚点） | **NOT CLOSED** | **排序一致性级**已首次可评但未通过：Ue1994 / Okoshi2015 氧化系列 **7** 个核心集分子 / **21** 对，Kendall **τ_b = 0.4286 < 0.90**，判 **`ordering_disagrees`**（`outputs/week25/series_rel_ordering_check.json`）。**绝对标定级**（溶液相锚点 **31 行** `est`）按 Week 22 的 R7 裁决记为 **limitation**，不再单列 blocker |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
 ## 5. 图表索引（F0–F55）

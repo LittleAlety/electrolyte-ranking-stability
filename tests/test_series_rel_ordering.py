@@ -2,8 +2,9 @@
 
 The tier is only credible if (a) the frozen threshold really is the pre-registered
 one, (b) the evaluator's arithmetic is pinned by synthetic cases whose answer is
-known by hand, and (c) the shipped empty table is *known* to be empty rather than
-accidentally empty.  All three are checked here.
+known by hand, and (c) the W25-ingested anchor table and the frozen pre-W25
+snapshot are *both* known to be exactly what they claim to be, with a routine run
+guaranteed to leave the frozen snapshot alone.  All of that is checked here.
 """
 
 from __future__ import annotations
@@ -56,27 +57,65 @@ def ox_rows(picks, values=None):
     ]
 
 
-def test_shipped_table_is_header_only_and_empty_on_purpose():
+def test_shipped_table_carries_only_the_transcribed_series():
+    """W25 populates the table with one transcribed series -- and nothing else."""
+
     with (REPO_ROOT / "data" / "anchors" / "within_series_ordering.csv").open(
         encoding="utf-8", newline=""
     ) as handle:
-        rows = list(csv.reader(handle))
-    assert rows, "the table must at least carry a header"
-    assert rows[0][:5] == HEADER[:5]
-    assert len(rows) == 1, "the shipped table must stay header-only while n_pairs = 0"
+        rows = list(csv.DictReader(handle))
+    assert rows, "the W25 anchor ingest must have populated the table"
+    assert list(rows[0].keys()) == HEADER
+    # Only the Ue1994 / Okoshi2015 oxidation transcript may sit in this table;
+    # every row has to carry the transcription-only provenance marker.
+    assert {row["series_id"] for row in rows} == {"Ue1994_Okoshi2015"}
+    assert {row["property"] for row in rows} == {"oxidation_potential"}
+    assert len(rows) == 14
+    for row in rows:
+        assert float(row["value_V"])
+        assert "transcription_only" in row["provenance"], row
 
 
-def test_shipped_check_json_matches_a_fresh_evaluation():
+def test_week2_frozen_snapshot_stays_the_pre_ingest_state():
+    """The week-2 payload is the frozen pre-W25 snapshot, not a live result."""
+
     on_disk = json.loads(
         (REPO_ROOT / "outputs" / "week2" / "series_rel_ordering_check.json").read_text(
             encoding="utf-8"
         )
     )
-    fresh = csr.evaluate(csr.DEFAULT_TABLE, csr.DEFAULT_MODEL)
-    assert on_disk == fresh
+    assert on_disk["n_rows"] == 0
     assert on_disk["n_pairs"] == 0
     assert on_disk["reason"] == "no_within_series_values"
     assert on_disk["ok"] is False
+
+
+def test_week25_check_json_matches_a_fresh_evaluation():
+    """W25's own payload is the live, reproducible evaluation."""
+
+    live = json.loads(
+        (REPO_ROOT / "outputs" / "week25" / "series_rel_ordering_check.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    fresh = csr.evaluate(csr.DEFAULT_TABLE, csr.DEFAULT_MODEL)
+    assert live == fresh
+    assert live["n_pairs"] == 21
+    assert live["reason"] == "ordering_disagrees"
+    assert live["ok"] is False
+
+
+def test_a_routine_run_is_read_only(tmp_path: Path):
+    """A plain evaluation must never clobber the frozen snapshot."""
+
+    frozen = REPO_ROOT / "outputs" / "week2" / "series_rel_ordering_check.json"
+    before = frozen.read_bytes()
+    assert csr.main(["--json"]) == 0
+    assert frozen.read_bytes() == before, "a routine run rewrote the frozen snapshot"
+    # Persisting is still possible, but only when asked for explicitly.
+    target = tmp_path / "payload.json"
+    assert csr.main(["--json", "--out", str(target)]) == 0
+    assert json.loads(target.read_text(encoding="utf-8"))["tier"] == "ordering_consistency"
 
 
 def test_seven_agreeing_species_reach_tau_b_one(tmp_path: Path):

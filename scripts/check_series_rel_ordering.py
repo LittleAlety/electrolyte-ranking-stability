@@ -61,15 +61,19 @@ promotes a row to reach a threshold.
 Output
 ------
 With ``--json`` the payload below is the *only* thing written to stdout, so the
-gate can parse it.  The same payload is always written to
-``outputs/week2/series_rel_ordering_check.json``.
+gate can parse it.
+
+The run is **read-only by default**: nothing is written unless ``--out PATH`` is
+given explicitly.  ``outputs/week2/series_rel_ordering_check.json`` is a frozen
+pre-W25 snapshot and must not be overwritten by a routine evaluation; the live W25
+evaluation lives in ``outputs/week25/series_rel_ordering_check.json``.
 
 Exit status: 0 when the evaluation completed (whatever ``ok`` says), 1 when the
 table itself is malformed, 2 on a usage error.
 
 Usage
 -----
-    python scripts/check_series_rel_ordering.py [--json] [--table PATH] [--model PATH]
+    python scripts/check_series_rel_ordering.py [--json] [--table PATH] [--model PATH] [--out PATH]
 """
 
 from __future__ import annotations
@@ -318,7 +322,11 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--table", type=Path, default=DEFAULT_TABLE)
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL)
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument(
+        "--out", type=Path, default=None,
+        help=("persist the payload to PATH; omit for a read-only run, because the "
+              "frozen week2 snapshot must not be overwritten"),
+    )
     parser.add_argument("--json", action="store_true", help="write the payload to stdout and nothing else")
     return parser.parse_args(argv)
 
@@ -327,14 +335,15 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     payload = evaluate(args.table, args.model)
 
-    try:
-        args.out.parent.mkdir(parents=True, exist_ok=True)
-        with args.out.open("w", encoding="utf-8", newline="") as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=False)
-            handle.write("\n")
-    except OSError as exc:
-        print("could not write %s: %s" % (args.out, exc), file=sys.stderr)
-        return 1
+    if args.out is not None:
+        try:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            with args.out.open("w", encoding="utf-8", newline="") as handle:
+                json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=False)
+                handle.write("\n")
+        except OSError as exc:
+            print("could not write %s: %s" % (args.out, exc), file=sys.stderr)
+            return 1
 
     if args.json:
         sys.stdout.write(json.dumps(payload, ensure_ascii=False))
@@ -348,7 +357,7 @@ def main(argv=None) -> int:
         print("  tau_b           : %s" % ("n/a" if payload["tau_b"] is None else "%.4f" % payload["tau_b"]))
         print("  verdict         : %s (%s)" % ("CLOSED" if payload["ok"] else "OPEN", payload["reason"]))
         print("  detail          : %s" % payload["detail"])
-        print("  wrote           : %s" % args.out)
+        print("  wrote           : %s" % (args.out if args.out else "(read-only run; pass --out to persist)"))
     return 1 if payload["problems"] else 0
 
 

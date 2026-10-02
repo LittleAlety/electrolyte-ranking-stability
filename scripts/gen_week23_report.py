@@ -49,14 +49,23 @@ def _gate1(data: Path) -> dict:
     """Read the Gate-1 ordering tier straight from its frozen inputs."""
 
     root = data.parent.parent
-    table = (root / "data" / "anchors" / "within_series_ordering.csv").read_text(encoding="utf-8")
-    rows = [line for line in table.splitlines() if line.strip()]
+    # The tier is read from its frozen Stage-1 snapshot, not from the live anchor
+    # table: W25 later ingests the transcribed series into
+    # ``data/anchors/within_series_ordering.csv`` and freezes it, while the live
+    # re-evaluation lives in ``outputs/week25/series_rel_ordering_check.json``.
+    # Reading the frozen week-2 payload keeps this week-23 report a truthful
+    # render of the state its own prose describes.
+    frozen = json.loads(
+        (root / "outputs" / "week2" / "series_rel_ordering_check.json").read_text(
+            encoding="utf-8"
+        )
+    )
     prereg = (root / "config" / "prereg.yaml").read_text(encoding="utf-8")
     threshold = re.search("strong_i_gt_j:[ ]*([0-9.]+)", prereg)
     checker = (root / "scripts" / "check_series_rel_ordering.py").read_text(encoding="utf-8")
     minimum = re.search("MIN_PAIRS[ ]*=[ ]*([0-9]+)", checker)
     return {
-        "n_rows": max(0, len(rows) - 1),
+        "n_rows": int(frozen.get("n_rows", 0)),
         "threshold": float(threshold.group(1)) if threshold else None,
         "min_pairs": int(minimum.group(1)) if minimum else None,
     }

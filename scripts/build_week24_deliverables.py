@@ -28,7 +28,46 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = Path(r"E:\Claude Code\电解液溶剂-HB\成果输出") / "week24_corealign"
 PAPER_DIR = Path(r"E:\Claude Code\电解液溶剂-HB\论文")
-PAPER_PDF = PAPER_DIR / "电解液溶剂氧化还原描述符决策稳定性_结题论文_v4.pdf"
+PAPER_STEM = "电解液溶剂氧化还原描述符决策稳定性_结题论文"
+PAPER_PDF_PATTERN = re.compile(rf"^{re.escape(PAPER_STEM)}_v(\d+)\.pdf$")
+#: keep in sync with 论文/build_paper_docx.py (v5 ships 图 1-22 / 表 1-15)
+PAPER_EXPECTED_FIGURES = 22
+PAPER_EXPECTED_TABLES = 15
+
+
+def resolve_paper_pdf() -> "tuple[Path | None, str]":
+    """Newest 论文/<stem>_v<N>.pdf by numeric version, plus an audit detail string."""
+
+    if not PAPER_DIR.is_dir():
+        return None, f"paper dir not found: {PAPER_DIR}"
+    candidates = []
+    for entry in sorted(PAPER_DIR.iterdir()):
+        match = PAPER_PDF_PATTERN.match(entry.name)
+        if match and entry.is_file():
+            candidates.append((int(match.group(1)), entry))
+    if not candidates:
+        return None, f"no {PAPER_STEM}_v<N>.pdf under {PAPER_DIR}"
+    version, path = max(candidates, key=lambda item: item[0])
+    stat = path.stat()
+    stamp = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+    return path, f"v{version} {path.name} ({stat.st_size} B, mtime {stamp})"
+
+
+def paper_first_appearance(text: str, kind: str) -> list:
+    """First-appearance order of *captions* like "图 22  标题" / "表 14  标题".
+
+    Anchoring on the two-space run that follows a caption number keeps in-text
+    cross-references ("见表 14 ...") out of the sequence.
+    """
+
+    order, seen = [], set()
+    for match in re.finditer(rf"(?:^|\n)\s*{kind}\s*(\d+)\s{{2,}}", text):
+        value = int(match.group(1))
+        if value not in seen:
+            seen.add(value)
+            order.append(value)
+    return order
+
 
 PRODUCTS = [
     "ml_direct_vs_shift.csv", "ml_direct_vs_shift.json", "ml_direct_vs_shift.md",
@@ -207,32 +246,28 @@ def checks(mirror: Path) -> list:
     else:
         add("f51.present", False, "MISSING")
 
-    if PAPER_PDF.exists():
+    paper_pdf, paper_detail = resolve_paper_pdf()
+    if paper_pdf is not None:
         from pypdf import PdfReader
 
-        reader = PdfReader(str(PAPER_PDF))
+        reader = PdfReader(str(paper_pdf))
         text = "\n".join((page.extract_text() or "") for page in reader.pages)
-        order, seen = [], set()
-        for match in re.finditer(r"图\s*(\d+)\s", text):
-            value = int(match.group(1))
-            if value not in seen:
-                seen.add(value)
-                order.append(value)
-        torder, tseen = [], set()
-        for match in re.finditer(r"表\s*(\d+)\s", text):
-            value = int(match.group(1))
-            if value not in tseen:
-                tseen.add(value)
-                torder.append(value)
-        add("paper.pages", len(reader.pages) >= 26, f"pages={len(reader.pages)}")
-        add("paper.figure_numbers_monotonic", order == sorted(order) and order == list(range(1, 19)),
-            f"first-appearance order={order}")
-        add("paper.table_numbers_monotonic", torder == sorted(torder) and torder == list(range(1, 15)),
-            f"first-appearance order={torder}")
-        add("paper.english_abstract_complete_on_page_1", "Key Words" in (reader.pages[0].extract_text() or ""),
-            "page 1 contains Key Words")
+        order = paper_first_appearance(text, "图")
+        torder = paper_first_appearance(text, "表")
+        add("paper.pdf.present", True, paper_detail)
+        add("paper.pages", len(reader.pages) >= 26,
+            f"pages={len(reader.pages)} ({paper_detail})")
+        add("paper.figure_numbers_monotonic",
+            order == sorted(order) and order == list(range(1, PAPER_EXPECTED_FIGURES + 1)),
+            f"first-appearance order={order} expected 1..{PAPER_EXPECTED_FIGURES} ({paper_detail})")
+        add("paper.table_numbers_monotonic",
+            torder == sorted(torder) and torder == list(range(1, PAPER_EXPECTED_TABLES + 1)),
+            f"first-appearance order={torder} expected 1..{PAPER_EXPECTED_TABLES} ({paper_detail})")
+        add("paper.english_abstract_complete_on_page_1",
+            "Key Words" in (reader.pages[0].extract_text() or ""),
+            f"page 1 contains Key Words ({paper_detail})")
     else:
-        add("paper.pdf.present", False, f"MISSING {PAPER_PDF}")
+        add("paper.pdf.present", False, f"MISSING {paper_detail}")
 
     return out
 

@@ -7,10 +7,10 @@
 
 | input | sha256 |
 | --- | --- |
-| `outputs/week19/stage20_relax_rung.json` | `2b06638528509cf7ba8664c71ab4b40a688f1b8aea9e39cea3652456f05149fa` |
+| `outputs/week19/stage20_relax_rung.json` | `e1a9cdd2ba5d5b65d84641d002ac42f9bbe8721e27e7e1c80ab49538181fd827` |
 | `outputs/week19/stage20_relax_rung_cells.csv` | `0ca188cd0bd2aba6cecef6c2d1411d3ec1f06598aea2867d49b7154d3edf6aff` |
-| `outputs/week19/stage20_relax_rung_ladder.csv` | `c7ba87969a91b6b3eb947063f82ef360d7f27b24b59be2188c14316417b5ae16` |
-| `outputs/week19/stage20_relax_rung_epsilon.csv` | `61428100e6730465f2b9f64e60dbdc74b564872a54a68b4d258e9d263cd04c4e` |
+| `outputs/week19/stage20_relax_rung_ladder.csv` | `f87e3ce8c230727c18312251fd49df090f39ab757742ee409bd2f65091e939b4` |
+| `outputs/week19/stage20_relax_rung_epsilon.csv` | `64b574f54ee5b452a02581bce750d2f90cf426b683c274855536b7b7e3ff3649` |
 | `outputs/week19/stage20_xtb_arms_analysis.json` | `30042094148ee0a0c37c3eafb3aa12405ce44d23142caf3a65f381fb4415c9fc` |
 | `outputs/week19/stage20_xtb_arms_cells_analysis.csv` | `d25449e22c4c0d0b575dfbb7c38f1657edf98a0466fa22a866ec09cbcae11565` |
 | `outputs/week18/stage19_relax_cells_analysis.csv` | `7e1333d553ebb72fe98049b094f61fcd93d9f66f79aa6872dff350f050ef79aa` |
