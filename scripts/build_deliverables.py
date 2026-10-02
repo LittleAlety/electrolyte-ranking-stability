@@ -5251,13 +5251,13 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week23/               Stage 24（批次 C+D：R5 三次配位 + R8 靶向双腿 + R12 叙事）
     ├── week22_hardening/     W22-H（论文加固：统计证据 B1–B5 + 数据统一；扁平文件 + SHA256SUMS）
     ├── week24_corealign/     W24-C（核心文件对齐：ML/AL 蒸馏 + 决策量补全 + F51；扁平文件 + artifacts/ + verification.json）
-    └── week25_gate1/         W25（Gate 1 排序层判据首次评估 + 家族分辨；data/docs/outputs/scripts + verification.json）
+    └── week25_gate1/         W25（Gate 1 排序层判据首次评估 + 家族分辨 + §24 Figure 5 描述符标签关联；data/docs/outputs/scripts + verification.json）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F54 中属于该周的部分）
+    ├── artifacts/            图（F0–F55 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -5338,8 +5338,8 @@ $env:PYTHONIOENCODING = "utf-8"
   由 `scripts/build_week25_deliverables.py` 生成。
   复现：`python scripts/build_week25_deliverables.py`；校验：`python scripts/build_week25_deliverables.py --check`。
 
-图表索引（F0–F54）中：`F47` 属 `week22_hardening`，`F48`–`F51` 属 `week24_corealign`，
-`F52`–`F54` 属 `week25_gate1`，逐图内容与来源见 `数据结果汇总.md` 的「图表索引」表。
+图表索引（F0–F55）中：`F47` 属 `week22_hardening`，`F48`–`F51` 属 `week24_corealign`，
+`F52`–`F55` 属 `week25_gate1`，逐图内容与来源见 `数据结果汇总.md` 的「图表索引」表。
 
 """
 
@@ -5536,7 +5536,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：**排序一致性级** —— `data/anchors/within_series_ordering.csv` 没有任何已核验的 within-series 值（`n_pairs = 0`，低于预注册下限 18，见 `scripts/check_series_rel_ordering.py`）。**绝对标定级**（溶液相锚点 **31 行** `est`）按 Week 22 的 R7 裁决记为 **limitation**，不再单列 blocker（ORCA 通路已由 week4 打通） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F54）
+## 5. 图表索引（F0–F55）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -5594,6 +5594,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f52_row}
 {f53_row}
 {f54_row}
+{f55_row}
 
 ## 6. 复现命令
 ```powershell
@@ -10188,6 +10189,15 @@ F54_NOTE_PRESENT = (
     "右侧单列外部参考层（R_gas / R_sol / R_env）；实心 / 斜纹 / 留白三态区分「已系统计算 / 仅 targeted "
     "敏感性 / 未计算」，并在图上锚定溶液锚点行数与 Gate 1 判决（τ_b = 0.4286、n_pairs = 21、ok = false）。")
 F54_NOTE_ABSENT = "（W25 §24 Figure 1 二维层级图尚未产出；week25_gate1 尚未生成）"
+F55_NOTE_PRESENT = (
+    "W25：§24 Figure 5 的配位位移 × 描述符标签关联——C1 子集 10 分子上，氧化轴与 `tpsa` "
+    "ρ = −0.890（精确置换 10! = 3 628 800 全枚举，p = 0.0011）、`donor_count` ρ = −0.794"
+    "（p = 0.0077）、`heteroatom_count` ρ = −0.702（p = 0.0282）、`n_heavy` ρ = −0.666"
+    "（p = 0.0394）等 14 / 14 条相关可估计，还原轴全部不显著；组间对比仅 3 / 47 条可估计"
+    "（要求组内 n ≥ 4）。未作多重比较校正，属探索性证据，不改动任何既有判决；ESP 字段"
+    "仓库内不存在，flexible / fluorinated / unsaturated 标签只覆盖 core-18 而本子集不可检验。"
+)
+F55_NOTE_ABSENT = "（W25 §24 Figure 5 配位位移 × 描述符标签关联图尚未产出；week25_gate1 尚未生成）"
 
 EXTENDED_FIGURES = (
     ("F47", "F47_broadpool_budget.png", F47_NOTE_PRESENT, F47_NOTE_ABSENT, "week22_hardening"),
@@ -10198,6 +10208,7 @@ EXTENDED_FIGURES = (
     ("F52", "F52_gate1_ordering.png", F52_NOTE_PRESENT, F52_NOTE_ABSENT, "week25_gate1"),
     ("F53", "F53_family_resolved.png", F53_NOTE_PRESENT, F53_NOTE_ABSENT, "week25_gate1"),
     ("F54", "F54_two_axis_hierarchy.png", F54_NOTE_PRESENT, F54_NOTE_ABSENT, "week25_gate1"),
+    ("F55", "F55_coord_descriptor_tags.png", F55_NOTE_PRESENT, F55_NOTE_ABSENT, "week25_gate1"),
 )
 
 
@@ -10213,7 +10224,7 @@ def extended_package_blocks():
                 "（`outputs/week22_hardening/*.json` 不齐） | Gate 0 CLOSED；Gate 1 **NOT CLOSED** |")
     w24_row = ("| week24_corealign | W24-C（核心文件对齐：ML/AL 蒸馏 + 决策量补全 + F51 流程图） | "
                "（`outputs/week24_corealign/*.json` 不齐） | Gate 0 CLOSED；Gate 1 **NOT CLOSED**（W24-D 审计判决 NOT_CLOSABLE） |")
-    w25_row = ("| week25_gate1 | W25（Gate 1 排序层判据首次评估 + 家族分辨统计） | "
+    w25_row = ("| week25_gate1 | W25（Gate 1 排序层判据首次评估 + 家族分辨统计 + §24 Figure 5 描述符标签关联） | "
                "（`outputs/week25/*.json` 不齐） | Gate 1 **NOT CLOSED** |")
 
     stats = load_json(W22H_STATS_JSON)
@@ -10315,7 +10326,7 @@ def extended_package_blocks():
                 f"{((gate1_red.get('criterion') or {}).get('min_pairs'))}）判 "
                 f"{gate1_red.get('verdict')}")
         w25_row = (
-            "| week25_gate1 | W25（Gate 1 排序层判据首次评估 + 家族分辨统计） | "
+            "| week25_gate1 | W25（Gate 1 排序层判据首次评估 + 家族分辨统计 + §24 Figure 5 描述符标签关联） | "
             f"Gate 1 排序层：Ue1994 / Okoshi2015 氧化系列 {n_species} 个核心集分子 / "
             f"{series.get('n_pairs')} 对首次可评，Kendall τ_b = {_fnum(series.get('tau_b'), 4)} < 0.90 → "
             f"ok = {series.get('ok')}（reason = {series.get('reason')}，一致 "

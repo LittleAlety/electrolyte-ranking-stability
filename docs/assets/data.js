@@ -2,10 +2,10 @@
 window.HB = {
  "repo": "https://github.com/LittleAlety/electrolyte-ranking-stability",
  "counts": {
-  "weeks": 23,
-  "figures": 47,
+  "weeks": 25,
+  "figures": 56,
   "orca_out": 1535,
-  "scripts": 108,
+  "scripts": 133,
   "test_files": 57,
   "tests_passed": 1194
  },
@@ -570,6 +570,48 @@ window.HB = {
     "6. 限制",
     "7. 产物清单"
    ]
+  },
+  {
+   "n": 24,
+   "doc": "docs/38_week24_corealign_report.md",
+   "title": "Week 24（W24-C）报告 —— 核心文件对齐、决策流程图与统一数据",
+   "stage": "W24-C",
+   "tag": "核心文件与结题论文之间的方法缺口在本周闭合：ML / 主动学习从 Stage 7/8 产物蒸馏为论文 §3.13–§3.14（接入 F48、F49），§22 分支与 §23 判据逐条自查落到 §5.1–§5.2，决策量补成 20 个组合的可核数值，并新增 F51 最小信息预算决策流程图；本周零新增电子结构计算。",
+   "summary": "核心文件与结题论文之间的方法缺口在本周闭合：ML / 主动学习从 Stage 7/8 产物蒸馏为论文 §3.13–§3.14（接入 F48、F49），§22 分支与 §23 判据逐条自查落到 §5.1–§5.2，决策量补成 20 个组合的可核数值，并新增 F51 最小信息预算决策流程图；本周零新增电子结构计算。",
+   "sections": [
+    "0. 一句话结论",
+    "1. 缺口审计（对照核心文件）",
+    "2. 新增产物（G1–G14）",
+    "3. 论文修订（v3 → v4）",
+    "4. 决策流程图 F51（本周重点）",
+    "5. 统一数据文档",
+    "6. QC 与限制",
+    "7. 产物清单",
+    "8. 缺失源",
+    "9. W24-D（第二轮）：对照核心文件的残余缺口"
+   ]
+  },
+  {
+   "n": 25,
+   "doc": "docs/40_week25_gate1_report.md",
+   "title": "Week 25（W25-G1）报告 —— 溶液相锚点排序一致性判据的首次评估（负结果）",
+   "stage": "W25-G1",
+   "tag": "Gate 1 排序层判据的状态从 \"无数据（no_within_series_values）\" 变为 \"已评估且不一致（ordering_disagrees）\"：7 个同系列溶剂、21 对给出 Kendall τ_b = 0.4286 < 0.90，判据首次可评但未通过；还原轴只有 3 对旁证，判 not_evaluable_secondary_only；本周零新增电子结构计算。",
+   "summary": "Gate 1 排序层判据的状态从 \"无数据（no_within_series_values）\" 变为 \"已评估且不一致（ordering_disagrees）\"：7 个同系列溶剂、21 对给出 Kendall τ_b = 0.4286 < 0.90，判据首次可评但未通过；还原轴只有 3 对旁证，判 not_evaluable_secondary_only；本周零新增电子结构计算。",
+   "sections": [
+    "0. 一句话结论",
+    "1. 本周解决的问题",
+    "2. 输入与入库（G1）",
+    "3. 冻结判据的首次评估结果（G2）",
+    "4. 氧化轴诊断（G3）",
+    "5. 还原轴判定（G4）",
+    "6. 诚实边界（G5 与全周口径）",
+    "7. 发现的一处缺陷（只报告，未改动）",
+    "8. 与核心文件 §15.2 / §19 Gate 1 的对照",
+    "9. 下周候选（G6 之外的延伸）",
+    "附录 A. 产物清单（G1–G6）",
+    "附录 B. 复现与自检"
+   ]
   }
  ],
  "figures": [
@@ -1042,6 +1084,96 @@ window.HB = {
    "bytes": 172726,
    "w": 2275,
    "h": 838
+  },
+  {
+   "id": "F47",
+   "file": "F47_broadpool_budget.png",
+   "week": 22,
+   "caption": "broad pool 的最小信息预算演示：不可分辨对比例、值得升级子集与两条口径下的预算节省（W22-H）",
+   "sha": "89cc88b21a9e5aea9e624991b96220c45529534d8f9d9f70a6034581468332ad",
+   "bytes": 184913,
+   "w": 2025,
+   "h": 1500
+  },
+  {
+   "id": "F48",
+   "file": "F48_ml_direct_vs_shift.png",
+   "week": 24,
+   "caption": "直接学习 vs 位移学习的留一家族出外推对照（W24-C）",
+   "sha": "76dfcce7eb7d0ec1e30eb1e5c198ab771b1d376016bef1246958057dc5724672",
+   "bytes": 157638,
+   "w": 2400,
+   "h": 1120
+  },
+  {
+   "id": "F49",
+   "file": "F49_al_budget.png",
+   "week": 24,
+   "caption": "主动学习预算重放：n_T 与 tau_b 曲线与冻结种子的分位带（W24-C）",
+   "sha": "7f50d469c58da9bf3fd494235e2f72ff003c839e42c188a7cfe0c0e88fe1de85",
+   "bytes": 106588,
+   "w": 1950,
+   "h": 1350
+  },
+  {
+   "id": "F50",
+   "file": "F50_decision_metrics.png",
+   "week": 24,
+   "caption": "W24-C 决策量补全：闭环判据与三臂对齐（W24-C）",
+   "sha": "d4b4543bc851a4242cd88a69eb2e723cba8f9f2ce0f64e155aaf5518bc32dbeb",
+   "bytes": 135427,
+   "w": 1650,
+   "h": 1230
+  },
+  {
+   "id": "F51",
+   "file": "F51_minimal_budget_flowchart.png",
+   "week": 24,
+   "caption": "最小信息预算决策流程图：该算哪些层、该买多少昂贵标签（W24-C）",
+   "sha": "857dc62df65b1cb19cd5ea1c4305a37a408065b7a25f24dccdbb368d2ab2647d",
+   "bytes": 499599,
+   "w": 1260,
+   "h": 1711
+  },
+  {
+   "id": "F52",
+   "file": "F52_gate1_ordering.png",
+   "week": 25,
+   "caption": "Gate 1 溶液锚点排序层判据的首次评估（tau_b = 0.4286、n_pairs = 21、ordering_disagrees）（W25）",
+   "sha": "33d8d86866ad039f20ed1447d0fec50cac3e295159fe1a1389623c555822f309",
+   "bytes": 217531,
+   "w": 1260,
+   "h": 1420
+  },
+  {
+   "id": "F53",
+   "file": "F53_family_resolved.png",
+   "week": 25,
+   "caption": "逐家族（family-resolved）排序统计：家族内 tau_b 与未解析比例（W25）",
+   "sha": "8be5d568f372ff03121ce2a180a4754c2cea9aaac2cfcd4132ca0ac135c18717",
+   "bytes": 252851,
+   "w": 1260,
+   "h": 1280
+  },
+  {
+   "id": "F54",
+   "file": "F54_two_axis_hierarchy.png",
+   "week": 25,
+   "caption": "二维模型层级（方法层级 x 条件态层级）+ 外部参考层（核心文件 §24 Figure 1）（W25）",
+   "sha": "accc74661564510efd0ca5992997862c5e319a229a20035ef79e261daa9d1038",
+   "bytes": 317318,
+   "w": 1260,
+   "h": 1270
+  },
+  {
+   "id": "F55",
+   "file": "F55_coord_descriptor_tags.png",
+   "week": 25,
+   "caption": "配位位移 x 描述符标签关联（核心文件 §24 Figure 5）：C1 n = 10，氧化轴 tpsa rho = -0.890（p = 0.0011）（W25）",
+   "sha": "c549be55a5841f28becf16b822d2dd9b5b1f29e5d0a9024cf5ccd01d20fefd91",
+   "bytes": 230195,
+   "w": 1260,
+   "h": 1320
   }
  ]
 };

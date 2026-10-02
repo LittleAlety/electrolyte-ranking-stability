@@ -6,6 +6,9 @@
 - 唯一变量纪律：本周**零新增电子结构计算**。全部工作是把一批新到的外部实验锚点入库、用 Stage 1 **冻结的判据脚本**首次评估、并如实报告结果。
 - Gate 1 现状口径：**排序层判据已评估但未闭合（τ_b = 0.4286 < 0.9）；绝对标定层仍记为 limitation**。本周的状态变化是"从无数据到已评估"，不是"已闭合"。
 
+## 0. 一句话结论
+
+Gate 1 排序层判据的状态从 **"无数据（no_within_series_values）"** 变为 **"已评估且不一致（ordering_disagrees）"**：7 个同系列溶剂、21 对给出 Kendall τ_b = 0.4286 < 0.90，判据首次可评但未通过；还原轴只有 3 对旁证，判 `not_evaluable_secondary_only`；本周零新增电子结构计算。
 ## 1. 本周解决的问题
 
 Gate 1 的排序层判据自 Stage 1 起就被冻结（见 `config/prereg.yaml` 与 `data/anchors/solution_anchor_verification.md`），关键参数如下：

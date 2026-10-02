@@ -40,6 +40,7 @@ SCRIPT_FILES = [
     "scripts/analyze_w25_figure_f53.py",
     "scripts/make_w25_figure_f54_two_axis_hierarchy.py",
     "scripts/build_compute_budget_ledger.py",
+    "scripts/analyze_w25_figure_f55.py",
 ]
 METADATA_FILES = [
     "data/metadata/core_set_metadata_ext.csv",
@@ -58,6 +59,7 @@ FIGURE_FILES = [
     "outputs/figures/F52_gate1_ordering.png",
     "outputs/figures/F53_family_resolved.png",
     "outputs/figures/F54_two_axis_hierarchy.png",
+    "outputs/figures/F55_coord_descriptor_tags.png",
 ]
 DOC_FILES = [
     "docs/39_week25_gate1_plan.md",
@@ -243,6 +245,10 @@ SHA256（`<sha256>  <相对路径>`，LF 换行，按相对路径排序）。
 
     .venv\\Scripts\\python.exe scripts\\build_week25_deliverables.py --check
 
+图 F55（§3.17 配位位移 × 描述符标签）的复现 / 自检：
+
+    .venv\\Scripts\\python.exe scripts\\analyze_w25_figure_f55.py --check
+
 ## provenance（来源）纪律
 
 - 用户转录值一律标注 `transcription_only`：
@@ -347,6 +353,7 @@ def build(outdir: Path) -> int:
             ".venv\\Scripts\\python.exe scripts\\build_core_set_metadata_ext.py",
             ".venv\\Scripts\\python.exe scripts\\analyze_family_resolved.py",
             ".venv\\Scripts\\python.exe scripts\\analyze_w25_figure_f53.py",
+            ".venv\\Scripts\\python.exe scripts\\analyze_w25_figure_f55.py --check",
             ".venv\\Scripts\\python.exe scripts\\build_week25_deliverables.py",
         ],
     }

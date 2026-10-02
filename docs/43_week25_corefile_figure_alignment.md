@@ -5,7 +5,7 @@
 - 输入（只读）：
   - `核心文件/ranking-electrolyte-materials-v2.md`：§23（L1429–1445）与 §24「建议核心图」（L1447–1509）。
   - `论文/build_paper_docx.py`：论文唯一真源；本文的图号、节号均由该文件的 `figure()` 调用与 `h1/h2` 标题解析得到。
-  - `电解液溶剂HB-Code/outputs/figures/figure_manifest*.md`、`outputs/week25/F52_manifest.md`、`outputs/week25/F53_manifest.md`、`outputs/week25/F54_manifest.md`。
+  - `电解液溶剂HB-Code/outputs/figures/figure_manifest*.md`、`outputs/week25/F52_manifest.md`、`outputs/week25/F53_manifest.md`、`outputs/week25/F54_manifest.md`、`outputs/week25/F55_manifest.md`。
   - 已有对齐/审计记录：`docs/41_week25_corefile_gap_audit.md`（§2.15 O1–O7）、`outputs/week24_corealign/core_alignment.json`。
 - 覆盖说明：`outputs/week24_corealign/core_alignment.json` 覆盖 §22 分支认领、§23 最小成果判据与阅读清单，**不含 §24 核心图逐条映射**；本文件补齐该双向映射，作为 §24 的单一入口。
 
@@ -38,7 +38,8 @@
 | 图 19 所在论文节 | 实测 **§3.14**（h2 `build_paper_docx.py:810`「3.14 最小昂贵标签预算：主动学习重放」） | 与任务锚点所写 §3.11 **不符**（见 §6；锚点用的是插入新图前的旧编号「图 18」） |
 | 图 20 = `F52_gate1_ordering.png`（§3.15） | 实测一致（`build_paper_docx.py:885`，§3.15） | 一致 |
 | 图 21 = `F53_family_resolved.png`（§3.16） | 实测一致（`build_paper_docx.py:913`，§3.16） | 一致 |
-| 论文图号范围 1–21 | `figure()` 调用共 21 次，caption「图 1」–「图 21」连续 | 一致 |
+| 图 22 = `F55_coord_descriptor_tags.png`（§3.17） | 实测一致（`build_paper_docx.py:949`；h2「3.17 配位位移与描述符标签的关系（§24 Figure 5 的补全）」在 `:922`） | 新增，一致 |
+| 论文图号范围 1–22 | `figure()` 调用共 22 次，caption「图 1」–「图 22」连续 | 一致 |
 | 表号范围 1–15 | caption「表 1」–「表 15」连续 | 一致 |
 
 ---
@@ -53,7 +54,7 @@
 | Figure 2 External validation and uncertainty audit | L1463–1465 | 图 4、图 7、图 10、图 20 | §3.1、§3.3、§3.6、§3.15 | **PASS** |
 | Figure 3 Uncertainty-aware rank stability matrix | L1467–1474 | 图 10、图 11 | §3.6 | **PASS** |
 | Figure 4 Robust rank-flow map | L1476–1478 | 图 5、图 6 | §3.2 | **PARTIAL** |
-| Figure 5 Mechanisms of coordination-induced inversion | L1480–1488 | 图 9、图 14 | §3.5、§3.9 | **PARTIAL** |
+| Figure 5 Mechanisms of coordination-induced inversion | L1480–1488 | 图 9、图 14、图 22 | §3.5、§3.9、§3.17 | **PASS** |
 | Figure 6 Direct vs Δ-learning under extrapolation | L1490–1492 | 图 17 | §3.13 | **PASS** |
 | Figure 7 Minimal expensive-information budget | L1494–1508 | 图 13、图 16、图 18、图 19 | §3.8、§3.12、§3.14 | **PASS** |
 
@@ -137,17 +138,23 @@
 ### 2.5 Figure 5：Mechanisms of coordination-induced inversion
 
 - **§24 原文要求摘录（≤60 字）**：分析 ΔΔG_coord 与 donor type/ESP/chelation/flexibility/functionalization tags 的关系，并给典型分子/态密度图。
-- **对应论文图号**：图 9（F12，C1 配位条件态）、图 14（F46，第三配位点饱和）。
-- **对应论文节**：§3.5 条件态台阶：Li+ 配位如何改写排序、§3.9 配位饱和的证据。
+- **对应论文图号**：图 9（F12，C1 配位条件态）、图 14（F46，第三配位点饱和）、图 22（F55，配位位移 × 描述符标签）。
+- **对应论文节**：§3.5 条件态台阶：Li+ 配位如何改写排序、§3.9 配位饱和的证据、§3.17 配位位移与描述符标签的关系（`build_paper_docx.py:922` 的 h2，图 22 置于 `build_paper_docx.py:949`）。
 - **证据文件**：
   - `outputs/figures/F12_li_coordination_c1.png`
   - `outputs/figures/F46_shell3_saturation.png`
+  - `outputs/figures/F55_coord_descriptor_tags.png`（4 面板：逐分子两轴位移 + ρ 热图（精确置换 p）+ 标签分层中位数 + dIP–tpsa / dIP–donor_count 散点；1260 × 1320 px @200 dpi）
+  - `outputs/week25/figure_f55_stats.json`、`outputs/week25/figure_f55_stats.md`（唯一数据负载：14 条秩相关 + 47 条组间对比 + not_estimable 清单）
+  - `outputs/week25/F55_manifest.md`（图件尺寸、输入/输出 SHA256、逐数字来源）
+  - `scripts/analyze_w25_figure_f55.py`（生成脚本，`--check` 逐像素 / 逐字节复现）
+  - `data/metadata/core_set.csv`（`tpsa` / `donor_count` / `heteroatom_count` / `n_heavy` / `mw` / `rotatable_bonds` / `donor_atoms` 标签字段）
   - `outputs/week5/c1_summary.json`、`outputs/week5/c1_coord_shifts.csv`、`outputs/week5/c1_state_identity.json`、`outputs/week5/c1_ligand_exchange.csv`
   - `outputs/figures/figure_manifest_week5_c1.md`、`outputs/figures/figure_manifest_week23_stage24.md`
   - `outputs/week23/shell3_xtb_sign_test.json`
   - `scripts/make_stage24_figure.py`
-- **状态**：PARTIAL
-- **备注**：机制**改以「态身份改变」解释**——还原时 11/12 个体系电子落在 Li⁺ 上（`c1_state_identity.json`），而非 §24 点名要求的「ΔΔG_coord 对 donor type / ESP / chelation / flexibility / functionalization tags 的关系分析」。这些 descriptor tag 在 `data/metadata/core_set.csv`（`scripts/build_metadata.py` 生成）中确有字段，但论文没有把它们与 ΔΔG_coord 建立关系图。此外 §24 标题中的 **inversion 现象本身在本项目未观测到**（f_robust_inv = 0），故无法展示 inversion 机制，只能展示配位改写与饱和；这属于「现象缺失 + 分析维度替代」，判 PARTIAL。
+- **状态**：PASS
+- **备注（限定：位移—标签维度已补全；inversion 机制在本项目未被观测，`f_robust_inv` 全 0）**：§24 点名要求的 **ΔΔG_coord 与 donor type / ESP / chelation / flexibility / functionalization tags 的关系分析**已由论文 §3.17 + 图 22（F55）补全，判定升为 PASS。口径：具 C1 条件态的 10 个分子（week5 汇总 12 motif 中取主 motif 10 个）；位移与 week5 C0→C1 冻结产物逐分子一致（delta = 0；氧化轴均值 +4.8872 eV、还原轴 −6.5782 eV）。14 条秩相关全部为 n = 10 的**精确置换**检验（10! = 3 628 800 全枚举）：氧化轴最强 `tpsa` ρ = −0.890（p = 0.0011）、`donor_count` ρ = −0.794（p = 0.0077）；**还原轴 14 条无一达 0.05**（最强 `tpsa` ρ = −0.457，p = 0.185）。组间对比仅 **3/47** 可估计（齿数、态身份、环状 vs 链状，p 均未过阈值），其余 44 条因至少一组 n < 4 记 `not_estimable`。**机制限定**：全台阶 `f_robust_inv = 0`（20 个 (台阶, 轴) 组合，`outputs/week9/stage10_ladder.json`），本项目从未观测到一次稳健翻转，故本图补的是「位移—标签」维度，**不是** inversion 机制；论文表 14 记为「位移—标签维度已补、机制结论未观测」。**统计纪律**：14 条相关未作多重比较校正（若 Bonferroni α ≈ 0.0036 则仅 `tpsa` 在界内），ESP 描述符 `not_available_in_repo`，`flexible / fluorinated / unsaturated` 三个 tag 只落在 C1 子集之外的分子（TEGDME / FEC / VC）故本子集不可检验；全部读作探索性提示，**不得称显著**。**口径歧义**：图上齿数取自 C1 主 motif 的实际 Li 接触数 `n_Li`（`c1_coord_shifts.csv:li_contacts`），`core_set.csv:donor_atoms` 给 donor 类型、`donor_count` 给杂原子总数，三者不同；DOL / SL 几何上 n_Li = 2 却未打 `chelating` tag。
+- **原 PARTIAL 理由（存档）**：机制曾改以「态身份改变」解释**——还原时 11/12 个体系电子落在 Li⁺ 上（`c1_state_identity.json`），而非 §24 点名要求的「ΔΔG_coord 对 donor type / ESP / chelation / flexibility / functionalization tags 的关系分析」。这些 descriptor tag 在 `data/metadata/core_set.csv`（`scripts/build_metadata.py` 生成）中确有字段，但论文没有把它们与 ΔΔG_coord 建立关系图。此外 §24 标题中的 **inversion 现象本身在本项目未观测到**（f_robust_inv = 0），故无法展示 inversion 机制，只能展示配位改写与饱和；这属于「现象缺失 + 分析维度替代」，判 PARTIAL。
 
 ---
 
@@ -188,7 +195,7 @@
 
 ---
 
-## 3. 论文实际图 1–21 → 核心文件 Figure 回溯（反向）
+## 3. 论文实际图 1–22 → 核心文件 Figure 回溯（反向）
 
 > 反向表保证双向可查：给定任一论文图号，可定位其对应 §24 条目；不属于 §24 七图者标「超出 §24 要求（增量）」。
 
@@ -215,10 +222,11 @@
 | 图 19 | `F51_minimal_budget_flowchart.png` | §3.14 | Figure 7 | PASS | `figure_manifest_week24_corealign.md` |
 | 图 20 | `F52_gate1_ordering.png` | §3.15 | Figure 2 | PASS | `outputs/week25/F52_manifest.md` |
 | 图 21 | `F53_family_resolved.png` | §3.16 | — | 超出 §24 要求（增量） | `outputs/week25/F53_manifest.md` |
+| 图 22 | `F55_coord_descriptor_tags.png` | §3.17 | Figure 5 | PASS | `outputs/week25/F55_manifest.md` |
 
 **反向汇总**：
 
-- 回溯源 → §24 七图：图 1,2,3（Fig1）；图 4,7,10,20（Fig2）；图 10,11（Fig3）；图 5,6（Fig4）；图 9,14（Fig5）；图 17（Fig6）；图 13,16,18,19（Fig7）。
+- 回溯源 → §24 七图：图 1,2,3（Fig1）；图 4,7,10,20（Fig2）；图 10,11（Fig3）；图 5,6（Fig4）；图 9,14,22（Fig5）；图 17（Fig6）；图 13,16,18,19（Fig7）。
 - 「超出 §24 要求（增量）」共 **4** 条：图 8（F10）、图 12（F24）、图 15（F44）、图 21（F53）。此 4 图不属 §24 七图的直接对应物，或因证据链扩张而新增（介电极限、NEB 几何盆地、逐家族统计），或作为 Figure 2 的容差支撑（裸 CPCM 扫描）。
 
 ---
@@ -227,20 +235,21 @@
 
 | 状态 | 条数 | 条目 |
 | --- | --- | --- |
-| PASS | 5 | Figure 1、Figure 2、Figure 3、Figure 6、Figure 7 |
-| PARTIAL | 2 | Figure 4、Figure 5 |
+| PASS | 6 | Figure 1、Figure 2、Figure 3、Figure 5、Figure 6、Figure 7 |
+| PARTIAL | 1 | Figure 4 |
 | MISSING | 0 | — |
 
-- 论文图 1–21 中，落入 §24 七图对应物者 17 条，标「超出 §24 要求（增量）」者 4 条（图 8、图 12、图 15、图 21）。
+- 论文图 1–22 中，落入 §24 七图对应物者 18 条，标「超出 §24 要求（增量）」者 4 条（图 8、图 12、图 15、图 21）。
 
 ---
 
-## 5. 关键缺口（Top 2）
+## 5. 关键缺口（Top 1）
 
 > 原 Top 3 的第 1 条「§24 Figure 1 缺真正的二维层级示意图」已由新图 2（`F54_two_axis_hierarchy.png`，证据 `outputs/week25/F54_manifest.md`、`scripts/make_w25_figure_f54_two_axis_hierarchy.py`）闭合，该条状态升为 PASS，不再列为缺口。
+>
+> 原第 2 条「§24 Figure 5 — descriptor 关系分析未做」已由论文 §3.17 + 图 22（`F55_coord_descriptor_tags.png`；证据 `outputs/week25/F55_manifest.md`、`outputs/week25/figure_f55_stats.{json,md}`、`scripts/analyze_w25_figure_f55.py`）闭合：ΔΔG_coord 与 donor type / chelation / flexibility / functionalization tags 的关系已建立（14 条精确置换秩相关 + 3 条可估计组间对比），Figure 5 升为 PASS；**唯一保留的限定是 inversion 机制本身在本项目未被观测**（`f_robust_inv = 0`）。
 
-1. **§24 Figure 4 / Figure 5 — robust inversion 现象在本项目未观测到，导致两图只能作语义替代**。全台阶 `f_robust_inv = 0`（20 个 (台阶, 轴) 组合，`outputs/week9/stage10_ladder.json`），因此「robust rank-flow map（只画超阈值 shift）」（Fig4）无内容可画，退化为未过滤的位次迁移（图 5/6）；「coordination-induced inversion 机制」（Fig5）退化为「配位改写 + 态身份改变」解释。这不是排版缺口，而是**核心科学现象缺失**，应在论文中显式登记为 negative result，而非仅标「语义需并读」。
-2. **§24 Figure 5 — descriptor 关系分析未做**。§24 点名要求 ΔΔG_coord 与 donor type / ESP / chelation / flexibility / functionalization tags 的关系分析，论文只给了逐分子 dIP/dEA、态身份与壳层饱和（图 9/14）；相关 tag 字段存在于 `data/metadata/core_set.csv`，但未与 ΔΔG_coord 建立关系图。属可低成本补做的分析维度（纯既有产物再聚合）。
+1. **§24 Figure 4 — robust inversion 现象在本项目未观测到，该图只能作语义替代**。全台阶 `f_robust_inv = 0`（20 个 (台阶, 轴) 组合，`outputs/week9/stage10_ladder.json`），因此「robust rank-flow map（只画超阈值 shift）」（Fig4）无内容可画，退化为未过滤的位次迁移（图 5/6）。这不是排版缺口，而是**核心科学现象缺失**，应在论文中显式登记为 negative result，而非仅标「语义需并读」。Figure 5 的 inversion 机制同受此限（图 22 补的是「位移—标签」维度，不是 inversion 机制）；论文表 14 已如实记为「位移—标签维度已补、机制结论未观测」。
 
 ---
 
