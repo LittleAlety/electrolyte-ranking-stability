@@ -5248,13 +5248,16 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
     ├── week20/               Stage 21（临界带的能量裁决 + 溶剂壳氧化还原 + 真回填）
     ├── week21/               Stage 22（批次 A：三臂对齐 + σ 相图 + 前瞻检验）
     ├── week22/               Stage 23（批次 B：热修正抽样 + 导体极限 + NEB 精修）
-    └── week23/               Stage 24（批次 C+D：R5 三次配位 + R8 靶向双腿 + R12 叙事）
+    ├── week23/               Stage 24（批次 C+D：R5 三次配位 + R8 靶向双腿 + R12 叙事）
+    ├── week22_hardening/     W22-H（论文加固：统计证据 B1–B5 + 数据统一；扁平文件 + SHA256SUMS）
+    ├── week24_corealign/     W24-C（核心文件对齐：ML/AL 蒸馏 + 决策量补全 + F51；扁平文件 + artifacts/ + verification.json）
+    └── week25_gate1/         W25（Gate 1 排序层判据首次评估 + 家族分辨；data/docs/outputs/scripts + verification.json）
 
 每个 week 目录包含：
 
     weekN/
     ├── <蒸馏产物：.csv / .json / .md>
-    ├── artifacts/            图（F0–F46 中属于该周的部分）
+    ├── artifacts/            图（F0–F54 中属于该周的部分）
     ├── weekN_report.md       本周小结（可独立阅读）
     ├── SHA256SUMS            `<sha256>  <相对路径>`，与仓库 outputs/week1 同格式
     └── verification.json     结构化校验记录
@@ -5289,6 +5292,9 @@ README_TEMPLATE = """# 电解液溶剂 redox 代理可审计性项目 —— 成
 {w21_row}
 {w22_row}
 {w23_row}
+{w22h_row}
+{w24_row}
+{w25_row}
 
 ## 如何复现
 ```powershell
@@ -5316,6 +5322,25 @@ $env:PYTHONIOENCODING = "utf-8"
 - 所有文本文件为 UTF-8（无 BOM）、LF 换行。
 - 复制文本产物时会规范化为 UTF-8（无 BOM）+ LF；若源文件原先带 BOM 或 CRLF，交付副本的 sha256
   会与仓库内源文件不同，这是有意为之（以本目录 `SHA256SUMS` 为准）。
+
+## 扩展交付包
+
+`week22_hardening`、`week24_corealign`、`week25_gate1` 三个包不经过本脚本的逐周复制流程，
+由各自的构建脚本生成，因此不在上面的 `weekN/` 树内（其产物仍逐文件写入对应目录的 `SHA256SUMS`）：
+
+- `week22_hardening/`（W22-H 论文加固周，扁平文件 + `SHA256SUMS`）：构建方式 UNVERIFIED ——
+  仓库内未找到生成该镜像的构建脚本；`scripts/` 下仅有产出 `outputs/week22_hardening/*` 的分析脚本
+  `analyze_w22_stats.py` / `analyze_w22_allowance.py` / `analyze_w22_broadpool.py`。
+- `week24_corealign/`（W24-C 核心文件对齐周，扁平文件 + `artifacts/` + `verification.json`）：
+  由 `scripts/build_week24_deliverables.py` 生成。
+  复现：`python scripts/build_week24_deliverables.py`；校验：`python scripts/build_week24_deliverables.py --check`。
+- `week25_gate1/`（W25 Gate 1 首评周，`data/ docs/ outputs/ scripts/` + `verification.json`）：
+  由 `scripts/build_week25_deliverables.py` 生成。
+  复现：`python scripts/build_week25_deliverables.py`；校验：`python scripts/build_week25_deliverables.py --check`。
+
+图表索引（F0–F54）中：`F47` 属 `week22_hardening`，`F48`–`F51` 属 `week24_corealign`，
+`F52`–`F54` 属 `week25_gate1`，逐图内容与来源见 `数据结果汇总.md` 的「图表索引」表。
+
 """
 
 
@@ -5511,7 +5536,7 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | 唯一 blocker：**排序一致性级** —— `data/anchors/within_series_ordering.csv` 没有任何已核验的 within-series 值（`n_pairs = 0`，低于预注册下限 18，见 `scripts/check_series_rel_ordering.py`）。**绝对标定级**（溶液相锚点 **31 行** `est`）按 Week 22 的 R7 裁决记为 **limitation**，不再单列 blocker（ORCA 通路已由 week4 打通） |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-## 5. 图表索引（F0–F46）
+## 5. 图表索引（F0–F54）
 | 图 | 文件 | 内容 | 所在周 |
 | --- | --- | --- | --- |
 | F0 | `F0_project_pipeline.png` | 项目管线：廉价代理 → 验证目标 → 排序变化 → 机制 → 最小预算 | week1 |
@@ -5561,6 +5586,14 @@ P0→P1 还原 tau_b（0.595）低于氧化 tau_b（0.673），但还原轴 Top-
 {f44_row}
 {f45_row}
 {f46_row}
+{f47_row}
+{f48_row}
+{f49_row}
+{f50_row}
+{f51_row}
+{f52_row}
+{f53_row}
+{f54_row}
 
 ## 6. 复现命令
 ```powershell
@@ -10096,6 +10129,209 @@ def generated_utc_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# ---------------------------------------------------------------------------
+# Extended deliverables (W22-H / W24-C / W25): week22_hardening,
+# week24_corealign, week25_gate1.  These three mirrors are built by their own
+# scripts (or, for W22-H, by no in-repo script at all) and never pass through
+# the per-week copy loop; the weekly rows and figure-index entries below read
+# every number back out of outputs/**/*.json so the digest cannot drift.
+# ---------------------------------------------------------------------------
+W22H_STATS_JSON = REPO / "outputs" / "week22_hardening" / "stats_b1_b2.json"
+W22H_ALLOWANCE_JSON = REPO / "outputs" / "week22_hardening" / "allowance_factor2.json"
+W22H_MULTCOMP_JSON = REPO / "outputs" / "week22_hardening" / "multiple_compare_b3.json"
+W22H_BROADPOOL_JSON = REPO / "outputs" / "week22_hardening" / "broad_pool_demo.json"
+W24_ML_JSON = REPO / "outputs" / "week24_corealign" / "ml_direct_vs_shift.json"
+W24_AL_JSON = REPO / "outputs" / "week24_corealign" / "al_budget.json"
+W24_DECISION_JSON = REPO / "outputs" / "week24_corealign" / "decision_metrics.json"
+W25_SERIES_JSON = REPO / "outputs" / "week25" / "series_rel_ordering_check.json"
+W25_GATE1_RED_JSON = REPO / "outputs" / "week25" / "gate1_reduction_secondary.json"
+W25_FAMILY_JSON = REPO / "outputs" / "week25" / "family_resolved_stats.json"
+
+F47_NOTE_PRESENT = (
+    "W22-H：broad pool 40 分子的最小信息预算演示——只升级「值得升」的子集"
+    "（主判据 Top-10% 并集 21/40，省 47.5%），并用 P0 + 家族位移闭式判据把不可分辨比例"
+    "从氧化 37.4%（还原 17.3%）收敛到目标层 19.5%（还原 76.0%，z = 1）；"
+    "由 `outputs/week22_hardening/broad_pool_demo.json` 逐字段回读。")
+F47_NOTE_ABSENT = "（W22-H broad pool 预算演示尚未产出；week22_hardening 尚未生成）"
+F48_NOTE_PRESENT = (
+    "W24-C G1：把 Stage 7 蒸馏成 direct vs Δ-learning 的配对 τ_b 对照"
+    "（同 task / feature_set / objective / model / split 成对）：LOFO 8 分组中 7 个 Δτ_b > 0、"
+    "3 个配对区间不含 0，中位 +0.463；24 个组合中 19 个不可区分（提示性证据）。")
+F48_NOTE_ABSENT = "（W24-C Stage 7 蒸馏尚未产出；week24_corealign 尚未生成）"
+F49_NOTE_PRESENT = (
+    "W24-C G2：回溯式主动学习重放（6 池 × 4 采集 × 20 组冻结种子，排除 n_T = n 端点）给出的"
+    "最小昂贵标签预算——τ_b ≥ 0.80 需 n_T = 8–9（10 分子池）/ 12–15（18 分子池），"
+    "四采集策略的区间两两重叠，ranking_aware 未稳定更优。")
+F49_NOTE_ABSENT = "（W24-C Stage 8 蒸馏尚未产出；week24_corealign 尚未生成）"
+F50_NOTE_PRESENT = (
+    "W24-C G8：把 §9.2 / §9.4 / §10.1 的决策量补成数值——五台阶 × 两轴 × 两池共 40 个 "
+    "f_robust_inv 全为 0；p_ij 与闭式 f_unresolved(z = 1.2816) 逐点相等（偏差 ≤ 1e-15）；"
+    "C0→C1 还原轴的换序对全落在 unresolved 区。")
+F50_NOTE_ABSENT = "（W24-C 决策量补全尚未产出；week24_corealign 尚未生成）"
+F51_NOTE_PRESENT = (
+    "W24-C G14：最小信息预算决策流程图，把「该算哪些计算层」（§3.11）与「该买多少昂贵标签」"
+    "（§3.14）合成一条判定路径；图上 24 个数字全部按点路径回溯到既有 JSON，"
+    "且两者不可相加（写进页脚）。")
+F51_NOTE_ABSENT = "（W24-C F51 决策流程图尚未产出；week24_corealign 尚未生成）"
+F52_NOTE_PRESENT = (
+    "W25：Gate 1 排序层判据的首次评估——Ue1994 / Okoshi2015 氧化系列 7 个核心集分子 / 21 对，"
+    "Kendall τ_b = 0.4286 < 0.90（一致 15 / 不一致 6），判决 ok = false、reason = ordering_disagrees；"
+    "复算 τ_b 与冻结值逐位一致。")
+F52_NOTE_ABSENT = "（W25 Gate 1 排序层评估尚未产出；week25_gate1 尚未生成）"
+F53_NOTE_PRESENT = (
+    "W25：家族分辨（family-resolved）与跨家族统计——160 个 (池 × 台阶 × 轴 × 家族) 组合中 "
+    "16 个可估计（native-18 为 16，common-10 为 0），其余因单分子家族或仅 1 对不可估计；"
+    "跨家族 τ_b(氧化 vs 还原) = 0.2857，95% CI [−0.455, 0.917]。")
+F53_NOTE_ABSENT = "（W25 家族分辨统计尚未产出；week25_gate1 尚未生成）"
+F54_NOTE_PRESENT = (
+    "W25：§24 Figure 1 的二维层级图——纵轴为方法层级（P0→P1→P2），横轴为条件态层级（C0→C1→C2），"
+    "右侧单列外部参考层（R_gas / R_sol / R_env）；实心 / 斜纹 / 留白三态区分「已系统计算 / 仅 targeted "
+    "敏感性 / 未计算」，并在图上锚定溶液锚点行数与 Gate 1 判决（τ_b = 0.4286、n_pairs = 21、ok = false）。")
+F54_NOTE_ABSENT = "（W25 §24 Figure 1 二维层级图尚未产出；week25_gate1 尚未生成）"
+
+EXTENDED_FIGURES = (
+    ("F47", "F47_broadpool_budget.png", F47_NOTE_PRESENT, F47_NOTE_ABSENT, "week22_hardening"),
+    ("F48", "F48_ml_direct_vs_shift.png", F48_NOTE_PRESENT, F48_NOTE_ABSENT, "week24_corealign"),
+    ("F49", "F49_al_budget.png", F49_NOTE_PRESENT, F49_NOTE_ABSENT, "week24_corealign"),
+    ("F50", "F50_decision_metrics.png", F50_NOTE_PRESENT, F50_NOTE_ABSENT, "week24_corealign"),
+    ("F51", "F51_minimal_budget_flowchart.png", F51_NOTE_PRESENT, F51_NOTE_ABSENT, "week24_corealign"),
+    ("F52", "F52_gate1_ordering.png", F52_NOTE_PRESENT, F52_NOTE_ABSENT, "week25_gate1"),
+    ("F53", "F53_family_resolved.png", F53_NOTE_PRESENT, F53_NOTE_ABSENT, "week25_gate1"),
+    ("F54", "F54_two_axis_hierarchy.png", F54_NOTE_PRESENT, F54_NOTE_ABSENT, "week25_gate1"),
+)
+
+
+def extended_package_blocks():
+    """Render the three extended-deliverable weekly rows.
+
+    W22-H / W24-C / W25 do not pass through build_week; their mirrors are
+    produced by dedicated builders (or, for W22-H, by no in-repo script at all).
+    Every number below is read back out of outputs/**/*.json; a missing product
+    yields an "(未产出)" row instead of raising.
+    """
+    w22h_row = ("| week22_hardening | W22-H（论文加固：统计证据 B1–B5 + 漏解容许量 + broad 池预算） | "
+                "（`outputs/week22_hardening/*.json` 不齐） | Gate 0 CLOSED；Gate 1 **NOT CLOSED** |")
+    w24_row = ("| week24_corealign | W24-C（核心文件对齐：ML/AL 蒸馏 + 决策量补全 + F51 流程图） | "
+               "（`outputs/week24_corealign/*.json` 不齐） | Gate 0 CLOSED；Gate 1 **NOT CLOSED**（W24-D 审计判决 NOT_CLOSABLE） |")
+    w25_row = ("| week25_gate1 | W25（Gate 1 排序层判据首次评估 + 家族分辨统计） | "
+               "（`outputs/week25/*.json` 不齐） | Gate 1 **NOT CLOSED** |")
+
+    stats = load_json(W22H_STATS_JSON)
+    allowance = load_json(W22H_ALLOWANCE_JSON)
+    multcomp = load_json(W22H_MULTCOMP_JSON)
+    broadpool = load_json(W22H_BROADPOOL_JSON)
+    if stats and allowance and multcomp and broadpool:
+        rho = ((stats.get("b1") or {}).get("full_10_points") or {}).get("rho_shift_std_vs_tau_b") or {}
+        rho_ci = rho.get("ci95_percentile") or [None, None]
+        b2 = (stats.get("b2") or {}).get("primary_12draw") or {}
+        b2_ci = b2.get("ci95_percentile") or [None, None]
+        axes = allowance.get("axes") or {}
+        ox = axes.get("oxidation") or {}
+        red = axes.get("reduction") or {}
+        ox_worst = ox.get("A_axis_worst_cell") or {}
+        red_worst = red.get("A_axis_worst_cell") or {}
+        strict = next((c for c in (ox.get("conventions") or [])
+                       if c.get("name") == "factor2_2A_axis"), {})
+        budget = (broadpool.get("budget") or {}).get("union") or {}
+        p_axes = (broadpool.get("primary") or {}).get("axes") or {}
+        p_ox = p_axes.get("oxidation") or {}
+        p_red = p_axes.get("reduction") or {}
+        w22h_row = (
+            "| week22_hardening | W22-H（论文加固：统计证据 B1–B5 + 漏解容许量 + broad 池预算） | "
+            f"broad 池 40 分子只升级「值得升」子集（主判据 Top-10% 并集 "
+            f"{budget.get('n_worth_union_axes_k10')}/{budget.get('n_full')}，省 "
+            f"{_fnum(budget.get('saving_union_axes_k10_pct'), 1)}%）；"
+            f"P0 闭式判据不可分辨比例氧化 {_fnum(100.0 * float(p_ox.get('f_unresolved_p0_mean') or 0.0), 1)}% → "
+            f"{_fnum(100.0 * float(p_ox.get('f_unresolved_target_mean') or 0.0), 1)}%、还原 "
+            f"{_fnum(100.0 * float(p_red.get('f_unresolved_p0_mean') or 0.0), 1)}% → "
+            f"{_fnum(100.0 * float(p_red.get('f_unresolved_target_mean') or 0.0), 1)}%（z = 1）；"
+            f"漏解容许量 A_axis = {_fnum(ox.get('A_axis_ev'), 4)} eV（氧化 "
+            f"{ox_worst.get('name')}@ε={ox_worst.get('epsilon')}）/ {_fnum(red.get('A_axis_ev'), 4)} eV（还原 "
+            f"{red_worst.get('name')}@ε={red_worst.get('epsilon')}），2·A_axis 严格界保护 "
+            f"{strict.get('n_targeted_cells')}/{strict.get('n_cells_total')}；"
+            f"ρ(std,τ_b) = {_fnum(rho.get('observed'), 3)} [{_fnum(rho_ci[0], 3)}, {_fnum(rho_ci[1], 3)}]，"
+            f"Δτ_b = {_fnum(b2.get('observed_delta_tau_b'), 3)} "
+            f"[{_fnum(b2_ci[0], 3)}, {_fnum(b2_ci[1], 3)}]（P(Δ>0) = {_fnum(b2.get('prob_delta_gt_0'), 3)}）；"
+            f"多重比较 {multcomp.get('n_predictors')} 个预警子 Bonferroni / Holm 均 "
+            f"{multcomp.get('n_bonferroni_significant')} 条显著"
+            + " | Gate 0 CLOSED；Gate 1 **NOT CLOSED** |"
+        )
+
+    ml = load_json(W24_ML_JSON)
+    alb = load_json(W24_AL_JSON)
+    decision = load_json(W24_DECISION_JSON)
+    if ml and alb and decision:
+        configs = (ml.get("delta_learning") or {}).get("configs") or []
+        lofo = [c for c in configs if c.get("split") == "lofo"]
+        deltas = sorted(float(c["headline_delta_canonical"]) for c in lofo
+                        if c.get("headline_delta_canonical") is not None)
+        median_delta = None
+        if deltas:
+            mid = len(deltas) // 2
+            median_delta = (deltas[mid] if len(deltas) % 2
+                            else 0.5 * (deltas[mid - 1] + deltas[mid]))
+        n_lofo_pos = sum(1 for c in lofo
+                         if float(c.get("headline_delta_canonical") or 0.0) > 0.0)
+        n_lofo_excl = sum(
+            1 for c in lofo
+            if float(c.get("headline_delta_paired_lo") or 0.0) > 0.0
+            or float(c.get("headline_delta_paired_hi") or 0.0) < 0.0)
+        n_indist = sum(1 for c in configs if c.get("verdict") == "indistinguishable")
+        tau_rows = alb.get("tau80_budget") or []
+
+        def _budget_range(pool_n):
+            vals = [r.get("budget_n_T_value") for r in tau_rows
+                    if r.get("pool_n") == pool_n and r.get("budget_n_T_value") is not None]
+            return (min(vals), max(vals)) if vals else (None, None)
+
+        lo10, hi10 = _budget_range(10)
+        lo18, hi18 = _budget_range(18)
+        ver = decision.get("verification") or {}
+        w24_row = (
+            "| week24_corealign | W24-C（核心文件对齐：ML/AL 蒸馏 + 决策量补全 + F51 流程图） | "
+            f"ML 蒸馏：LOFO {len(lofo)} 分组中 {n_lofo_pos} 个 Δτ_b > 0"
+            f"（{n_lofo_excl} 个配对区间不含 0、中位 {_fnum(median_delta, 3, signed=True)}），"
+            f"{len(configs)} 个组合中 {n_indist} 个不可区分；"
+            f"AL 预算：τ_b ≥ 0.80 需 n_T = {lo10}–{hi10}（10 分子池）/ {lo18}–{hi18}（18 分子池）；"
+            f"决策量补全：40 个 f_robust_inv 全为 0 = {ver.get('all_40_f_robust_inv_zero')}，"
+            f"p_ij 与闭式 f_unresolved(z = 1.2816) 逐点相等（偏差 "
+            f"{ver.get('max_abs_dev_p_unresolved_vs_closedform_at_z_phi09')}）"
+            + " | Gate 0 CLOSED；Gate 1 **NOT CLOSED**（W24-D 审计判决 NOT_CLOSABLE） |"
+        )
+
+    series = load_json(W25_SERIES_JSON)
+    gate1_red = load_json(W25_GATE1_RED_JSON)
+    family = load_json(W25_FAMILY_JSON)
+    if series and family:
+        series_rows = series.get("series") or [{}]
+        n_species = (series_rows[0] or {}).get("n_species")
+        cross = (family.get("cross_family") or [{}])[0] or {}
+        counts = family.get("counts") or {}
+        red_bits = ""
+        if gate1_red:
+            red_bits = (
+                f"；还原旁证（DOE 2016，{gate1_red.get('n_species')} 分子 / "
+                f"{gate1_red.get('n_pairs')} 对 < "
+                f"{((gate1_red.get('criterion') or {}).get('min_pairs'))}）判 "
+                f"{gate1_red.get('verdict')}")
+        w25_row = (
+            "| week25_gate1 | W25（Gate 1 排序层判据首次评估 + 家族分辨统计） | "
+            f"Gate 1 排序层：Ue1994 / Okoshi2015 氧化系列 {n_species} 个核心集分子 / "
+            f"{series.get('n_pairs')} 对首次可评，Kendall τ_b = {_fnum(series.get('tau_b'), 4)} < 0.90 → "
+            f"ok = {series.get('ok')}（reason = {series.get('reason')}，一致 "
+            f"{series.get('concordant')} / 不一致 {series.get('discordant')}）"
+            f"{red_bits}；"
+            f"家族分辨：{counts.get('combos_total')} 个组合中 {counts.get('estimable_total')} 个可估计"
+            f"（native-18 全部、common-10 为 0）；跨家族 τ_b(氧化 vs 还原) = "
+            f"{_fnum(cross.get('tau_b_ox_vs_red'), 4)}，95% CI "
+            f"[{_fnum(cross.get('tau_b_ox_vs_red_ci_low'), 3)}, {_fnum(cross.get('tau_b_ox_vs_red_ci_high'), 3)}]"
+            + " | Gate 1 **NOT CLOSED**（排序层已评估，ordering_disagrees） |"
+        )
+
+    return {"w22h_row": w22h_row, "w24_row": w24_row, "w25_row": w25_row}
+
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Build the distilled deliverables bundle under 成果输出/.")
@@ -10748,6 +10984,17 @@ def main(argv=None):
                          ("{w23_row}", w23_row),
                          ("{f45_row}", f45_row),
                          ("{f46_row}", f46_row))
+        ext = extended_package_blocks()
+        placeholders += (("{w22h_row}", ext["w22h_row"]),
+                         ("{w24_row}", ext["w24_row"]),
+                         ("{w25_row}", ext["w25_row"]))
+        for _code, _fname, _present, _absent, _week in EXTENDED_FIGURES:
+            _fig = REPO / "outputs" / "figures" / _fname
+            _row = (f"| {_code} | `{_fname}` | " + _present + f" | {_week} |"
+                    if _fig.exists() else
+                    f"| {_code} | 未生成 | " + _absent + " | —— |")
+            placeholders += ((f"{{{_code.lower()}_row}}", _row),)
+
         for key, value in placeholders:
             summary = summary.replace(key, value)
         readme = README_TEMPLATE

@@ -38,6 +38,8 @@ SCRIPT_FILES = [
     "scripts/build_core_set_metadata_ext.py",
     "scripts/analyze_family_resolved.py",
     "scripts/analyze_w25_figure_f53.py",
+    "scripts/make_w25_figure_f54_two_axis_hierarchy.py",
+    "scripts/build_compute_budget_ledger.py",
 ]
 METADATA_FILES = [
     "data/metadata/core_set_metadata_ext.csv",
@@ -51,16 +53,18 @@ ANCHOR_FILES = [
 RECEIVED_REL = "data/anchors/_received/Gate1_solution_anchor_potentials_2026-10-02.csv"
 RECEIVED_REV2_REL = "data/anchors/_received/Gate1_solution_anchor_potentials_2026-10-02_rev2.csv"
 WEEK25_OUTPUT_DIR = "outputs/week25"
-WEEK25_OUTPUT_SUFFIXES = (".json", ".md")
+WEEK25_OUTPUT_SUFFIXES = (".json", ".md", ".csv")
 FIGURE_FILES = [
     "outputs/figures/F52_gate1_ordering.png",
     "outputs/figures/F53_family_resolved.png",
+    "outputs/figures/F54_two_axis_hierarchy.png",
 ]
 DOC_FILES = [
     "docs/39_week25_gate1_plan.md",
     "docs/40_week25_gate1_report.md",
     "docs/42_w25_core_set_metadata_mapping.md",
     "docs/43_week25_corefile_figure_alignment.md",
+    "docs/44_week25_compute_budget_ledger.md",
 ]
 
 # --- 断言常量 --------------------------------------------------------------
