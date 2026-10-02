@@ -54,7 +54,15 @@ GAS_SOURCE_TYPE = {
 GAS_VALUE_OPTIONAL = {"unbound_anion", "not_curated"}
 
 SOLUTION_PROPERTY = {"oxidation_potential", "reduction_potential"}
-SOLUTION_METHOD = {"exp", "calc", "est"}
+#: ``est``            -- a literature-informed estimate with no verified source of
+#:                      *this* value; the DOI column must stay empty.
+#: ``series_rel``     -- a within-series relative anchor: the number is only
+#:                      comparable to the other rows of the same source series, so
+#:                      the DOI must name that series (R7, ``docs/31``).
+#: ``verified_abs``   -- an absolute value traced to a primary source whose
+#:                      conditions match this row; DOI required.
+SOLUTION_METHOD = {"exp", "calc", "est", "series_rel", "verified_abs"}
+SOURCE_BACKED_SOLUTION_METHODS = {"series_rel", "verified_abs"}
 SOLUTION_ELECTRODE = {"Li/Li+", "Fc/Fc+", "SCE", "Ag/Ag+"}
 
 POTENTIAL_WINDOW = {
@@ -259,6 +267,9 @@ def validate_solution(report):
         if method == "est" and doi != "":
             report.error(where, "method='est' rows must leave doi empty "
                                 "(doi means 'the source of THIS value')")
+        if method in SOURCE_BACKED_SOLUTION_METHODS and doi == "":
+            report.error(where, "method=%r rows must carry the DOI of the source "
+                                "they were read from" % method)
 
         seen[(row.get("species", ""), prop, electrode, row.get("solvent", ""))] += 1
     for key, count in seen.items():
@@ -295,6 +306,8 @@ def summarize_solution(report):
     print("  reference electrode  : %s" % dict(Counter(r["reference_electrode"] for r in rows)))
     print("  curated-literature   : %d" % sum(1 for r in rows if r.get("method") in {"exp", "calc"}))
     print("  estimated (est)      : %d" % sum(1 for r in rows if r.get("method") == "est"))
+    print("  within-series (rel)  : %d" % sum(1 for r in rows if r.get("method") == "series_rel"))
+    print("  verified absolute    : %d" % sum(1 for r in rows if r.get("method") == "verified_abs"))
     print("  rows with a DOI      : %d" % sum(1 for r in rows if r.get("doi", "")))
 
 
