@@ -13,7 +13,7 @@
 | C3 | INFO | scripts reaching outside the repository | 6 script(s) reference the out-of-repo delivery layer (the auditor itself is excluded by construction); none of them is a verification entry point. analyze_w24_alignment.py; analyze_w24_audit.py; analyze_w24_decision.py; build_compute_budget_ledger.py; build_week25_deliverables.py; scan_stage15_anchor_literature.py |
 | C4 | PASS | tests never reach outside the repository | 0 references |
 | C5 | INFO | external binaries are optional for verification | no verification entry point needs ORCA or xTB; they are required only for NEW electronic structure. Their presence is printed to stdout, not written into this report, so the report stays machine-independent and --check works in a clean clone. |
-| C6 | PASS | frozen manifests recompute | 7458/7458 rows match; broken: none |
+| C6 | PASS | frozen manifests recompute | 7480/7480 rows match; broken: none |
 | C7 | PASS | close-out documents match the products | README Scope + NOT CLOSABLE present; FINAL_CONCLUSIONS.md answers 10 questions |
 
 ## 冻结清单复算
@@ -22,7 +22,7 @@
 | --- | --- | --- | --- | --- |
 | `outputs/week1/SHA256SUMS` | 6 | 6 | 0 | 0 |
 | `outputs/week2/SHA256SUMS` | 30 | 30 | 0 | 0 |
-| `outputs/week3/SHA256SUMS` | 7422 | 7422 | 0 | 0 |
+| `outputs/week3/SHA256SUMS` | 7444 | 7444 | 0 | 0 |
 
 ## 仓库外依赖（非验证路径）
 

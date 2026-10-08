@@ -100,6 +100,8 @@ FIGURES = [
     ("F54", "F54_two_axis_hierarchy.png", 25, "二维模型层级（方法层级 x 条件态层级）+ 外部参考层（核心文件 §24 Figure 1）（W25）"),
     ("F55", "F55_coord_descriptor_tags.png", 25, "配位位移 x 描述符标签关联（核心文件 §24 Figure 5）：C1 n = 10，氧化轴 tpsa rho = -0.890（p = 0.0011）（W25）"),
     ("F56", "F56_r13_summary.png", 26, "R14 收口汇总：三态判据/分辨率曲线/Gate 1 双轨 NOT CLOSABLE/防误读卡片（R13 阶段）"),
+    ("F57", "F57_metric_robustness.png", 27, "R15 指标稳健性与排序可识别性：(a) 每个 block 的排序一致性政策带（pessimistic → optimistic），蓝点为 tie 政策；(b) f_tie = 证据无法解析的 pair 占比（= 政策带宽度的一半）；(c) 可分层层数：cheap 自排序 / target 自排序 / 双方认证，竖线为分子数 n；(d) 近临界 pair 数（比值 ∈ [1, 1.25)），认证了但极易翻转"),
+    ("F58", "F58_layer_independence.png", 27, "R15 模型层独立性与信息增益：(a) 每级位移的 dispersion（氧化/还原），标注该层 ORCA job 数；(b) 5 个 rung 两两之间位移向量的 max |Pearson|（同分子集上现算）；(c) 每级的 Kendall tau_b（红虚线 = 0.90 排序门槛）与最大 f_unresolved；(d) 结论卡片：层不是同一信号的再编码、阶梯是分解、T3 常数位移免费"),
 ]
 
 # ---------------------------------------------------------------- week table
@@ -313,7 +315,7 @@ def counts():
         # Recorded, not measured: pytest cannot be run from the generator.  Bump
         # it in the same commit that adds or removes a test, otherwise the page
         # will advertise a number the suite no longer produces.
-        "tests_passed": 1234,
+        "tests_passed": 1248,
     }
 
 

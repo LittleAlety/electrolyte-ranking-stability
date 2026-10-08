@@ -27,6 +27,24 @@ Gate 1 有两层：
 
 机器可读形式：`outputs/gate1/gate1_dual_track.json` 的`gate1_closability = "NOT CLOSABLE"` 与 `track_B.components.closability`（含预注册条件、证据、结论）。
 
+## 1c. 措辞边界：NOT CLOSABLE ≠ 世上不存在这类数据
+
+**这个负结果是可被证伪的**，而不是一条不可动摇的断言。它只声称：
+
+> 在预注册的发现 / 验证标准（同装置 · 同判据 · 同态 · ≥7 个核心集分子的同源序列）下，**未定位到**足以关闭排序层的外部数据。
+
+它**不**声称这类数据在世界上不存在。absence of evidence 不等于 evidence of absence：
+
+```text
+NOT CLOSABLE
+≠  NO SUCH DATA EXIST ANYWHERE
+=
+NO SUFFICIENTLY VERIFIED DATA WERE LOCATED
+UNDER THE PRE-REGISTERED DISCOVERY / VALIDATION CRITERIA
+```
+
+若日后出现满足全部预注册条件的同源序列，本判定应被该数据直接推翻。机器可读形式为 `track_B.components.closability.scope_caveat` / `scope_caveat_en`（`outputs/gate1/gate1_dual_track.json`）。
+
 ## 2. 决定：不修数据，改叙事
 
 外部评审给出的关键判断是：

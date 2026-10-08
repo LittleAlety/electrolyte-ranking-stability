@@ -3,11 +3,11 @@ window.HB = {
  "repo": "https://github.com/LittleAlety/electrolyte-ranking-stability",
  "counts": {
   "weeks": 25,
-  "figures": 57,
+  "figures": 59,
   "orca_out": 1535,
-  "scripts": 141,
-  "test_files": 63,
-  "tests_passed": 1234
+  "scripts": 146,
+  "test_files": 64,
+  "tests_passed": 1248
  },
  "pipeline": [
   {
@@ -1184,6 +1184,26 @@ window.HB = {
    "bytes": 214639,
    "w": 1260,
    "h": 1400
+  },
+  {
+   "id": "F57",
+   "file": "F57_metric_robustness.png",
+   "week": 27,
+   "caption": "R15 指标稳健性与排序可识别性：(a) 每个 block 的排序一致性政策带（pessimistic → optimistic），蓝点为 tie 政策；(b) f_tie = 证据无法解析的 pair 占比（= 政策带宽度的一半）；(c) 可分层层数：cheap 自排序 / target 自排序 / 双方认证，竖线为分子数 n；(d) 近临界 pair 数（比值 ∈ [1, 1.25)），认证了但极易翻转",
+   "sha": "d2dcc79f9813eca908fcd73f9d0c9aa849e75bde7c41e8a0c541bcdde1efa7ed",
+   "bytes": 126880,
+   "w": 1260,
+   "h": 1400
+  },
+  {
+   "id": "F58",
+   "file": "F58_layer_independence.png",
+   "week": 27,
+   "caption": "R15 模型层独立性与信息增益：(a) 每级位移的 dispersion（氧化/还原），标注该层 ORCA job 数；(b) 5 个 rung 两两之间位移向量的 max |Pearson|（同分子集上现算）；(c) 每级的 Kendall tau_b（红虚线 = 0.90 排序门槛）与最大 f_unresolved；(d) 结论卡片：层不是同一信号的再编码、阶梯是分解、T3 常数位移免费",
+   "sha": "4c255a190f7135aa3a5fa44ac30db56724a16767597325757b5d3c68441e8fce",
+   "bytes": 160489,
+   "w": 1263,
+   "h": 1285
   }
  ]
 };

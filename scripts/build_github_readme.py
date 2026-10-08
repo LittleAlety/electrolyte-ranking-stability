@@ -543,7 +543,7 @@ TAIL = [
     "- **broad 40 vs 建议 300–1000**：v2 建议 broad pool ≈ 300–1000，实际 **40**；broad 池只到 P0 廉价层。",
     "- **未做 RS-hybrid**：v2 把 range-separated hybrid（如 ωB97X-D4 一类）列为生产候选，本项目未运行该类方法；全部能量为单参考 r2SCAN-3c 或 GFN2-xTB。",
     "- **`f_robust_inv` 全 0 是负结果**：Stage 10 的 20 个 (台阶, 轴) 组合、Week 24 的 40 个数值（2 z × 2 population × 10 点）全部为 **0**；这是「不可判定主导」而非「处处稳定」（同一批数据 `f_unresolved` 最高 **0.800**），不得读成稳健性证据。",
-    "- **Gate 1 未闭合**：排序层 `ordering_disagrees`（τ_b = 0.4286 < 0.90，n_pairs = 21）、绝对标定层 limitation；溶液相锚点 31 行仍为 `est`；定性为 **NOT CLOSABLE**（`docs/gate1_negative_result.md`、`outputs/gate1/gate1_dual_track.md`）。",
+    "- **Gate 1 未闭合**：排序层 `ordering_disagrees`（τ_b = 0.4286 < 0.90，n_pairs = 21）、绝对标定层 limitation；溶液相锚点 31 行仍为 `est`；定性为 **NOT CLOSABLE**（`docs/gate1_negative_result.md`、`outputs/gate1/gate1_dual_track.md`）。措辞边界：**NOT CLOSABLE ≠ NO SUCH DATA EXIST ANYWHERE**（不做 absence-of-evidence → evidence-of-absence 的推论），只表示在预注册的检索 / 验证标准下未定位到够格的同源序列；若日后出现满足全部条件的同源序列，该判定可被证伪。",
     "- **还原侧定性失效**：P1 气相阴离子 18/18 全部不束缚，Koopmans 还原代理与真实 EA 不是同一物理量；还原轴结论只以 P2 / C1 为载体。",
     "- **基组无弥散**：r2SCAN-3c 的 def2-mTZVPP 不含弥散函数，不能裁断 0.01 eV 量级的阴离子束缚与否（T5）；氧化侧不受此限制。",
     "- **单构象 + G1 / G2 两级几何**：主结果建立在 GFN2-xTB 单构象几何 G1 上，未做全局构象搜索；G2 台阶仅在 12 分子审计子集。",

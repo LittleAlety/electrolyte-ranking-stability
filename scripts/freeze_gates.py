@@ -394,6 +394,19 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "docs/47_*.md",
     "docs/48_*.md",
     "outputs/week26/**/*",
+    # R15 (Week 27 / 2026-10-08): the round-3 adversarial scientific audit --
+    # estimator circularity (A), metric robustness / rank identifiability (B),
+    # selection / multiplicity (C), layer independence / information gain (D),
+    # Gate-1 scope caveat (E) and claim scope (F), with the F57 / F58 figures.
+    "src/electrolyte_ranking/robustness.py",
+    "scripts/audit_estimator_circularity.py",
+    "scripts/audit_metric_robustness.py",
+    "scripts/audit_selection_multiplicity.py",
+    "scripts/audit_layer_independence.py",
+    "scripts/audit_claim_scope.py",
+    "tests/test_round3_adversarial_audit.py",
+    "docs/49_*.md",
+    "outputs/week27/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large

@@ -66,6 +66,25 @@ CLOSABILITY_DETAIL = (
     "删分子 / 换模型列 / 放宽容差”的救活路径。"
 )
 
+#: Anti-misread guard for the negative result (R15, round-3 review item E).
+#: ``NOT CLOSABLE`` is a statement about the *discovery / validation criteria*,
+#: not about the world: it must not be read as "no such data exist anywhere".
+CLOSABILITY_SCOPE = (
+    "措辞边界（防止把 absence of evidence 读成 evidence of absence）："
+    "本判定只声称，在预注册的发现 / 验证标准"
+    "（同装置 · 同判据 · 同态 · ≥7 个核心集分子的同源序列）下，"
+    "**未定位到**足以关闭排序层的外部数据；"
+    "它不声称这类数据在世界上不存在"
+    "（NOT CLOSABLE ≠ NO SUCH DATA EXIST ANYWHERE）。"
+    "若日后出现满足全部预注册条件的同源序列，"
+    "本判定应被该数据推翻——这是可被证伪的负结果，而不是不可动摇的断言。"
+)
+CLOSABILITY_SCOPE_EN = (
+    "NOT CLOSABLE != NO SUCH DATA EXIST ANYWHERE: no sufficiently verified data "
+    "were located under the pre-registered discovery / validation criteria; a "
+    "future series meeting every criterion would falsify this verdict."
+)
+
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Assemble the R13 Gate-1 dual-track record.")
@@ -171,6 +190,8 @@ def build() -> dict:
             "verdict": "NOT CLOSABLE",
             "statement": CLOSABILITY_STATEMENT,
             "detail": CLOSABILITY_DETAIL,
+            "scope_caveat": CLOSABILITY_SCOPE,
+            "scope_caveat_en": CLOSABILITY_SCOPE_EN,
             "prereg_requirement": {
                 "min_species_covering_core_set": min_species_needed,
                 "min_pairs": criterion.get("min_pairs"),
@@ -342,6 +363,8 @@ def write_doc(path: Path, report: dict) -> None:
         "> " + cl["statement"],
         "",
         cl["detail"],
+        "",
+        "**措辞边界**：" + cl["scope_caveat"],
         "",
         "| 预注册关闭条件 | 要求 | 现状 |",
         "| --- | --- | --- |",
