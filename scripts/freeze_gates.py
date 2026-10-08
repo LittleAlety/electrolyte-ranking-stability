@@ -383,6 +383,17 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "scripts/gate1_dual_track_report.py",
     "tests/test_gate1_dual_track.py",
     "outputs/gate1/**/*",
+    # R14 (Week 26 / 2026-10-08): the round-2 external-review close-out -- the
+    # Gate 1 NOT CLOSABLE statement, the FINAL_CONCLUSIONS question matrix, the
+    # F56 three-state summary figure and the clean-room reproduction audit.
+    "scripts/build_final_conclusions.py",
+    "scripts/analyze_r13_summary_figure.py",
+    "scripts/audit_clean_room.py",
+    "tests/test_round2_closeout.py",
+    "FINAL_CONCLUSIONS.md",
+    "docs/47_*.md",
+    "docs/48_*.md",
+    "outputs/week26/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large

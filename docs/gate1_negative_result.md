@@ -11,6 +11,22 @@ Gate 1 有两层：
 
 来源：`outputs/week25/series_rel_ordering_check.json`、`data/anchors/solution_anchor_verification.md`。
 
+## 1b. 最终定性：NOT CLOSED **且** NOT CLOSABLE（研究结果，不是待办缺陷）
+
+**结论（一句话）**：在预注册要求的同装置 / 同判据 / 至少 7 个核心集分子的同源序列条件下，公开可验证数据不足，因此无法完成排序层外部锚定。
+
+这不是“还没做完”，而是“在当前可得证据下不可闭合”。判据如下：
+
+| 预注册关闭条件（同装置 / 同判据 / 同态） | 要求 | 现状 |
+| --- | --- | --- |
+| 同源序列覆盖核心集 | ≥ 7 个分子（C(7,2)=21 ≥ n_pairs 18） | 最长同源序列 **k = 1** |
+| 排序一致性 | Kendall τ_b ≥ 0.90 | 唯一可评序列 = **0.4286** |
+| 绝对标定层 | 至少一行升级至 exp/calc | **0 / 31**（仍 `est`） |
+
+因此 Gate 1 从此**作为研究结果**报告：**NOT CLOSED 且 NOT CLOSABLE**。禁止事后通过剔除分子 / 替换模型列 / 放宽容差把它「救」成 PASS；也不再为它无限追加周次计算。
+
+机器可读形式：`outputs/gate1/gate1_dual_track.json` 的`gate1_closability = "NOT CLOSABLE"` 与 `track_B.components.closability`（含预注册条件、证据、结论）。
+
 ## 2. 决定：不修数据，改叙事
 
 外部评审给出的关键判断是：

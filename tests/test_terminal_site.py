@@ -107,7 +107,7 @@ def test_figure_payload_covers_exactly_the_repository_figures():
     on_disk = sorted(p.name for p in REPO_FIGURES.glob("*.png"))
     listed = sorted(row["file"] for row in payload["figures"])
     assert listed == on_disk, "the site and outputs/figures/ disagree on the figure set"
-    assert len(listed) == 56
+    assert len(listed) == 57
 
 
 def test_every_figure_has_a_caption_and_a_hash():

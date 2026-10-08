@@ -47,6 +47,25 @@ DEFAULT_DOC = DEFAULT_OUTDIR / "gate1_dual_track.md"
 
 FORBIDDEN_TERMS = ["validated target", "physically validated target"]
 
+#: The one-sentence final characterisation of Gate 1 (R13, round-2 review item 1).
+#: It is deliberately a *result*, not a to-do: the pre-registered anchor series
+#: does not exist in the public literature, so the ordering tier cannot be closed
+#: by any amount of further computation on this repository's side.
+CLOSABILITY_STATEMENT = (
+    "在预注册要求的同装置 / 同判据 / "
+    "至少 7 个核心集分子的同源序列条件下，"
+    "公开可验证数据不足，因此无法完成"
+    "排序层外部锚定。"
+)
+
+CLOSABILITY_DETAIL = (
+    "该判定不是“还没做完”，而是"
+    "“在当前可得证据下不可闭合”："
+    "本地文献中最长的同装置 / 同判据同源序列"
+    "只有 k = 1（需 ≥ 7），叙事上不使用“"
+    "删分子 / 换模型列 / 放宽容差”的救活路径。"
+)
+
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Assemble the R13 Gate-1 dual-track record.")
@@ -86,6 +105,8 @@ def build() -> dict:
     sid = read_json(STATE_ID)
     ordering = read_json(ORDERING) or {}
     reduction = read_json(REDUCTION) or {}
+    min_species_needed = reduction.get("min_species_needed")
+    required_to_close = reduction.get("required_to_close") or {}
     calibration = read_json(CALIBRATION) or {}
     cal_summary = calibration.get("summary", {}) if isinstance(calibration, dict) else {}
 
@@ -146,6 +167,43 @@ def build() -> dict:
             "note": "W24-D 发现本地文献里最长同装置 / 同判据同源序列只有 k = 1；审计细节见来源文档。",
             "source": "outputs/week24_corealign/gate1_anchor_feasibility.md",
         },
+        "closability": {
+            "verdict": "NOT CLOSABLE",
+            "statement": CLOSABILITY_STATEMENT,
+            "detail": CLOSABILITY_DETAIL,
+            "prereg_requirement": {
+                "min_species_covering_core_set": min_species_needed,
+                "min_pairs": criterion.get("min_pairs"),
+                "min_tau_b": criterion.get("min_tau_b"),
+                "same_apparatus": True,
+                "same_criterion": True,
+                "same_state": True,
+                "source": "config/prereg.yaml; data/anchors/solution_anchor_verification.md sections 1-3",
+            },
+            "evidence": {
+                "longest_homologous_series_k": 1,
+                "longest_homologous_series_source": "outputs/week24_corealign/gate1_anchor_feasibility.md",
+                "oxidation_axis_pairs": ordering.get("n_pairs"),
+                "oxidation_axis_tau_b": ordering.get("tau_b"),
+                "reduction_axis_pairs": reduction.get("n_pairs"),
+                "anchor_rows_total": cal_summary.get("rows_total"),
+                "upgraded_anchor_rows": len(cal_summary.get("upgraded") or []),
+                "required_to_close_minimum": required_to_close.get("minimum"),
+                "required_to_close": required_to_close.get("requirements"),
+                "source": (
+                    "outputs/week24_corealign/gate1_anchor_feasibility.md; "
+                    "outputs/week25/series_rel_ordering_check.json; "
+                    "outputs/week25/gate1_reduction_secondary.json"
+                ),
+            },
+            "consequence": (
+                "Gate 1 从此作为 research result（negative result）报告："
+                "既 NOT CLOSED、又 NOT CLOSABLE，而不是待办缺陷；"
+                "禁止事后通过剔除分子 / 替换模型列 / "
+                "放宽容差把它「救」成 PASS。"
+            ),
+            "source": "docs/gate1_negative_result.md",
+        },
     }
 
     report = {
@@ -165,6 +223,7 @@ def build() -> dict:
         "track_B": {
             "name": "external / experimental validity",
             "status": "NOT CLOSED",
+            "closability": "NOT CLOSABLE",
             "components": track_b,
         },
         "independence_rule": (
@@ -172,6 +231,7 @@ def build() -> dict:
             "absolute-scale and true-ordering claims; it does not invalidate the decision-stability results."
         ),
         "gate1_status": "NOT CLOSED",
+        "gate1_closability": "NOT CLOSABLE",
         "naming": {
             "allowed": ["designated computational target", "designated reference model"],
             "forbidden": FORBIDDEN_TERMS,
@@ -261,6 +321,7 @@ def write_doc(path: Path, report: dict) -> None:
     ac = b["absolute_calibration"]
     ra = b["reduction_axis_secondary"]
     uf = b["upstream_feasibility"]
+    cl = b["closability"]
     lines += [
         "",
         "## Track B：external / experimental validity（NOT CLOSED）",
@@ -275,6 +336,31 @@ def write_doc(path: Path, report: dict) -> None:
         "| 还原轴旁证 | %s | 只有 %s 个 pair（门槛 %s）：**数据不足**，不是不一致（`%s`） |"
         % (ra["verdict"], ra["n_pairs"], ra["min_pairs"], ra["source"]),
         "| 上游可行性 | %s | %s（`%s`） |" % (uf["status"], uf["note"], uf["source"]),
+        "",
+        "## Gate 1 的最终定性：NOT CLOSABLE（研究结果，不是待办缺陷）",
+        "",
+        "> " + cl["statement"],
+        "",
+        cl["detail"],
+        "",
+        "| 预注册关闭条件 | 要求 | 现状 |",
+        "| --- | --- | --- |",
+        "| 同源序列覆盖 | 至少 %s 个核心集分子（C(7,2)=21 ≥ n_pairs %s） | 最长同源序列 k = %s |"
+        % (
+            cl["prereg_requirement"]["min_species_covering_core_set"],
+            cl["prereg_requirement"]["min_pairs"],
+            cl["evidence"]["longest_homologous_series_k"],
+        ),
+        "| 同装置 / 同判据 / 同态 | 必须同源 | 无满足条件的序列 |",
+        "| 排序一致性 tau_b | ≥ %s | 唯一可评序列 = %s（outputs/week25/series_rel_ordering_check.json） |"
+        % (cl["prereg_requirement"]["min_tau_b"], _fmt(cl["evidence"]["oxidation_axis_tau_b"], 4)),
+        "| 绝对标定行升级 | > 0 | %s / %s 仍为 `est` |"
+        % (cl["evidence"]["upgraded_anchor_rows"], cl["evidence"]["anchor_rows_total"]),
+        "",
+        "**结论**：" + cl["consequence"],
+        "",
+        "可行性审计：`%s`；落地文档：`%s`。"
+        % (cl["evidence"]["longest_homologous_series_source"], cl["source"]),
         "",
         "## 措辞规范",
         "",

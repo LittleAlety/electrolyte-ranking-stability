@@ -99,6 +99,7 @@ FIGURES = [
     ("F53", "F53_family_resolved.png", 25, "逐家族（family-resolved）排序统计：家族内 tau_b 与未解析比例（W25）"),
     ("F54", "F54_two_axis_hierarchy.png", 25, "二维模型层级（方法层级 x 条件态层级）+ 外部参考层（核心文件 §24 Figure 1）（W25）"),
     ("F55", "F55_coord_descriptor_tags.png", 25, "配位位移 x 描述符标签关联（核心文件 §24 Figure 5）：C1 n = 10，氧化轴 tpsa rho = -0.890（p = 0.0011）（W25）"),
+    ("F56", "F56_r13_summary.png", 26, "R14 收口汇总：三态判据/分辨率曲线/Gate 1 双轨 NOT CLOSABLE/防误读卡片（R13 阶段）"),
 ]
 
 # ---------------------------------------------------------------- week table
@@ -312,7 +313,7 @@ def counts():
         # Recorded, not measured: pytest cannot be run from the generator.  Bump
         # it in the same commit that adds or removes a test, otherwise the page
         # will advertise a number the suite no longer produces.
-        "tests_passed": 1225,
+        "tests_passed": 1234,
     }
 
 

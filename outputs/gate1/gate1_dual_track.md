@@ -38,6 +38,23 @@ Track B 未闭合**不**使 Track A 失效；它只限制「绝对尺度 / 真�
 | 还原轴旁证 | not_evaluable_secondary_only | 只有 3 个 pair（门槛 18）：**数据不足**，不是不一致（`outputs/week25/gate1_reduction_secondary.json`） |
 | 上游可行性 | not_closable_on_current_literature | W24-D 发现本地文献里最长同装置 / 同判据同源序列只有 k = 1；审计细节见来源文档。（`outputs/week24_corealign/gate1_anchor_feasibility.md`） |
 
+## Gate 1 的最终定性：NOT CLOSABLE（研究结果，不是待办缺陷）
+
+> 在预注册要求的同装置 / 同判据 / 至少 7 个核心集分子的同源序列条件下，公开可验证数据不足，因此无法完成排序层外部锚定。
+
+该判定不是“还没做完”，而是“在当前可得证据下不可闭合”：本地文献中最长的同装置 / 同判据同源序列只有 k = 1（需 ≥ 7），叙事上不使用“删分子 / 换模型列 / 放宽容差”的救活路径。
+
+| 预注册关闭条件 | 要求 | 现状 |
+| --- | --- | --- |
+| 同源序列覆盖 | 至少 7 个核心集分子（C(7,2)=21 ≥ n_pairs 18） | 最长同源序列 k = 1 |
+| 同装置 / 同判据 / 同态 | 必须同源 | 无满足条件的序列 |
+| 排序一致性 tau_b | ≥ 0.9 | 唯一可评序列 = 0.4286（outputs/week25/series_rel_ordering_check.json） |
+| 绝对标定行升级 | > 0 | 0 / 31 仍为 `est` |
+
+**结论**：Gate 1 从此作为 research result（negative result）报告：既 NOT CLOSED、又 NOT CLOSABLE，而不是待办缺陷；禁止事后通过剔除分子 / 替换模型列 / 放宽容差把它「救」成 PASS。
+
+可行性审计：`outputs/week24_corealign/gate1_anchor_feasibility.md`；落地文档：`docs/gate1_negative_result.md`。
+
 ## 措辞规范
 
 - 允许：`designated computational target`、`designated reference model`

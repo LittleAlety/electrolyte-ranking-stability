@@ -3,11 +3,11 @@ window.HB = {
  "repo": "https://github.com/LittleAlety/electrolyte-ranking-stability",
  "counts": {
   "weeks": 25,
-  "figures": 56,
+  "figures": 57,
   "orca_out": 1535,
-  "scripts": 138,
-  "test_files": 62,
-  "tests_passed": 1225
+  "scripts": 141,
+  "test_files": 63,
+  "tests_passed": 1234
  },
  "pipeline": [
   {
@@ -1174,6 +1174,16 @@ window.HB = {
    "bytes": 230195,
    "w": 1260,
    "h": 1320
+  },
+  {
+   "id": "F56",
+   "file": "F56_r13_summary.png",
+   "week": 26,
+   "caption": "R14 收口汇总：三态判据/分辨率曲线/Gate 1 双轨 NOT CLOSABLE/防误读卡片（R13 阶段）",
+   "sha": "52c45fe70f46339b0567cae7f23067576fa14e8ebc31bb7d69b5d84b390b067e",
+   "bytes": 214639,
+   "w": 1260,
+   "h": 1400
   }
  ]
 };

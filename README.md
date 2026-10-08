@@ -1,5 +1,9 @@
 # 电解液溶剂HB —— 决策稳定性研究（Electrolyte Ranking Stability）
 
+> **Scope.** This repository does not establish a definitive electrolyte-solvent ranking. It studies the stability, instability, and information cost of ranking decisions under progressively more realistic computational models.
+>
+> 本仓库**不**给出「18 个溶剂谁最好」的最终排行榜；它研究的是**排序决策**在逐步更真实的计算模型下的**稳定性 / 不稳定性 / 信息成本**。任何把本仓库引用成「最终性能排行榜」的读法都是误读。
+
 在**很小的分子集**（core set = **18** 个分子）上，用**两种**高效量子化学方法（GFN2-xTB 与 r2SCAN-3c），研究「从廉价代理量走向更真实的电子结构 / 环境模型」时，**哪些改变只是数值平移、哪些会真正翻转材料筛选决策**，以及这些翻转背后的物理机制。
 
 > 核心不是「筛出最好的电解液」，而是：
@@ -7,7 +11,14 @@
 >
 > （R13 起：Gate 1 闭合前不称 *validated* target；外部有效性单独作为 negative result 报告，见 `docs/gate1_negative_result.md`。）
 
-**项目状态**：`Gate 0` **CLOSED** · `Gate 1` **未闭合**（排序层已评估：`ordering_disagrees`，τ_b = 0.4286 < 0.90，n_pairs = 21；绝对标定层按 limitation 处理）。
+**项目状态**：`Gate 0` **CLOSED** · `Gate 1` **未闭合且 NOT CLOSABLE**（排序层已评估：`ordering_disagrees`，τ_b = 0.4286 < 0.90，n_pairs = 21；绝对标定层按 limitation 处理；预注册要求的同源序列在公开文献中不存在，**不再尝试把它做成 PASS**，见 `docs/gate1_negative_result.md`）。
+
+| 计数 | 值 | 含义 |
+| --- | --- | --- |
+| robust inversion | **0 observed** | 在 20 个 (台阶, 轴) 组合中，没有任何 pair 被**反向证明**（1σ 主口径） |
+| unresolved（最高） | **80.0%** | 大量 pair 的证据**不足以判定**方向 |
+
+> **0 robust inversions ≠ 0 ranking instability.** 把 `f_robust_inv = 0` 读成「排序稳定」是本项目最容易被误读的一处；正确的读法是「不可判定主导（`evidence insufficient to resolve`）」。汇总图 `outputs/figures/F56_r13_summary.png` 把这句话画进了图里。
 
 > 本 README 由 `scripts/build_github_readme.py` 确定性生成：逐周关键数字尽量从 `outputs/` 的冻结产物读回，`--check` 逐字节复核。全量汇总另见仓库外 `成果输出/数据结果汇总.md` 与 `成果输出/统一数据文档.md`。
 
@@ -19,7 +30,21 @@
 - **不确定性感知的排序变化**：pair 级主判据是 `resolved(i,j) ⇔ |ΔP_ij| ≥ max(z·σ_ij, delta_m)`；`config/prereg.yaml` 冻结 `z = 1.0` 为主口径，`z = 1.96` 只作并列敏感性。
 - **机制**：位移的**离散度**（而非幅度）决定排序是否被改写 —— `f_unresolved(z) = Pr(q_ij > √2/z)`，其中 `q` 是位移相对目标轴的割线斜率；符号比幅度重要。
 - **最小信息预算**：闭式判据（花钱前预判）+ 介电层自相似（可稀疏采样）+ 配位层只算第一壳 + 漏解只做靶向。
+- **结论矩阵**：`FINAL_CONCLUSIONS.md` 用 **10 个问题**（结论 → 数字 → evidence path → limitation）把 25 周结果收口；本 README 是工作日志，该文件是**研究成果索引**。
 - 科学方案：`核心文件/ranking-electrolyte-materials-v2.md`；阅读清单：`核心文件/ranking-electrolyte-materials-reading-list.md`；项目计划：`计划.md`。
+
+## n = 18 的四层可声明边界（external-validity limitation）
+
+core set = **18**（broad pool = **40**；v2 原建议 core ≈ 60–100、broad ≈ 300–1000）。本项目不再把 core set 扩到 60–100，而是把可声明范围按四层**分别**界定：
+
+| 层面 | 当前状态 | 说明 |
+| --- | --- | --- |
+| 机制验证（mechanism） | **可以成立** | 机制结论（位移离散度决定排序是否被改写）在 10 个分子的 common subset 上精确闭式验证（误差 = 0）。 |
+| 排序规律的普适性 | **不能宣称成立** | 18 个分子只能支持 family 层面的提示性证据，不能外推到更大化学空间。 |
+| 大规模筛选能力 | **未验证** | broad 池只到 P0 廉价层（40 个）；本项目不声称可做高吞吐量筛选。 |
+| 方法学 proof-of-concept | **成立** | 三态判据 + 分辨率曲线 + 最小信息预算，作为可复用方法学成立（不依赖 n）。 |
+
+> 读法：引用本仓库时应区分这四层。「机制可以成立」不等于「排序普适性成立」，也不等于「可大规模筛选」。
 
 ## 逐周工作日志（Week 1 – Week 25）
 
@@ -230,7 +255,7 @@ R13 按优先级落地（完整对照见 `docs/46_definitional_amendment_r13.md`
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | **排序一致性层**首次可评但未通过：Kendall **τ_b = 0.4286 < 0.90**、**n_pairs = 21**，判 **`ordering_disagrees`**（一致 15 / 不一致 6）（`outputs/week25/series_rel_ordering_check.json`）。**绝对标定层**：溶液相锚点 31 行 `est` 按 R7 裁决记为 **limitation**，不再单列 blocker。 |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
-- **排序层为什么未闭合**：证据是**预注册的负结果**；数值本身不得事后通过剔除分子、替换模型列或放宽容差「救回」（`docs/40_week25_gate1_report.md`）。要闭合需要一条覆盖 ≥ 7 个核心集分子、同装置 / 同判据、且描述符在溶剂间**真有离散度**的新同源序列。
+- **排序层为什么未闭合**：证据是**预注册的负结果**；数值本身不得事后通过剔除分子、替换模型列或放宽容差「救回」（`docs/40_week25_gate1_report.md`）。要闭合需要一条覆盖 ≥ 7 个核心集分子、同装置 / 同判据、且描述符在溶剂间**真有离散度**的新同源序列；W24-D 进一步升级为 **NOT CLOSABLE**（本地文献里最长同装置 / 同判据同源序列 k = 1），不再作为待办缺陷。
 - **还原轴**：旁证级数据只有 3 分子 / 3 对（< 18），判 `not_evaluable_secondary_only` —— 是「数据不足」，不是「不一致」（`outputs/week25/gate1_reduction_secondary.json`）。
 - **上游可行性审计**：W24-D 发现本地文献最长同源序列 k = 1，判 Gate 1 **NOT_CLOSABLE**（`outputs/week24_corealign/gate1_anchor_feasibility.md`）。
 - **R13 · P1 实为 vertical**：早期 `P1` 是同一几何上的三态单点；R13 更名 `P1v` 并补出 adiabatic 层 `P1a`（`outputs/phase2_p1a/`）。气相阴离子全部不束缚（`unbound_anion = 18`），因此 **P1a 只有氧化轴可比较**，还原轴按规则排除（`docs/p1v_vs_p1a.md`）。
@@ -244,8 +269,8 @@ R13 按优先级落地（完整对照见 `docs/46_definitional_amendment_r13.md`
 | `src/electrolyte_ranking/` | 库：`toolchain` / `xtb` / `orca` / `ranking` / `decision_state` / `uncertainty` / `provenance` / `qc` |
 | `scripts/` | 环境自检、元数据构建、锚点校验、逐周运行器与分析脚本，以及本 README 的生成器 `build_github_readme.py` |
 | `data/` | `metadata/`（`core_set.csv` 18、`broad_pool.csv` 40）、`anchors/`（气相 / 溶液相锚点、`within_series_ordering.csv`、`_received/`） |
-| `outputs/` | 每周可复现产物 `week1`–`week25`（含 `week22_hardening`、`week24_corealign`）、`figures/`（F0–F55 及清单） |
-| `docs/` | Stage 说明与逐周报告（`00`–`44`，**文件名前缀不连续**，以目录为准） |
+| `outputs/` | 每周可复现产物 `week1`–`week25`（含 `week22_hardening`、`week24_corealign`）与 `week26` 收口包（F56 + clean-room 审计）、`figures/`（F0–F56 及清单） |
+| `docs/` | Stage 说明与逐周报告（`00`–`48`，**文件名前缀不连续**，以目录为准） |
 | `config/` | `scientific_definitions.yaml`（定义冻结）、`prereg.yaml`（预注册阈值，append-only） |
 | `tests/` | 单元测试（无 QM 二进制也必须通过） |
 | `structures/` | 几何，含 `li_motifs/`、`microsolvation/` |
@@ -337,12 +362,32 @@ R13 按优先级落地（完整对照见 `docs/46_definitional_amendment_r13.md`
 - **broad 40 vs 建议 300–1000**：v2 建议 broad pool ≈ 300–1000，实际 **40**；broad 池只到 P0 廉价层。
 - **未做 RS-hybrid**：v2 把 range-separated hybrid（如 ωB97X-D4 一类）列为生产候选，本项目未运行该类方法；全部能量为单参考 r2SCAN-3c 或 GFN2-xTB。
 - **`f_robust_inv` 全 0 是负结果**：Stage 10 的 20 个 (台阶, 轴) 组合、Week 24 的 40 个数值（2 z × 2 population × 10 点）全部为 **0**；这是「不可判定主导」而非「处处稳定」（同一批数据 `f_unresolved` 最高 **0.800**），不得读成稳健性证据。
-- **Gate 1 未闭合**：排序层 `ordering_disagrees`（τ_b = 0.4286 < 0.90，n_pairs = 21）、绝对标定层 limitation；溶液相锚点 31 行仍为 `est`（`docs/40_week25_gate1_report.md`）。
+- **Gate 1 未闭合**：排序层 `ordering_disagrees`（τ_b = 0.4286 < 0.90，n_pairs = 21）、绝对标定层 limitation；溶液相锚点 31 行仍为 `est`；定性为 **NOT CLOSABLE**（`docs/gate1_negative_result.md`、`outputs/gate1/gate1_dual_track.md`）。
 - **还原侧定性失效**：P1 气相阴离子 18/18 全部不束缚，Koopmans 还原代理与真实 EA 不是同一物理量；还原轴结论只以 P2 / C1 为载体。
 - **基组无弥散**：r2SCAN-3c 的 def2-mTZVPP 不含弥散函数，不能裁断 0.01 eV 量级的阴离子束缚与否（T5）；氧化侧不受此限制。
 - **单构象 + G1 / G2 两级几何**：主结果建立在 GFN2-xTB 单构象几何 G1 上，未做全局构象搜索；G2 台阶仅在 12 分子审计子集。
 - **隐式溶剂**：P2 为 CPCM(SMD) 隐式溶剂，不含显式溶剂分子；C2 只做第一溶剂壳的几何预筛。
 - **锚点样本小**：外部气相锚点仅 12 个分子，τ_b 的 bootstrap 区间较宽（如 P0 臂 [0.16, 0.90]）。
+
+## 复现边界与 clean-room 审计
+
+仓库内的可复现面（**不依赖任何仓库外文件**）：`config/`、`data/`、`outputs/`、`scripts/`、`src/`、`tests/`、`structures/`、`README.md`、`FINAL_CONCLUSIONS.md`。
+
+**仓库外交付层**：`..\成果输出\`、`..\核心文件\`、`..\论文\` 位于**本仓库之外**，不随 GitHub 一起分发。README 引用它们只是交付层说明；外部 reviewer 克隆本仓库时**不需要**它们。
+
+clean-room 入口（在全新 clone 中逐条执行）：
+
+```powershell
+.venv\Scripts\python.exe scripts\build_metadata.py --check
+.venv\Scripts\python.exe scripts\build_github_readme.py --check
+.venv\Scripts\python.exe scripts\build_final_conclusions.py --check
+.venv\Scripts\python.exe scripts\audit_clean_room.py
+.venv\Scripts\python.exe scripts\analyze_r13_summary_figure.py --check
+.venv\Scripts\python.exe scripts\freeze_gates.py --stage all
+.venv\Scripts\python.exe -m pytest
+```
+
+`scripts/audit_clean_room.py` 逐项报告「缺什么会挡住复现」；本机 `E:\ORCA软件\...` 与 xTB 只影响**新增电子结构计算**，不影响仓库内任何已冻结产物、check 或测试。
 
 ## 工程约定（轻量借鉴 `电解质ML`）
 
@@ -363,4 +408,4 @@ R13 按优先级落地（完整对照见 `docs/46_definitional_amendment_r13.md`
 .venv\Scripts\python.exe scripts\build_week25_deliverables.py --check
 ```
 
-图表索引 F0–F55：`F47` 属 `week22_hardening`，`F48`–`F51` 属 `week24_corealign`，`F52`–`F54` 属 `week25_gate1`；逐图内容与来源见 `成果输出/数据结果汇总.md` 的「图表索引」表。
+图表索引 F0–F56：`F47` 属 `week22_hardening`，`F48`–`F51` 属 `week24_corealign`，`F52`–`F54` 属 `week25_gate1`；`F55` 见 `outputs/week25`，`F56` 见仓库内 `outputs/week26`（R14 收口汇总图，不在交付层）；逐图内容与来源见 `成果输出/数据结果汇总.md` 的「图表索引」表。
