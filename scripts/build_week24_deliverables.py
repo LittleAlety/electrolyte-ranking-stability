@@ -30,9 +30,9 @@ DEFAULT_OUT = Path(r"E:\Claude Code\电解液溶剂-HB\成果输出") / "week24_
 PAPER_DIR = Path(r"E:\Claude Code\电解液溶剂-HB\论文")
 PAPER_STEM = "电解液溶剂氧化还原描述符决策稳定性_结题论文"
 PAPER_PDF_PATTERN = re.compile(rf"^{re.escape(PAPER_STEM)}_v(\d+)\.pdf$")
-#: keep in sync with 论文/build_paper_docx.py (v5 ships 图 1-22 / 表 1-15)
+#: keep in sync with 论文/build_paper_docx.py (v6 ships 图 1-22 / 表 1-17)
 PAPER_EXPECTED_FIGURES = 22
-PAPER_EXPECTED_TABLES = 15
+PAPER_EXPECTED_TABLES = 17
 
 
 def resolve_paper_pdf() -> "tuple[Path | None, str]":
