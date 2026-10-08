@@ -5,10 +5,25 @@
 # 状态: FROZEN, 见 config/prereg.yaml 的冻结声明
 # 编码: UTF-8; 字段名英文, 说明中文
 # =============================================================================
-schema_version: "1.0"
+schema_version: "2.0"
 frozen: true
-frozen_date: "2026-09-29"
+frozen_date: "2026-10-08"
 project: electrolyte-solvent-ranking-stability
+amendment:
+  id: "R13"
+  date: "2026-10-08"
+  kind: "definitional correction (external review response)"
+  summary: >
+    P1 明确拆成 vertical 层 P1v 与 adiabatic 层 P1a; P2 明确拆成固定溶剂层 P2a 与纯介电层 P2eps;
+    C1 新增还原态 state-identity 分层规则; 新增 pairwise decision_state 三态判据与 f_unresolved(z)
+    resolution curve; target 命名由 validated target 改为 designated computational target/reference;
+    C2 更名为 first-shell microsolvation (coordination number 2)。全部为 append-only 修订, 见
+    config/prereg.yaml 的 amendment_log。
+  record: "docs/46_definitional_amendment_r13.md"
+  amendment_log: "config/prereg.yaml#amendment_log"
+  legacy_aliases:
+    P1: "P1v"
+    P2: "P2a"
 
 provenance:
   source_document: "E:/Claude Code/电解液溶剂-HB/核心文件/ranking-electrolyte-materials-v2.md"
@@ -32,9 +47,11 @@ framing:
   is:
     - "intact-species / conditional-species one-electron redox thermodynamic proxy 的排序稳定性研究"
     - "严格区分 model complexity != accuracy != physical representativeness"
+    - "decision-stability benchmark: 定量研究缺失物理何时真正改变材料筛选决策, 以及达到可靠排序所需的最小计算信息; 电解液只是第一个 case study"
   core_identities:
     - "model complexity != accuracy != physical representativeness"
     - "different conditional species != different-fidelity estimates of the same observable"
+    - "ranking stability is controlled by candidate-specific differential displacement, not by a common-mode shift"
 
 # -----------------------------------------------------------------------------
 # Axis A: proxy / electronic-structure hierarchy
@@ -62,18 +79,34 @@ axis_A_proxy_hierarchy:
       - "分子 fingerprint"
       - "任何多维 descriptor 组合 (features 不等于一个 fidelity level)"
     interpretation: "只回答'极低成本 scalar proxy 是否已经保留目标排序', 不得解释为真实 redox potential"
-  P1:
-    label: "gas-phase molecular redox thermodynamics"
+  P1v:
+    label: "gas-phase vertical redox-energy proxy"
+    geometry_policy: "neutral / cation / anion 三态共用同一几何 (G1), 只做单点; 因此是 vertical 量, 不是 redox 热力学"
     oxidation:
-      formula: "dG_ox_gas(M) = G_gas(M+) - G_gas(M)"
+      formula: "IP_v(M) = E(M+; G1) - E(M; G1)"
       objective_direction: maximize
     reduction:
-      formula: "dG_red_gas(M) = G_gas(M-) - G_gas(M)"
+      formula: "EA_v(M) = E(M; G1) - E(M-; G1)"
       objective_direction: maximize
     failure_flag: "unbound_anion"
     failure_rule: "若气相阴离子不是稳定电子束缚态, 标记 unbound_anion, 不强制给出伪精确 adiabatic electron affinity"
-  P2:
-    label: "fixed-background continuum molecular redox thermodynamics"
+    note: "本层即仓库早期文档中的 P1 (Week 4 三态单点); R13 起正式更名 P1v 以与 P1a 区分。数据: outputs/week4/p1_core_set.csv"
+  P1a:
+    label: "gas-phase adiabatic redox thermodynamics"
+    geometry_policy: "每个电荷态各自弛豫到自身极小 (r2SCAN-3c Opt), redox 量取弛豫态能量差"
+    oxidation:
+      formula: "IP_a(M) = E(M+; relaxed) - E(M; relaxed)"
+      objective_direction: maximize
+    reduction:
+      formula: "EA_a(M) = E(M; relaxed) - E(M-; relaxed)"
+      objective_direction: maximize
+    failure_flag: "unbound_anion"
+    failure_rule: "气相阴离子不束缚时 EA_a 无物理意义, 必须标记 unbound_anion 并排除出任何 ranking 指标; 此时只有氧化轴支持 P1v -> P1a 比较"
+    scope: "第一版只在 core set 的 12 分子 T2 子集上执行"
+    status: "IMPLEMENTED (oxidation axis); reduction axis flagged unbound_anion by design"
+    data: "outputs/phase2_p1a/p1a_adiabatic.csv; runner scripts/run_p1a_adiabatic.py"
+  P2a:
+    label: "fixed-background continuum redox thermodynamics (SMD acetonitrile)"
     oxidation:
       formula: "dG_ox_cont(M) = G_cont(M+) - G_cont(M)"
       objective_direction: maximize
@@ -81,6 +114,13 @@ axis_A_proxy_hierarchy:
       formula: "dG_red_cont(M) = G_cont(M-) - G_cont(M)"
       objective_direction: maximize
     embedding_rule: "所有候选使用同一固定背景介质; 用于研究共同 embedding 引起的 rank shift, 不模拟每个候选自己的 neat-liquid bulk 环境"
+    note: "P2a 是固定的 solvent model (SMD, 乙腈), 对应 continuum_sensitivity.A_fixed_solvent_benchmark; 本层即仓库早期文档中的 P2"
+  P2eps:
+    label: "dielectric-only sensitivity (bare CPCM epsilon sweep)"
+    formula: "dG_ox/red_cont(M; epsilon), 见 continuum_sensitivity.B_dielectric_only"
+    objective_direction: maximize
+    meaning: "只改变 continuum 的介电常数, 不含 solvent-specific non-electrostatic 项; 是 electrostatic screening sensitivity, 不是换一种真实溶剂"
+    separation_rule: "P2a (SMD) 与 P2eps (bare CPCM epsilon) 是两种不同的物理实验, 报告必须分开, 不得混成同一条 solvent ladder"
 
 # -----------------------------------------------------------------------------
 # Axis B: environment / conditional-species hierarchy
@@ -103,9 +143,21 @@ axis_B_environment_states:
       dGdG_ox_coord: "dG_ox_Li - dG_ox_free"
       dGdG_red_coord: "dG_red_Li - dG_red_free"
     priority: "dGdG_coord 是本项目最重要的环境响应量之一"
+    redox_state_identity_stratification:
+      rule: "还原轴的 ranking 只能使用 molecule_centered_redox 的态; 其余标签一律作为 mechanistic state-identity outcome 单独统计, 不进入主 ranking"
+      main_ranking_label: molecule_centered_redox
+      reported_separately:
+        - Li_centered_or_mixed_redox
+        - motif_switch
+        - no_intact_minimum_found
+        - dissociated_optimized_product
+        - state_identity_ambiguous
+      rationale: "Li+ 配位可能改变被还原对象的电子身份; 若电子落到 Li 上, 数值 ranking 的变化就不是同一 observable 的排序不稳定, 而是 observable identity failure"
+      outputs: "outputs/state_identity/; scripts/classify_state_identity.py"
   C2:
-    label: "selected explicit microsolvation states"
-    species: "少量代表体系在相同化学计量下的显式局域溶剂化 cluster"
+    label: "first-shell microsolvation (coordination number 2)"
+    species: "[Li(M)2]+: Li+ 周围两个配体的第一配位壳"
+    naming_rule: "不得称为 second solvation shell; 本层增加的是第一配位壳的配位数 (CN=2), 不是第二溶剂壳"
     scope: "第一阶段只做 targeted sensitivity check"
     forbidden: "不得把不同配位数/不同阴离子数/不同化学计量的 cluster 用裸 Gibbs energy 做简单 Boltzmann 平均"
 
@@ -365,3 +417,34 @@ provenance_requirements:
     - standard state
     - conformer/motif ID
     - QC flags
+
+# -----------------------------------------------------------------------------
+# Pairwise decision state (R13)
+# -----------------------------------------------------------------------------
+decision_state:
+  rationale: "f_robust_inv = 0 不等于排序稳定, 它常是 unresolved 主导; 必须把 pair 状态三元化"
+  labels: [STABLE, UNRESOLVED, ROBUST_INVERSION]
+  optional_extra: WEAK_SHIFT
+  assignment_rule: >
+    对同一 pair (i,j): 令 dP_A = P_i^A - P_j^A, dP_B = P_i^B - P_j^B。若两模型都在其自身
+    不确定度下 resolve 且 sign(dP_A) != sign(dP_B) -> ROBUST_INVERSION; 若任一模型不 resolve
+    -> UNRESOLVED; 否则 STABLE。可选第四态 WEAK_SHIFT: 两模型都 resolve 且符号相同,
+    但窄带刚过阈值 (描述列, 不进主判据)。
+  resolution_curve:
+    definition: "f_unresolved(z) 随证据门槛 z 的曲线; 主结果报出整条曲线, 而不是争论某一个 z"
+    z_bands: [1.0, 1.645, 1.96, 2.576]
+    z_band_meaning: "1.0 = screening-resolution; 1.645 ~ 90%; 1.96 ~ 95%; 2.576 ~ 99%"
+    primary: "prereg.yaml z_factor.value (=1.0) 仍是主判据; resolution curve 是并列的稳健性报告"
+  outputs: "outputs/decision_state/; scripts/decision_state_report.py"
+
+# -----------------------------------------------------------------------------
+# Target naming (R13)
+# -----------------------------------------------------------------------------
+target_naming:
+  rule: >
+    在 Gate 1 闭合之前, P1v / P1a / P2a / P2eps 一律不得称为 validated target;
+    统一称为 designated computational target/reference。
+  reason: "Gate 1 排序一致性层未通过 (ordering_disagrees), 外部有效性尚未建立"
+  allowed_terms: ["designated computational target", "designated reference model"]
+  forbidden_terms: ["validated target", "physically validated target"]
+  lift_condition: "仅当 Gate 1 (含 ordering-consistency tier) CLOSED 后, 才可恢复 validated 字样"

@@ -5,9 +5,9 @@ window.HB = {
   "weeks": 25,
   "figures": 56,
   "orca_out": 1535,
-  "scripts": 133,
-  "test_files": 57,
-  "tests_passed": 1194
+  "scripts": 138,
+  "test_files": 62,
+  "tests_passed": 1225
  },
  "pipeline": [
   {
@@ -60,7 +60,7 @@ window.HB = {
     {
      "name": "prereg:amendment_log",
      "ok": true,
-     "detail": "empty"
+     "detail": "1 amendment(s), all re-frozen"
     }
    ]
   },
@@ -68,7 +68,7 @@ window.HB = {
    "name": "Gate 1 - 外部锚点与工具链",
    "status": "NOT CLOSED",
    "blockers": [
-    "Gate 1 ordering-consistency tier (R7): no verified within-series values on file (n_pairs=0); the absolute-calibration level is recorded as a limitation and this tier stays open"
+    "Gate 1 ordering-consistency tier (R7): tau_b=0.4286 < 0.90 over n_pairs=21"
    ],
    "checks": [
     {
@@ -84,7 +84,7 @@ window.HB = {
     {
      "name": "anchors:series_rel_ordering",
      "ok": false,
-     "detail": "no verified within-series values on file (n_pairs=0); the absolute-calibration level is recorded as a limitation and this tier stays open"
+     "detail": "tau_b=0.4286 < 0.90 over n_pairs=21"
     },
     {
      "name": "toolchain:xtb",

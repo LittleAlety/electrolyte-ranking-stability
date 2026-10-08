@@ -17,7 +17,38 @@ freeze_statement: >
 amendment_policy:
   rule: "任何修改必须以追加 (append-only) 方式写入 amendment_log, 记录时间、修改项、旧值、新值与理由; 历史条目不得删除或改写"
   forbidden: "禁止在看过数据后静默修改任何已冻结项 (Gate 0)"
-amendment_log: []
+refreeze_policy:
+  rule: >
+    amendment_log 为 append-only: 已冻结项的修订必须登记在此, 不得静默改写历史。每条 amendment
+    必须写明旧值/新值/理由与记录文档, 并在完成重冻结 (re-freeze) 后标注 refrozen: true。
+  gate0_rule: "Gate 0 CLOSED 当且仅当 amendment_log 中所有条目均 refrozen: true; 空日志等价于 CLOSED"
+  forbidden: "禁止在存在 refrozen: false 条目时宣称 Gate 0 CLOSED"
+amendment_log:
+  - id: "R13"
+    date: "2026-10-08"
+    kind: "definitional correction (external review response)"
+    schema_version: "1.0 -> 2.0"
+    items:
+      - field: "scientific_definitions.yaml:axis_A_proxy_hierarchy"
+        old: "P1 = gas-phase molecular redox thermodynamics; P2 = fixed-background continuum redox thermodynamics"
+        new: "P1v = gas-phase vertical redox-energy proxy; P1a = gas-phase adiabatic redox thermodynamics; P2a = fixed-solvent continuum (SMD acetonitrile); P2eps = dielectric-only bare-CPCM epsilon sweep"
+        reason: "P1 的实际实现是同一几何上的三态单点 (vertical), 与 v2 的 adiabatic redox 定义不一致; P2 的 SMD 与 dielectric-only 是两种不同的物理实验, 不得混成同一条溶剂阶梯"
+      - field: "scientific_definitions.yaml:axis_B_environment_states.C1.redox_state_identity_stratification"
+        old: "(无还原态 state-identity 分层)"
+        new: "还原轴 ranking 只使用 molecule_centered_redox 的态; 其余标签作为 mechanistic state-identity outcome 单独统计"
+        reason: "core set 12 个还原态中 11 个外加电子落在 Li 上; 数值 ranking 的变化来自 observable identity failure, 而非同一 observable 的排序不稳定"
+      - field: "scientific_definitions.yaml:axis_B_environment_states.C2"
+        old: "selected explicit microsolvation states"
+        new: "first-shell microsolvation (coordination number 2)"
+        reason: "[Li(M)2]+ 增加的是第一配位壳的配位数 (CN=2), 不是 second solvation shell"
+      - field: "scientific_definitions.yaml:decision_state / target_naming"
+        old: "(无)"
+        new: "pairwise 判据三态 STABLE / UNRESOLVED / ROBUST_INVERSION + f_unresolved(z) resolution curve (z = 1.0 / 1.645 / 1.96 / 2.576); target 命名改为 designated computational target/reference"
+        reason: "f_robust_inv = 0 不等于排序稳定; Gate 1 排序一致性层未通过前不得使用 validated target 字样"
+    geometry_and_data: "P1a 只在 T2 12 分子子集上执行 (outputs/phase2_p1a); 仅氧化轴可比较, 还原轴按 unbound_anion 规则排除"
+    refrozen: true
+    record: "docs/46_definitional_amendment_r13.md"
+    gate0_note: "重冻结后 Gate 0 重新 CLOSED; 由 scripts/freeze_gates.py evaluate_stage0 判定"
 
 # -----------------------------------------------------------------------------
 # 1. Top-k 选择

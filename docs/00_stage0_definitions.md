@@ -3,7 +3,7 @@
 - 项目: 电解液溶剂 ranking 稳定性 (decision-centric ranking stability)
 - 阶段: Stage 0 — 冻结科学定义与 metadata
 - 状态: **FROZEN**
-- 冻结日期: 2026-09-29
+- 冻结日期: 2026-09-29（**R13 修订: 2026-10-08**，见 `docs/46_definitional_amendment_r13.md`）
 - 依据: `核心文件/ranking-electrolyte-materials-v2.md` 第 3 / 4 / 5 / 6 / 8 节与第 19 节 Stage 0
 
 本文件是 Stage 0 的收口文档: 汇总"科学定义冻结"的全部内容, 并给出可判定的 Gate 0 判据。
@@ -20,7 +20,7 @@ v2 第 19 节列出 Stage 0 的 8 项操作。其落盘位置如下:
 | 1 | 确定 core set 与 broad pool | `data/metadata/core_set.csv` (18), `data/metadata/broad_pool.csv` (40) |
 | 2 | 建立 structural_family / functionalization_tags / use_role | `data/metadata/chemical_space_metadata.md`, `config/scientific_definitions.yaml` |
 | 3 | 定义 oxidation / reduction quantity 与方向 | `config/scientific_definitions.yaml` 的 `objectives` |
-| 4 | 冻结 common embedding 的物理含义 | `config/scientific_definitions.yaml` 的 `axis_A_proxy_hierarchy.P2` 与 `axis_C_external_reference` |
+| 4 | 冻结 common embedding 的物理含义 | `config/scientific_definitions.yaml` 的 `axis_A_proxy_hierarchy.P2a` / `P2eps` 与 `axis_C_external_reference` |
 | 5 | 预注册 k/N = 10%, 20%, 30% | `config/prereg.yaml` 的 `top_k` |
 | 6 | 预注册 robust-pair tolerance 的确定方法 | `config/prereg.yaml` 的 `pair_comparison` |
 | 7 | 冻结 reference ligand R | `config/scientific_definitions.yaml` 的 `reference_ligand` |
@@ -128,6 +128,19 @@ v2 第 19 节列出 Stage 0 的 8 项操作。其落盘位置如下:
   `motif_switch`, `no_intact_minimum_found`, `dissociated_optimized_product`,
   `reaction_path_verified`。只有具备额外 reaction-path/TS/动力学证据时才可解释为已验证反应路径;
   几何优化导致断键本身不能证明无势垒。
+
+### 2.9 R13 定义修订 (2026-10-08)
+
+append-only amendment (`config/prereg.yaml` 的 `amendment_log`), schema 1.0 -> 2.0。要点:
+
+- **P1 -> P1v + P1a**: 早期 "P1" 实为同一几何上的三态单点 (vertical), 正式更名 `P1v`
+  (`IP_v = E(M+;G1) - E(M;G1)`); 新增 `P1a` (adiabatic, 每态各自弛豫)。气相阴离子不束缚时 `EA_a`
+  按 `unbound_anion` 规则排除。
+- **P2 -> P2a + P2eps**: `P2a` = 固定溶剂 (SMD 乙腈); `P2eps` = bare CPCM 介电扫描。二者是不同物理实验, 不得混成同一条溶剂阶梯。
+- **C2 更名**: `[Li(M)2]+` 是第一配位壳 (coordination number 2), 不是 second solvation shell。
+- **C1 还原态分层**: 主还原 ranking 只接受 `molecule_centered_redox`; 其余标签作为 mechanistic state-identity outcome 单独统计。
+- **pairwise 三态判据**: `STABLE` / `UNRESOLVED` / `ROBUST_INVERSION` (+ 描述性 `WEAK_SHIFT`) 与 `f_unresolved(z)` resolution curve (z = 1.0 / 1.645 / 1.96 / 2.576)。
+- **target 命名**: Gate 1 闭合前统一称 `designated computational target/reference`, 禁用 `validated target`。
 
 ---
 

@@ -3,7 +3,9 @@
 在**很小的分子集**（core set = **18** 个分子）上，用**两种**高效量子化学方法（GFN2-xTB 与 r2SCAN-3c），研究「从廉价代理量走向更真实的电子结构 / 环境模型」时，**哪些改变只是数值平移、哪些会真正翻转材料筛选决策**，以及这些翻转背后的物理机制。
 
 > 核心不是「筛出最好的电解液」，而是：
-> cheap proxy → validated target → uncertainty-aware rank change → mechanism → minimal budget
+> cheap proxy → designated computational target → uncertainty-aware rank change → mechanism → minimal budget
+>
+> （R13 起：Gate 1 闭合前不称 *validated* target；外部有效性单独作为 negative result 报告，见 `docs/gate1_negative_result.md`。）
 
 **项目状态**：`Gate 0` **CLOSED** · `Gate 1` **未闭合**（排序层已评估：`ordering_disagrees`，τ_b = 0.4286 < 0.90，n_pairs = 21；绝对标定层按 limitation 处理）。
 
@@ -11,7 +13,9 @@
 
 ## 科学定位与核心问题
 
-- **廉价代理 → 经验证目标**：P0 = GFN2-xTB Koopmans 代理；P1 = ORCA r2SCAN-3c 三态垂直 IP/EA（气相）；P2 = P1 + CPCM(SMD, 乙腈)。相邻层之间**只有一个变量**在变（P0→P1 换电子结构方法，P1→P2 换环境），几何 G1 与构象全层共享。
+- **廉价代理 → 指定计算目标 → 外部参考**（`cheap → intermediate → external reference`，**不**写成 `cheap → truth`）：`P0` = GFN2-xTB Koopmans 代理；`P1v` = ORCA r2SCAN-3c **三态垂直** IP/EA（气相，三态共用 G1 几何）；`P1a` = 每个电荷态各自弛豫的 **adiabatic** redox（12 分子子集，`outputs/phase2_p1a`）；`P2a` = `P1v` + SMD(乙腈) **固定溶剂**层；`P2eps` = bare CPCM **纯介电**扫描（改变 ε，不是换真实溶剂）。相邻层之间只有一个变量在变。
+- **条件态与状态身份**：`C0` = 自由分子；`C1` = `[LiM]+` 配位态；`C2` = `[Li(M)2]+` **第一配位壳**（coordination number 2，**不是** second solvation shell）。**还原轴只允许 `molecule_centered_redox` 进入主 ranking**，其余标签作为 mechanistic state-identity outcome 单独统计（`docs/state_identity_protocol.md`）。
+- **三态判据**：pair 级判据同时给出 `STABLE / UNRESOLVED / ROBUST_INVERSION` 与 `f_unresolved(z)` **分辨率曲线**（z = 1.0 / 1.645 / 1.96 / 2.576）；`f_robust_inv = 0` 只有在 UNRESOLVED 占比小时才等于「排序稳定」。
 - **不确定性感知的排序变化**：pair 级主判据是 `resolved(i,j) ⇔ |ΔP_ij| ≥ max(z·σ_ij, delta_m)`；`config/prereg.yaml` 冻结 `z = 1.0` 为主口径，`z = 1.96` 只作并列敏感性。
 - **机制**：位移的**离散度**（而非幅度）决定排序是否被改写 —— `f_unresolved(z) = Pr(q_ij > √2/z)`，其中 `q` 是位移相对目标轴的割线斜率；符号比幅度重要。
 - **最小信息预算**：闭式判据（花钱前预判）+ 介电层自相似（可稀疏采样）+ 配位层只算第一壳 + 漏解只做靶向。
@@ -23,7 +27,7 @@
 
 ### Week 1 —— Stage 0：定义冻结与 Gate 0（`outputs/week1`）
 
-- 冻结科学定义与预注册（`config/scientific_definitions.yaml`、`config/prereg.yaml`）；本 README 现场重算 `prereg.yaml` SHA256 = `e89f2e2ab714ac42…`。
+- 冻结科学定义与预注册（`config/scientific_definitions.yaml`、`config/prereg.yaml`）；本 README 现场重算 `prereg.yaml` SHA256 = `43c269611d108bef…`。
 - 建立 chemical-space 元数据：core set **18** 行、broad pool **40** 行（`data/metadata/core_set.csv`、`data/metadata/broad_pool.csv`）。
 - Gate 0 = **CLOSED**：4 项检查全部通过、`amendment_log` 为空、冻结产物逐字节重算一致（`outputs/week1/gate0_record.md`、`docs/00_stage0_definitions.md`）。
 
@@ -184,24 +188,60 @@
 - §21 计算预算账本：PASS 4 / PARTIAL 4 / MISSING 2；仓库无 CPU-core-hours / p90 作业成本 / frequency-only 成本（`outputs/week25/compute_budget_ledger.json`、`docs/44_week25_compute_budget_ledger.md`）。
 - F55 / 核心文件 §24 Figure 5 补全：在 C1 子集（n = 10）上给出配位位移 × 描述符标签的关系——氧化轴 `tpsa` ρ = **−0.890**（精确置换 p = 0.0011）、`donor_count` ρ = **−0.794**（p = 0.0077），还原轴 14 条相关**全部不显著**；标签分层对比 47 条中仅 **3** 条可估计（齿数 / 态身份 / cyclic vs linear，组内 n ≥ 4），其余（组内 n < 4）判 `not_estimable`；ESP 字段仓库内不存在（`not_available_in_repo`）。**未作多重比较校正，属探索性证据、不得称显著**，也不改动任何既有判决（`scripts/analyze_w25_figure_f55.py`、`outputs/week25/figure_f55_stats.json`、`outputs/week25/F55_manifest.md`、`outputs/figures/F55_coord_descriptor_tags.png`）。
 - 论文 v5 同步：新增 §3.17「配位位移与描述符标签的关系（§24 Figure 5 的补全）」与图 22，论文图数 21 → **22**（重建后 **34 页**、表 1–15），并按评审意见移除运行页眉；核心文件 §24 对齐表中 Figure 5 由 PARTIAL → **PASS**（`论文/build_paper_docx.py`、`docs/43_week25_corefile_figure_alignment.md`）。
+- 论文 v6 同步（核心文件结构性要求补全）：新增 §5.10「核心方案结构性要求的落点」与表 16、表 17——逐条登记 §7.1 方法审计（‘两种 DFT functional’未做、以 GFN2-xTB↔r2SCAN-3c 跨引擎与 T5 弥散对照替代）、§17.1 微溶剂化覆盖（11 分子 × 12 motif、单一 1:2 化学计量、robust inversion 一类因现象未观测为空）、§27 Phase II–IV 路线与 §28 目录骨架↔仓库实际路径映射；§5.3 增补 §25.2 / §26 的增量逐条对应，§5.4 表 10 增方法审计两行，§5.8 表 14 将 §24 Figure 4 明确登记为 negative result。重建后 **35 页**、表 1–17（`论文/build_paper_docx.py`、`docs/45_week25_paper_v6_corefile_optimization.md`）。
+
+## R13 定义修订（2026-10-08，append-only amendment）
+
+外部评审把仓库定位为「相当完整的 decision-stability prototype」，并指出下一阶段的关键不是继续堆周，而是补齐几个**物理定义缺口**、收缩叙事。
+R13 按优先级落地（完整对照见 `docs/46_definitional_amendment_r13.md`）：
+
+| 优先级 | 修正 | 落地 |
+| --- | --- | --- |
+| 🔴 P0 | P1 vertical → 拆成 `P1v` + `P1a` | `config/scientific_definitions.yaml`、`outputs/phase2_p1a/`、`docs/p1v_vs_p1a.md` |
+| 🔴 P0 | C1 还原态 state-identity 分层 | `outputs/state_identity/`、`docs/state_identity_protocol.md` |
+| 🔴 P0 | Gate 1 双轨、停用 validated target | `target_naming`、`docs/gate1_negative_result.md` |
+| 🟠 P1 | `f_robust_inv = 0` 三元化 + 分辨率曲线 | `src/electrolyte_ranking/decision_state.py`、`outputs/decision_state/` |
+| 🟠 P1 | C2 更名 first-shell microsolvation（CN=2） | `axis_B_environment_states.C2` |
+| 🟠 P1 | P2 拆成 `P2a`（SMD）/ `P2eps`（bare CPCM ε） | `axis_A_proxy_hierarchy` |
+
+### R13 · 三态判据 + 分辨率曲线（`outputs/decision_state`）
+
+- `P0 → P1v` 还原轴：STABLE **44** / UNRESOLVED **109** / ROBUST_INVERSION **0**；`f_UNRESOLVED` = 71.2%。「零稳健翻转」在这里的含义是 **evidence insufficient to resolve**，不是 stable（`outputs/decision_state/decision_state_summary.md`）。
+
+### R13 · C1 还原态身份分层（`outputs/state_identity`）
+
+- 12 个还原态标签：`Li_centered_or_mixed_redox` **11**、`molecule_centered_redox` **1**。
+- 分层后还原轴：all states n = **10**（τ_b = -0.467）→ molecule-centered only n = **1**，**排序无定义**（配不成 pair）。
+
+### R13 · P1v vs P1a 绝热阶梯（`outputs/phase2_p1a`）
+
+- 氧化轴 n = **12**：Kendall τ_b(P1v, P1a) = **0.788**，Spearman ρ = 0.923；位移 d = IP_a − IP_v 的 population std = **0.207 eV**（`docs/p1v_vs_p1a.md`）。
+- 还原轴按 `unbound_anion` 规则**排除**（气相阴离子不束缚），这不是缺陷，而是补出 P1a 这一层的理由本身。
+
+### R13 · Gate 1 双轨定位（`outputs/gate1`）
+
+- **Track A**（decision stability）= **computationally_established**；**Track B**（external validity）= **NOT CLOSED**。排序一致性层判 `ordering_disagrees`（Kendall τ_b = 0.429 < 0.90，n_pairs = 21）。Track A 的结论**不依赖** Track B；Track B 未闭合只削弱「绝对尺度 / 真实排序」类声明的强度（`outputs/gate1/gate1_dual_track.md`）。
 
 ## Gate 状态与未闭合项
 
 | Gate | 状态 | 说明 |
 | --- | --- | --- |
-| Gate 0（定义冻结） | **CLOSED** | `config/scientific_definitions.yaml` + `config/prereg.yaml` 未被改动，`amendment_log` 为空（`outputs/week1/gate0_record.md`）。 |
+| Gate 0（定义冻结） | **CLOSED** | R13 amendment（P1→P1v/P1a、P2→P2a/P2eps、C2 更名、C1 还原态分层、三态判据）已登记进 `config/prereg.yaml` 的 `amendment_log` 并**重冻结**；`scientific_definitions.yaml` schema 1.0→2.0（`outputs/week1/gate0_record.md`）。 |
 | Gate 1（方法 / 锚点） | **NOT CLOSED** | **排序一致性层**首次可评但未通过：Kendall **τ_b = 0.4286 < 0.90**、**n_pairs = 21**，判 **`ordering_disagrees`**（一致 15 / 不一致 6）（`outputs/week25/series_rel_ordering_check.json`）。**绝对标定层**：溶液相锚点 31 行 `est` 按 R7 裁决记为 **limitation**，不再单列 blocker。 |
 | Gate 2+ | 未定义 / 未触发 | —— |
 
 - **排序层为什么未闭合**：证据是**预注册的负结果**；数值本身不得事后通过剔除分子、替换模型列或放宽容差「救回」（`docs/40_week25_gate1_report.md`）。要闭合需要一条覆盖 ≥ 7 个核心集分子、同装置 / 同判据、且描述符在溶剂间**真有离散度**的新同源序列。
 - **还原轴**：旁证级数据只有 3 分子 / 3 对（< 18），判 `not_evaluable_secondary_only` —— 是「数据不足」，不是「不一致」（`outputs/week25/gate1_reduction_secondary.json`）。
 - **上游可行性审计**：W24-D 发现本地文献最长同源序列 k = 1，判 Gate 1 **NOT_CLOSABLE**（`outputs/week24_corealign/gate1_anchor_feasibility.md`）。
+- **R13 · P1 实为 vertical**：早期 `P1` 是同一几何上的三态单点；R13 更名 `P1v` 并补出 adiabatic 层 `P1a`（`outputs/phase2_p1a/`）。气相阴离子全部不束缚（`unbound_anion = 18`），因此 **P1a 只有氧化轴可比较**，还原轴按规则排除（`docs/p1v_vs_p1a.md`）。
+- **R13 · C1 还原态身份失败**：12 个还原态里 **11** 个外加电子落在 Li 上；只用 `molecule_centered_redox` 时主 motif 只剩 **1** 个成员、还原排序**无定义**。因此原来的还原轴 `τ_b = -0.467` 不是排序不稳定，而是 observable identity failure（`outputs/state_identity/state_identity_summary.md`）。
+- **R13 · 泛化声明降级**：18 / 40 只支撑 mechanistic proof-of-concept；不得据此声称方法可泛化到电解液化学空间，也不得把 AL 预算说成普适最小标签数。
 
 ## 目录结构与关键路径
 
 | 路径 | 内容 |
 | --- | --- |
-| `src/electrolyte_ranking/` | 库：`toolchain` / `xtb` / `orca` / `ranking` / `uncertainty` / `provenance` / `qc` |
+| `src/electrolyte_ranking/` | 库：`toolchain` / `xtb` / `orca` / `ranking` / `decision_state` / `uncertainty` / `provenance` / `qc` |
 | `scripts/` | 环境自检、元数据构建、锚点校验、逐周运行器与分析脚本，以及本 README 的生成器 `build_github_readme.py` |
 | `data/` | `metadata/`（`core_set.csv` 18、`broad_pool.csv` 40）、`anchors/`（气相 / 溶液相锚点、`within_series_ordering.csv`、`_received/`） |
 | `outputs/` | 每周可复现产物 `week1`–`week25`（含 `week22_hardening`、`week24_corealign`）、`figures/`（F0–F55 及清单） |
@@ -217,7 +257,7 @@
 | --- | --- |
 | `..\成果输出\` | 对外交付层：`README.md`（索引 + 一周一张表）、`数据结果汇总.md`、`统一数据文档.md`、`weekN/` 镜像（含 `SHA256SUMS`、`verification.json`） |
 | `..\核心文件\` | 科学方案 v2、阅读清单、Gate 1 溶液锚点电位表、文献 |
-| `..\论文\` | 结题论文源与 PDF（`build_paper_docx.py` 重建；当前 `_v5`） |
+| `..\论文\` | 结题论文源与 PDF（`build_paper_docx.py` 重建；当前 `_v6`） |
 
 ## 快速开始 / 复现
 

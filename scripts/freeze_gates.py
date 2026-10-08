@@ -358,6 +358,31 @@ STAGE2_PATTERNS: tuple[str, ...] = (
     "tests/test_week23_report.py",
     "docs/34_*.md",
     "outputs/week23/**/*",
+    # R13 (Week 26 / 2026-10-08): the definitional amendment.  P1 -> P1v + P1a,
+    # P2 -> P2a + P2eps, C2 renamed to first-shell microsolvation, the C1
+    # reduction state-identity stratification, and the three-state decision
+    # vocabulary with the f_unresolved(z) resolution curve.  The only new
+    # electronic structure is the gas-phase adiabatic cation/anion Opt of the
+    # 12-molecule T2 subset (outputs/phase2_p1a); the stratification and the
+    # decision-state report are zero-new-job re-reads of frozen Week-4/5 tables.
+    "scripts/run_p1a_adiabatic.py",
+    "scripts/compare_vertical_adiabatic.py",
+    "scripts/classify_state_identity.py",
+    "scripts/decision_state_report.py",
+    "src/electrolyte_ranking/decision_state.py",
+    "tests/test_decision_state.py",
+    "tests/test_decision_state_report.py",
+    "tests/test_state_identity_stratification.py",
+    "docs/46_*.md",
+    "docs/p1v_vs_p1a.md",
+    "docs/state_identity_protocol.md",
+    "docs/gate1_negative_result.md",
+    "outputs/phase2_p1a/**/*",
+    "outputs/state_identity/**/*",
+    "outputs/decision_state/**/*",
+    "scripts/gate1_dual_track_report.py",
+    "tests/test_gate1_dual_track.py",
+    "outputs/gate1/**/*",
 )
 
 #: Binary wavefunction/scratch products are provenance, not numbers: they are large
@@ -496,8 +521,28 @@ def evaluate_stage0(root: Path = REPO_ROOT) -> GateResult:
     if amendments in ([], None):
         result.add("prereg:amendment_log", True, "empty")
     else:
-        result.add("prereg:amendment_log", False, f"{len(amendments)} amendment(s) present")
-        result.closed = False
+        # amendment_log is append-only, so a correction never disappears; what the
+        # gate checks is whether every recorded amendment has been re-frozen after
+        # being explained (config/prereg.yaml ``refreeze_policy``).  An open
+        # amendment keeps Gate 0 NOT CLOSED rather than letting a silent edit pass.
+        open_items = [
+            entry
+            for entry in amendments
+            if not (isinstance(entry, dict) and entry.get("refrozen"))
+        ]
+        if open_items:
+            result.add(
+                "prereg:amendment_log",
+                False,
+                f"{len(open_items)} of {len(amendments)} amendment(s) not re-frozen",
+            )
+            result.closed = False
+        else:
+            result.add(
+                "prereg:amendment_log",
+                True,
+                f"{len(amendments)} amendment(s), all re-frozen",
+            )
 
     return result
 
