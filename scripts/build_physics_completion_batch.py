@@ -650,112 +650,228 @@ LOCAL_FREQ_CHECK = {"molecule": "water", "n_atoms": "3", "n_modes": "9",
                     "imaginary_modes": "0", "note": "NumFreq under SMD completed; frequency path usable"}
 
 # ---------------------------------------------------------------------------
-# 方案 15.5 / 15.6 —— DMC/EMC 自由态 pilot（新增电子结构计算）
-# 几何：RDKit ETKDG+MMFF 起点 -> xTB 6.7.1pre GFN2 Opt（气相）；
-# 单点/频率：ORCA 6.1.1，用 WP1 核验过的关键字。
-# 只覆盖四主状态中的自由态两态（M、M+）；Li 配位两态留待后续。
+# 方案 15.5 / 15.6 —— 自由态 + Li 配位态 pilot（新增电子结构计算，12 主集）
+# 几何：RDKit ETKDG+MMFF 起点 -> xTB 6.7.1pre GFN2 Opt（气相），同一驱动脚本重算；
+# 单点：ORCA 6.1.1 wB97X-D4 + SMD(acetonitrile)，中性 def2-TZVP / def2-TZVPD 各一次，
+# 阳离子与 Li 复合物一律 def2-TZVPD（含弥散：电离/还原态必须）。
+# Li 初始位按给体类型（羰基/醚/腈/S=O/P=O 氧或腈氮）沿外侧 1.9 A 放置后 GFN2 优化；
+# 2+ 态若 Li 在弛豫中解离，照实记为 dissociated，不换 motif 硬凑配位数（方案 6.3/9）。
 # 原始输出留在仓库外，不入交付镜像。
 # ---------------------------------------------------------------------------
-PILOT_METHOD_NOTE = "wB97X-D4/def2-TZVP (neutral); wB97X-D4/def2-TZVPD (cation, diffuse); SMD acetonitrile"
+PILOT_METHOD_NOTE = "wB97X-D4/def2-TZVP (neutral); wB97X-D4/def2-TZVPD (charged, diffuse); SMD acetonitrile"
 PILOT_GEOM_NOTE = "RDKit ETKDG+MMFF start -> xTB 6.7.1pre GFN2 Opt (gas)"
 
+#: pilot 覆盖的 12 主集分子（顺序 = 主集顺序）。
+PILOT_MAIN_MOLECULES = [("C01", "DMC"), ("C02", "EMC"), ("C03", "DEC"), ("C04", "EC"), ("C05", "PC"), ("C08", "DME"), ("C09", "DOL"), ("C13", "GBL"), ("C14", "SL"), ("C15", "DMSO"), ("C16", "AN"), ("C17", "TMP")]
+
+#: Li 初始位所用给体（逐分子记录；direction 为单位矢量，指向 Li 起点外移一侧）。
+PILOT_DONOR_PLACEMENT = [
+    {"mol_id": "C01", "name": "DMC", "donor_family": "carbonyl", "donor_index": "3", "direction": "[-0.042043, 0.916646, -0.397483]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+    {"mol_id": "C02", "name": "EMC", "donor_family": "carbonyl", "donor_index": "4", "direction": "[-0.299228, 0.037424, -0.953447]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+    {"mol_id": "C03", "name": "DEC", "donor_family": "carbonyl", "donor_index": "4", "direction": "[-0.165012, 0.571254, -0.804015]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+    {"mol_id": "C04", "name": "EC", "donor_family": "carbonyl", "donor_index": "4", "direction": "[0.892373, 0.429417, 0.138823]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+    {"mol_id": "C05", "name": "PC", "donor_family": "carbonyl", "donor_index": "5", "direction": "[-0.606250, -0.270178, -0.747974]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+    {"mol_id": "C08", "name": "DME", "donor_family": "ether", "donor_index": "1", "direction": "[0.218490, 0.348784, 0.911379]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+    {"mol_id": "C09", "name": "DOL", "donor_family": "ether", "donor_index": "2", "direction": "[-0.016158, 0.937163, 0.348518]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+    {"mol_id": "C13", "name": "GBL", "donor_family": "carbonyl", "donor_index": "0", "direction": "[0.922428, 0.360256, 0.139076]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+    {"mol_id": "C14", "name": "SL", "donor_family": "sulfone", "donor_index": "0", "direction": "[0.597317, 0.151480, 0.787570]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+    {"mol_id": "C15", "name": "DMSO", "donor_family": "sulfoxide", "donor_index": "3", "direction": "[0.103789, 0.680423, 0.725433]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+    {"mol_id": "C16", "name": "AN", "donor_family": "nitrile", "donor_index": "2", "direction": "[0.999831, 0.000151, -0.018397]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+    {"mol_id": "C17", "name": "TMP", "donor_family": "phosphoryl", "donor_index": "3", "direction": "[-0.033129, 0.102713, -0.994159]", "placement": "Li start at donor outward 1.9 A from the GFN2-optimised neutral geometry"},
+]
+
+#: 自由态单点（M 两基组 + M_plus 一致基组），每分子 3 行。
 PILOT_FREE_STATE_ENERGIES = [
-    {"record_id": "C01|M", "mol_id": "C01", "name": "DMC", "state": "M", "charge": "0", "multiplicity": "1",
-     "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP",
-     "scf_cycles": "20", "final_sp_eh": "-343.854211229029", "terminated": "true", "wall_sec": "24.4", "cores": "4"},
-    {"record_id": "C01|M_tzvpd", "mol_id": "C01", "name": "DMC", "state": "M", "charge": "0", "multiplicity": "1",
-     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
-     "scf_cycles": "20", "final_sp_eh": "-343.856181464212", "terminated": "true", "wall_sec": "36.3", "cores": "4"},
-    {"record_id": "C01|M_plus", "mol_id": "C01", "name": "DMC", "state": "M_plus", "charge": "1", "multiplicity": "2",
-     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
-     "scf_cycles": "20", "final_sp_eh": "-343.526965851004", "terminated": "true", "wall_sec": "44.1", "cores": "4"},
-    {"record_id": "C02|M", "mol_id": "C02", "name": "EMC", "state": "M", "charge": "0", "multiplicity": "1",
-     "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP",
-     "scf_cycles": "20", "final_sp_eh": "-383.211199702608", "terminated": "true", "wall_sec": "31.9", "cores": "4"},
-    {"record_id": "C02|M_tzvpd", "mol_id": "C02", "name": "EMC", "state": "M", "charge": "0", "multiplicity": "1",
-     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
-     "scf_cycles": "20", "final_sp_eh": "-383.213141521146", "terminated": "true", "wall_sec": "52.7", "cores": "4"},
-    {"record_id": "C02|M_plus", "mol_id": "C02", "name": "EMC", "state": "M_plus", "charge": "1", "multiplicity": "2",
-     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
-     "scf_cycles": "31", "final_sp_eh": "-382.899370886410", "terminated": "true", "wall_sec": "92.9", "cores": "4"},
+    {"record_id": "C01|M", "mol_id": "C01", "name": "DMC", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-343.854211228425", "terminated": "true", "wall_sec": "36.0", "cores": "4"},
+    {"record_id": "C01|M_tzvpd", "mol_id": "C01", "name": "DMC", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-343.856181464206", "terminated": "true", "wall_sec": "62.3", "cores": "4"},
+    {"record_id": "C01|M_plus", "mol_id": "C01", "name": "DMC", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-343.527011826787", "terminated": "true", "wall_sec": "76.1", "cores": "4"},
+    {"record_id": "C02|M", "mol_id": "C02", "name": "EMC", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-383.211199702608", "terminated": "true", "wall_sec": "60.5", "cores": "4"},
+    {"record_id": "C02|M_tzvpd", "mol_id": "C02", "name": "EMC", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-383.213141521146", "terminated": "true", "wall_sec": "102.3", "cores": "4"},
+    {"record_id": "C02|M_plus", "mol_id": "C02", "name": "EMC", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "31", "final_sp_eh": "-382.899405959663", "terminated": "true", "wall_sec": "165.2", "cores": "4"},
+    {"record_id": "C03|M", "mol_id": "C03", "name": "DEC", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-422.568593818278", "terminated": "true", "wall_sec": "41.4", "cores": "4"},
+    {"record_id": "C03|M_tzvpd", "mol_id": "C03", "name": "DEC", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-422.570563717756", "terminated": "true", "wall_sec": "71.7", "cores": "4"},
+    {"record_id": "C03|M_plus", "mol_id": "C03", "name": "DEC", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "34", "final_sp_eh": "-422.254798778826", "terminated": "true", "wall_sec": "133.3", "cores": "4"},
+    {"record_id": "C04|M", "mol_id": "C04", "name": "EC", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-342.648140166966", "terminated": "true", "wall_sec": "29.8", "cores": "4"},
+    {"record_id": "C04|M_tzvpd", "mol_id": "C04", "name": "EC", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-342.650103844399", "terminated": "true", "wall_sec": "51.0", "cores": "4"},
+    {"record_id": "C04|M_plus", "mol_id": "C04", "name": "EC", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "18", "final_sp_eh": "-342.333927357547", "terminated": "true", "wall_sec": "62.5", "cores": "4"},
+    {"record_id": "C05|M", "mol_id": "C05", "name": "PC", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-382.007760780767", "terminated": "true", "wall_sec": "51.4", "cores": "4"},
+    {"record_id": "C05|M_tzvpd", "mol_id": "C05", "name": "PC", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-382.009785515284", "terminated": "true", "wall_sec": "89.1", "cores": "4"},
+    {"record_id": "C05|M_plus", "mol_id": "C05", "name": "PC", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "24", "final_sp_eh": "-381.695871733911", "terminated": "true", "wall_sec": "127.6", "cores": "4"},
+    {"record_id": "C08|M", "mol_id": "C08", "name": "DME", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-309.100173877788", "terminated": "true", "wall_sec": "53.7", "cores": "4"},
+    {"record_id": "C08|M_tzvpd", "mol_id": "C08", "name": "DME", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-309.102759637016", "terminated": "true", "wall_sec": "91.5", "cores": "4"},
+    {"record_id": "C08|M_plus", "mol_id": "C08", "name": "DME", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "18", "final_sp_eh": "-308.851702088551", "terminated": "true", "wall_sec": "87.3", "cores": "4"},
+    {"record_id": "C09|M", "mol_id": "C09", "name": "DOL", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-268.549202816037", "terminated": "true", "wall_sec": "29.3", "cores": "4"},
+    {"record_id": "C09|M_tzvpd", "mol_id": "C09", "name": "DOL", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-268.551257729030", "terminated": "true", "wall_sec": "49.7", "cores": "4"},
+    {"record_id": "C09|M_plus", "mol_id": "C09", "name": "DOL", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "18", "final_sp_eh": "-268.287236055064", "terminated": "true", "wall_sec": "54.0", "cores": "4"},
+    {"record_id": "C13|M", "mol_id": "C13", "name": "GBL", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-306.736096877865", "terminated": "true", "wall_sec": "41.4", "cores": "4"},
+    {"record_id": "C13|M_tzvpd", "mol_id": "C13", "name": "GBL", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-306.737875285260", "terminated": "true", "wall_sec": "68.5", "cores": "4"},
+    {"record_id": "C13|M_plus", "mol_id": "C13", "name": "GBL", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "21", "final_sp_eh": "-306.442615657033", "terminated": "true", "wall_sec": "100.2", "cores": "4"},
+    {"record_id": "C14|M", "mol_id": "C14", "name": "SL", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-706.150931720970", "terminated": "true", "wall_sec": "73.3", "cores": "4"},
+    {"record_id": "C14|M_tzvpd", "mol_id": "C14", "name": "SL", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-706.153885628549", "terminated": "true", "wall_sec": "121.2", "cores": "4"},
+    {"record_id": "C14|M_plus", "mol_id": "C14", "name": "SL", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "18", "final_sp_eh": "-705.862184264030", "terminated": "true", "wall_sec": "132.1", "cores": "4"},
+    {"record_id": "C15|M", "mol_id": "C15", "name": "DMSO", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-553.367190849897", "terminated": "true", "wall_sec": "24.8", "cores": "4"},
+    {"record_id": "C15|M_tzvpd", "mol_id": "C15", "name": "DMSO", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-553.370194407920", "terminated": "true", "wall_sec": "38.3", "cores": "4"},
+    {"record_id": "C15|M_plus", "mol_id": "C15", "name": "DMSO", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-553.132235081139", "terminated": "true", "wall_sec": "46.9", "cores": "4"},
+    {"record_id": "C16|M", "mol_id": "C16", "name": "AN", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "19", "final_sp_eh": "-132.866446560651", "terminated": "true", "wall_sec": "15.8", "cores": "4"},
+    {"record_id": "C16|M_tzvpd", "mol_id": "C16", "name": "AN", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "19", "final_sp_eh": "-132.866896538774", "terminated": "true", "wall_sec": "19.1", "cores": "4"},
+    {"record_id": "C16|M_plus", "mol_id": "C16", "name": "AN", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "17", "final_sp_eh": "-132.519126824547", "terminated": "true", "wall_sec": "19.3", "cores": "4"},
+    {"record_id": "C17|M", "mol_id": "C17", "name": "TMP", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-762.423053579956", "terminated": "true", "wall_sec": "79.0", "cores": "4"},
+    {"record_id": "C17|M_tzvpd", "mol_id": "C17", "name": "TMP", "state": "M", "charge": "0", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "20", "final_sp_eh": "-762.426072838656", "terminated": "true", "wall_sec": "136.9", "cores": "4"},
+    {"record_id": "C17|M_plus", "mol_id": "C17", "name": "TMP", "state": "M_plus", "charge": "1", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "scf_cycles": "18", "final_sp_eh": "-762.105771531730", "terminated": "true", "wall_sec": "144.9", "cores": "4"},
 ]
 
-PILOT_LEDGER_RAW = [
-    {"record_id": "C01|M", "mol_id": "C01", "name": "DMC", "state": "M",
-     "level": "wB97X-D4/def2-TZVP SMD(acetonitrile) NumFreq (qRRHO)",
-     "e_sp_eh": "-343.854211229029", "zpe_eh": "0.09601496", "e_to_g_thermal_eh": "0.06577493",
-     "enthalpy_eh": "-343.75019266", "entropy_corr_eh": "-0.03825196", "g_single_eh": "-343.78844462",
-     "qrrho": "true", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00",
-     "lowest_freq_cm1": "73.31", "imaginary_modes": "0"},
-]
-
-PILOT_COST_JOBS = [
-    {"job_id": "C01|M|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "xtb_opt",
-     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.25", "status": "ok"},
-    {"job_id": "C01|M_plus|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "M_plus", "phase": "xtb_opt",
-     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.13", "status": "ok"},
-    {"job_id": "C02|M|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "M", "phase": "xtb_opt",
-     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.14", "status": "ok"},
-    {"job_id": "C02|M_plus|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "M_plus", "phase": "xtb_opt",
-     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.25", "status": "ok"},
-    {"job_id": "C01|M|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "orca_sp",
-     "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "24.4", "status": "ok"},
-    {"job_id": "C01|M_tzvpd|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "orca_sp",
-     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "36.3", "status": "ok"},
-    {"job_id": "C01|M_plus|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "M_plus", "phase": "orca_sp",
-     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "44.1", "status": "ok"},
-    {"job_id": "C02|M|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "M", "phase": "orca_sp",
-     "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "31.9", "status": "ok"},
-    {"job_id": "C02|M_tzvpd|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "M", "phase": "orca_sp",
-     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "52.7", "status": "ok"},
-    {"job_id": "C02|M_plus|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "M_plus", "phase": "orca_sp",
-     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "92.9", "status": "ok"},
-    {"job_id": "C01|M|orca_freq", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "orca_freq",
-     "method": "wB97X-D4/def2-TZVP SMD NumFreq", "cores": "4", "wall_sec": "1129.1", "status": "ok"},
-    {"job_id": "C01|LiM_plus|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "LiM_plus", "phase": "xtb_opt",
-     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.28", "status": "ok"},
-    {"job_id": "C01|LiM_2plus|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "LiM_2plus", "phase": "xtb_opt",
-     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.17", "status": "ok"},
-    {"job_id": "C02|LiM_plus|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "LiM_plus", "phase": "xtb_opt",
-     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.14", "status": "ok"},
-    {"job_id": "C02|LiM_2plus|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "LiM_2plus", "phase": "xtb_opt",
-     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.34", "status": "ok"},
-    {"job_id": "C01|LiM_plus|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "LiM_plus", "phase": "orca_sp",
-     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "42.3", "status": "ok"},
-    {"job_id": "C01|LiM_2plus|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "LiM_2plus", "phase": "orca_sp",
-     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "50.6", "status": "ok"},
-    {"job_id": "C02|LiM_plus|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "LiM_plus", "phase": "orca_sp",
-     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "60.7", "status": "ok"},
-    {"job_id": "C02|LiM_2plus|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "LiM_2plus", "phase": "orca_sp",
-     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "104.5", "status": "ok"},
-]
-
-#: 理想气体 1 atm -> 溶液 1 mol/L 标准态项：RT ln(V_m)，V_m = RT/P = 24.4654 L/mol @ 298.15 K, 1 atm。
-#: Li 配位两态（LiM_plus / LiM_2plus）：xTB GFN2 Opt 起点 Li 置于羰基 O 外侧 1.9 A。
+#: Li 配位两态（LiM_plus / LiM_2plus）；Li 起点见 PILOT_DONOR_PLACEMENT。
+#: donor_contacts = 2.60 A 内的给体 O/N 数；identity=dissociated_* 表示 2+ 态 Li 已离开片段。
 PILOT_LI_STATE_ENERGIES = [
-    {"record_id": "C01|LiM_plus", "mol_id": "C01", "name": "DMC", "state": "LiM_plus", "charge": "1", "multiplicity": "1",
-     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
-     "basis_functions": "302", "scf_cycles": "20", "final_sp_eh": "-351.306668533885", "terminated": "true",
-     "wall_sec": "42.3", "cores": "4", "li_o_ang": "1.654", "nonli_components": "1", "identity": "intact_monodentate_carbonyl"},
-    {"record_id": "C01|LiM_2plus", "mol_id": "C01", "name": "DMC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2",
-     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
-     "basis_functions": "302", "scf_cycles": "20", "final_sp_eh": "-350.957111705625", "terminated": "true",
-     "wall_sec": "50.6", "cores": "4", "li_o_ang": "1.805", "nonli_components": "1", "identity": "intact_monodentate_carbonyl"},
-    {"record_id": "C02|LiM_plus", "mol_id": "C02", "name": "EMC", "state": "LiM_plus", "charge": "1", "multiplicity": "1",
-     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
-     "basis_functions": "357", "scf_cycles": "20", "final_sp_eh": "-390.664261343481", "terminated": "true",
-     "wall_sec": "60.7", "cores": "4", "li_o_ang": "1.659", "nonli_components": "1", "identity": "intact_monodentate_carbonyl"},
-    {"record_id": "C02|LiM_2plus", "mol_id": "C02", "name": "EMC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2",
-     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
-     "basis_functions": "357", "scf_cycles": "31", "final_sp_eh": "-390.323858369572", "terminated": "true",
-     "wall_sec": "104.5", "cores": "4", "li_o_ang": "1.782", "nonli_components": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C01|LiM_plus", "mol_id": "C01", "name": "DMC", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "302", "scf_cycles": "20", "final_sp_eh": "-351.306668426280", "terminated": "true", "wall_sec": "70.1", "cores": "4", "li_o_ang": "1.654", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C01|LiM_2plus", "mol_id": "C01", "name": "DMC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "302", "scf_cycles": "20", "final_sp_eh": "-350.957111976693", "terminated": "true", "wall_sec": "86.1", "cores": "4", "li_o_ang": "1.805", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C02|LiM_plus", "mol_id": "C02", "name": "EMC", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "357", "scf_cycles": "20", "final_sp_eh": "-390.664261161903", "terminated": "true", "wall_sec": "119.1", "cores": "4", "li_o_ang": "1.659", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C02|LiM_2plus", "mol_id": "C02", "name": "EMC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "357", "scf_cycles": "31", "final_sp_eh": "-390.323857580036", "terminated": "true", "wall_sec": "194.2", "cores": "4", "li_o_ang": "1.782", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C03|LiM_plus", "mol_id": "C03", "name": "DEC", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "412", "scf_cycles": "20", "final_sp_eh": "-430.021811072568", "terminated": "true", "wall_sec": "81.5", "cores": "4", "li_o_ang": "1.653", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C03|LiM_2plus", "mol_id": "C03", "name": "DEC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "412", "scf_cycles": "20", "final_sp_eh": "-429.679002025732", "terminated": "true", "wall_sec": "97.2", "cores": "4", "li_o_ang": "1.736", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C04|LiM_plus", "mol_id": "C04", "name": "EC", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "284", "scf_cycles": "20", "final_sp_eh": "-350.101404846212", "terminated": "true", "wall_sec": "62.1", "cores": "4", "li_o_ang": "1.658", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C04|LiM_2plus", "mol_id": "C04", "name": "EC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "284", "scf_cycles": "18", "final_sp_eh": "-349.772032662564", "terminated": "true", "wall_sec": "68.2", "cores": "4", "li_o_ang": "1.852", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C05|LiM_plus", "mol_id": "C05", "name": "PC", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "339", "scf_cycles": "20", "final_sp_eh": "-389.461161737606", "terminated": "true", "wall_sec": "95.1", "cores": "4", "li_o_ang": "1.651", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C05|LiM_2plus", "mol_id": "C05", "name": "PC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "339", "scf_cycles": "23", "final_sp_eh": "-389.134132175016", "terminated": "true", "wall_sec": "148.7", "cores": "4", "li_o_ang": "1.800", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C08|LiM_plus", "mol_id": "C08", "name": "DME", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "335", "scf_cycles": "20", "final_sp_eh": "-316.574613930125", "terminated": "true", "wall_sec": "67.3", "cores": "4", "li_o_ang": "1.795", "nonli_components": "1", "donor_contacts": "2", "identity": "intact_bidentate_ether"},
+    {"record_id": "C08|LiM_2plus", "mol_id": "C08", "name": "DME", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "335", "scf_cycles": "18", "final_sp_eh": "-316.277931354453", "terminated": "true", "wall_sec": "67.2", "cores": "4", "li_o_ang": "11.298", "nonli_components": "1", "donor_contacts": "0", "identity": "dissociated_ether"},
+    {"record_id": "C09|LiM_plus", "mol_id": "C09", "name": "DOL", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "262", "scf_cycles": "20", "final_sp_eh": "-275.998301763872", "terminated": "true", "wall_sec": "57.3", "cores": "4", "li_o_ang": "1.973", "nonli_components": "1", "donor_contacts": "2", "identity": "intact_bidentate_ether"},
+    {"record_id": "C09|LiM_2plus", "mol_id": "C09", "name": "DOL", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "262", "scf_cycles": "22", "final_sp_eh": "-275.715481828471", "terminated": "true", "wall_sec": "75.8", "cores": "4", "li_o_ang": "2.505", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_ether"},
+    {"record_id": "C13|LiM_plus", "mol_id": "C13", "name": "GBL", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "299", "scf_cycles": "20", "final_sp_eh": "-314.190822388363", "terminated": "true", "wall_sec": "78.3", "cores": "4", "li_o_ang": "1.667", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C13|LiM_2plus", "mol_id": "C13", "name": "GBL", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "299", "scf_cycles": "23", "final_sp_eh": "-313.866423793393", "terminated": "true", "wall_sec": "105.1", "cores": "4", "li_o_ang": "1.815", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C14|LiM_plus", "mol_id": "C14", "name": "SL", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "363", "scf_cycles": "20", "final_sp_eh": "-713.604058153811", "terminated": "true", "wall_sec": "89.2", "cores": "4", "li_o_ang": "1.885", "nonli_components": "1", "donor_contacts": "2", "identity": "intact_bidentate_sulfone"},
+    {"record_id": "C14|LiM_2plus", "mol_id": "C14", "name": "SL", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "363", "scf_cycles": "18", "final_sp_eh": "-713.289177417651", "terminated": "true", "wall_sec": "88.1", "cores": "4", "li_o_ang": "1.721", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_sulfone"},
+    {"record_id": "C15|LiM_plus", "mol_id": "C15", "name": "DMSO", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "231", "scf_cycles": "20", "final_sp_eh": "-560.832093775537", "terminated": "true", "wall_sec": "47.4", "cores": "4", "li_o_ang": "1.628", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_sulfoxide"},
+    {"record_id": "C15|LiM_2plus", "mol_id": "C15", "name": "DMSO", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "231", "scf_cycles": "20", "final_sp_eh": "-560.561162382104", "terminated": "true", "wall_sec": "57.4", "cores": "4", "li_o_ang": "1.802", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_sulfoxide"},
+    {"record_id": "C16|LiM_plus", "mol_id": "C16", "name": "AN", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "155", "scf_cycles": "19", "final_sp_eh": "-140.319887493920", "terminated": "true", "wall_sec": "21.8", "cores": "4", "li_o_ang": "1.859", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_nitrile"},
+    {"record_id": "C16|LiM_2plus", "mol_id": "C16", "name": "AN", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "155", "scf_cycles": "18", "final_sp_eh": "-139.946294773154", "terminated": "true", "wall_sec": "21.5", "cores": "4", "li_o_ang": "10.953", "nonli_components": "1", "donor_contacts": "0", "identity": "dissociated_nitrile"},
+    {"record_id": "C17|LiM_plus", "mol_id": "C17", "name": "TMP", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "412", "scf_cycles": "20", "final_sp_eh": "-769.884723216208", "terminated": "true", "wall_sec": "159.6", "cores": "4", "li_o_ang": "1.604", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_phosphoryl"},
+    {"record_id": "C17|LiM_2plus", "mol_id": "C17", "name": "TMP", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "basis_functions": "412", "scf_cycles": "26", "final_sp_eh": "-769.550930450943", "terminated": "true", "wall_sec": "213.7", "cores": "4", "li_o_ang": "1.684", "nonli_components": "1", "donor_contacts": "1", "identity": "intact_monodentate_phosphoryl"},
 ]
 
-#: 冻结 C1 层的对照值（只 DMC 有主 motif 行）；其 SMD 位移把气相自由 IP 当作 SMD 参考，属混口径。
+#: 液/气标准态项：RT ln(V_m)，V_m = RT/P = 24.4654 L/mol @ 298.15 K, 1 atm。
+PILOT_LEDGER_RAW = [
+    {"record_id": "C01|M", "mol_id": "C01", "name": "DMC", "state": "M", "level": "wB97X-D4/def2-TZVP SMD(acetonitrile) NumFreq (qRRHO)", "e_sp_eh": "-343.854211229029", "zpe_eh": "0.09601496", "e_to_g_thermal_eh": "0.06577493", "enthalpy_eh": "-343.75019266", "entropy_corr_eh": "-0.03825196", "g_single_eh": "-343.78844462", "qrrho": "true", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "73.31", "imaginary_modes": "0"},
+]
+
+#: 冻结 C1 层的对照（混口径：把气相自由 IP 当作 SMD 参考）；逐分子查表见 c1_primary。
 PILOT_C1_FROZEN_REF = {
     "C01": {"mol_id": "C01", "name": "DMC", "motif_id": "m1", "frozen_d_ip_smd_ev": "-1.75858",
             "convention": "frozen C1 used the gas-phase free IP as the SMD reference (mixed convention)"},
 }
+
+PILOT_COST_JOBS = [
+    {"job_id": "C01|M|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.09", "status": "ok"},
+    {"job_id": "C01|M_plus|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.15", "status": "ok"},
+    {"job_id": "C01|LiM_plus|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.13", "status": "ok"},
+    {"job_id": "C01|LiM_2plus|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.14", "status": "ok"},
+    {"job_id": "C01|M|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "36.0", "status": "ok"},
+    {"job_id": "C01|M_tzvpd|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "62.3", "status": "ok"},
+    {"job_id": "C01|M_plus|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "76.1", "status": "ok"},
+    {"job_id": "C01|LiM_plus|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "70.1", "status": "ok"},
+    {"job_id": "C01|LiM_2plus|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "86.1", "status": "ok"},
+    {"job_id": "C02|M|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.14", "status": "ok"},
+    {"job_id": "C02|M_plus|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.23", "status": "ok"},
+    {"job_id": "C02|LiM_plus|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.19", "status": "ok"},
+    {"job_id": "C02|LiM_2plus|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.35", "status": "ok"},
+    {"job_id": "C02|M|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "60.5", "status": "ok"},
+    {"job_id": "C02|M_tzvpd|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "102.3", "status": "ok"},
+    {"job_id": "C02|M_plus|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "165.2", "status": "ok"},
+    {"job_id": "C02|LiM_plus|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "119.1", "status": "ok"},
+    {"job_id": "C02|LiM_2plus|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "194.2", "status": "ok"},
+    {"job_id": "C03|M|xtb_opt", "mol_id": "C03", "molecule": "DEC", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.12", "status": "ok"},
+    {"job_id": "C03|M_plus|xtb_opt", "mol_id": "C03", "molecule": "DEC", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.37", "status": "ok"},
+    {"job_id": "C03|LiM_plus|xtb_opt", "mol_id": "C03", "molecule": "DEC", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.19", "status": "ok"},
+    {"job_id": "C03|LiM_2plus|xtb_opt", "mol_id": "C03", "molecule": "DEC", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.52", "status": "ok"},
+    {"job_id": "C03|M|orca_sp", "mol_id": "C03", "molecule": "DEC", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "41.4", "status": "ok"},
+    {"job_id": "C03|M_tzvpd|orca_sp", "mol_id": "C03", "molecule": "DEC", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "71.7", "status": "ok"},
+    {"job_id": "C03|M_plus|orca_sp", "mol_id": "C03", "molecule": "DEC", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "133.3", "status": "ok"},
+    {"job_id": "C03|LiM_plus|orca_sp", "mol_id": "C03", "molecule": "DEC", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "81.5", "status": "ok"},
+    {"job_id": "C03|LiM_2plus|orca_sp", "mol_id": "C03", "molecule": "DEC", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "97.2", "status": "ok"},
+    {"job_id": "C04|M|xtb_opt", "mol_id": "C04", "molecule": "EC", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.15", "status": "ok"},
+    {"job_id": "C04|M_plus|xtb_opt", "mol_id": "C04", "molecule": "EC", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.14", "status": "ok"},
+    {"job_id": "C04|LiM_plus|xtb_opt", "mol_id": "C04", "molecule": "EC", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.09", "status": "ok"},
+    {"job_id": "C04|LiM_2plus|xtb_opt", "mol_id": "C04", "molecule": "EC", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.10", "status": "ok"},
+    {"job_id": "C04|M|orca_sp", "mol_id": "C04", "molecule": "EC", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "29.8", "status": "ok"},
+    {"job_id": "C04|M_tzvpd|orca_sp", "mol_id": "C04", "molecule": "EC", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "51.0", "status": "ok"},
+    {"job_id": "C04|M_plus|orca_sp", "mol_id": "C04", "molecule": "EC", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "62.5", "status": "ok"},
+    {"job_id": "C04|LiM_plus|orca_sp", "mol_id": "C04", "molecule": "EC", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "62.1", "status": "ok"},
+    {"job_id": "C04|LiM_2plus|orca_sp", "mol_id": "C04", "molecule": "EC", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "68.2", "status": "ok"},
+    {"job_id": "C05|M|xtb_opt", "mol_id": "C05", "molecule": "PC", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.20", "status": "ok"},
+    {"job_id": "C05|M_plus|xtb_opt", "mol_id": "C05", "molecule": "PC", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.21", "status": "ok"},
+    {"job_id": "C05|LiM_plus|xtb_opt", "mol_id": "C05", "molecule": "PC", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.14", "status": "ok"},
+    {"job_id": "C05|LiM_2plus|xtb_opt", "mol_id": "C05", "molecule": "PC", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.21", "status": "ok"},
+    {"job_id": "C05|M|orca_sp", "mol_id": "C05", "molecule": "PC", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "51.4", "status": "ok"},
+    {"job_id": "C05|M_tzvpd|orca_sp", "mol_id": "C05", "molecule": "PC", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "89.1", "status": "ok"},
+    {"job_id": "C05|M_plus|orca_sp", "mol_id": "C05", "molecule": "PC", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "127.6", "status": "ok"},
+    {"job_id": "C05|LiM_plus|orca_sp", "mol_id": "C05", "molecule": "PC", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "95.1", "status": "ok"},
+    {"job_id": "C05|LiM_2plus|orca_sp", "mol_id": "C05", "molecule": "PC", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "148.7", "status": "ok"},
+    {"job_id": "C08|M|xtb_opt", "mol_id": "C08", "molecule": "DME", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.19", "status": "ok"},
+    {"job_id": "C08|M_plus|xtb_opt", "mol_id": "C08", "molecule": "DME", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.38", "status": "ok"},
+    {"job_id": "C08|LiM_plus|xtb_opt", "mol_id": "C08", "molecule": "DME", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.86", "status": "ok"},
+    {"job_id": "C08|LiM_2plus|xtb_opt", "mol_id": "C08", "molecule": "DME", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.69", "status": "ok"},
+    {"job_id": "C08|M|orca_sp", "mol_id": "C08", "molecule": "DME", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "53.7", "status": "ok"},
+    {"job_id": "C08|M_tzvpd|orca_sp", "mol_id": "C08", "molecule": "DME", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "91.5", "status": "ok"},
+    {"job_id": "C08|M_plus|orca_sp", "mol_id": "C08", "molecule": "DME", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "87.3", "status": "ok"},
+    {"job_id": "C08|LiM_plus|orca_sp", "mol_id": "C08", "molecule": "DME", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "67.3", "status": "ok"},
+    {"job_id": "C08|LiM_2plus|orca_sp", "mol_id": "C08", "molecule": "DME", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "67.2", "status": "ok"},
+    {"job_id": "C09|M|xtb_opt", "mol_id": "C09", "molecule": "DOL", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.09", "status": "ok"},
+    {"job_id": "C09|M_plus|xtb_opt", "mol_id": "C09", "molecule": "DOL", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.12", "status": "ok"},
+    {"job_id": "C09|LiM_plus|xtb_opt", "mol_id": "C09", "molecule": "DOL", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.22", "status": "ok"},
+    {"job_id": "C09|LiM_2plus|xtb_opt", "mol_id": "C09", "molecule": "DOL", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.36", "status": "ok"},
+    {"job_id": "C09|M|orca_sp", "mol_id": "C09", "molecule": "DOL", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "29.3", "status": "ok"},
+    {"job_id": "C09|M_tzvpd|orca_sp", "mol_id": "C09", "molecule": "DOL", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "49.7", "status": "ok"},
+    {"job_id": "C09|M_plus|orca_sp", "mol_id": "C09", "molecule": "DOL", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "54.0", "status": "ok"},
+    {"job_id": "C09|LiM_plus|orca_sp", "mol_id": "C09", "molecule": "DOL", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "57.3", "status": "ok"},
+    {"job_id": "C09|LiM_2plus|orca_sp", "mol_id": "C09", "molecule": "DOL", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "75.8", "status": "ok"},
+    {"job_id": "C13|M|xtb_opt", "mol_id": "C13", "molecule": "GBL", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.16", "status": "ok"},
+    {"job_id": "C13|M_plus|xtb_opt", "mol_id": "C13", "molecule": "GBL", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.14", "status": "ok"},
+    {"job_id": "C13|LiM_plus|xtb_opt", "mol_id": "C13", "molecule": "GBL", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.20", "status": "ok"},
+    {"job_id": "C13|LiM_2plus|xtb_opt", "mol_id": "C13", "molecule": "GBL", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.21", "status": "ok"},
+    {"job_id": "C13|M|orca_sp", "mol_id": "C13", "molecule": "GBL", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "41.4", "status": "ok"},
+    {"job_id": "C13|M_tzvpd|orca_sp", "mol_id": "C13", "molecule": "GBL", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "68.5", "status": "ok"},
+    {"job_id": "C13|M_plus|orca_sp", "mol_id": "C13", "molecule": "GBL", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "100.2", "status": "ok"},
+    {"job_id": "C13|LiM_plus|orca_sp", "mol_id": "C13", "molecule": "GBL", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "78.3", "status": "ok"},
+    {"job_id": "C13|LiM_2plus|orca_sp", "mol_id": "C13", "molecule": "GBL", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "105.1", "status": "ok"},
+    {"job_id": "C14|M|xtb_opt", "mol_id": "C14", "molecule": "SL", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.19", "status": "ok"},
+    {"job_id": "C14|M_plus|xtb_opt", "mol_id": "C14", "molecule": "SL", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.16", "status": "ok"},
+    {"job_id": "C14|LiM_plus|xtb_opt", "mol_id": "C14", "molecule": "SL", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.33", "status": "ok"},
+    {"job_id": "C14|LiM_2plus|xtb_opt", "mol_id": "C14", "molecule": "SL", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.17", "status": "ok"},
+    {"job_id": "C14|M|orca_sp", "mol_id": "C14", "molecule": "SL", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "73.3", "status": "ok"},
+    {"job_id": "C14|M_tzvpd|orca_sp", "mol_id": "C14", "molecule": "SL", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "121.2", "status": "ok"},
+    {"job_id": "C14|M_plus|orca_sp", "mol_id": "C14", "molecule": "SL", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "132.1", "status": "ok"},
+    {"job_id": "C14|LiM_plus|orca_sp", "mol_id": "C14", "molecule": "SL", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "89.2", "status": "ok"},
+    {"job_id": "C14|LiM_2plus|orca_sp", "mol_id": "C14", "molecule": "SL", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "88.1", "status": "ok"},
+    {"job_id": "C15|M|xtb_opt", "mol_id": "C15", "molecule": "DMSO", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.09", "status": "ok"},
+    {"job_id": "C15|M_plus|xtb_opt", "mol_id": "C15", "molecule": "DMSO", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.10", "status": "ok"},
+    {"job_id": "C15|LiM_plus|xtb_opt", "mol_id": "C15", "molecule": "DMSO", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.11", "status": "ok"},
+    {"job_id": "C15|LiM_2plus|xtb_opt", "mol_id": "C15", "molecule": "DMSO", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.10", "status": "ok"},
+    {"job_id": "C15|M|orca_sp", "mol_id": "C15", "molecule": "DMSO", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "24.8", "status": "ok"},
+    {"job_id": "C15|M_tzvpd|orca_sp", "mol_id": "C15", "molecule": "DMSO", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "38.3", "status": "ok"},
+    {"job_id": "C15|M_plus|orca_sp", "mol_id": "C15", "molecule": "DMSO", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "46.9", "status": "ok"},
+    {"job_id": "C15|LiM_plus|orca_sp", "mol_id": "C15", "molecule": "DMSO", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "47.4", "status": "ok"},
+    {"job_id": "C15|LiM_2plus|orca_sp", "mol_id": "C15", "molecule": "DMSO", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "57.4", "status": "ok"},
+    {"job_id": "C16|M|xtb_opt", "mol_id": "C16", "molecule": "AN", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.09", "status": "ok"},
+    {"job_id": "C16|M_plus|xtb_opt", "mol_id": "C16", "molecule": "AN", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.13", "status": "ok"},
+    {"job_id": "C16|LiM_plus|xtb_opt", "mol_id": "C16", "molecule": "AN", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.12", "status": "ok"},
+    {"job_id": "C16|LiM_2plus|xtb_opt", "mol_id": "C16", "molecule": "AN", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.18", "status": "ok"},
+    {"job_id": "C16|M|orca_sp", "mol_id": "C16", "molecule": "AN", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "15.8", "status": "ok"},
+    {"job_id": "C16|M_tzvpd|orca_sp", "mol_id": "C16", "molecule": "AN", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "19.1", "status": "ok"},
+    {"job_id": "C16|M_plus|orca_sp", "mol_id": "C16", "molecule": "AN", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "19.3", "status": "ok"},
+    {"job_id": "C16|LiM_plus|orca_sp", "mol_id": "C16", "molecule": "AN", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "21.8", "status": "ok"},
+    {"job_id": "C16|LiM_2plus|orca_sp", "mol_id": "C16", "molecule": "AN", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "21.5", "status": "ok"},
+    {"job_id": "C17|M|xtb_opt", "mol_id": "C17", "molecule": "TMP", "state": "M", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.21", "status": "ok"},
+    {"job_id": "C17|M_plus|xtb_opt", "mol_id": "C17", "molecule": "TMP", "state": "M_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.63", "status": "ok"},
+    {"job_id": "C17|LiM_plus|xtb_opt", "mol_id": "C17", "molecule": "TMP", "state": "LiM_plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.31", "status": "ok"},
+    {"job_id": "C17|LiM_2plus|xtb_opt", "mol_id": "C17", "molecule": "TMP", "state": "LiM_2plus", "phase": "xtb_opt", "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "1.32", "status": "ok"},
+    {"job_id": "C17|M|orca_sp", "mol_id": "C17", "molecule": "TMP", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "79.0", "status": "ok"},
+    {"job_id": "C17|M_tzvpd|orca_sp", "mol_id": "C17", "molecule": "TMP", "state": "M", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "136.9", "status": "ok"},
+    {"job_id": "C17|M_plus|orca_sp", "mol_id": "C17", "molecule": "TMP", "state": "M_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "144.9", "status": "ok"},
+    {"job_id": "C17|LiM_plus|orca_sp", "mol_id": "C17", "molecule": "TMP", "state": "LiM_plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "159.6", "status": "ok"},
+    {"job_id": "C17|LiM_2plus|orca_sp", "mol_id": "C17", "molecule": "TMP", "state": "LiM_2plus", "phase": "orca_sp", "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "213.7", "status": "ok"},
+    {"job_id": "C01|M|orca_freq", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "orca_freq", "method": "wB97X-D4/def2-TZVP SMD NumFreq", "cores": "4", "wall_sec": "1129.1", "status": "ok"},
+]
+
 PILOT_RT_EH = 0.000944183
 PILOT_LN_VM = 3.197365
 
@@ -1046,7 +1162,7 @@ def wp2():
     # 方案 15.5 / 15.6 —— 自由态 pilot（新增计算）。
     pilot_lookup = {row["record_id"]: row for row in PILOT_FREE_STATE_ENERGIES}
     pilot_ip = []
-    for pilot_mol, pilot_name in (("C01", "DMC"), ("C02", "EMC")):
+    for pilot_mol, pilot_name in PILOT_MAIN_MOLECULES:
         p_neutral = float(pilot_lookup["%s|M_tzvpd" % pilot_mol]["final_sp_eh"])
         p_cation = float(pilot_lookup["%s|M_plus" % pilot_mol]["final_sp_eh"])
         pilot_ip.append({
@@ -1089,22 +1205,32 @@ def wp2():
     pilot_core_hours = sum(float(r["core_hours"]) for r in pilot_cost)
     pilot_li_lookup = {row["record_id"]: row for row in PILOT_LI_STATE_ENERGIES}
     pilot_coord_shift = []
-    for pilot_mol, pilot_name in (("C01", "DMC"), ("C02", "EMC")):
+    pilot_dissociated = []
+    for pilot_mol, pilot_name in PILOT_MAIN_MOLECULES:
         free_row = next(r for r in pilot_ip if r["mol_id"] == pilot_mol)
-        li_plus = float(pilot_li_lookup["%s|LiM_plus" % pilot_mol]["final_sp_eh"])
-        li_2plus = float(pilot_li_lookup["%s|LiM_2plus" % pilot_mol]["final_sp_eh"])
+        li_plus_row = pilot_li_lookup["%s|LiM_plus" % pilot_mol]
+        li_2plus_row = pilot_li_lookup["%s|LiM_2plus" % pilot_mol]
+        li_plus = float(li_plus_row["final_sp_eh"])
+        li_2plus = float(li_2plus_row["final_sp_eh"])
         ip_li = (li_2plus - li_plus) * HARTREE_TO_EV
-        frozen = PILOT_C1_FROZEN_REF.get(pilot_mol)
+        bound_2plus = not li_2plus_row["identity"].startswith("dissociated")
+        if not bound_2plus:
+            pilot_dissociated.append(pilot_name)
+        frozen = c1_primary.get(pilot_mol)
         pilot_coord_shift.append({
             "mol_id": pilot_mol, "name": pilot_name, "quantity": "coordination_shift",
             "e_liM_plus_eh": "%.12f" % li_plus, "e_liM_2plus_eh": "%.12f" % li_2plus,
             "ip_li_ev": "%.6f" % ip_li, "ip_free_ev": free_row["ip_ev"],
             "d_ip_ev": "%.6f" % (ip_li - float(free_row["ip_ev"])),
+            "two_plus_state": ("bound" if bound_2plus
+                               else "dissociated (Li leaves the fragment during GFN2 relaxation)"),
+            "d_ip_interpretable": "true" if bound_2plus else "false",
             "level": "wB97X-D4/def2-TZVPD SMD(acetonitrile), consistent basis",
             "frozen_c1_motif": (frozen["motif_id"] if frozen else ""),
-            "frozen_c1_d_ip_smd_ev": (frozen["frozen_d_ip_smd_ev"] if frozen else ""),
-            "note": ("frozen C1 value exists but mixes conventions; not directly comparable"
-                     if frozen else "no frozen C1 row for this molecule"),
+            "frozen_c1_d_ip_smd_ev": ((frozen.get("d_ip_smd_ev") or "") if frozen else ""),
+            "note": (("frozen C1 layer value exists but mixes conventions (gas-phase free IP as the "
+                      "SMD reference); not directly comparable") if frozen
+                     else "no frozen C1 primary row for this molecule"),
         })
     n_existing_mol = len({row["mol_id"] for row in existing})
     checks = [
@@ -1122,32 +1248,66 @@ def wp2():
         {"id": "ensemble_rules_frozen", "description": "系综规则在观察目标排名前冻结",
          "ok": len(ENSEMBLE_RULES) >= 6, "detail": "n_rules=%d" % len(ENSEMBLE_RULES)},
         {"id": "pilot_free_state_jobs_all_converged", "description": "自由态 pilot 的 ORCA 单点全部正常收敛",
-         "ok": len(PILOT_FREE_STATE_ENERGIES) == 6
+         "ok": len(PILOT_FREE_STATE_ENERGIES) == 3 * len(PILOT_MAIN_MOLECULES)
                and all(r["terminated"] == "true" for r in PILOT_FREE_STATE_ENERGIES),
-         "detail": "free-state rows=%d; molecules=DMC,EMC" % len(PILOT_FREE_STATE_ENERGIES)},
+         "detail": "free-state rows=%d over %d main-set molecules" % (
+             len(PILOT_FREE_STATE_ENERGIES), len(PILOT_MAIN_MOLECULES))},
         {"id": "pilot_vertical_ip_is_basis_consistent", "description": "pilot 垂直 IP 用中性/阳离子一致基组",
-         "ok": len(pilot_ip) == 2 and all(r["basis_consistent"] == "true" for r in pilot_ip),
+         "ok": len(pilot_ip) == len(PILOT_MAIN_MOLECULES)
+               and all(r["basis_consistent"] == "true" for r in pilot_ip),
          "detail": ",".join("%s=%s eV" % (r["name"], r["ip_ev"]) for r in pilot_ip)},
         {"id": "pilot_ledger_instance_is_complete", "description": "自由能账本实例给出 E/ZPE/热项/G/标准态项",
-         "ok": len(pilot_ledger) == 1 and all(pilot_ledger[0][key] for key in
-               ("e_sp_eh", "zpe_eh", "e_to_g_thermal_eh", "g_single_eh", "std_state_corr_eh", "g_single_ev")),
+         "ok": bool(pilot_ledger) and all(
+               all(row[key] for key in ("e_sp_eh", "zpe_eh", "e_to_g_thermal_eh",
+                                        "g_single_eh", "std_state_corr_eh", "g_single_ev"))
+               for row in pilot_ledger),
          "detail": "record=%s; G=%s eV" % (pilot_ledger[0]["record_id"], pilot_ledger[0]["g_single_ev"])},
         {"id": "pilot_cost_ledger_records_core_hours", "description": "pilot 成本账本逐作业记录 allocated core-hours",
          "ok": bool(pilot_cost) and all(float(r["core_hours"]) > 0 for r in pilot_cost),
          "detail": "jobs=%d; total=%.6f core-hours" % (len(pilot_cost), pilot_core_hours)},
-        {"id": "pilot_li_states_converged_and_intact", "description": "Li 配位两态收敛且分子完整（Li-O 成键、无碎裂）",
-         "ok": len(PILOT_LI_STATE_ENERGIES) == 4 and all(
-               r["terminated"] == "true" and r["nonli_components"] == "1" and float(r["li_o_ang"]) < 2.2
-               for r in PILOT_LI_STATE_ENERGIES),
-         "detail": "li rows=%d; Li-O %.3f-%.3f A" % (len(PILOT_LI_STATE_ENERGIES),
-                   min(float(r["li_o_ang"]) for r in PILOT_LI_STATE_ENERGIES),
-                   max(float(r["li_o_ang"]) for r in PILOT_LI_STATE_ENERGIES))},
-        {"id": "pilot_covers_all_four_master_states", "description": "pilot 覆盖 DMC/EMC 的四主态（自由 2 + 配位 2）",
-         "ok": len(PILOT_FREE_STATE_ENERGIES) == 6 and len(PILOT_LI_STATE_ENERGIES) == 4,
-         "detail": "free-state rows=6 + li-state rows=4 over DMC,EMC"},
+        {"id": "pilot_li_states_converged_and_intact", "description": "Li 两态收敛、分子骨架完整；LiM_plus 全部成键，2+ 态解离单独标注",
+         "ok": len(PILOT_LI_STATE_ENERGIES) == 2 * len(PILOT_MAIN_MOLECULES)
+               and all(r["terminated"] == "true" and r["nonli_components"] == "1"
+                       for r in PILOT_LI_STATE_ENERGIES)
+               and all(float(r["li_o_ang"]) < 2.45 for r in PILOT_LI_STATE_ENERGIES
+                       if r["state"] == "LiM_plus")
+               and all((float(r["li_o_ang"]) < 2.60) != r["identity"].startswith("dissociated")
+                       for r in PILOT_LI_STATE_ENERGIES),
+         "detail": "rows=%d; LiM_plus bound %d/%d; dissociated=%s" % (
+             len(PILOT_LI_STATE_ENERGIES),
+             sum(1 for r in PILOT_LI_STATE_ENERGIES
+                 if r["state"] == "LiM_plus" and float(r["li_o_ang"]) < 2.45),
+             len(PILOT_MAIN_MOLECULES),
+             ",".join(sorted(r["record_id"] for r in PILOT_LI_STATE_ENERGIES
+                            if r["identity"].startswith("dissociated"))) or "none")},
+        {"id": "pilot_covers_all_four_master_states", "description": "pilot 覆盖 12 主集分子的四主态（自由 3 + 配位 2）",
+         "ok": (len(PILOT_FREE_STATE_ENERGIES) == 3 * len(PILOT_MAIN_MOLECULES)
+                and len(PILOT_LI_STATE_ENERGIES) == 2 * len(PILOT_MAIN_MOLECULES)),
+         "detail": "free=%d + li=%d rows over %d main-set molecules" % (
+             len(PILOT_FREE_STATE_ENERGIES), len(PILOT_LI_STATE_ENERGIES),
+             len(PILOT_MAIN_MOLECULES))},
+        {"id": "pilot_donor_placement_recorded", "description": "Li 初始位按给体类型（羰基/醚/腈/亚砜/砜/磷酰）逐分子记录",
+         "ok": len(PILOT_DONOR_PLACEMENT) == len(PILOT_MAIN_MOLECULES)
+               and all(r["donor_family"] and r["direction"] for r in PILOT_DONOR_PLACEMENT),
+         "detail": "families=%s" % ",".join(sorted({r["donor_family"] for r in PILOT_DONOR_PLACEMENT}))},
+        {"id": "pilot_covers_all_twelve_main_molecules", "description": "pilot 覆盖 12 主集全部分子",
+         "ok": {r["mol_id"] for r in pilot_ip} == set(PB.COHORTS["main"]),
+         "detail": "molecules=%d" % len({r["mol_id"] for r in pilot_ip})},
         {"id": "pilot_coordination_shift_computed", "description": "pilot 配位位移（SMD 自洽口径）逐分子给出",
-         "ok": len(pilot_coord_shift) == 2 and all(r["d_ip_ev"] for r in pilot_coord_shift),
-         "detail": ",".join("%s d_ip=%s eV" % (r["name"], r["d_ip_ev"]) for r in pilot_coord_shift)},
+         "ok": len(pilot_coord_shift) == len(PILOT_MAIN_MOLECULES)
+               and all(r["d_ip_ev"] for r in pilot_coord_shift)
+               and all(float(r["d_ip_ev"]) > 0.0 for r in pilot_coord_shift
+                       if r["d_ip_interpretable"] == "true"),
+         "detail": "%d interpretable + %d dissociated(not interpretable); d_ip %.3f-%.3f eV over interpretable" % (
+             sum(1 for r in pilot_coord_shift if r["d_ip_interpretable"] == "true"),
+             sum(1 for r in pilot_coord_shift if r["d_ip_interpretable"] == "false"),
+             min(float(r["d_ip_ev"]) for r in pilot_coord_shift if r["d_ip_interpretable"] == "true"),
+             max(float(r["d_ip_ev"]) for r in pilot_coord_shift if r["d_ip_interpretable"] == "true"))},
+        {"id": "pilot_flags_dissociated_dication_states", "description": "2+ 态解离的分子逐条标注并排除出配位位移结论",
+         "ok": all((r["d_ip_interpretable"] == "false") == r["two_plus_state"].startswith("dissociated")
+                   for r in pilot_coord_shift),
+         "detail": "dissociated=[%s]" % ",".join(r["name"] for r in pilot_coord_shift
+                                                 if r["d_ip_interpretable"] == "false")},
     ]
 
     payload = {
@@ -1172,7 +1332,7 @@ def wp2():
         },
         "ensemble_rules": ENSEMBLE_RULES,
         "free_state_pilot": {
-            "scope": "DMC/EMC: all 4 master states (M, M+, LiM_plus, LiM_2plus) at the pilot level",
+            "scope": "all 12 main-set molecules: 4 master states (M, M+, LiM_plus, LiM_2plus) at the pilot level",
             "geometry": PILOT_GEOM_NOTE,
             "method": PILOT_METHOD_NOTE,
             "free_state_energies": PILOT_FREE_STATE_ENERGIES,
@@ -1181,6 +1341,7 @@ def wp2():
             "coordination_shift": pilot_coord_shift,
             "ledger_instances": pilot_ledger,
             "cost_jobs": pilot_cost,
+            "donor_placement": PILOT_DONOR_PLACEMENT,
             "totals": {"orca_jobs": pilot_orca_jobs, "xtb_jobs": pilot_xtb_jobs,
                        "core_hours": "%.6f" % pilot_core_hours},
             "raw_outputs": "kept outside the repository (not mirrored)",
@@ -1211,7 +1372,7 @@ def wp2():
         ["mol_id", "name", "motif", "states", "note"],
         [{"mol_id": mol_id, "name": PB.COHORT_NAMES[mol_id], "motif": "one representative C1 motif",
           "states": "LiM_plus; LiM_2plus",
-          "note": "charged complexes that fail to form a complete state are recorded as a QC outcome; motifs are not swapped until a number is obtained"}
+          "note": "charged complexes that fail to form a complete state (e.g. a 2+ state where Li dissociates) are recorded as a QC outcome; motifs are not swapped until a number is obtained"}
          for mol_id in PB.COHORTS["main"]])
     local["outputs/physics_completion/free_states/pilot_free_state_energies.csv"] = csv_text(
         ["record_id", "mol_id", "name", "state", "charge", "multiplicity", "basis", "orca_keyword",
@@ -1227,10 +1388,11 @@ def wp2():
     local["outputs/physics_completion/free_states/pilot_li_state_energies.csv"] = csv_text(
         ["record_id", "mol_id", "name", "state", "charge", "multiplicity", "basis", "orca_keyword",
          "basis_functions", "scf_cycles", "final_sp_eh", "terminated", "wall_sec", "cores",
-         "li_o_ang", "nonli_components", "identity"], PILOT_LI_STATE_ENERGIES)
+         "li_o_ang", "nonli_components", "donor_contacts", "identity"], PILOT_LI_STATE_ENERGIES)
     local["outputs/physics_completion/free_states/pilot_coordination_shift.csv"] = csv_text(
         ["mol_id", "name", "quantity", "e_liM_plus_eh", "e_liM_2plus_eh", "ip_li_ev", "ip_free_ev",
-         "d_ip_ev", "level", "frozen_c1_motif", "frozen_c1_d_ip_smd_ev", "note"], pilot_coord_shift)
+         "d_ip_ev", "two_plus_state", "d_ip_interpretable", "level", "frozen_c1_motif",
+         "frozen_c1_d_ip_smd_ev", "note"], pilot_coord_shift)
     local["outputs/physics_completion/cost/pilot_cost_ledger.csv"] = csv_text(
         ["job_id", "mol_id", "molecule", "state", "phase", "method", "cores", "wall_sec",
          "core_hours", "status"], pilot_cost)
@@ -1238,7 +1400,7 @@ def wp2():
     summary = [
         "# Week 39 / WP2 — 固定背景配对自由能标签",
         "",
-        "**状态**：账本与系综规则已冻结；48 行生产模板的热校正仍为空。已另跑 DMC/EMC 自由态 pilot（新增计算，方案 15.5/15.6），见下节。",
+        "**状态**：账本与系综规则已冻结；48 行生产模板的热校正仍为空。已另跑 12 主集自由态 + Li 配位态 pilot（新增计算，方案 15.5/15.6），见下节。",
         "",
         "## 交付",
         "",
@@ -1256,11 +1418,11 @@ def wp2():
         summary.append("| %s | %s | %s |" % (item["id"], "PASS" if item["ok"] else "FAIL", item["detail"]))
     summary += [
         "",
-        "## DMC/EMC 四主态 pilot（方案 15.5 / 15.6，新增计算）",
+        "## 12 主集四主态 pilot（方案 15.5 / 15.6，新增计算）",
         "",
         "几何：%s；方法：%s。原始输出留在仓库外，不入交付镜像。" % (PILOT_GEOM_NOTE, PILOT_METHOD_NOTE),
         "",
-        "覆盖 DMC/EMC 的**四主态**：自由态 M、M+ 与 Li 配位态 LiM_plus、LiM_2plus。",
+        "覆盖 **12 主集全部分子**的**四主态**：自由态 M、M+ 与 Li 配位态 LiM_plus、LiM_2plus。",
         "",
         "| 分子 | 量 | 一致基组 | E(中性) Eh | E(阳离子) Eh | Eox_vertical (eV) |",
         "| --- | --- | --- | --- | --- | --- |",
@@ -1286,35 +1448,39 @@ def wp2():
         "成本账本：%d 个作业（ORCA %d / xTB %d），合计 **%.6f core-hours**（allocated cores × wall clock）。"
         % (len(pilot_cost), pilot_orca_jobs, pilot_xtb_jobs, pilot_core_hours),
         "",
-        "Li 配位两态（SMD，def2-TZVPD，Li 置于羰基 O 外侧 1.9 A 起点后 GFN2 优化）：",
+        "Li 配位两态（SMD，def2-TZVPD，Li 按给体类型沿外侧 1.9 A 起点后 GFN2 优化；donor_contacts = 2.60 A 内给体数）：",
         "",
-        "| 记录 | 电荷/多重度 | 基函数 | SCF | 末单点 (Eh) | Li-O (A) | 非 Li 片段数 | 身份 |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| 记录 | 电荷/多重度 | 基函数 | SCF | 末单点 (Eh) | Li-O/N (A) | 给体接触 | 非 Li 片段数 | 身份 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in PILOT_LI_STATE_ENERGIES:
-        summary.append("| %s | %s/%s | %s | %s | %s | %s | %s | %s |"
+        summary.append("| %s | %s/%s | %s | %s | %s | %s | %s | %s | %s |"
                        % (row["record_id"].replace("|", "\\|"), row["charge"], row["multiplicity"],
                           row["basis_functions"], row["scf_cycles"], row["final_sp_eh"],
-                          row["li_o_ang"], row["nonli_components"], row["identity"]))
+                          row["li_o_ang"], row["donor_contacts"], row["nonli_components"],
+                          row["identity"]))
     summary += [
         "",
         "配位位移（SMD 自洽口径）：d_ip = IP(Li 复合物) - IP(自由分子)。",
         "",
-        "| 分子 | E([LiM]+) Eh | E([LiM]2+) Eh | IP_Li (eV) | IP_free (eV) | d_ip (eV) | 冻结 C1 motif | 冻结 d_ip_smd (eV) | 说明 |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| 分子 | E([LiM]+) Eh | E([LiM]2+) Eh | IP_Li (eV) | IP_free (eV) | d_ip (eV) | 2+ 态 | 可解释 | 冻结 C1 motif | 冻结 d_ip_smd (eV) | 说明 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in pilot_coord_shift:
-        summary.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+        summary.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
                        % (row["name"], row["e_liM_plus_eh"], row["e_liM_2plus_eh"], row["ip_li_ev"],
-                          row["ip_free_ev"], row["d_ip_ev"], row["frozen_c1_motif"] or "-",
+                          row["ip_free_ev"], row["d_ip_ev"], row["two_plus_state"],
+                          row["d_ip_interpretable"], row["frozen_c1_motif"] or "-",
                           row["frozen_c1_d_ip_smd_ev"] or "-", row["note"]))
     summary += [
         "",
         "## 限制",
         "",
         "- 48 行**生产模板**的热校正仍为空（尚未做生产频率）；pilot 只单独给出 1 条 DMC 中性完整账本行。",
-        "- pilot 只覆盖 2 个分子（DMC/EMC）的四主态，且几何来自 xTB GFN2 而非 r2SCAN-3c；不能替代 12 主集完整生产。",
-        "- pilot 配位位移为 SMD 自洽口径；冻结 C1（DMC m1）把气相自由 IP 当作 SMD 参考，属混口径，两者不可直接相比；EMC 无冻结 C1 行。",
+        "- pilot 覆盖 12 主集全部分子，但每态只有单一构象（GFN2 起点），不是方案 6 的多构象系综生产；几何来自 GFN2 而非 r2SCAN-3c。",
+        "- DME 与 AN 的 2+ 态在 GFN2 弛豫中 Li 解离（Li-O/N > 10 A），故其 d_ip 记为不可解释、不进入结论；这本身是 GFN2 下 2+ 复合物不稳定的 QC 结果。",
+        "- Li 配位态只对单一给体位点、单一构象做了一次；不能替代 12 主集完整生产。",
+        "- pilot 配位位移为 SMD 自洽口径；冻结 C1 层把气相自由 IP 当作 SMD 参考，属混口径，两者不可直接相比。",
         "- 标准态项把理想气体 1 atm 自由能换到溶液 1 mol/L（RT ln V_m）；同一化学计量的 redox 差值中该项相消。",
         "- 既有 P1v/P1a/C1 数值是 r2SCAN-3c 气相电子能差，不能直接当作固定背景 SMD 自由能标签。",
         "- 采样窗口 6 kcal/mol 与上限 3 结构是**资源规则**，不是已经证明收敛的采样尺度。",

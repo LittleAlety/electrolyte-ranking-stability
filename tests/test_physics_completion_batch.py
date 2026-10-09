@@ -91,8 +91,9 @@ def test_wp1_local_method_echo_and_smoke_runs() -> None:
 def test_wp2_free_state_pilot_ledger_and_cost() -> None:
     payload = json.loads((REPO_ROOT / "outputs/week39/wp2_free_energy_labels.json").read_text(encoding="utf-8"))
     pilot = payload["free_state_pilot"]
+    main_names = {"DMC", "EMC", "DEC", "EC", "PC", "DME", "DOL", "GBL", "SL", "DMSO", "AN", "TMP"}
     ip = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_vertical_ip.csv")
-    assert {row["name"] for row in ip} == {"DMC", "EMC"}
+    assert {row["name"] for row in ip} == main_names
     assert all(row["basis_consistent"] == "true" for row in ip)
     assert all(float(row["ip_ev"]) > 0 for row in ip)
     ledger = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_ledger_instance.csv")
@@ -100,20 +101,27 @@ def test_wp2_free_state_pilot_ledger_and_cost() -> None:
     assert ledger[0]["qrrho"] == "true" and ledger[0]["imaginary_modes"] == "0"
     assert float(ledger[0]["g_single_ev"]) < 0 and float(ledger[0]["std_state_corr_ev"]) > 0
     cost = _read_csv(REPO_ROOT / "outputs/physics_completion/cost/pilot_cost_ledger.csv")
-    assert len(cost) == 19
+    assert len(cost) == 109
     assert all(float(row["core_hours"]) > 0 for row in cost)
     assert any(row["phase"] == "orca_freq" for row in cost)
     energies = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_free_state_energies.csv")
-    assert len(energies) == 6
+    assert len(energies) == 36
     assert all(row["terminated"] == "true" for row in energies)
-    assert pilot["totals"]["orca_jobs"] == 11 and pilot["totals"]["xtb_jobs"] == 8
+    assert pilot["totals"]["orca_jobs"] == 61 and pilot["totals"]["xtb_jobs"] == 48
     li = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_li_state_energies.csv")
-    assert len(li) == 4
+    assert len(li) == 24
     assert all(row["terminated"] == "true" and row["nonli_components"] == "1" for row in li)
-    assert all(float(row["li_o_ang"]) < 2.2 for row in li)
+    assert all(float(row["li_o_ang"]) < 2.45 for row in li if row["state"] == "LiM_plus")
+    assert {row["record_id"] for row in li if row["identity"].startswith("dissociated")} == {
+        "C08|LiM_2plus", "C16|LiM_2plus"}
+    assert all((float(row["li_o_ang"]) < 2.60) != row["identity"].startswith("dissociated") for row in li)
     shift = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_coordination_shift.csv")
-    assert {row["name"] for row in shift} == {"DMC", "EMC"}
-    assert all(float(row["d_ip_ev"]) > 0 for row in shift)
+    assert {row["name"] for row in shift} == main_names
+    assert all(row["d_ip_ev"] for row in shift)
+    interpretable = [row for row in shift if row["d_ip_interpretable"] == "true"]
+    assert len(interpretable) == 10
+    assert all(float(row["d_ip_ev"]) > 0 for row in interpretable)
+    assert {row["name"] for row in shift if row["d_ip_interpretable"] == "false"} == {"DME", "AN"}
 
 
 def test_wp2_ledger_leaves_missing_fields_empty() -> None:

@@ -1,6 +1,6 @@
 # Week 39 / WP2 — 固定背景配对自由能标签
 
-**状态**：账本与系综规则已冻结；48 行生产模板的热校正仍为空。已另跑 DMC/EMC 自由态 pilot（新增计算，方案 15.5/15.6），见下节。
+**状态**：账本与系综规则已冻结；48 行生产模板的热校正仍为空。已另跑 12 主集自由态 + Li 配位态 pilot（新增计算，方案 15.5/15.6），见下节。
 
 ## 交付
 
@@ -9,7 +9,7 @@
 - `ensemble_rules.csv`：7 条系综/窗口/去重规则。
 - `existing_electronic_layer.csv`：32 条既有电子能层数值（12 个分子），全部标注 `thermal_correction=absent`。
 
-## 验收（12/12 通过）
+## 验收（15/15 通过）
 
 | check | ok | detail |
 | --- | --- | --- |
@@ -18,24 +18,37 @@
 | sampling_plan_has_escalation_rule | PASS | n_rows=16 |
 | existing_electronic_layer_is_labelled | PASS | 32 条既有数值 / 12 个分子 |
 | ensemble_rules_frozen | PASS | n_rules=7 |
-| pilot_free_state_jobs_all_converged | PASS | free-state rows=6; molecules=DMC,EMC |
-| pilot_vertical_ip_is_basis_consistent | PASS | DMC=8.958413 eV,EMC=8.538134 eV |
+| pilot_free_state_jobs_all_converged | PASS | free-state rows=36 over 12 main-set molecules |
+| pilot_vertical_ip_is_basis_consistent | PASS | DMC=8.957162 eV,EMC=8.537180 eV,DEC=8.592402 eV,EC=8.603601 eV,PC=8.542029 eV,DME=6.831624 eV,DOL=7.184396 eV,GBL=8.034424 eV,SL=7.937598 eV,DMSO=6.475203 eV,AN=9.463296 eV,TMP=8.715843 eV |
 | pilot_ledger_instance_is_complete | PASS | record=C01|M; G=-9354.960153462 eV |
-| pilot_cost_ledger_records_core_hours | PASS | jobs=19; total=1.855470 core-hours |
-| pilot_li_states_converged_and_intact | PASS | li rows=4; Li-O 1.654-1.805 A |
-| pilot_covers_all_four_master_states | PASS | free-state rows=6 + li-state rows=4 over DMC,EMC |
-| pilot_coordination_shift_computed | PASS | DMC d_ip=0.553513 eV,EMC d_ip=0.724703 eV |
+| pilot_cost_ledger_records_core_hours | PASS | jobs=109; total=6.546039 core-hours |
+| pilot_li_states_converged_and_intact | PASS | rows=24; LiM_plus bound 12/12; dissociated=C08|LiM_2plus,C16|LiM_2plus |
+| pilot_covers_all_four_master_states | PASS | free=36 + li=24 rows over 12 main-set molecules |
+| pilot_donor_placement_recorded | PASS | families=carbonyl,ether,nitrile,phosphoryl,sulfone,sulfoxide |
+| pilot_covers_all_twelve_main_molecules | PASS | molecules=12 |
+| pilot_coordination_shift_computed | PASS | 10 interpretable + 2 dissociated(not interpretable); d_ip 0.357-0.897 eV over interpretable |
+| pilot_flags_dissociated_dication_states | PASS | dissociated=[DME,AN] |
 
-## DMC/EMC 四主态 pilot（方案 15.5 / 15.6，新增计算）
+## 12 主集四主态 pilot（方案 15.5 / 15.6，新增计算）
 
-几何：RDKit ETKDG+MMFF start -> xTB 6.7.1pre GFN2 Opt (gas)；方法：wB97X-D4/def2-TZVP (neutral); wB97X-D4/def2-TZVPD (cation, diffuse); SMD acetonitrile。原始输出留在仓库外，不入交付镜像。
+几何：RDKit ETKDG+MMFF start -> xTB 6.7.1pre GFN2 Opt (gas)；方法：wB97X-D4/def2-TZVP (neutral); wB97X-D4/def2-TZVPD (charged, diffuse); SMD acetonitrile。原始输出留在仓库外，不入交付镜像。
 
-覆盖 DMC/EMC 的**四主态**：自由态 M、M+ 与 Li 配位态 LiM_plus、LiM_2plus。
+覆盖 **12 主集全部分子**的**四主态**：自由态 M、M+ 与 Li 配位态 LiM_plus、LiM_2plus。
 
 | 分子 | 量 | 一致基组 | E(中性) Eh | E(阳离子) Eh | Eox_vertical (eV) |
 | --- | --- | --- | --- | --- | --- |
-| DMC | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -343.856181464212 | -343.526965851004 | 8.958413 |
-| EMC | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -383.213141521146 | -382.899370886410 | 8.538134 |
+| DMC | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -343.856181464206 | -343.527011826787 | 8.957162 |
+| EMC | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -383.213141521146 | -382.899405959663 | 8.537180 |
+| DEC | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -422.570563717756 | -422.254798778826 | 8.592402 |
+| EC | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -342.650103844399 | -342.333927357547 | 8.603601 |
+| PC | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -382.009785515284 | -381.695871733911 | 8.542029 |
+| DME | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -309.102759637016 | -308.851702088551 | 6.831624 |
+| DOL | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -268.551257729030 | -268.287236055064 | 7.184396 |
+| GBL | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -306.737875285260 | -306.442615657033 | 8.034424 |
+| SL | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -706.153885628549 | -705.862184264030 | 7.937598 |
+| DMSO | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -553.370194407920 | -553.132235081139 | 6.475203 |
+| AN | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -132.866896538774 | -132.519126824547 | 9.463296 |
+| TMP | Eox_vertical | def2-TZVPD (same basis for neutral and cation) | -762.426072838656 | -762.105771531730 | 8.715843 |
 
 自由能账本实例（1 行，qRRHO）：
 
@@ -43,29 +56,61 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | C01\|M | wB97X-D4/def2-TZVP SMD(acetonitrile) NumFreq (qRRHO) | -343.854211229029 | 0.09601496 | 0.06577493 | -0.03825196 | -343.78844462 | -9354.960153462 | 0.082148 | 0 |
 
-成本账本：19 个作业（ORCA 11 / xTB 8），合计 **1.855470 core-hours**（allocated cores × wall clock）。
+成本账本：109 个作业（ORCA 61 / xTB 48），合计 **6.546039 core-hours**（allocated cores × wall clock）。
 
-Li 配位两态（SMD，def2-TZVPD，Li 置于羰基 O 外侧 1.9 A 起点后 GFN2 优化）：
+Li 配位两态（SMD，def2-TZVPD，Li 按给体类型沿外侧 1.9 A 起点后 GFN2 优化；donor_contacts = 2.60 A 内给体数）：
 
-| 记录 | 电荷/多重度 | 基函数 | SCF | 末单点 (Eh) | Li-O (A) | 非 Li 片段数 | 身份 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| C01\|LiM_plus | 1/1 | 302 | 20 | -351.306668533885 | 1.654 | 1 | intact_monodentate_carbonyl |
-| C01\|LiM_2plus | 2/2 | 302 | 20 | -350.957111705625 | 1.805 | 1 | intact_monodentate_carbonyl |
-| C02\|LiM_plus | 1/1 | 357 | 20 | -390.664261343481 | 1.659 | 1 | intact_monodentate_carbonyl |
-| C02\|LiM_2plus | 2/2 | 357 | 31 | -390.323858369572 | 1.782 | 1 | intact_monodentate_carbonyl |
+| 记录 | 电荷/多重度 | 基函数 | SCF | 末单点 (Eh) | Li-O/N (A) | 给体接触 | 非 Li 片段数 | 身份 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| C01\|LiM_plus | 1/1 | 302 | 20 | -351.306668426280 | 1.654 | 1 | 1 | intact_monodentate_carbonyl |
+| C01\|LiM_2plus | 2/2 | 302 | 20 | -350.957111976693 | 1.805 | 1 | 1 | intact_monodentate_carbonyl |
+| C02\|LiM_plus | 1/1 | 357 | 20 | -390.664261161903 | 1.659 | 1 | 1 | intact_monodentate_carbonyl |
+| C02\|LiM_2plus | 2/2 | 357 | 31 | -390.323857580036 | 1.782 | 1 | 1 | intact_monodentate_carbonyl |
+| C03\|LiM_plus | 1/1 | 412 | 20 | -430.021811072568 | 1.653 | 1 | 1 | intact_monodentate_carbonyl |
+| C03\|LiM_2plus | 2/2 | 412 | 20 | -429.679002025732 | 1.736 | 1 | 1 | intact_monodentate_carbonyl |
+| C04\|LiM_plus | 1/1 | 284 | 20 | -350.101404846212 | 1.658 | 1 | 1 | intact_monodentate_carbonyl |
+| C04\|LiM_2plus | 2/2 | 284 | 18 | -349.772032662564 | 1.852 | 1 | 1 | intact_monodentate_carbonyl |
+| C05\|LiM_plus | 1/1 | 339 | 20 | -389.461161737606 | 1.651 | 1 | 1 | intact_monodentate_carbonyl |
+| C05\|LiM_2plus | 2/2 | 339 | 23 | -389.134132175016 | 1.800 | 1 | 1 | intact_monodentate_carbonyl |
+| C08\|LiM_plus | 1/1 | 335 | 20 | -316.574613930125 | 1.795 | 2 | 1 | intact_bidentate_ether |
+| C08\|LiM_2plus | 2/2 | 335 | 18 | -316.277931354453 | 11.298 | 0 | 1 | dissociated_ether |
+| C09\|LiM_plus | 1/1 | 262 | 20 | -275.998301763872 | 1.973 | 2 | 1 | intact_bidentate_ether |
+| C09\|LiM_2plus | 2/2 | 262 | 22 | -275.715481828471 | 2.505 | 1 | 1 | intact_monodentate_ether |
+| C13\|LiM_plus | 1/1 | 299 | 20 | -314.190822388363 | 1.667 | 1 | 1 | intact_monodentate_carbonyl |
+| C13\|LiM_2plus | 2/2 | 299 | 23 | -313.866423793393 | 1.815 | 1 | 1 | intact_monodentate_carbonyl |
+| C14\|LiM_plus | 1/1 | 363 | 20 | -713.604058153811 | 1.885 | 2 | 1 | intact_bidentate_sulfone |
+| C14\|LiM_2plus | 2/2 | 363 | 18 | -713.289177417651 | 1.721 | 1 | 1 | intact_monodentate_sulfone |
+| C15\|LiM_plus | 1/1 | 231 | 20 | -560.832093775537 | 1.628 | 1 | 1 | intact_monodentate_sulfoxide |
+| C15\|LiM_2plus | 2/2 | 231 | 20 | -560.561162382104 | 1.802 | 1 | 1 | intact_monodentate_sulfoxide |
+| C16\|LiM_plus | 1/1 | 155 | 19 | -140.319887493920 | 1.859 | 1 | 1 | intact_monodentate_nitrile |
+| C16\|LiM_2plus | 2/2 | 155 | 18 | -139.946294773154 | 10.953 | 0 | 1 | dissociated_nitrile |
+| C17\|LiM_plus | 1/1 | 412 | 20 | -769.884723216208 | 1.604 | 1 | 1 | intact_monodentate_phosphoryl |
+| C17\|LiM_2plus | 2/2 | 412 | 26 | -769.550930450943 | 1.684 | 1 | 1 | intact_monodentate_phosphoryl |
 
 配位位移（SMD 自洽口径）：d_ip = IP(Li 复合物) - IP(自由分子)。
 
-| 分子 | E([LiM]+) Eh | E([LiM]2+) Eh | IP_Li (eV) | IP_free (eV) | d_ip (eV) | 冻结 C1 motif | 冻结 d_ip_smd (eV) | 说明 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| DMC | -351.306668533885 | -350.957111705625 | 9.511926 | 8.958413 | 0.553513 | m1 | -1.75858 | frozen C1 value exists but mixes conventions; not directly comparable |
-| EMC | -390.664261343481 | -390.323858369572 | 9.262837 | 8.538134 | 0.724703 | - | - | no frozen C1 row for this molecule |
+| 分子 | E([LiM]+) Eh | E([LiM]2+) Eh | IP_Li (eV) | IP_free (eV) | d_ip (eV) | 2+ 态 | 可解释 | 冻结 C1 motif | 冻结 d_ip_smd (eV) | 说明 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DMC | -351.306668426280 | -350.957111976693 | 9.511916 | 8.957162 | 0.554754 | bound | true | m1 | -1.75858 | frozen C1 layer value exists but mixes conventions (gas-phase free IP as the SMD reference); not directly comparable |
+| EMC | -390.664261161903 | -390.323857580036 | 9.262853 | 8.537180 | 0.725673 | bound | true | - | - | no frozen C1 primary row for this molecule |
+| DEC | -430.021811072568 | -429.679002025732 | 9.328309 | 8.592402 | 0.735907 | bound | true | - | - | no frozen C1 primary row for this molecule |
+| EC | -350.101404846212 | -349.772032662564 | 8.962674 | 8.603601 | 0.359073 | bound | true | m1 | -2.032304 | frozen C1 layer value exists but mixes conventions (gas-phase free IP as the SMD reference); not directly comparable |
+| PC | -389.461161737606 | -389.134132175016 | 8.898928 | 8.542029 | 0.356899 | bound | true | - | - | no frozen C1 primary row for this molecule |
+| DME | -316.574613930125 | -316.277931354453 | 8.073144 | 6.831624 | 1.241520 | dissociated (Li leaves the fragment during GFN2 relaxation) | false | m1 | -1.308041 | frozen C1 layer value exists but mixes conventions (gas-phase free IP as the SMD reference); not directly comparable |
+| DOL | -275.998301763872 | -275.715481828471 | 7.695923 | 7.184396 | 0.511527 | bound | true | m1 | -0.906573 | frozen C1 layer value exists but mixes conventions (gas-phase free IP as the SMD reference); not directly comparable |
+| GBL | -314.190822388363 | -313.866423793393 | 8.827335 | 8.034424 | 0.792911 | bound | true | m1 | -1.387599 | frozen C1 layer value exists but mixes conventions (gas-phase free IP as the SMD reference); not directly comparable |
+| SL | -713.604058153811 | -713.289177417651 | 8.568341 | 7.937598 | 0.630743 | bound | true | m1 | -1.261894 | frozen C1 layer value exists but mixes conventions (gas-phase free IP as the SMD reference); not directly comparable |
+| DMSO | -560.832093775537 | -560.561162382104 | 7.372419 | 6.475203 | 0.897216 | bound | true | m1 | -1.25523 | frozen C1 layer value exists but mixes conventions (gas-phase free IP as the SMD reference); not directly comparable |
+| AN | -140.319887493920 | -139.946294773154 | 10.165976 | 9.463296 | 0.702680 | dissociated (Li leaves the fragment during GFN2 relaxation) | false | m1 | -2.177326 | frozen C1 layer value exists but mixes conventions (gas-phase free IP as the SMD reference); not directly comparable |
+| TMP | -769.884723216208 | -769.550930450943 | 9.082964 | 8.715843 | 0.367121 | bound | true | m1 | -1.551212 | frozen C1 layer value exists but mixes conventions (gas-phase free IP as the SMD reference); not directly comparable |
 
 ## 限制
 
 - 48 行**生产模板**的热校正仍为空（尚未做生产频率）；pilot 只单独给出 1 条 DMC 中性完整账本行。
-- pilot 只覆盖 2 个分子（DMC/EMC）的四主态，且几何来自 xTB GFN2 而非 r2SCAN-3c；不能替代 12 主集完整生产。
-- pilot 配位位移为 SMD 自洽口径；冻结 C1（DMC m1）把气相自由 IP 当作 SMD 参考，属混口径，两者不可直接相比；EMC 无冻结 C1 行。
+- pilot 覆盖 12 主集全部分子，但每态只有单一构象（GFN2 起点），不是方案 6 的多构象系综生产；几何来自 GFN2 而非 r2SCAN-3c。
+- DME 与 AN 的 2+ 态在 GFN2 弛豫中 Li 解离（Li-O/N > 10 A），故其 d_ip 记为不可解释、不进入结论；这本身是 GFN2 下 2+ 复合物不稳定的 QC 结果。
+- Li 配位态只对单一给体位点、单一构象做了一次；不能替代 12 主集完整生产。
+- pilot 配位位移为 SMD 自洽口径；冻结 C1 层把气相自由 IP 当作 SMD 参考，属混口径，两者不可直接相比。
 - 标准态项把理想气体 1 atm 自由能换到溶液 1 mol/L（RT ln V_m）；同一化学计量的 redox 差值中该项相消。
 - 既有 P1v/P1a/C1 数值是 r2SCAN-3c 气相电子能差，不能直接当作固定背景 SMD 自由能标签。
 - 采样窗口 6 kcal/mol 与上限 3 结构是**资源规则**，不是已经证明收敛的采样尺度。
