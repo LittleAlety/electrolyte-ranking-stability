@@ -46,7 +46,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | --- | --- |
 | `check_wp2_anchors.py` | 复核 `emit_wp2.py` 的补丁锚点在当前生成器基线里唯一存在 |
 | `emit_wp2.py` | 把 `work/wp2prod/**` 已跑完的状态折进生成器：重打 `WP2_PRODUCTION_LEDGER` 等补丁块 |
-| `emit_wp1.py` + `wp1_audit_src.txt` | 把 WP1 方法审计矩阵折进生成器 |
+| `emit_wp1.py` + `wp1_audit_src.txt` + `wp1_newsrc.py` | 把 WP1 方法审计矩阵折进生成器；`wp1_audit_src.txt` 是带 SECTION 标记的分段源码（`emit_wp1.py` 直接读它），`wp1_newsrc.py` 是同一内容的原始文本留档（无代码 import） |
 | `run_batch.py` | 12 主集分子 × 4 主态的 xTB/ORCA 批量驱动与公共工具（几何、ORCA/xTB 路径、片段分析） |
 | `run_wp2_production.py` | 生产级 Opt+NumFreq 驱动（`M` / `M_plus` / `LiM_plus` / `LiM_2plus`） |
 | `run_wp2_extra.py` | 与带电腿**基组一致**的中性腿 `M_tzvpd`（def2-TZVPD）驱动 |
@@ -55,15 +55,16 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息（写 `work/_wp2_commit_msg.txt`） |
 | `finalize_wp2.ps1` | 上面那条一键收口链 |
 | `supervise_pending.ps1` | 无人值守监守：单实例锁 + 等其它驱动退出后调 `run_wp2_queue.py --run`（最多 3 轮） |
+| `watch_smpd.ps1` | 轻量 smpd 看护（常驻、约 0 CPU）：每 `-IntervalSeconds`（默认 300）检查 Microsoft MPI 的 smpd，缺失就拉起，日志写 `work/_smpd_watch.log`。用途是兜住**已在跑的**旧驱动——它们没有队列的逐次复查，smpd 一死就会级联秒败；停止：`Get-CimInstance Win32_Process | Where-Object CommandLine -like '*watch_smpd*'` 取 PID 后 `Stop-Process` |
 | `archive_raw_outputs.py` | 把 provenance 里登记的原始作业文件打成**确定性、可复核的 zip 归档**（`--build` 生成，默认落在仓库外 `_compute_archive/`；`--check <zip>` 逐条复算 sha256） |
-| `scripts/wp_production/build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |
-| `scripts/wp_production/build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
-| `scripts/wp_production/build_compute_provenance.py` | 逐作业复现证据清单 + 从各自 `.log` 推导的 `failure_reason`（派生层） |
-| `scripts/wp_production/build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） |
-| `scripts/wp_production/build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的结果前预注册计划（派生层，零新增计算） |
-| `scripts/wp_production/build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） |
-| `scripts/wp_production/make_physics_completion_figures.py` | 方案 14 的六张主图（F59-F64）与图清单 |
-| `scripts/wp_production/build_physics_completion_deliverables.py` | 建交付镜像（仓库外 `成果输出（part2）/week37..week44`）；week44 结题提交包收录结题报告、协议、配置、样本、锚点审计、`docs/65_repo_layout.md` 骨架图、生成器源码、测试与全部 `outputs/physics_completion/**`；`--check` 逐文件复核 byte-identical |
+| `build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |
+| `build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
+| `build_compute_provenance.py` | 逐作业复现证据清单 + 从各自 `.log` 推导的 `failure_reason`（派生层） |
+| `build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） |
+| `build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的结果前预注册计划（派生层，零新增计算） |
+| `build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） |
+| `make_physics_completion_figures.py` | 方案 14 的六张主图（F59-F64）与图清单 |
+| `build_physics_completion_deliverables.py` | 建交付镜像（仓库外 `成果输出（part2）/week37..week44`）；week44 结题提交包收录结题报告、协议、配置、样本、锚点审计、`docs/65_repo_layout.md` 骨架图、生成器源码、测试与全部 `outputs/physics_completion/**`；`--check` 逐文件复核 byte-identical |
 
 ## 边界
 
