@@ -24,7 +24,7 @@ def _read_csv(path: Path):
 
 def test_every_artifact_is_byte_reproducible() -> None:
     files = batch.build_all()
-    assert len(files) == 84
+    assert len(files) == 88
     for rel, text in files.items():
         target = REPO_ROOT / rel
         assert target.is_file(), rel
@@ -152,13 +152,72 @@ def test_wp2_free_state_pilot_ledger_and_cost() -> None:
     assert all(float(row["d_ip_ev"]) > 0 for row in interpretable)
     assert {row["name"] for row in shift if row["d_ip_interpretable"] == "false"} == {"DME", "AN"}
 
+    production = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/production_ledger.csv")
+    progress = payload["free_state_production"]["progress"]
+    assert 1 <= len(production) <= 20
+    assert progress["states_total"] == 16
+    master = [row for row in production if row["state"] in PB.FOUR_STATES]
+    assert len(master) == progress["states_done"]
+    assert {(row["mol_id"], row["state"]) for row in master} <= {
+        (mol_id, state) for mol_id in ("C01", "C02", "C13", "C14") for state in PB.FOUR_STATES}
+    assert {row["mol_id"] for row in master} == set(progress["molecules_started"])
+    assert len(progress["molecules_complete"]) <= len(progress["molecules_started"])
+    assert all(row["e_sp_eh"] and row["zpe_eh"] and row["g_single_eh"] for row in production)
+    assert all(float(row["g_single_ev"]) < 0 and float(row["std_state_corr_ev"]) > 0
+               for row in production)
+    # E_SP 必须是溶液级末几何单点（ORCA 热化学段的 Electronic energy），使 G = E_SP + (G - E(el)) 成立
+    assert all(abs(float(row["g_single_ev"])
+                   - (float(row["e_sp_eh"]) + float(row["e_to_g_thermal_eh"])) * 27.211386245988) < 1e-5
+               for row in production)
+    assert all(row["qrrho"].lower() == "true" for row in production)
+    assert all(abs(float(row["temp_k"]) - 298.15) < 0.01 for row in production)
+    qc = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/production_qc.csv")
+    assert len(qc) == len(production)
+    assert all(row["terminated"] == "true" and row["opt_converged"] == "true"
+               and row["imaginary_modes"] == "0" for row in qc)
+    li_production = [row for row in production if row["state"] in ("LiM_plus", "LiM_2plus")]
+    assert all(row["li_o_ang"] and row["nonli_components"] for row in li_production)
+    cost_production = _read_csv(
+        REPO_ROOT / "outputs/physics_completion/cost/production_cost_ledger.csv")
+    assert len(cost_production) == len(production)
+    assert all(float(row["core_hours"]) > 0 for row in cost_production)
+    assert payload["free_state_production"]["totals"]["orca_jobs"] == len(production)
+    redox = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/production_redox.csv")
+    assert len(redox) == 4
+    assert all(row["basis"] == "def2-TZVPD" for row in redox)
+    for row in redox:
+        if row["status"] == "computed":
+            assert float(row["gox_single_ev"]) > 0
+            assert float(row["li_ip_g_ev"]) > 0
+            assert row["coordination_shift_g_ev"] != ""
+        else:
+            assert row["gox_single_ev"] == "" and row["coordination_shift_g_ev"] == ""
+
 
 def test_wp2_ledger_leaves_missing_fields_empty() -> None:
+    payload = json.loads((REPO_ROOT / "outputs/week39/wp2_free_energy_labels.json").read_text(encoding="utf-8"))
     rows = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/state_ledger_template.csv")
     assert len(rows) == 48
-    for row in rows:
+    produced = [row for row in rows if row["status"] == "produced_single_conformer"]
+    planned = [row for row in rows if row["status"] == "planned"]
+    assert len(produced) == payload["free_state_production"]["progress"]["states_done"]
+    assert len(produced) + len(planned) == 48
+    assert {(row["mol_id"], row["state"]) for row in produced} == {
+        (row["mol_id"], row["state"])
+        for row in _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/production_ledger.csv")
+        if row["state"] in PB.FOUR_STATES}
+    for row in planned:
         assert row["g_single_ev"] == ""
         assert row["thermal_corr_ev"] == ""
+        assert row["g_ensemble_ev"] == ""
+    for row in produced:
+        assert row["thermal_corr_ev"] != "" and row["n_conformers"] == "1"
+        assert float(row["g_single_ev"]) < 0
+        assert row["g_ensemble_ev"] == ""
+        assert row["identity_label"] in ("intact", "bound", "dissociated")
+    for row in produced:
+        assert row["thermal_corr_ev"] != "" and row["n_conformers"] == "1"
+        assert float(row["g_single_ev"]) < 0
         assert row["g_ensemble_ev"] == ""
 
 

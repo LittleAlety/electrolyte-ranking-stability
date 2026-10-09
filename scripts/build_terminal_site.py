@@ -107,7 +107,7 @@ FIGURES = [
     ("F60", "F60_physics_completion_method_audit.png", 44,
      "独立方法审计（方案 WP1）已实测：128 个单点（8 分子 x 4 状态 x 4 设定，全收敛）+ 32 格阳离子弛豫腿；32 个无弥散还原态格子被标出并排除出决策统计（琥珀）；(b) 竖直 IP 的方法展宽显示泛函效应约比基组效应大一个数量级"),
     ("F61", "F61_physics_completion_ladder.png", 44,
-     "E -> G -> ensemble 台阶（方案 WP3）：只有垂直->绝热这一级是冻结的（n=12，逐分子位移箭头），三态判定 55/9/2；G_single / G_ensemble / Li 支仍需 WP2 生产，故 ROBUST_INVERSION 只是标签不是已认证翻转"),
+     "E -> G -> ensemble 台阶（方案 WP3）：只有垂直->绝热这一级是冻结的（n=12，逐分子位移箭头），三态判定 55/9/2；G_single 已有 4 主集分子的中性 M 态生产标签（4/16 主态），G_ensemble、带电/Li 主态与其余 8 分子的 G_single 仍需 WP2 生产，故 ROBUST_INVERSION 只是标签不是已认证翻转"),
     ("F62", "F62_physics_completion_pair_identity.png", 44,
      "固定背景 pair 证据与身份结论（方案 WP3）：66 对逐对按三态判据着色并叠 z*sigma 带；右侧是 C1 状态身份分层，说明还原轴为什么只有分子中心态可排序"),
     ("F63", "F63_physics_completion_mechanism_cases.png", 44,

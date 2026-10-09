@@ -67,7 +67,7 @@ WP_LABEL = {
 
 GATE_STATUS = ("Gate 0 CLOSED；Gate 1 NOT CLOSED 且 NOT CLOSABLE（本批次只登记与复算既有冻结数据："
                "不复核、不关闭、不跳过；排序/配对证据零新增电子结构计算、零数据剔除、零阈值改动；"
-               "WP1 另计 161 个本机独立方法审计作业（128 单点 + 32 弛豫腿 + 1 EMC Li 松弛），原始日志不入镜像）")
+               "WP1 另计 161 个本机独立方法审计作业（128 单点 + 32 弛豫腿 + 1 EMC Li 松弛）、WP2 另计 12 分子四主态 pilot 与 4 分子 x 4 主态生产 Opt/Freq（16 态），原始日志不入镜像）")
 
 DISCIPLINE = (
     "三层表述（模型事实 / 统计判定 / 材料意义）不得混写；方向 ox = IP、red = -EA（均 maximise）；"
