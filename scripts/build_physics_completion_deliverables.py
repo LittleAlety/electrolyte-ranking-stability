@@ -37,7 +37,16 @@ WEEK_EXTRA = {
                "data/references/anchor_primary_audit.csv",
                "docs/physics_completion_protocol.md",
                "docs/claim_migration.md"],
-    "week43": ["docs/physics_completion_final_report.md"],
+    "week43": ["docs/physics_completion_final_report.md",
+               # 方案 14 的六张主图（F59-F64）与图清单：由 scripts/make_physics_completion_figures.py 生成。
+               "outputs/figures/F59_physics_completion_definition.png",
+               "outputs/figures/F60_physics_completion_method_audit.png",
+               "outputs/figures/F61_physics_completion_ladder.png",
+               "outputs/figures/F62_physics_completion_pair_identity.png",
+               "outputs/figures/F63_physics_completion_mechanism_cases.png",
+               "outputs/figures/F64_physics_completion_budget_curve.png",
+               "outputs/figures/figure_manifest_week45_physics_completion.md",
+               "scripts/make_physics_completion_figures.py"],
 }
 
 WEEK_COMMON = ["scripts/build_physics_completion_batch.py",

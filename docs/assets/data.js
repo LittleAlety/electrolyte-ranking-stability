@@ -3,11 +3,11 @@ window.HB = {
  "repo": "https://github.com/LittleAlety/electrolyte-ranking-stability",
  "counts": {
   "weeks": 25,
-  "figures": 59,
+  "figures": 65,
   "orca_out": 1535,
-  "scripts": 167,
+  "scripts": 168,
   "test_files": 74,
-  "tests_passed": 1360
+  "tests_passed": 1363
  },
  "pipeline": [
   {
@@ -1204,6 +1204,66 @@ window.HB = {
    "bytes": 160489,
    "w": 1263,
    "h": 1285
+  },
+  {
+   "id": "F59",
+   "file": "F59_physics_completion_definition.png",
+   "week": 44,
+   "caption": "新批次 physics_completion_v1（方案 WP0）：七个登记量名与目标方向 + 12/8/4 队列与 6 条写明原因的排除（零新增电子结构计算）",
+   "sha": "3885020bbfbce2290d3922677ae1a794b79c2cc501e00625f9565751a275e33d",
+   "bytes": 106075,
+   "w": 1760,
+   "h": 832
+  },
+  {
+   "id": "F60",
+   "file": "F60_physics_completion_method_audit.png",
+   "week": 44,
+   "caption": "独立方法审计（方案 WP1）：128 个单点作业只登记为 planned（8 分子 x 4 状态 x 4 设定），可复用的既有行只到电子能层——这是设计图不是结果图",
+   "sha": "eedf8615ec31bd7736219c87976a5814b704ef1982c4cb6d72ed3156c007b69c",
+   "bytes": 71605,
+   "w": 1984,
+   "h": 800
+  },
+  {
+   "id": "F61",
+   "file": "F61_physics_completion_ladder.png",
+   "week": 44,
+   "caption": "E -> G -> ensemble 台阶（方案 WP3）：只有垂直->绝热这一级是冻结的（n=12，逐分子位移箭头），三态判定 55/9/2；G_single / G_ensemble / Li 支仍需 WP2 生产，故 ROBUST_INVERSION 只是标签不是已认证翻转",
+   "sha": "02836aa7b309bc894f1f4418ef700d1065584fc262888e87a3199fc7def6868b",
+   "bytes": 103486,
+   "w": 1856,
+   "h": 832
+  },
+  {
+   "id": "F62",
+   "file": "F62_physics_completion_pair_identity.png",
+   "week": 44,
+   "caption": "固定背景 pair 证据与身份结论（方案 WP3）：66 对逐对按三态判据着色并叠 z*sigma 带；右侧是 C1 状态身份分层，说明还原轴为什么只有分子中心态可排序",
+   "sha": "27fa0a942a4ba60430cebd167925aa9ba6d1406023a180fdcc1e43898235adad",
+   "bytes": 85171,
+   "w": 1856,
+   "h": 832
+  },
+  {
+   "id": "F63",
+   "file": "F63_physics_completion_mechanism_cases.png",
+   "week": 44,
+   "caption": "机制案例（方案 7.3）：用既有冻结几何给出中性->阳离子的最大键长变化（EMC 0.090 A / GBL 0.086 A / SL 0.016 A），右侧是两例稳健翻转的 d_lower 与 d_upper 变号；电子密度/自旋、配位变化与 G 层分解仍待 WP1/WP2",
+   "sha": "a27bc1987da2e18cef4a278e9d9e97c7a4e3e2e47a4682bf21d345d021c28938",
+   "bytes": 92419,
+   "w": 1856,
+   "h": 832
+  },
+  {
+   "id": "F64",
+   "file": "F64_physics_completion_budget_curve.png",
+   "week": 44,
+   "caption": "累计成本 -> 选集恢复曲线（方案 WP5）：冻结的 20 种子池内回放，tau_b 与 Top-3 重叠随已查询标签数 n_T 的曲线与端点线；这是已知数据的回放，不是盲预注册",
+   "sha": "9ac732cae4ecf9d54313f661ea11bfcc79b35345d9f9f95cbc2b86cd2f727a84",
+   "bytes": 150393,
+   "w": 1856,
+   "h": 832
   }
  ]
 };

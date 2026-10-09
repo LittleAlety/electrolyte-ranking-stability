@@ -181,6 +181,21 @@ METHOD_AUDIT_HOLDOUTS = {
     "C15": "held out as a post-freeze check; must not be used to select the method",
 }
 
+#: WP5 冻结的模型族（方案 9.1：主模型只用岭回归/核岭与 GPR 两类）。
+#: 既有 stage7 复算表还含 gbdt/rf/constant；任何进入新批次主结论的选型都必须先
+#: 限制在本族内，越族的既有最优只作旁证并显式标记。
+FROZEN_MODEL_FAMILY = ["ridge", "krr", "gpr"]
+
+#: WP5 冻结族复算的冻结输入（零新增电子结构计算）。
+FROZEN_OOF_METRICS = "outputs/week32/oof_metrics_reconciliation.csv"
+
+#: WP3 机制案例的原始结构来源（均为既有冻结产物，本批次不新算）。
+MECHANISM_NEUTRAL_GEOMETRY = "outputs/week4/t2_opt_freq/{name}/{name}_G2.xyz"
+MECHANISM_CATION_GEOMETRY = "outputs/phase2_p1a/geometry_relaxation/{name}/{name}_cation_opt.xyz"
+MECHANISM_ADIABATIC_TABLE = "outputs/phase2_p1a/p1a_adiabatic.csv"
+#: 只用于枚举重原子成键对的几何截断（Angstrom）；不是力常数判据。
+GEOMETRY_BOND_CUTOFF_ANG = 1.8
+
 
 def load_json(path):
     with io.open(path, encoding="utf-8") as handle:

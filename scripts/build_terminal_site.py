@@ -102,6 +102,18 @@ FIGURES = [
     ("F56", "F56_r13_summary.png", 26, "R14 收口汇总：三态判据/分辨率曲线/Gate 1 双轨 NOT CLOSABLE/防误读卡片（R13 阶段）"),
     ("F57", "F57_metric_robustness.png", 27, "R15 指标稳健性与排序可识别性：(a) 每个 block 的排序一致性政策带（pessimistic → optimistic），蓝点为 tie 政策；(b) f_tie = 证据无法解析的 pair 占比（= 政策带宽度的一半）；(c) 可分层层数：cheap 自排序 / target 自排序 / 双方认证，竖线为分子数 n；(d) 近临界 pair 数（比值 ∈ [1, 1.25)），认证了但极易翻转"),
     ("F58", "F58_layer_independence.png", 27, "R15 模型层独立性与信息增益：(a) 每级位移的 dispersion（氧化/还原），标注该层 ORCA job 数；(b) 5 个 rung 两两之间位移向量的 max |Pearson|（同分子集上现算）；(c) 每级的 Kendall tau_b（红虚线 = 0.90 排序门槛）与最大 f_unresolved；(d) 结论卡片：层不是同一信号的再编码、阶梯是分解、T3 常数位移免费"),
+    ("F59", "F59_physics_completion_definition.png", 44,
+     "新批次 physics_completion_v1（方案 WP0）：七个登记量名与目标方向 + 12/8/4 队列与 6 条写明原因的排除（零新增电子结构计算）"),
+    ("F60", "F60_physics_completion_method_audit.png", 44,
+     "独立方法审计（方案 WP1）：128 个单点作业只登记为 planned（8 分子 x 4 状态 x 4 设定），可复用的既有行只到电子能层——这是设计图不是结果图"),
+    ("F61", "F61_physics_completion_ladder.png", 44,
+     "E -> G -> ensemble 台阶（方案 WP3）：只有垂直->绝热这一级是冻结的（n=12，逐分子位移箭头），三态判定 55/9/2；G_single / G_ensemble / Li 支仍需 WP2 生产，故 ROBUST_INVERSION 只是标签不是已认证翻转"),
+    ("F62", "F62_physics_completion_pair_identity.png", 44,
+     "固定背景 pair 证据与身份结论（方案 WP3）：66 对逐对按三态判据着色并叠 z*sigma 带；右侧是 C1 状态身份分层，说明还原轴为什么只有分子中心态可排序"),
+    ("F63", "F63_physics_completion_mechanism_cases.png", 44,
+     "机制案例（方案 7.3）：用既有冻结几何给出中性->阳离子的最大键长变化（EMC 0.090 A / GBL 0.086 A / SL 0.016 A），右侧是两例稳健翻转的 d_lower 与 d_upper 变号；电子密度/自旋、配位变化与 G 层分解仍待 WP1/WP2"),
+    ("F64", "F64_physics_completion_budget_curve.png", 44,
+     "累计成本 -> 选集恢复曲线（方案 WP5）：冻结的 20 种子池内回放，tau_b 与 Top-3 重叠随已查询标签数 n_T 的曲线与端点线；这是已知数据的回放，不是盲预注册"),
 ]
 
 # ---------------------------------------------------------------- week table
@@ -315,7 +327,7 @@ def counts():
         # Recorded, not measured: pytest cannot be run from the generator.  Bump
         # it in the same commit that adds or removes a test, otherwise the page
         # will advertise a number the suite no longer produces.
-        "tests_passed": 1360,
+        "tests_passed": 1363,
     }
 
 

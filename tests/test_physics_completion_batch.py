@@ -24,7 +24,7 @@ def _read_csv(path: Path):
 
 def test_every_artifact_is_byte_reproducible() -> None:
     files = batch.build_all()
-    assert len(files) == 63
+    assert len(files) == 66
     for rel, text in files.items():
         target = REPO_ROOT / rel
         assert target.is_file(), rel
@@ -173,5 +173,88 @@ def test_manifests_cover_their_week_files() -> None:
         assert manifest["week"] == week
         assert manifest["new_electronic_structure_jobs"] == 0
         assert manifest["n_files"] == len(manifest["files"])
+
+
+
         for entry in manifest["files"]:
             assert (REPO_ROOT / entry["path"]).is_file(), entry["path"]
+
+
+def test_mechanism_bond_changes_recompute_from_frozen_geometry() -> None:
+    """机制案例的键长变化必须能从冻结 .xyz 独立重算出来。"""
+    rows = _read_csv(REPO_ROOT / "outputs/physics_completion/pair_evidence/mechanism_bond_changes.csv")
+    summary = {row["name"]: row for row in
+               _read_csv(REPO_ROOT / "outputs/physics_completion/pair_evidence/mechanism_geometry.csv")}
+    assert set(summary) == {"EMC", "GBL", "SL"}
+    for name, entry in summary.items():
+        neutral = _read_xyz(REPO_ROOT / ("outputs/week4/t2_opt_freq/%s/%s_G2.xyz" % (name, name)))
+        cation = _read_xyz(REPO_ROOT / ("outputs/phase2_p1a/geometry_relaxation/%s/%s_cation_opt.xyz" % (name, name)))
+        assert [atom[0] for atom in neutral] == [atom[0] for atom in cation]
+        bonds_neutral = _heavy_bonds(neutral, 1.8)
+        bonds_cation = _heavy_bonds(cation, 1.8)
+        shared = sorted(set(bonds_neutral) & set(bonds_cation))
+        assert len(shared) == int(entry["n_heavy_bonds_shared"])
+        drifts = {pair: bonds_cation[pair] - bonds_neutral[pair] for pair in shared}
+        worst = max(drifts, key=lambda pair: abs(drifts[pair]))
+        assert abs(float(entry["max_abs_bond_change_ang"]) - abs(drifts[worst])) < 1e-6
+        assert abs(float(entry["mean_abs_bond_change_ang"])
+                   - sum(abs(v) for v in drifts.values()) / len(shared)) < 1e-6
+    assert len(rows) == 17
+    assert sum(1 for row in rows if row["is_largest_change"] == "true") == 3
+
+
+def test_wp5_frozen_family_view_matches_the_source_table() -> None:
+    """WP5 冻结族复算必须与既有 stage7 复算表逐格一致。"""
+    source = _read_csv(REPO_ROOT / "outputs/week32/oof_metrics_reconciliation.csv")
+    view = _read_csv(REPO_ROOT / "outputs/physics_completion/ml/frozen_family_view.csv")
+    assert len(source) == 288
+    assert len(view) == 48
+    assert sum(int(row["n_models_all"]) for row in view) == len(source)
+    assert {int(row["n_models_frozen_family"]) for row in view} == {len(PB.FROZEN_MODEL_FAMILY)}
+    outside = [row for row in view if row["tau_winner_all"] in ("gbdt", "rf", "constant")]
+    assert len(outside) == 21
+    for row in view:
+        if row["tau_winner_all"] in PB.FROZEN_MODEL_FAMILY:
+            assert row["tau_winner_all"] == row["tau_winner_frozen_family"]
+
+
+def test_plan_section_14_figures_exist_and_are_registered() -> None:
+    """方案 14 要求的六张主图必须存在，并被图清单与交付清单同时登记。"""
+    figdir = REPO_ROOT / "outputs" / "figures"
+    manifest = (figdir / "figure_manifest_week45_physics_completion.md").read_text(encoding="utf-8")
+    names = ("F59_physics_completion_definition.png",
+             "F60_physics_completion_method_audit.png",
+             "F61_physics_completion_ladder.png",
+             "F62_physics_completion_pair_identity.png",
+             "F63_physics_completion_mechanism_cases.png",
+             "F64_physics_completion_budget_curve.png")
+    assert len(names) == 6
+    for index, name in enumerate(names, 59):
+        assert (figdir / name).is_file(), name
+        assert "| F%d |" % index in manifest
+        assert "`%s`" % name in manifest
+    assert len(list(figdir.glob("*_physics_completion_*.png"))) == 6
+
+
+def _read_xyz(path: Path):
+    lines = path.read_text(encoding="utf-8").splitlines()
+    n_atoms = int(lines[0].split()[0])
+    atoms = []
+    for line in lines[2:2 + n_atoms]:
+        parts = line.split()
+        atoms.append((parts[0], float(parts[1]), float(parts[2]), float(parts[3])))
+    return atoms
+
+
+def _heavy_bonds(atoms, cutoff):
+    bonds = {}
+    for i in range(len(atoms)):
+        if atoms[i][0] == "H":
+            continue
+        for j in range(i + 1, len(atoms)):
+            if atoms[j][0] == "H":
+                continue
+            distance = sum((atoms[i][k] - atoms[j][k]) ** 2 for k in (1, 2, 3)) ** 0.5
+            if distance <= cutoff:
+                bonds[(i, j)] = distance
+    return bonds

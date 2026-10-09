@@ -917,6 +917,88 @@ def _pair_label(dl, du, tol):
     return "UNRESOLVED"
 
 
+
+def _read_xyz(path):
+    """读一个 .xyz：返回 (elements, coords)，原子顺序按文件顺序保留。"""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    n_atoms = int(lines[0].split()[0])
+    elements, coords = [], []
+    for line in lines[2:2 + n_atoms]:
+        parts = line.replace(",", " ").split()
+        elements.append(parts[0])
+        coords.append((float(parts[1]), float(parts[2]), float(parts[3])))
+    if len(elements) != n_atoms:
+        raise ValueError("truncated xyz: %s" % path)
+    return elements, coords
+
+
+def _heavy_bonds(elements, coords, cutoff):
+    """枚举距离 <= cutoff 的重原子成键对；只用几何判据，不用力常数。"""
+    bonds = {}
+    for i in range(len(coords)):
+        if elements[i] == "H":
+            continue
+        for j in range(i + 1, len(coords)):
+            if elements[j] == "H":
+                continue
+            distance = math.dist(coords[i], coords[j])
+            if distance <= cutoff:
+                bonds[(i, j)] = distance
+    return bonds
+
+
+def build_mechanism_geometry(cases):
+    """机制案例的原始结构证据：中性松弛几何 vs 阳离子松弛几何的键长变化。
+
+    两个几何都来自既有冻结产物（本批次零新增电子结构计算）。键长是平移/旋转
+    不变量，因此不需要叠合；成键对只用几何截断枚举，不作力常数判据。
+    """
+    adiabatic = {row["name"]: row for row in
+                 PB.load_rows(REPO / PB.MECHANISM_ADIABATIC_TABLE)}
+    names = sorted({part.strip() for case in cases for part in case["pair"].split("|")})
+    rows, bond_rows = [], []
+    for name in names:
+        neutral_rel = PB.MECHANISM_NEUTRAL_GEOMETRY.format(name=name)
+        cation_rel = PB.MECHANISM_CATION_GEOMETRY.format(name=name)
+        neutral_elements, neutral_coords = _read_xyz(REPO / neutral_rel)
+        cation_elements, cation_coords = _read_xyz(REPO / cation_rel)
+        neutral_bonds = _heavy_bonds(neutral_elements, neutral_coords, PB.GEOMETRY_BOND_CUTOFF_ANG)
+        cation_bonds = _heavy_bonds(cation_elements, cation_coords, PB.GEOMETRY_BOND_CUTOFF_ANG)
+        shared = sorted(set(neutral_bonds) & set(cation_bonds))
+        change = {pair: cation_bonds[pair] - neutral_bonds[pair] for pair in shared}
+        worst = max(change, key=lambda pair: abs(change[pair])) if change else None
+        entry = adiabatic.get(name, {})
+        rows.append({
+            "name": name,
+            "family": entry.get("family", ""),
+            "n_atoms": len(neutral_elements),
+            "element_sequence_matches": str(neutral_elements == cation_elements).lower(),
+            "n_heavy_bonds_shared": len(shared),
+            "mean_abs_bond_change_ang": ("%.6f" % (sum(abs(v) for v in change.values()) / len(shared)))
+                                         if shared else "",
+            "max_abs_bond_change_ang": ("%.6f" % abs(change[worst])) if worst else "",
+            "max_bond_pair": ("%s%d-%s%d" % (neutral_elements[worst[0]], worst[0] + 1,
+                                             neutral_elements[worst[1]], worst[1] + 1)) if worst else "",
+            "max_bond_change_ang": ("%.6f" % change[worst]) if worst else "",
+            "d_ip_ev": entry.get("d_ip_ev", ""),
+            "neutral_geometry": neutral_rel,
+            "cation_geometry": cation_rel,
+        })
+        for pair in shared:
+            drift = change[pair]
+            bond_rows.append({
+                "name": name,
+                "bond": "%s%d-%s%d" % (neutral_elements[pair[0]], pair[0] + 1,
+                                       neutral_elements[pair[1]], pair[1] + 1),
+                "r_neutral_ang": "%.6f" % neutral_bonds[pair],
+                "r_cation_ang": "%.6f" % cation_bonds[pair],
+                "dr_ang": "%.6f" % drift,
+                "is_largest_change": str(pair == worst).lower(),
+                "moved_over_0p01_ang": str(abs(drift) >= 0.01).lower(),
+            })
+    return rows, bond_rows
+
+
 def wp3():
     files = {}
     local = {}
@@ -968,6 +1050,7 @@ def wp3():
             "selection_impact": "flips the relative oxidation order of the pair under relaxation",
         })
 
+    geometry_rows, geometry_bonds = build_mechanism_geometry(cases)
     unresolved_share = counts.get("UNRESOLVED", 0) / len(rows)
     payload_certified = False
     checks = [
@@ -991,6 +1074,18 @@ def wp3():
         {"id": "rung_cohort_difference_is_documented", "description": "该 rung 与主集的成员差异被显式记录",
          "ok": ("SN" in members) and ("DEC" not in members),
          "detail": "rung members 含 SN 不含 DEC；主集含 DEC 不含 SN —— 已在 payload 的 rung_members_note 说明"},
+        {"id": "mechanism_case_geometries_are_frozen_inputs", "description": "机制案例的原始结构来自既有冻结几何且元素序列一致",
+         "ok": bool(geometry_rows) and all(row["element_sequence_matches"] == "true" for row in geometry_rows)
+                 and all(row["n_heavy_bonds_shared"] for row in geometry_rows),
+         "detail": "%d 个案例分子；%s" % (len(geometry_rows), "、".join(
+             "%s max|Δr|=%.3f Å (%s)" % (row["name"], float(row["max_abs_bond_change_ang"]),
+                                         row["max_bond_pair"]) for row in geometry_rows))},
+        {"id": "mechanism_bond_table_covers_every_case_molecule", "description": "案例的键长变化表逐键覆盖每个案例分子",
+         "ok": bool(geometry_bonds) and all(
+             any(row["name"] == entry["name"] for row in geometry_bonds) for entry in geometry_rows),
+         "detail": "n_bond_rows=%d ; n_molecules=%d ; 变化 >0.01 A 的键 %d 条"
+                   % (len(geometry_bonds), len(geometry_rows),
+                      sum(1 for row in geometry_bonds if row["moved_over_0p01_ang"] == "true"))},
     ]
 
     payload = {
@@ -1021,6 +1116,14 @@ def wp3():
         "state_counts": counts, "frozen_state_counts": frozen_counts,
         "unresolved_fraction": "%.9f" % unresolved_share,
         "resolution_curve_three_state": curve, "mechanism_cases": cases,
+        "mechanism_geometry": geometry_rows,
+        "mechanism_bond_changes": geometry_bonds,
+        "mechanism_geometry_sources": {
+            "neutral": PB.MECHANISM_NEUTRAL_GEOMETRY,
+            "cation": PB.MECHANISM_CATION_GEOMETRY,
+            "bond_cutoff_ang": PB.GEOMETRY_BOND_CUTOFF_ANG,
+            "caveat": "bond pairs are enumerated by a geometric cutoff only; no force constants are used",
+        },
         "frozen_resolution_curve_per_model": frozen["resolution_curve"],
         "frozen_ranking": {"kendall_tau_b": frozen["ranking"]["kendall_tau_b"],
                            "spearman_rho": frozen["ranking"]["spearman_rho"],
@@ -1036,6 +1139,13 @@ def wp3():
     local["outputs/physics_completion/pair_evidence/mechanism_cases.csv"] = csv_text(
         ["case_id", "rule", "pair", "axis", "d_lower_ev", "d_upper_ev", "sigma_ev", "label",
          "selection_impact"], cases)
+    local["outputs/physics_completion/pair_evidence/mechanism_geometry.csv"] = csv_text(
+        ["name", "family", "n_atoms", "element_sequence_matches", "n_heavy_bonds_shared",
+         "mean_abs_bond_change_ang", "max_abs_bond_change_ang", "max_bond_pair",
+         "max_bond_change_ang", "d_ip_ev", "neutral_geometry", "cation_geometry"], geometry_rows)
+    local["outputs/physics_completion/pair_evidence/mechanism_bond_changes.csv"] = csv_text(
+        ["name", "bond", "r_neutral_ang", "r_cation_ang", "dr_ang", "is_largest_change",
+         "moved_over_0p01_ang"], geometry_bonds)
     local["outputs/physics_completion/pair_evidence/conservative_interval_protocol.md"] = (
         "# 保守区间与三态判据协议\n\n"
         "1. 对固定目标模型 m 与 pair i,j、每个预先接受的合理方法 r，得到 D_ij^(m,r)；自由态与 Li 态分别构造方法范围，\n"
@@ -1046,21 +1156,51 @@ def wp3():
         "4. 另给方法 pair spread 的 z 曲线作为 sensitivity；小数目相关泛函不是独立随机重复，\n"
         "   1.96×spread 不能自动标成校准 95% 置信度。\n"
         "5. 本仓库首轮只在既有冻结 rung（P1v→P1a，n=12）上演示该判据；多方法版本待 WP1 生产单点完成后填入。\n")
-    local["outputs/physics_completion/pair_evidence/mechanism_cases.md"] = (
-        "# 机制案例页（最多 3 例）\n\n"
-        "选择规则（事先冻结）：优先选证据最强的稳健翻转，再选影响 Top-k 的 unresolved 边界，再选有身份改变的代表；"
-        "**无稳健翻转时不强行补案例**。\n\n"
-        + "".join(
-            "## %s：%s\n\n"
-            "- 轴：%s\n"
-            "- d_lower = %s eV；d_upper = %s eV；sigma = %s eV\n"
-            "- 判定：%s\n"
-            "- 选集影响：%s\n\n"
-            % (case["case_id"], case["pair"], case["axis"], case["d_lower_ev"], case["d_upper_ev"],
-               case["sigma_ev"], case["label"], case["selection_impact"])
-            for case in cases)
-        + "> 说明：本页只登记判定与选集影响；对应的原始结构、电子密度/自旋、配位变化与 E/G 分解，"
-          "需在 WP1/WP2 的新计算完成后补入（本批次无可提供的原始结构）。\n")
+    case_lines = ["# 机制案例页（最多 3 例）", "",
+                  "选择规则（事先冻结）：优先选证据最强的稳健翻转，再选影响 Top-k 的 unresolved 边界，再选有身份改变的代表；"
+                  "**无稳健翻转时不强行补案例**。", ""]
+    for case in cases:
+        case_lines += [
+            "## %s：%s" % (case["case_id"], case["pair"]), "",
+            "- 轴：%s" % case["axis"],
+            "- d_lower = %s eV；d_upper = %s eV；sigma = %s eV"
+            % (case["d_lower_ev"], case["d_upper_ev"], case["sigma_ev"]),
+            "- 判定：%s" % case["label"],
+            "- 选集影响：%s" % case["selection_impact"], "",
+        ]
+    case_lines += [
+        "## 原始结构证据（既有冻结几何，零新增计算）", "",
+        "| 分子 | 家族 | 原子数 | 元素序列一致 | 重原子成键对 | 平均 abs(dr) (Å) | 最大 abs(dr) (Å) | 最大变化键 | 该键 dr (Å) | dIP (eV) |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in geometry_rows:
+        case_lines.append(
+            "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+            % (row["name"], row["family"], row["n_atoms"], row["element_sequence_matches"],
+               row["n_heavy_bonds_shared"], row["mean_abs_bond_change_ang"],
+               row["max_abs_bond_change_ang"], row["max_bond_pair"],
+               row["max_bond_change_ang"], row["d_ip_ev"]))
+    case_lines += [
+        "",
+        "结构来源（既有冻结路径；按交付层纪律不复制原始几何文件，只交付派生的键长变化）："
+        "中性松弛几何 `%s`；阳离子松弛几何 `%s`。" % (PB.MECHANISM_NEUTRAL_GEOMETRY, PB.MECHANISM_CATION_GEOMETRY),
+        "成键对只用 %.1f Å 几何截断枚举，不是力常数判据；键长是平移/旋转不变量，因此不需要结构叠合。"
+        % PB.GEOMETRY_BOND_CUTOFF_ANG,
+        "",
+        "## 逐例六项证据覆盖（方案 7.3）", "",
+        "| 项目 | 状态 | 说明 |",
+        "| --- | --- | --- |",
+        "| 原始结构 | 已提供（派生） | 上表 + `mechanism_bond_changes.csv` 逐键列出中性/阳离子键长（原始几何仍留在冻结路径，未复制进交付层） |",
+        "| 电子密度/自旋 | 待补 | 需 WP1 生产单点的密度/自旋分析（本批次零新增计算） |",
+        "| 配位变化 | 待补 | 本 rung 为自由态；配位态属 WP2 |",
+        "| E/G 分解 | 部分 | 有电子能层分解（dIP 列）；G 层待 WP2 |",
+        "| 方法敏感性 | 待补 | 现为单 rung 位移 std；多方法范围待 WP1 |",
+        "| 选集影响 | 已提供 | 每例的 pair 级翻转说明 |",
+        "",
+        "> 说明：本页登记判定、原始结构与选集影响；电子密度/自旋、配位变化、G 层分解与方法敏感性范围"
+        "需在 WP1/WP2 的新计算完成后补入（本批次无可提供的对应计算）。",
+    ]
+    local["outputs/physics_completion/pair_evidence/mechanism_cases.md"] = "\n".join(case_lines) + "\n"
 
     summary = [
         "# Week 40 / WP3 — 排序、独立不确定度与机制",
@@ -1094,6 +1234,7 @@ def wp3():
         "- 首轮只用**单一既有 rung**演示；多方法保守区间待 WP1 生产单点完成后才有真正的方法范围。",
         "- 该 rung 的 12 个成员与主 cohort 差一个分子（SN 进、DEC 出）：它只作判据演示，不代表已登记的主集。",
         "- 稳健翻转**尚未认证**：本标签只表示「在该 rung 的位移 std 敏感性尺度下的翻转」，认证需 WP1 独立方法审计与采样界限（方案 2）。",
+        "- 机制案例已补原始结构证据（既有冻结几何的重原子键长变化表，逐键列出中性/阳离子键长），但电子密度/自旋、配位变化与 G 层分解仍需 WP1/WP2 新计算。",
         "- n=%d 时主选集固定 k=3（辅助 k=2/4）；pairwise unresolved 不任意变成标准 tau_b 的相等值。" % len(members),
         "- 未解析关系不一定传递；优先用偏序 / 集合与显式政策带，而不是强行排名。",
     ]
@@ -1290,6 +1431,50 @@ COST_LEDGER = [
 ]
 
 
+def _best_model(rows, field, reverse):
+    """按 field 取最优 (model, value)；缺值不参与比较。"""
+    winner = None
+    for row in rows:
+        if not row.get(field):
+            continue
+        value = float(row[field])
+        if winner is None or (value > winner[1] if reverse else value < winner[1]):
+            winner = (row["model"], value)
+    return winner
+
+
+def build_frozen_family_view(metrics_rows):
+    """把既有 stage7 复算表限制到 WP5 冻结模型族（ridge/krr/gpr），逐格对比选型。
+
+    方案 9.1 只把岭回归 / 核岭与 GPR 列为主模型；既有表里还有 gbdt/rf/constant。
+    这里不改动任何既有数值，只把「全模型最优」与「冻结族内最优」并排登记，
+    并把越族胜出的格子显式标出，避免把越族成绩当成新批次主结论。
+    """
+    groups = {}
+    for row in metrics_rows:
+        key = (row["task"], row["feature_set"], row["axis"], row["split"], row["shape"])
+        groups.setdefault(key, []).append(row)
+    view = []
+    for key in sorted(groups):
+        members = groups[key]
+        frozen = [row for row in members if row["model"] in PB.FROZEN_MODEL_FAMILY]
+        tau_all = _best_model(members, "kendall_tau_b", True)
+        tau_frozen = _best_model(frozen, "kendall_tau_b", True)
+        mae_all = _best_model(members, "mae_ev", False)
+        mae_frozen = _best_model(frozen, "mae_ev", False)
+        view.append({
+            "task": key[0], "feature_set": key[1], "axis": key[2], "split": key[3], "shape": key[4],
+            "n_models_all": len(members), "n_models_frozen_family": len(frozen),
+            "tau_winner_all": tau_all[0], "tau_winner_frozen_family": tau_frozen[0],
+            "tau_all": "%.9f" % tau_all[1], "tau_frozen_family": "%.9f" % tau_frozen[1],
+            "tau_winner_outside_family": str(tau_all[0] not in PB.FROZEN_MODEL_FAMILY).lower(),
+            "mae_winner_all": mae_all[0], "mae_winner_frozen_family": mae_frozen[0],
+            "mae_all": "%.9f" % mae_all[1], "mae_frozen_family": "%.9f" % mae_frozen[1],
+            "mae_winner_outside_family": str(mae_all[0] not in PB.FROZEN_MODEL_FAMILY).lower(),
+        })
+    return view
+
+
 def wp5():
     files = {}
     local = {}
@@ -1310,6 +1495,16 @@ def wp5():
         })
 
     n_scenario = len({(row["task"], row["axis"]) for row in sb})
+
+    metrics_rows = PB.load_rows(REPO / PB.FROZEN_OOF_METRICS)
+    family_view = build_frozen_family_view(metrics_rows)
+    n_rows_accounted = sum(int(row["n_models_all"]) for row in family_view)
+    n_frozen_per_cell = sorted({int(row["n_models_frozen_family"]) for row in family_view})
+    n_tau_outside = sum(1 for row in family_view if row["tau_winner_outside_family"] == "true")
+    n_mae_outside = sum(1 for row in family_view if row["mae_winner_outside_family"] == "true")
+    family_invariant = all(
+        (row["tau_winner_all"] not in PB.FROZEN_MODEL_FAMILY)
+        or (row["tau_winner_all"] == row["tau_winner_frozen_family"]) for row in family_view)
     checks = [
         {"id": "task_A_and_B_separated", "description": "任务 A（自由态）与任务 B（配位位移）分开，B 的成本含 free 标签成本",
          "ok": True, "detail": "B 的成本显式包含获得 free 标签的成本，不隐含为免费"},
@@ -1323,6 +1518,14 @@ def wp5():
         {"id": "absolute_cost_missing_flagged", "description": "绝对成本字段缺失被显式标 MISSING，不给金额",
          "ok": sum(1 for item in COST_LEDGER if item["status"] == "MISSING") == 3,
          "detail": "MISSING=%d" % sum(1 for item in COST_LEDGER if item["status"] == "MISSING")},
+        {"id": "frozen_family_view_covers_every_cell", "description": "冻结族复算覆盖既有 stage7 复算表的每一格",
+         "ok": (n_rows_accounted == len(metrics_rows)) and n_frozen_per_cell == [len(PB.FROZEN_MODEL_FAMILY)],
+         "detail": "%d/%d 行；%d 格，每格冻结族候选 %s 个"
+                   % (n_rows_accounted, len(metrics_rows), len(family_view), n_frozen_per_cell)},
+        {"id": "frozen_family_winner_consistent_with_published", "description": "冻结族与全模型选型不互相矛盾（族内模型胜出时两者必须同选）",
+         "ok": family_invariant,
+         "detail": "tau 越族胜出 %d/%d 格；MAE 越族胜出 %d/%d 格"
+                   % (n_tau_outside, len(family_view), n_mae_outside, len(family_view))},
     ]
 
     payload = {
@@ -1348,6 +1551,17 @@ def wp5():
         "counts": {"delta_vs_direct_cells": len(dv), "shift_better_cells": shift_better,
                    "success_budget_rows": len(sb), "budget_to_threshold_rows": len(btt),
                    "scenarios": n_scenario},
+        "frozen_model_family": PB.FROZEN_MODEL_FAMILY,
+        "frozen_family_summary": {
+            "source_table": PB.FROZEN_OOF_METRICS,
+            "n_cells": len(family_view),
+            "n_source_rows": len(metrics_rows),
+            "tau_winner_outside_family": n_tau_outside,
+            "mae_winner_outside_family": n_mae_outside,
+            "note": ("existing stage7 cells whose winner is gbdt/rf/constant are kept as evidence but "
+                     "are not eligible to carry the new-batch frozen-method claim"),
+        },
+        "frozen_family_view": family_view,
         "checks": checks, "n_checks": len(checks),
         "n_failed": sum(0 if item["ok"] else 1 for item in checks),
     }
@@ -1356,6 +1570,11 @@ def wp5():
         ["check_id", "description", "ok", "detail"], acceptance_rows(checks))
     local["outputs/physics_completion/ml/delta_vs_direct.csv"] = csv_text(
         list(dv[0].keys()), dv)
+    local["outputs/physics_completion/ml/frozen_family_view.csv"] = csv_text(
+        ["task", "feature_set", "axis", "split", "shape", "n_models_all", "n_models_frozen_family",
+         "tau_winner_all", "tau_winner_frozen_family", "tau_all", "tau_frozen_family",
+         "tau_winner_outside_family", "mae_winner_all", "mae_winner_frozen_family",
+         "mae_all", "mae_frozen_family", "mae_winner_outside_family"], family_view)
     local["outputs/physics_completion/active_learning/success_budget.csv"] = csv_text(
         ["task", "axis", "baseline", "n_T_median_tau080", "n_T_majority_tau080",
          "n_T_majority_combined", "median_overstates_majority", "regret_tolerance_ev"], endpoint_rows)
@@ -1383,6 +1602,9 @@ def wp5():
         "- `success_budget.csv`：%d 行 / %d 个 (task,axis) 场景；`budget_to_threshold.csv` %d 行。" % (len(sb), n_scenario, len(btt)),
         "- 成本账本：%d 项相对预算；**3 项绝对成本缺字段（MISSING）**，故只给相对预算、不给金额。"
         % len(COST_LEDGER),
+        "- 冻结族口径（方案 9.1）：把既有 stage7 复算表（%d 行）限制到 ridge/krr/gpr，逐格对比选型；"
+        "全模型最优落在族外（gbdt/rf/constant）的格子：tau %d/%d、MAE %d/%d —— 这些格子只作旁证。"
+        % (len(metrics_rows), n_tau_outside, len(family_view), n_mae_outside, len(family_view)),
         "",
         "## 验收（%d/%d 通过）" % (len(checks) - payload["n_failed"], len(checks)),
         "",

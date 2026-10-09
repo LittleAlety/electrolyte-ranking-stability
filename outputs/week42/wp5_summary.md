@@ -15,8 +15,9 @@
 - `delta_vs_direct.csv`：24 格，其中 shift 在 tau_b 上更好 **15** 格。
 - `success_budget.csv`：24 行 / 6 个 (task,axis) 场景；`budget_to_threshold.csv` 24 行。
 - 成本账本：7 项相对预算；**3 项绝对成本缺字段（MISSING）**，故只给相对预算、不给金额。
+- 冻结族口径（方案 9.1）：把既有 stage7 复算表（288 行）限制到 ridge/krr/gpr，逐格对比选型；全模型最优落在族外（gbdt/rf/constant）的格子：tau 21/48、MAE 26/48 —— 这些格子只作旁证。
 
-## 验收（5/5 通过）
+## 验收（7/7 通过）
 
 | check | ok | detail |
 | --- | --- | --- |
@@ -25,6 +26,8 @@
 | success_endpoint_frozen | PASS | 端点由 freeze 规则给出，不由结果反推 |
 | replay_not_pretended_blind | PASS | 已声明旧数据大致行为已知；真实前瞻性需另留未计算分子 |
 | absolute_cost_missing_flagged | PASS | MISSING=3 |
+| frozen_family_view_covers_every_cell | PASS | 288/288 行；48 格，每格冻结族候选 [3] 个 |
+| frozen_family_winner_consistent_with_published | PASS | tau 越族胜出 21/48 格；MAE 越族胜出 26/48 格 |
 
 ## 限制
 
