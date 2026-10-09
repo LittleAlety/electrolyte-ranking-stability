@@ -893,7 +893,7 @@ PILOT_LN_VM = 3.197365
 WP2_PRODUCTION_MOLECULES = ["C01", "C02", "C13", "C14"]
 WP2_PRODUCTION_NAMES = {"C01": "DMC", "C02": "EMC", "C13": "GBL", "C14": "SL"}
 WP2_PRODUCTION_STATES = ["M", "M_plus", "LiM_plus", "LiM_2plus"]
-WP2_PRODUCTION_EXTRA_STATES = []
+WP2_PRODUCTION_EXTRA_STATES = ["M_tzvpd"]
 WP2_PRODUCTION_METHOD_NOTE = ("wB97X-D4 (= omegaB97X-D4) / def2-TZVP for the neutral leg and def2-TZVPD "
                               "for the charged/Li legs; SMD acetonitrile; Opt NumFreq TightOpt TightSCF SlowConv")
 WP2_PRODUCTION_GEOM_NOTE = ("per-state frozen r2SCAN-3c start structure: M -> <name>_G2.xyz, "
@@ -923,6 +923,7 @@ WP2_PRODUCTION_LEDGER = [
     {"record_id": "C13|M", "mol_id": "C13", "name": "GBL", "state": "M", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVP", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVP SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/GBL/GBL_G2.xyz", "e_sp_eh": "-306.73708477", "electronic_eh": "-306.73708477", "zpe_eh": "0.09943860", "enthalpy_eh": "-306.63160526", "entropy_corr_eh": "-0.03461257", "e_to_g_thermal_eh": "0.07086694", "g_single_eh": "-306.66621783", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "150.06", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "3935.5", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; the recorded e_sp_eh is the final Opt energy", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVP", "e_sp_solution_ev": "-8346.741289645", "g_single_ev": "-8344.812901968", "zpe_ev": "2.705862152", "thermal_corr_ev": "1.928387676", "std_state_corr_ev": "0.082148454", "core_hours": "4.372778"},
     {"record_id": "C13|M_plus", "mol_id": "C13", "name": "GBL", "state": "M_plus", "charge": "1", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/GBL/GBL_G2_cation.xyz", "e_sp_eh": "-306.45395804", "electronic_eh": "-306.45395804", "zpe_eh": "0.09748803", "enthalpy_eh": "-306.35023859", "entropy_corr_eh": "-0.03548273", "e_to_g_thermal_eh": "0.06823672", "g_single_eh": "-306.38572132", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "164.90", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "10481.3", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; the recorded e_sp_eh is the final Opt energy", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-8339.037018838", "g_single_ev": "-8337.180203094", "zpe_ev": "2.652784439", "thermal_corr_ev": "1.856815744", "std_state_corr_ev": "0.082148454", "core_hours": "11.645889"},
     {"record_id": "C14|M", "mol_id": "C14", "name": "SL", "state": "M", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVP", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVP SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/SL/SL_G2.xyz", "e_sp_eh": "-706.15322084", "electronic_eh": "-706.15322084", "zpe_eh": "0.12428876", "enthalpy_eh": "-706.02140690", "entropy_corr_eh": "-0.03823048", "e_to_g_thermal_eh": "0.09358347", "g_single_eh": "-706.05963738", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "37.15", "n_freq": "45", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "7409.8", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; the recorded e_sp_eh is the final Opt energy", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVP", "e_sp_solution_ev": "-19215.408041126", "g_single_ev": "-19212.861505449", "zpe_ev": "3.382069454", "thermal_corr_ev": "2.546535948", "std_state_corr_ev": "0.082148454", "core_hours": "8.233111"},
+    {"record_id": "C13|M_tzvpd", "mol_id": "C13", "name": "GBL", "state": "M_tzvpd", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/GBL/GBL_G2.xyz", "e_sp_eh": "-306.73892277", "electronic_eh": "-306.73892277", "zpe_eh": "0.09936051", "enthalpy_eh": "-306.63350971", "entropy_corr_eh": "-0.03463989", "e_to_g_thermal_eh": "0.07077317", "g_single_eh": "-306.66814960", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "146.18", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "6173.7", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-8346.791304173", "g_single_ev": "-8344.865468108", "zpe_ev": "2.703737215", "thermal_corr_ev": "1.925836065", "std_state_corr_ev": "0.082148454", "core_hours": "6.859667"},
 ]
 
 WP2_PRODUCTION_CORE_HOURS = sum(float(row["core_hours"]) for row in WP2_PRODUCTION_LEDGER)
@@ -930,6 +931,8 @@ WP2_PRODUCTION_STATES_DONE = len([row for row in WP2_PRODUCTION_LEDGER
                                    if row["state"] in WP2_PRODUCTION_STATES])
 WP2_PRODUCTION_STATES_TOTAL = len(WP2_PRODUCTION_MOLECULES) * len(WP2_PRODUCTION_STATES)
 WP2_PRODUCTION_LEDGER_ROWS = len(WP2_PRODUCTION_LEDGER)
+WP2_PRODUCTION_EXTRA_DONE = len([row for row in WP2_PRODUCTION_LEDGER
+                                 if row["state"] in WP2_PRODUCTION_EXTRA_STATES])
 
 
 
@@ -2150,21 +2153,20 @@ def wp2():
         entry = {"mol_id": mol_id, "name": name, "basis": "def2-TZVPD",
                  "eox_adiabatic_ev": "", "gox_single_ev": "", "thermal_step_free_ev": "",
                  "li_ip_e_ev": "", "li_ip_g_ev": "", "thermal_step_li_ev": "",
-                 "coordination_shift_e_ev": "", "coordination_shift_g_ev": "", "status": "",
-                 "note": ""}
-        if free_neutral is None or free_cation is None:
-            entry["status"] = "not_computed"
-            entry["note"] = ("a basis-consistent free-molecule redox label needs both a def2-TZVPD "
-                             "neutral leg (M_tzvpd) and the def2-TZVPD cation; the def2-TZVP M leg is "
-                             "never subtracted from a def2-TZVPD cation")
-            production_redox.append(entry)
-            continue
-        free_e = float(free_cation["e_sp_solution_ev"]) - float(free_neutral["e_sp_solution_ev"])
-        free_g = float(free_cation["g_single_ev"]) - float(free_neutral["g_single_ev"])
-        entry["eox_adiabatic_ev"] = "%.6f" % free_e
-        entry["gox_single_ev"] = "%.6f" % free_g
-        entry["thermal_step_free_ev"] = "%.6f" % (free_g - free_e)
-        if li_plus is not None and li_2plus is not None:
+                 "coordination_shift_e_ev": "", "coordination_shift_g_ev": "",
+                 "free_status": "", "li_status": "", "status": "", "note": ""}
+        free_ok = free_neutral is not None and free_cation is not None
+        if free_ok:
+            free_e = float(free_cation["e_sp_solution_ev"]) - float(free_neutral["e_sp_solution_ev"])
+            free_g = float(free_cation["g_single_ev"]) - float(free_neutral["g_single_ev"])
+            entry["eox_adiabatic_ev"] = "%.6f" % free_e
+            entry["gox_single_ev"] = "%.6f" % free_g
+            entry["thermal_step_free_ev"] = "%.6f" % (free_g - free_e)
+            entry["free_status"] = "computed"
+        else:
+            entry["free_status"] = "not_computed"
+        li_ok = free_ok and li_plus is not None and li_2plus is not None
+        if li_ok:
             li_e = float(li_2plus["e_sp_solution_ev"]) - float(li_plus["e_sp_solution_ev"])
             li_g = float(li_2plus["g_single_ev"]) - float(li_plus["g_single_ev"])
             entry["li_ip_e_ev"] = "%.6f" % li_e
@@ -2172,8 +2174,23 @@ def wp2():
             entry["thermal_step_li_ev"] = "%.6f" % (li_g - li_e)
             entry["coordination_shift_e_ev"] = "%.6f" % (li_e - free_e)
             entry["coordination_shift_g_ev"] = "%.6f" % (li_g - free_g)
-        entry["status"] = "computed"
-        entry["note"] = ("same-basis (def2-TZVPD/TZVPD) adiabatic E and qRRHO G; single conformer per state")
+            entry["li_status"] = "computed"
+        else:
+            entry["li_status"] = "not_computed"
+        # 自由腿与 Li 腿分开登记：只有两腿齐备才把整行标成 computed，避免半行充数。
+        entry["status"] = ("computed" if (free_ok and li_ok)
+                           else ("free_only" if free_ok else "not_computed"))
+        if not free_ok:
+            entry["note"] = ("a basis-consistent free-molecule redox label needs both a def2-TZVPD "
+                             "neutral leg (M_tzvpd) and the def2-TZVPD cation; the def2-TZVP M leg is "
+                             "never subtracted from a def2-TZVPD cation")
+        elif not li_ok:
+            entry["note"] = ("free-molecule Eox/Gox_single are same-basis (def2-TZVPD/TZVPD) and "
+                             "qRRHO (single conformer); the Li-leg IP and coordination shift still "
+                             "need both LiM_plus and LiM_2plus at def2-TZVPD, so they stay empty")
+        else:
+            entry["note"] = ("same-basis (def2-TZVPD/TZVPD) adiabatic E and qRRHO G; "
+                             "single conformer per state")
         production_redox.append(entry)
 
     sampling = []
@@ -2413,15 +2430,25 @@ def wp2():
          "description": "生产作业逐条记录 allocated core-hours（cores x wall clock）",
          "ok": len(production_cost) == len(all_production) and production_core_hours > 0.0,
          "detail": "jobs=%d; total=%.6f core-hours" % (len(production_cost), production_core_hours)},
-        {"id": "wp2_production_redox_registered_without_numbers",
-         "description": "缺基组一致的中性腿时不补数：redox 表登记 status=not_computed 且数值留空",
-         "ok": (len(production_extra) == 0
-                and all(row["status"] == "not_computed" for row in production_redox)
-                and all(not row[key] for row in production_redox
-                        for key in ("eox_adiabatic_ev", "gox_single_ev",
-                                    "coordination_shift_g_ev"))),
-         "detail": "production states=%d; redox rows=%d (all not_computed)"
-                   % (len(production), len(production_redox))},
+        {"id": "wp2_production_redox_uses_basis_consistent_legs",
+         "description": "自由腿与 Li 腿分开登记：自由腿 Gox_single 要 def2-TZVPD 中性腿 + def2-TZVPD 阳离子，Li 腿另要两个 Li 态；未齐的腿留空，两腿齐才标 computed",
+         "ok": (len(production_extra) > 0
+                and all(row["basis"] == "def2-TZVPD" for row in production_redox)
+                and any(row["gox_single_ev"] for row in production_redox)
+                and all(row["free_status"] == "computed" and row["thermal_step_free_ev"]
+                        for row in production_redox if row["gox_single_ev"])
+                and all(not row["gox_single_ev"] for row in production_redox
+                        if row["free_status"] != "computed")
+                and all(row["li_ip_g_ev"] and row["coordination_shift_g_ev"]
+                        for row in production_redox if row["li_status"] == "computed")
+                and all(not row["coordination_shift_g_ev"] for row in production_redox
+                        if row["li_status"] != "computed")),
+         "detail": "extra_legs=%d; free_computed=%s; li_computed=%s"
+                   % (len(production_extra),
+                      ",".join("%s %s" % (row["name"], row["gox_single_ev"])
+                               for row in production_redox if row["free_status"] == "computed") or "none",
+                      ",".join(row["name"] for row in production_redox
+                               if row["li_status"] == "computed") or "none")},
     ]
 
     payload = {
@@ -2508,7 +2535,8 @@ def wp2():
     local["outputs/physics_completion/free_states/production_redox.csv"] = csv_text(
         ["mol_id", "name", "basis", "eox_adiabatic_ev", "gox_single_ev", "thermal_step_free_ev",
          "li_ip_e_ev", "li_ip_g_ev", "thermal_step_li_ev", "coordination_shift_e_ev",
-         "coordination_shift_g_ev", "status", "note"], production_redox)
+         "coordination_shift_g_ev", "free_status", "li_status", "status", "note"],
+        production_redox)
     local["outputs/physics_completion/cost/production_cost_ledger.csv"] = csv_text(
         ["job_id", "mol_id", "name", "state", "phase", "level", "cores", "wall_sec",
          "core_hours", "status"], production_cost)
@@ -2651,11 +2679,22 @@ def wp2():
         "成本：%d 个 Opt+Freq 作业，合计 %.6f core-hours（allocated cores x wall clock）。"
         % (len(production_cost), production_core_hours),
         "",
-        "基组一致的 Gox_single 与配位位移**未计算**：需要一条 def2-TZVPD 的中性腿；登记为下一批作业，"
-        "不把 def2-TZVP 中性腿与 def2-TZVPD 阳离子腿相减充数。",
+        "基组一致（同为 def2-TZVPD）的自由腿 Gox_single 与 Li 腿配位位移（两条腿分开登记）：",
+        "",
+        "| 分子 | 自由腿 | Li 腿 | 整行 | Eox_adiabatic (eV) | Gox_single (eV) | E->G 台阶 (eV) | Li IP (E, eV) | Li IP (G, eV) | 配位位移 (E, eV) | 配位位移 (G, eV) |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in production_redox:
+        summary.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+                       % (row["name"], row["free_status"], row["li_status"], row["status"],
+                          row["eox_adiabatic_ev"], row["gox_single_ev"],
+                          row["thermal_step_free_ev"], row["li_ip_e_ev"], row["li_ip_g_ev"],
+                          row["coordination_shift_e_ev"], row["coordination_shift_g_ev"]))
+    summary += [
         "",
         "## 限制",
         "- 生产模板只回填已跑完的主态（本次 5/16）：中性腿 def2-TZVP、带电/Li 腿 def2-TZVPD，两腿相减不是基组一致的自由分子 IP，本报告不据此计算 Eox；其余行热校正保持为空（未把缺值写成 0）。",
+        "- Gox_single 与配位位移在 production_redox.csv 单列，只用两腿同为 def2-TZVPD 的差值。",
         "- 生产首段每态只有**单一代表结构**（n_conformers = 1），不是方案 6.1 的多构象/多 motif 系综；6 kcal/mol 窗口与 3 结构上限仍是资源规则。",
         "- pilot 覆盖 12 主集全部分子，但每态只有单一构象（GFN2 起点），不是方案 6 的多构象系综生产；几何来自 GFN2 而非 r2SCAN-3c。",
         "- DME 与 AN 的 2+ 态在 GFN2 弛豫中 Li 解离（Li-O/N > 10 A），故其 d_ip 记为不可解释、不进入结论；这本身是 GFN2 下 2+ 复合物不稳定的 QC 结果。",
@@ -3604,9 +3643,10 @@ def build_final_report():
         "泛函效应 >> 基组效应；2 个冻结翻转的方法轴 certified=%s | 气相 r2SCAN-3c 冻结几何；8 分子口径；采样界限未纳入 |"
         % METHOD_AUDIT_CERTIFICATION["certified"],
         "| WP2 | week39 | 固定背景配对自由能标签 | 48 行账本；4 主集分子 x 4 主态生产中已登记 %d/%d 个真实 "
-        "Opt+Freq G 标签（%.6f core-hours）；基组一致 redox 表=%s | 生产首段每态单构象；其余状态在产，未完成不补数 |"
+        "Opt+Freq G 标签（%.6f core-hours，另含 %d 条 def2-TZVPD 中性腿）| 生产首段每态单构象；其余状态在产；"
+        "基组一致 redox 的自由腿与 Li 腿分开登记，未齐不补数 |"
         % (WP2_PRODUCTION_STATES_DONE, WP2_PRODUCTION_STATES_TOTAL, WP2_PRODUCTION_CORE_HOURS,
-           "computed" if WP2_PRODUCTION_EXTRA_STATES else "not_computed"),
+           WP2_PRODUCTION_EXTRA_DONE),
         "| WP3 | week40 | pair 证据表 + 机制案例 | P1v→P1a（n=12，66 pair）逐对复算 55/9/2；2 个机制案例 | 单 rung 演示；多方法范围已由 WP1 审计给出（方法轴） |",
         "| WP4 | week41 | 外部可比性审计 | 7 氧化锚点逐条重算 tau_b=0.4286；三级分类 | transcription-only；21 pair 非独立样本 |",
         "| WP5 | week42 | Δ-learning + 成本账本 | 端点/泄漏防线冻结；成本 3 项 MISSING | 回放非盲预注册；绝对成本缺失 |",
@@ -3628,9 +3668,9 @@ def build_final_report():
            METHOD_AUDIT_CERTIFICATION["certified"]),
         "- WP4：Ue1994_Okoshi2015 序列 14 行、被模型覆盖 7 个；逐对一致 15 / 不一致 6 → tau_b = 0.428571（< 0.90）。",
         "- WP2：48 行状态账本，其中 4 主集分子 x 4 主态生产已登记 %d/%d 个真实 Opt+Freq 自由能标签"
-        "（qRRHO，合计 %.6f core-hours）；未完成的主态保持空串（None），未把缺值写成 0。"
+        "（qRRHO，合计 %.6f core-hours），另登记 %d 条 def2-TZVPD 中性腿；未完成的主态保持空串（None），未把缺值写成 0。"
         % (WP2_PRODUCTION_STATES_DONE, WP2_PRODUCTION_STATES_TOTAL,
-           WP2_PRODUCTION_CORE_HOURS),
+           WP2_PRODUCTION_CORE_HOURS, WP2_PRODUCTION_EXTRA_DONE),
         "- WP5：shift 在 tau_b 上更好的格数与冻结表一致；成本账本 3 项 MISSING。",
         "",
         "## 5. 限制与停止规则",

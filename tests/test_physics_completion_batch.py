@@ -175,23 +175,35 @@ def test_wp2_free_state_pilot_ledger_and_cost() -> None:
     assert len(qc) == len(production)
     assert all(row["terminated"] == "true" and row["opt_converged"] == "true"
                and row["imaginary_modes"] == "0" for row in qc)
+    extra_legs = [row for row in production if row["state"] not in PB.FOUR_STATES]
+    assert all(row["mol_id"] in ("C01", "C02", "C13", "C14") for row in extra_legs)
     li_production = [row for row in production if row["state"] in ("LiM_plus", "LiM_2plus")]
     assert all(row["li_o_ang"] and row["nonli_components"] for row in li_production)
     cost_production = _read_csv(
         REPO_ROOT / "outputs/physics_completion/cost/production_cost_ledger.csv")
+    # 成本表覆盖全部已登记状态（主态 + 额外 def2-TZVPD 中性腿）
     assert len(cost_production) == len(production)
+    assert len(cost_production) >= len(master) + len(extra_legs)
     assert all(float(row["core_hours"]) > 0 for row in cost_production)
-    assert payload["free_state_production"]["totals"]["orca_jobs"] == len(production)
+    assert payload["free_state_production"]["totals"]["orca_jobs"] == len(cost_production)
     redox = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/production_redox.csv")
     assert len(redox) == 4
     assert all(row["basis"] == "def2-TZVPD" for row in redox)
     for row in redox:
-        if row["status"] == "computed":
+        # 自由腿与 Li 腿分开登记：谁齐谁给数，未齐的腿必须留空（不能以 0 充数）
+        if row["free_status"] == "computed":
             assert float(row["gox_single_ev"]) > 0
+            assert row["thermal_step_free_ev"] != ""
+        else:
+            assert row["gox_single_ev"] == "" and row["eox_adiabatic_ev"] == ""
+        if row["li_status"] == "computed":
+            assert row["free_status"] == "computed"
             assert float(row["li_ip_g_ev"]) > 0
             assert row["coordination_shift_g_ev"] != ""
+            assert row["status"] == "computed"
         else:
-            assert row["gox_single_ev"] == "" and row["coordination_shift_g_ev"] == ""
+            assert row["coordination_shift_g_ev"] == "" and row["li_ip_g_ev"] == ""
+            assert row["status"] in ("free_only", "not_computed")
 
 
 def test_wp2_ledger_leaves_missing_fields_empty() -> None:

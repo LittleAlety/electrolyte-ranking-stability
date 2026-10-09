@@ -28,13 +28,13 @@
 | pilot_covers_all_twelve_main_molecules | PASS | molecules=12 |
 | pilot_coordination_shift_computed | PASS | 10 interpretable + 2 dissociated(not interpretable); d_ip 0.357-0.897 eV over interpretable |
 | pilot_flags_dissociated_dication_states | PASS | dissociated=[DME,AN] |
-| wp2_production_states_terminated_without_imaginary | PASS | 5 个已生产状态全部 terminated / Opt 收敛 / 无虚频 |
-| wp2_production_gibbs_decomposes_from_the_solution_sp | PASS | max |G - (E_SP + G-E(el))| = 1.000e-08 Eh over 5 state(s) |
-| wp2_production_is_a_registered_subset | PASS | states 5/16 over 4/4 molecules; extra legs 0 |
+| wp2_production_states_terminated_without_imaginary | PASS | 6 个已生产状态全部 terminated / Opt 收敛 / 无虚频 |
+| wp2_production_gibbs_decomposes_from_the_solution_sp | PASS | max |G - (E_SP + G-E(el))| = 1.000e-08 Eh over 6 state(s) |
+| wp2_production_is_a_registered_subset | PASS | states 5/16 over 4/4 molecules; extra legs 1 |
 | wp2_production_fills_only_the_produced_template_rows | PASS | produced=5 planned=43; planned rows carry empty G |
 | wp2_production_li_states_record_binding_metrics | PASS | li_states=0 bound=0 |
-| wp2_production_cost_records_allocated_core_hours | PASS | jobs=5; total=36.354000 core-hours |
-| wp2_production_redox_registered_without_numbers | PASS | production states=5; redox rows=4 (all not_computed) |
+| wp2_production_cost_records_allocated_core_hours | PASS | jobs=6; total=43.213667 core-hours |
+| wp2_production_redox_uses_basis_consistent_legs | PASS | extra_legs=1; free_computed=GBL 7.685265; li_computed=none |
 
 ## 12 主集四主态 pilot（方案 15.5 / 15.6，新增计算）
 
@@ -124,13 +124,22 @@ Li 配位两态（SMD，def2-TZVPD，Li 按给体类型沿外侧 1.9 A 起点后
 | C13|M | -306.73708477 | 0.09943860 | 0.07086694 | -306.66621783 | -8344.812901968 | 0 | 150.06 | - | - | intact |
 | C13|M_plus | -306.45395804 | 0.09748803 | 0.06823672 | -306.38572132 | -8337.180203094 | 0 | 164.90 | - | - | intact |
 | C14|M | -706.15322084 | 0.12428876 | 0.09358347 | -706.05963738 | -19212.861505449 | 0 | 37.15 | - | - | intact |
+| C13|M_tzvpd | -306.73892277 | 0.09936051 | 0.07077317 | -306.66814960 | -8344.865468108 | 0 | 146.18 | - | - | intact |
 
-成本：5 个 Opt+Freq 作业，合计 36.354000 core-hours（allocated cores x wall clock）。
+成本：6 个 Opt+Freq 作业，合计 43.213667 core-hours（allocated cores x wall clock）。
 
-基组一致的 Gox_single 与配位位移**未计算**：需要一条 def2-TZVPD 的中性腿；登记为下一批作业，不把 def2-TZVP 中性腿与 def2-TZVPD 阳离子腿相减充数。
+基组一致（同为 def2-TZVPD）的自由腿 Gox_single 与 Li 腿配位位移（两条腿分开登记）：
+
+| 分子 | 自由腿 | Li 腿 | 整行 | Eox_adiabatic (eV) | Gox_single (eV) | E->G 台阶 (eV) | Li IP (E, eV) | Li IP (G, eV) | 配位位移 (E, eV) | 配位位移 (G, eV) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DMC | not_computed | not_computed | not_computed |  |  |  |  |  |  |  |
+| EMC | not_computed | not_computed | not_computed |  |  |  |  |  |  |  |
+| GBL | computed | not_computed | free_only | 7.754285 | 7.685265 | -0.069020 |  |  |  |  |
+| SL | not_computed | not_computed | not_computed |  |  |  |  |  |  |  |
 
 ## 限制
 - 生产模板只回填已跑完的主态（本次 5/16）：中性腿 def2-TZVP、带电/Li 腿 def2-TZVPD，两腿相减不是基组一致的自由分子 IP，本报告不据此计算 Eox；其余行热校正保持为空（未把缺值写成 0）。
+- Gox_single 与配位位移在 production_redox.csv 单列，只用两腿同为 def2-TZVPD 的差值。
 - 生产首段每态只有**单一代表结构**（n_conformers = 1），不是方案 6.1 的多构象/多 motif 系综；6 kcal/mol 窗口与 3 结构上限仍是资源规则。
 - pilot 覆盖 12 主集全部分子，但每态只有单一构象（GFN2 起点），不是方案 6 的多构象系综生产；几何来自 GFN2 而非 r2SCAN-3c。
 - DME 与 AN 的 2+ 态在 GFN2 弛豫中 Li 解离（Li-O/N > 10 A），故其 d_ip 记为不可解释、不进入结论；这本身是 GFN2 下 2+ 复合物不稳定的 QC 结果。
