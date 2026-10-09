@@ -287,7 +287,9 @@ def build_submission(out, sources):
         "work_packages": {week: WP_LABEL[week] for week in WEEK_DIRS},
         "gate_status": GATE_STATUS,
         "discipline": DISCIPLINE,
-        "no_new_electronic_structure_jobs": True,
+        "no_new_electronic_structure_jobs_on_ranking_layer": True,
+        "new_jobs_note": ("no new job changes the frozen ranking/pair evidence; the WP1 local supportability probe "
+                          "and the WP2 DMC/EMC free-state pilot are separate and mirrored only as derived CSVs"),
         "source_manifest": [{"path": rel, "sha256": sha256_file(REPO / rel)} for rel in sorted(sources)],
     }
     (out / "SUBMISSION.json").write_text(

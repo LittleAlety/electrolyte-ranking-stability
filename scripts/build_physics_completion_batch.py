@@ -70,6 +70,7 @@ def finish_week(files, local, week, wp, title, extra=None):
         "baseline_commit": PB.BASELINE_COMMIT,
         "frozen_date": PB.FROZEN_DATE,
         "new_electronic_structure_jobs": 0,
+        "new_electronic_structure_jobs_scope": "jobs that change the frozen ranking/pair evidence; the WP1 supportability probe and the WP2 free-state pilot are counted separately",
         "n_files": len(local),
         "files": [{"path": rel, "sha256": sha_text(local[rel]), "bytes": len(local[rel].encode("utf-8"))}
                   for rel in sorted(local)],
@@ -647,6 +648,76 @@ LOCAL_FREQ_CHECK = {"molecule": "water", "n_atoms": "3", "n_modes": "9",
                     "modes": "6 near-zero (trans/rot) + 3 real: 1588.03, 3892.52, 3972.24 cm^-1",
                     "imaginary_modes": "0", "note": "NumFreq under SMD completed; frequency path usable"}
 
+# ---------------------------------------------------------------------------
+# 方案 15.5 / 15.6 —— DMC/EMC 自由态 pilot（新增电子结构计算）
+# 几何：RDKit ETKDG+MMFF 起点 -> xTB 6.7.1pre GFN2 Opt（气相）；
+# 单点/频率：ORCA 6.1.1，用 WP1 核验过的关键字。
+# 只覆盖四主状态中的自由态两态（M、M+）；Li 配位两态留待后续。
+# 原始输出留在仓库外，不入交付镜像。
+# ---------------------------------------------------------------------------
+PILOT_METHOD_NOTE = "wB97X-D4/def2-TZVP (neutral); wB97X-D4/def2-TZVPD (cation, diffuse); SMD acetonitrile"
+PILOT_GEOM_NOTE = "RDKit ETKDG+MMFF start -> xTB 6.7.1pre GFN2 Opt (gas)"
+
+PILOT_FREE_STATE_ENERGIES = [
+    {"record_id": "C01|M", "mol_id": "C01", "name": "DMC", "state": "M", "charge": "0", "multiplicity": "1",
+     "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP",
+     "scf_cycles": "20", "final_sp_eh": "-343.854211229029", "terminated": "true", "wall_sec": "24.4", "cores": "4"},
+    {"record_id": "C01|M_tzvpd", "mol_id": "C01", "name": "DMC", "state": "M", "charge": "0", "multiplicity": "1",
+     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
+     "scf_cycles": "20", "final_sp_eh": "-343.856181464212", "terminated": "true", "wall_sec": "36.3", "cores": "4"},
+    {"record_id": "C01|M_plus", "mol_id": "C01", "name": "DMC", "state": "M_plus", "charge": "1", "multiplicity": "2",
+     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
+     "scf_cycles": "20", "final_sp_eh": "-343.526965851004", "terminated": "true", "wall_sec": "44.1", "cores": "4"},
+    {"record_id": "C02|M", "mol_id": "C02", "name": "EMC", "state": "M", "charge": "0", "multiplicity": "1",
+     "basis": "def2-TZVP", "orca_keyword": "wB97X-D4 def2-TZVP SMD(acetonitrile) SP",
+     "scf_cycles": "20", "final_sp_eh": "-383.211199702608", "terminated": "true", "wall_sec": "31.9", "cores": "4"},
+    {"record_id": "C02|M_tzvpd", "mol_id": "C02", "name": "EMC", "state": "M", "charge": "0", "multiplicity": "1",
+     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
+     "scf_cycles": "20", "final_sp_eh": "-383.213141521146", "terminated": "true", "wall_sec": "52.7", "cores": "4"},
+    {"record_id": "C02|M_plus", "mol_id": "C02", "name": "EMC", "state": "M_plus", "charge": "1", "multiplicity": "2",
+     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
+     "scf_cycles": "31", "final_sp_eh": "-382.899370886410", "terminated": "true", "wall_sec": "92.9", "cores": "4"},
+]
+
+PILOT_LEDGER_RAW = [
+    {"record_id": "C01|M", "mol_id": "C01", "name": "DMC", "state": "M",
+     "level": "wB97X-D4/def2-TZVP SMD(acetonitrile) NumFreq (qRRHO)",
+     "e_sp_eh": "-343.854211229029", "zpe_eh": "0.09601496", "e_to_g_thermal_eh": "0.06577493",
+     "enthalpy_eh": "-343.75019266", "entropy_corr_eh": "-0.03825196", "g_single_eh": "-343.78844462",
+     "qrrho": "true", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00",
+     "lowest_freq_cm1": "73.31", "imaginary_modes": "0"},
+]
+
+PILOT_COST_JOBS = [
+    {"job_id": "C01|M|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "xtb_opt",
+     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.25", "status": "ok"},
+    {"job_id": "C01|M_plus|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "M_plus", "phase": "xtb_opt",
+     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.13", "status": "ok"},
+    {"job_id": "C02|M|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "M", "phase": "xtb_opt",
+     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.14", "status": "ok"},
+    {"job_id": "C02|M_plus|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "M_plus", "phase": "xtb_opt",
+     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.25", "status": "ok"},
+    {"job_id": "C01|M|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "orca_sp",
+     "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "24.4", "status": "ok"},
+    {"job_id": "C01|M_tzvpd|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "orca_sp",
+     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "36.3", "status": "ok"},
+    {"job_id": "C01|M_plus|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "M_plus", "phase": "orca_sp",
+     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "44.1", "status": "ok"},
+    {"job_id": "C02|M|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "M", "phase": "orca_sp",
+     "method": "wB97X-D4/def2-TZVP SMD", "cores": "4", "wall_sec": "31.9", "status": "ok"},
+    {"job_id": "C02|M_tzvpd|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "M", "phase": "orca_sp",
+     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "52.7", "status": "ok"},
+    {"job_id": "C02|M_plus|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "M_plus", "phase": "orca_sp",
+     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "92.9", "status": "ok"},
+    {"job_id": "C01|M|orca_freq", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "orca_freq",
+     "method": "wB97X-D4/def2-TZVP SMD NumFreq", "cores": "4", "wall_sec": "1129.1", "status": "ok"},
+]
+
+#: 理想气体 1 atm -> 溶液 1 mol/L 标准态项：RT ln(V_m)，V_m = RT/P = 24.4654 L/mol @ 298.15 K, 1 atm。
+PILOT_RT_EH = 0.000944183
+PILOT_LN_VM = 3.197365
+
+
 def wp1():
     files = {}
     local = {}
@@ -930,6 +1001,50 @@ def wp2():
                 "thermal_correction": "absent", "status": "existing_electronic_only",
             })
 
+    # 方案 15.5 / 15.6 —— 自由态 pilot（新增计算）。
+    pilot_lookup = {row["record_id"]: row for row in PILOT_FREE_STATE_ENERGIES}
+    pilot_ip = []
+    for pilot_mol, pilot_name in (("C01", "DMC"), ("C02", "EMC")):
+        p_neutral = float(pilot_lookup["%s|M_tzvpd" % pilot_mol]["final_sp_eh"])
+        p_cation = float(pilot_lookup["%s|M_plus" % pilot_mol]["final_sp_eh"])
+        pilot_ip.append({
+            "mol_id": pilot_mol, "name": pilot_name, "quantity": "Eox_vertical",
+            "basis_family": "def2-TZVPD (same basis for neutral and cation)",
+            "e_neutral_eh": "%.12f" % p_neutral, "e_cation_eh": "%.12f" % p_cation,
+            "ip_ev": "%.6f" % ((p_cation - p_neutral) * HARTREE_TO_EV),
+            "level": "wB97X-D4 SMD(acetonitrile) SP at GFN2-xTB geometry",
+            "basis_consistent": "true",
+            "note": "the cation must use diffuse functions; a TZVP-neutral vs TZVPD-cation difference is NOT a valid IP",
+        })
+    pilot_std_state_eh = PILOT_RT_EH * PILOT_LN_VM
+    pilot_ledger = []
+    for pilot_row in PILOT_LEDGER_RAW:
+        pilot_g = float(pilot_row["g_single_eh"])
+        pilot_ledger.append({
+            "record_id": pilot_row["record_id"], "mol_id": pilot_row["mol_id"],
+            "name": pilot_row["name"], "state": pilot_row["state"], "level": pilot_row["level"],
+            "e_sp_eh": pilot_row["e_sp_eh"], "zpe_eh": pilot_row["zpe_eh"],
+            "e_to_g_thermal_eh": pilot_row["e_to_g_thermal_eh"], "enthalpy_eh": pilot_row["enthalpy_eh"],
+            "entropy_corr_eh": pilot_row["entropy_corr_eh"], "g_single_eh": pilot_row["g_single_eh"],
+            "g_single_ev": "%.9f" % (pilot_g * HARTREE_TO_EV),
+            "std_state_corr_eh": "%.8f" % pilot_std_state_eh,
+            "std_state_corr_ev": "%.6f" % (pilot_std_state_eh * HARTREE_TO_EV),
+            "qrrho": pilot_row["qrrho"], "temp_k": pilot_row["temp_k"],
+            "pressure_atm": pilot_row["pressure_atm"], "cutoff_cm1": pilot_row["cutoff_cm1"],
+            "lowest_freq_cm1": pilot_row["lowest_freq_cm1"], "imaginary_modes": pilot_row["imaginary_modes"],
+        })
+    pilot_cost = []
+    for cost_row in PILOT_COST_JOBS:
+        core_hours = float(cost_row["wall_sec"]) * float(cost_row["cores"]) / 3600.0
+        pilot_cost.append({
+            "job_id": cost_row["job_id"], "mol_id": cost_row["mol_id"], "molecule": cost_row["molecule"],
+            "state": cost_row["state"], "phase": cost_row["phase"], "method": cost_row["method"],
+            "cores": cost_row["cores"], "wall_sec": cost_row["wall_sec"],
+            "core_hours": "%.6f" % core_hours, "status": cost_row["status"],
+        })
+    pilot_orca_jobs = sum(1 for r in PILOT_COST_JOBS if r["phase"].startswith("orca"))
+    pilot_xtb_jobs = sum(1 for r in PILOT_COST_JOBS if r["phase"].startswith("xtb"))
+    pilot_core_hours = sum(float(r["core_hours"]) for r in pilot_cost)
     n_existing_mol = len({row["mol_id"] for row in existing})
     checks = [
         {"id": "ledger_covers_main_x_four_states", "description": "自由能账本登记 12 主集 x 4 主状态 = 48 行",
@@ -945,6 +1060,20 @@ def wp2():
          "detail": "%d 条既有数值 / %d 个分子" % (len(existing), n_existing_mol)},
         {"id": "ensemble_rules_frozen", "description": "系综规则在观察目标排名前冻结",
          "ok": len(ENSEMBLE_RULES) >= 6, "detail": "n_rules=%d" % len(ENSEMBLE_RULES)},
+        {"id": "pilot_free_state_jobs_all_converged", "description": "自由态 pilot 的 ORCA 单点全部正常收敛",
+         "ok": len(PILOT_FREE_STATE_ENERGIES) == 6
+               and all(r["terminated"] == "true" for r in PILOT_FREE_STATE_ENERGIES),
+         "detail": "free-state rows=%d; molecules=DMC,EMC" % len(PILOT_FREE_STATE_ENERGIES)},
+        {"id": "pilot_vertical_ip_is_basis_consistent", "description": "pilot 垂直 IP 用中性/阳离子一致基组",
+         "ok": len(pilot_ip) == 2 and all(r["basis_consistent"] == "true" for r in pilot_ip),
+         "detail": ",".join("%s=%s eV" % (r["name"], r["ip_ev"]) for r in pilot_ip)},
+        {"id": "pilot_ledger_instance_is_complete", "description": "自由能账本实例给出 E/ZPE/热项/G/标准态项",
+         "ok": len(pilot_ledger) == 1 and all(pilot_ledger[0][key] for key in
+               ("e_sp_eh", "zpe_eh", "e_to_g_thermal_eh", "g_single_eh", "std_state_corr_eh", "g_single_ev")),
+         "detail": "record=%s; G=%s eV" % (pilot_ledger[0]["record_id"], pilot_ledger[0]["g_single_ev"])},
+        {"id": "pilot_cost_ledger_records_core_hours", "description": "pilot 成本账本逐作业记录 allocated core-hours",
+         "ok": bool(pilot_cost) and all(float(r["core_hours"]) > 0 for r in pilot_cost),
+         "detail": "jobs=%d; total=%.6f core-hours" % (len(pilot_cost), pilot_core_hours)},
     ]
 
     payload = {
@@ -968,6 +1097,18 @@ def wp2():
             "gate1_status": "Gate 1 NOT CLOSED / NOT CLOSABLE (unchanged)",
         },
         "ensemble_rules": ENSEMBLE_RULES,
+        "free_state_pilot": {
+            "scope": "DMC/EMC free states (M, M+): 2 of the 4 master states; Li-coordinated states deferred",
+            "geometry": PILOT_GEOM_NOTE,
+            "method": PILOT_METHOD_NOTE,
+            "free_state_energies": PILOT_FREE_STATE_ENERGIES,
+            "vertical_ip": pilot_ip,
+            "ledger_instances": pilot_ledger,
+            "cost_jobs": pilot_cost,
+            "totals": {"orca_jobs": pilot_orca_jobs, "xtb_jobs": pilot_xtb_jobs,
+                       "core_hours": "%.6f" % pilot_core_hours},
+            "raw_outputs": "kept outside the repository (not mirrored)",
+        },
         "counts": {"ledger_rows": len(ledger), "sampling_rows": len(sampling),
                    "existing_electronic_rows": len(existing), "existing_molecules": n_existing_mol},
         "checks": checks,
@@ -996,11 +1137,25 @@ def wp2():
           "states": "LiM_plus; LiM_2plus",
           "note": "charged complexes that fail to form a complete state are recorded as a QC outcome; motifs are not swapped until a number is obtained"}
          for mol_id in PB.COHORTS["main"]])
+    local["outputs/physics_completion/free_states/pilot_free_state_energies.csv"] = csv_text(
+        ["record_id", "mol_id", "name", "state", "charge", "multiplicity", "basis", "orca_keyword",
+         "scf_cycles", "final_sp_eh", "terminated", "wall_sec", "cores"], PILOT_FREE_STATE_ENERGIES)
+    local["outputs/physics_completion/free_states/pilot_vertical_ip.csv"] = csv_text(
+        ["mol_id", "name", "quantity", "basis_family", "e_neutral_eh", "e_cation_eh", "ip_ev",
+         "level", "basis_consistent", "note"], pilot_ip)
+    local["outputs/physics_completion/free_states/pilot_ledger_instance.csv"] = csv_text(
+        ["record_id", "mol_id", "name", "state", "level", "e_sp_eh", "zpe_eh", "e_to_g_thermal_eh",
+         "enthalpy_eh", "entropy_corr_eh", "g_single_eh", "g_single_ev", "std_state_corr_eh",
+         "std_state_corr_ev", "qrrho", "temp_k", "pressure_atm", "cutoff_cm1", "lowest_freq_cm1",
+         "imaginary_modes"], pilot_ledger)
+    local["outputs/physics_completion/cost/pilot_cost_ledger.csv"] = csv_text(
+        ["job_id", "mol_id", "molecule", "state", "phase", "method", "cores", "wall_sec",
+         "core_hours", "status"], pilot_cost)
 
     summary = [
         "# Week 39 / WP2 — 固定背景配对自由能标签",
         "",
-        "**状态**：账本与系综规则已冻结；既有数值只盘点电子能层，热校正仍为空（未计算）。",
+        "**状态**：账本与系综规则已冻结；48 行生产模板的热校正仍为空。已另跑 DMC/EMC 自由态 pilot（新增计算，方案 15.5/15.6），见下节。",
         "",
         "## 交付",
         "",
@@ -1018,16 +1173,51 @@ def wp2():
         summary.append("| %s | %s | %s |" % (item["id"], "PASS" if item["ok"] else "FAIL", item["detail"]))
     summary += [
         "",
+        "## DMC/EMC 自由态 pilot（方案 15.5 / 15.6，新增计算）",
+        "",
+        "几何：%s；方法：%s。原始输出留在仓库外，不入交付镜像。" % (PILOT_GEOM_NOTE, PILOT_METHOD_NOTE),
+        "",
+        "覆盖四主状态中的**自由态两态**（M、M+）；Li 配位两态（LiM_plus、LiM_2plus）留待后续。",
+        "",
+        "| 分子 | 量 | 一致基组 | E(中性) Eh | E(阳离子) Eh | Eox_vertical (eV) |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in pilot_ip:
+        summary.append("| %s | %s | %s | %s | %s | %s |"
+                       % (row["name"], row["quantity"], row["basis_family"],
+                          row["e_neutral_eh"], row["e_cation_eh"], row["ip_ev"]))
+    summary += [
+        "",
+        "自由能账本实例（1 行，qRRHO）：",
+        "",
+        "| 记录 | 级别 | E_SP (Eh) | ZPE (Eh) | E→G 热项 (Eh) | 熵项 (Eh) | G_single (Eh) | G (eV) | 标准态项 (eV) | 虚频 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in pilot_ledger:
+        summary.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+                       % (row["record_id"].replace("|", "\\|"), row["level"], row["e_sp_eh"], row["zpe_eh"],
+                          row["e_to_g_thermal_eh"], row["entropy_corr_eh"], row["g_single_eh"],
+                          row["g_single_ev"], row["std_state_corr_ev"], row["imaginary_modes"]))
+    summary += [
+        "",
+        "成本账本：%d 个作业（ORCA %d / xTB %d），合计 **%.6f core-hours**（allocated cores × wall clock）。"
+        % (len(pilot_cost), pilot_orca_jobs, pilot_xtb_jobs, pilot_core_hours),
+        "",
         "## 限制",
         "",
-        "- 热校正字段全部为空：本批次尚未运行任何频率计算，**不**把气相热项静默当作溶液热项。",
+        "- 48 行**生产模板**的热校正仍为空（尚未做生产频率）；pilot 只单独给出 1 条 DMC 中性完整账本行。",
+        "- pilot 只覆盖 2 个分子的自由态两态，且几何来自 xTB GFN2 而非 r2SCAN-3c；不能替代完整生产。",
+        "- 标准态项把理想气体 1 atm 自由能换到溶液 1 mol/L（RT ln V_m）；同一化学计量的 redox 差值中该项相消。",
         "- 既有 P1v/P1a/C1 数值是 r2SCAN-3c 气相电子能差，不能直接当作固定背景 SMD 自由能标签。",
         "- 采样窗口 6 kcal/mol 与上限 3 结构是**资源规则**，不是已经证明收敛的采样尺度。",
     ]
     local["outputs/week39/wp2_summary.md"] = "\n".join(summary) + "\n"
     local["docs/60_week39_wp2_free_energy_labels.md"] = "\n".join(summary) + "\n"
     finish_week(files, local, "week39", "WP2", "fixed-background paired free-energy labels",
-                {"ledger_rows": len(ledger), "existing_electronic_rows": len(existing)})
+                {"ledger_rows": len(ledger), "existing_electronic_rows": len(existing),
+                 "free_state_pilot_orca_jobs": pilot_orca_jobs,
+                 "free_state_pilot_xtb_jobs": pilot_xtb_jobs,
+                 "free_state_pilot_core_hours": "%.6f" % pilot_core_hours})
     return files
 
 

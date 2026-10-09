@@ -24,7 +24,7 @@ def _read_csv(path: Path):
 
 def test_every_artifact_is_byte_reproducible() -> None:
     files = batch.build_all()
-    assert len(files) == 70
+    assert len(files) == 74
     for rel, text in files.items():
         target = REPO_ROOT / rel
         assert target.is_file(), rel
@@ -86,6 +86,27 @@ def test_wp1_local_method_echo_and_smoke_runs() -> None:
     assert all(row["terminated_normally"] == "true" for row in runs)
     assert any(row["charge"] == "1" for row in runs)
     assert env["freq_check"]["imaginary_modes"] == "0"
+
+
+def test_wp2_free_state_pilot_ledger_and_cost() -> None:
+    payload = json.loads((REPO_ROOT / "outputs/week39/wp2_free_energy_labels.json").read_text(encoding="utf-8"))
+    pilot = payload["free_state_pilot"]
+    ip = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_vertical_ip.csv")
+    assert {row["name"] for row in ip} == {"DMC", "EMC"}
+    assert all(row["basis_consistent"] == "true" for row in ip)
+    assert all(float(row["ip_ev"]) > 0 for row in ip)
+    ledger = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_ledger_instance.csv")
+    assert len(ledger) == 1
+    assert ledger[0]["qrrho"] == "true" and ledger[0]["imaginary_modes"] == "0"
+    assert float(ledger[0]["g_single_ev"]) < 0 and float(ledger[0]["std_state_corr_ev"]) > 0
+    cost = _read_csv(REPO_ROOT / "outputs/physics_completion/cost/pilot_cost_ledger.csv")
+    assert len(cost) == 11
+    assert all(float(row["core_hours"]) > 0 for row in cost)
+    assert any(row["phase"] == "orca_freq" for row in cost)
+    energies = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_free_state_energies.csv")
+    assert len(energies) == 6
+    assert all(row["terminated"] == "true" for row in energies)
+    assert pilot["totals"]["orca_jobs"] == 7 and pilot["totals"]["xtb_jobs"] == 4
 
 
 def test_wp2_ledger_leaves_missing_fields_empty() -> None:
