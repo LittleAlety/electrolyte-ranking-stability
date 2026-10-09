@@ -12,7 +12,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finali
 ```
 
 顺序：`anchors` → `emit-wp2` → `generator` → `closure` → `provenance` → `sampling` → `cost` →
-`figures` → `mirror` → `site` → `freeze` → `clean-room` → 八个 `--check` → `pytest`。
+`recheck-plan` → `figures` → `mirror` → `site` → `freeze` → `clean-room` → 九个 `--check` → `pytest`。
 任一非零即 `ABORT`，不提交。
 
 ## 生产队列：查状态与断点续跑
@@ -54,6 +54,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `scripts/build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
 | `scripts/build_compute_provenance.py` | 逐作业复现证据清单（派生层） |
 | `scripts/build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） |
+| `scripts/build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的结果前预注册计划（派生层，零新增计算） |
 
 ## 边界
 

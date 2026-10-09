@@ -21,6 +21,7 @@ Step "closure"      { & $py -X utf8 scripts\build_wp2_closure.py }
 Step "provenance"   { & $py -X utf8 scripts\build_compute_provenance.py }
 Step "sampling"     { & $py -X utf8 scripts\build_wp2_sampling.py }
 Step "cost"         { & $py -X utf8 scripts\build_wp2_cost_scenarios.py }
+Step "recheck-plan" { & $py -X utf8 scripts\build_pair_recheck_plan.py }
 Step "figures"      { & $py -X utf8 scripts\make_physics_completion_figures.py }
 Step "mirror"       { & $py -X utf8 scripts\build_physics_completion_deliverables.py }
 Step "site"         { & $py -X utf8 scripts\build_terminal_site.py }
@@ -31,6 +32,7 @@ Step "check-closure" { & $py -X utf8 scripts\build_wp2_closure.py --check }
 Step "check-provenance" { & $py -X utf8 scripts\build_compute_provenance.py --check }
 Step "check-sampling" { & $py -X utf8 scripts\build_wp2_sampling.py --check }
 Step "check-cost"   { & $py -X utf8 scripts\build_wp2_cost_scenarios.py --check }
+Step "check-recheck-plan" { & $py -X utf8 scripts\build_pair_recheck_plan.py --check }
 Step "check-figs"   { & $py -X utf8 scripts\make_physics_completion_figures.py --check }
 Step "check-mirror" { & $py -X utf8 scripts\build_physics_completion_deliverables.py --check }
 Step "check-site"   { & $py -X utf8 scripts\build_terminal_site.py --check }

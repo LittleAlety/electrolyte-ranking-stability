@@ -3321,7 +3321,7 @@ COST_LEDGER = [
     {"item": "sampling_extension_state_structures", "unit": "state structure", "value": "48", "kind": "planned",
      "status": "planned", "note": "4 molecules x 4 states x 3 extra structures, deduplicated where possible"},
     {"item": "targeted_pair_second_method_single_points", "unit": "SP", "value": "16-32", "kind": "planned",
-     "status": "planned", "note": "explicit selection rule; targeted re-check"},
+     "status": "planned", "note": "explicit selection rule registered before any result; 24 single points (3 molecules x 4 main states x the two second-functional settings) planned in outputs/physics_completion/pair_evidence/targeted_recheck/"},
     {"item": "cpu_core_hours", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
      "note": "allocated core-hours are recorded per job in the production / audit / pilot cost ledgers; "
              "this project-level scalar stays empty until the four-molecule loop closes"},

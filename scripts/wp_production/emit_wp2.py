@@ -508,6 +508,9 @@ WP5_AL_CHECK_BLOCK = '        {"id": "replay_not_pretended_blind", "description"
 ANCHOR_WP5_AL_CONVENTION = '            "al_protocol": "12-label pool replay; initial 4 labels, 1 per round, 20 acquisition seeds; random/diversity/uncertainty/ranking-aware",\n'
 WP5_AL_CONVENTION_BLOCK = '            "al_protocol": replay_pool_note,\n'
 
+ANCHOR_TARGETED_COST_NOTE = '    {"item": "targeted_pair_second_method_single_points", "unit": "SP", "value": "16-32", "kind": "planned",\n     "status": "planned", "note": "explicit selection rule; targeted re-check"},\n'
+TARGETED_COST_NOTE_BLOCK = '    {"item": "targeted_pair_second_method_single_points", "unit": "SP", "value": "16-32", "kind": "planned",\n     "status": "planned", "note": "explicit selection rule registered before any result; 24 single points (3 molecules x 4 main states x the two second-functional settings) planned in outputs/physics_completion/pair_evidence/targeted_recheck/"},\n'
+
 def load_rows():
     rows = []
     rejected = []
@@ -623,6 +626,7 @@ def main():
     src = sub_once(src, ANCHOR_LASTPARA, LASTPARA_BLOCK)
     src = sub_once(src, ANCHOR_SCOPE, SCOPE_BLOCK)
     src = sub_once(src, ANCHOR_COST_NOTES, COST_NOTES_BLOCK)
+    src = sub_once(src, ANCHOR_TARGETED_COST_NOTE, TARGETED_COST_NOTE_BLOCK)
     src = sub_once(src, ANCHOR_WP3_REGRET_DOC, WP3_REGRET_DOC_BLOCK)
     src = sub_once(src, ANCHOR_WP3_REGRET_CHECK, WP3_REGRET_CHECK_BLOCK)
     src = sub_once(src, ANCHOR_WP3_REGRET_MD, WP3_REGRET_MD_BLOCK)
