@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""新阶段（评审实施方案 WP0-WP6）产物生成器：physics_completion_v1 批次。
+r"""新阶段（评审实施方案 WP0-WP6）产物生成器：physics_completion_v1 批次。
 
 本生成器把仓库外那份**建议实施方案**（电解液排序稳定性：物理证据补强与决策预算研究
 执行方案）登记成可复现的批次产物，并基于仓库既有冻结数据给出**首轮**可交付分析。
-它不运行任何新的电子结构计算，不改动任何既有冻结数据、阈值或结论；只新增
+排序/配对证据层不运行新的电子结构计算，不改动任何既有冻结数据、阈值或结论
+（WP1 本机方法回显与 WP2 四主态 pilot 是单列的支撑性/试算作业，原始输出不入镜像）；只新增
    * config/physics_completion_v1.yaml   新批次协议与量名登记
    * data/metadata/physics_completion_set.csv   主集/审计集/采样集
    * data/references/anchor_primary_audit.csv   原始锚点复核（WP4 三级分类）
@@ -711,9 +712,50 @@ PILOT_COST_JOBS = [
      "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "92.9", "status": "ok"},
     {"job_id": "C01|M|orca_freq", "mol_id": "C01", "molecule": "DMC", "state": "M", "phase": "orca_freq",
      "method": "wB97X-D4/def2-TZVP SMD NumFreq", "cores": "4", "wall_sec": "1129.1", "status": "ok"},
+    {"job_id": "C01|LiM_plus|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "LiM_plus", "phase": "xtb_opt",
+     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.28", "status": "ok"},
+    {"job_id": "C01|LiM_2plus|xtb_opt", "mol_id": "C01", "molecule": "DMC", "state": "LiM_2plus", "phase": "xtb_opt",
+     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.17", "status": "ok"},
+    {"job_id": "C02|LiM_plus|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "LiM_plus", "phase": "xtb_opt",
+     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.14", "status": "ok"},
+    {"job_id": "C02|LiM_2plus|xtb_opt", "mol_id": "C02", "molecule": "EMC", "state": "LiM_2plus", "phase": "xtb_opt",
+     "method": "GFN2-xTB Opt", "cores": "1", "wall_sec": "0.34", "status": "ok"},
+    {"job_id": "C01|LiM_plus|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "LiM_plus", "phase": "orca_sp",
+     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "42.3", "status": "ok"},
+    {"job_id": "C01|LiM_2plus|orca_sp", "mol_id": "C01", "molecule": "DMC", "state": "LiM_2plus", "phase": "orca_sp",
+     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "50.6", "status": "ok"},
+    {"job_id": "C02|LiM_plus|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "LiM_plus", "phase": "orca_sp",
+     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "60.7", "status": "ok"},
+    {"job_id": "C02|LiM_2plus|orca_sp", "mol_id": "C02", "molecule": "EMC", "state": "LiM_2plus", "phase": "orca_sp",
+     "method": "wB97X-D4/def2-TZVPD SMD", "cores": "4", "wall_sec": "104.5", "status": "ok"},
 ]
 
 #: 理想气体 1 atm -> 溶液 1 mol/L 标准态项：RT ln(V_m)，V_m = RT/P = 24.4654 L/mol @ 298.15 K, 1 atm。
+#: Li 配位两态（LiM_plus / LiM_2plus）：xTB GFN2 Opt 起点 Li 置于羰基 O 外侧 1.9 A。
+PILOT_LI_STATE_ENERGIES = [
+    {"record_id": "C01|LiM_plus", "mol_id": "C01", "name": "DMC", "state": "LiM_plus", "charge": "1", "multiplicity": "1",
+     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
+     "basis_functions": "302", "scf_cycles": "20", "final_sp_eh": "-351.306668533885", "terminated": "true",
+     "wall_sec": "42.3", "cores": "4", "li_o_ang": "1.654", "nonli_components": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C01|LiM_2plus", "mol_id": "C01", "name": "DMC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2",
+     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
+     "basis_functions": "302", "scf_cycles": "20", "final_sp_eh": "-350.957111705625", "terminated": "true",
+     "wall_sec": "50.6", "cores": "4", "li_o_ang": "1.805", "nonli_components": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C02|LiM_plus", "mol_id": "C02", "name": "EMC", "state": "LiM_plus", "charge": "1", "multiplicity": "1",
+     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
+     "basis_functions": "357", "scf_cycles": "20", "final_sp_eh": "-390.664261343481", "terminated": "true",
+     "wall_sec": "60.7", "cores": "4", "li_o_ang": "1.659", "nonli_components": "1", "identity": "intact_monodentate_carbonyl"},
+    {"record_id": "C02|LiM_2plus", "mol_id": "C02", "name": "EMC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2",
+     "basis": "def2-TZVPD", "orca_keyword": "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP",
+     "basis_functions": "357", "scf_cycles": "31", "final_sp_eh": "-390.323858369572", "terminated": "true",
+     "wall_sec": "104.5", "cores": "4", "li_o_ang": "1.782", "nonli_components": "1", "identity": "intact_monodentate_carbonyl"},
+]
+
+#: 冻结 C1 层的对照值（只 DMC 有主 motif 行）；其 SMD 位移把气相自由 IP 当作 SMD 参考，属混口径。
+PILOT_C1_FROZEN_REF = {
+    "C01": {"mol_id": "C01", "name": "DMC", "motif_id": "m1", "frozen_d_ip_smd_ev": "-1.75858",
+            "convention": "frozen C1 used the gas-phase free IP as the SMD reference (mixed convention)"},
+}
 PILOT_RT_EH = 0.000944183
 PILOT_LN_VM = 3.197365
 
@@ -1045,6 +1087,25 @@ def wp2():
     pilot_orca_jobs = sum(1 for r in PILOT_COST_JOBS if r["phase"].startswith("orca"))
     pilot_xtb_jobs = sum(1 for r in PILOT_COST_JOBS if r["phase"].startswith("xtb"))
     pilot_core_hours = sum(float(r["core_hours"]) for r in pilot_cost)
+    pilot_li_lookup = {row["record_id"]: row for row in PILOT_LI_STATE_ENERGIES}
+    pilot_coord_shift = []
+    for pilot_mol, pilot_name in (("C01", "DMC"), ("C02", "EMC")):
+        free_row = next(r for r in pilot_ip if r["mol_id"] == pilot_mol)
+        li_plus = float(pilot_li_lookup["%s|LiM_plus" % pilot_mol]["final_sp_eh"])
+        li_2plus = float(pilot_li_lookup["%s|LiM_2plus" % pilot_mol]["final_sp_eh"])
+        ip_li = (li_2plus - li_plus) * HARTREE_TO_EV
+        frozen = PILOT_C1_FROZEN_REF.get(pilot_mol)
+        pilot_coord_shift.append({
+            "mol_id": pilot_mol, "name": pilot_name, "quantity": "coordination_shift",
+            "e_liM_plus_eh": "%.12f" % li_plus, "e_liM_2plus_eh": "%.12f" % li_2plus,
+            "ip_li_ev": "%.6f" % ip_li, "ip_free_ev": free_row["ip_ev"],
+            "d_ip_ev": "%.6f" % (ip_li - float(free_row["ip_ev"])),
+            "level": "wB97X-D4/def2-TZVPD SMD(acetonitrile), consistent basis",
+            "frozen_c1_motif": (frozen["motif_id"] if frozen else ""),
+            "frozen_c1_d_ip_smd_ev": (frozen["frozen_d_ip_smd_ev"] if frozen else ""),
+            "note": ("frozen C1 value exists but mixes conventions; not directly comparable"
+                     if frozen else "no frozen C1 row for this molecule"),
+        })
     n_existing_mol = len({row["mol_id"] for row in existing})
     checks = [
         {"id": "ledger_covers_main_x_four_states", "description": "自由能账本登记 12 主集 x 4 主状态 = 48 行",
@@ -1074,6 +1135,19 @@ def wp2():
         {"id": "pilot_cost_ledger_records_core_hours", "description": "pilot 成本账本逐作业记录 allocated core-hours",
          "ok": bool(pilot_cost) and all(float(r["core_hours"]) > 0 for r in pilot_cost),
          "detail": "jobs=%d; total=%.6f core-hours" % (len(pilot_cost), pilot_core_hours)},
+        {"id": "pilot_li_states_converged_and_intact", "description": "Li 配位两态收敛且分子完整（Li-O 成键、无碎裂）",
+         "ok": len(PILOT_LI_STATE_ENERGIES) == 4 and all(
+               r["terminated"] == "true" and r["nonli_components"] == "1" and float(r["li_o_ang"]) < 2.2
+               for r in PILOT_LI_STATE_ENERGIES),
+         "detail": "li rows=%d; Li-O %.3f-%.3f A" % (len(PILOT_LI_STATE_ENERGIES),
+                   min(float(r["li_o_ang"]) for r in PILOT_LI_STATE_ENERGIES),
+                   max(float(r["li_o_ang"]) for r in PILOT_LI_STATE_ENERGIES))},
+        {"id": "pilot_covers_all_four_master_states", "description": "pilot 覆盖 DMC/EMC 的四主态（自由 2 + 配位 2）",
+         "ok": len(PILOT_FREE_STATE_ENERGIES) == 6 and len(PILOT_LI_STATE_ENERGIES) == 4,
+         "detail": "free-state rows=6 + li-state rows=4 over DMC,EMC"},
+        {"id": "pilot_coordination_shift_computed", "description": "pilot 配位位移（SMD 自洽口径）逐分子给出",
+         "ok": len(pilot_coord_shift) == 2 and all(r["d_ip_ev"] for r in pilot_coord_shift),
+         "detail": ",".join("%s d_ip=%s eV" % (r["name"], r["d_ip_ev"]) for r in pilot_coord_shift)},
     ]
 
     payload = {
@@ -1098,11 +1172,13 @@ def wp2():
         },
         "ensemble_rules": ENSEMBLE_RULES,
         "free_state_pilot": {
-            "scope": "DMC/EMC free states (M, M+): 2 of the 4 master states; Li-coordinated states deferred",
+            "scope": "DMC/EMC: all 4 master states (M, M+, LiM_plus, LiM_2plus) at the pilot level",
             "geometry": PILOT_GEOM_NOTE,
             "method": PILOT_METHOD_NOTE,
             "free_state_energies": PILOT_FREE_STATE_ENERGIES,
             "vertical_ip": pilot_ip,
+            "li_state_energies": PILOT_LI_STATE_ENERGIES,
+            "coordination_shift": pilot_coord_shift,
             "ledger_instances": pilot_ledger,
             "cost_jobs": pilot_cost,
             "totals": {"orca_jobs": pilot_orca_jobs, "xtb_jobs": pilot_xtb_jobs,
@@ -1148,6 +1224,13 @@ def wp2():
          "enthalpy_eh", "entropy_corr_eh", "g_single_eh", "g_single_ev", "std_state_corr_eh",
          "std_state_corr_ev", "qrrho", "temp_k", "pressure_atm", "cutoff_cm1", "lowest_freq_cm1",
          "imaginary_modes"], pilot_ledger)
+    local["outputs/physics_completion/free_states/pilot_li_state_energies.csv"] = csv_text(
+        ["record_id", "mol_id", "name", "state", "charge", "multiplicity", "basis", "orca_keyword",
+         "basis_functions", "scf_cycles", "final_sp_eh", "terminated", "wall_sec", "cores",
+         "li_o_ang", "nonli_components", "identity"], PILOT_LI_STATE_ENERGIES)
+    local["outputs/physics_completion/free_states/pilot_coordination_shift.csv"] = csv_text(
+        ["mol_id", "name", "quantity", "e_liM_plus_eh", "e_liM_2plus_eh", "ip_li_ev", "ip_free_ev",
+         "d_ip_ev", "level", "frozen_c1_motif", "frozen_c1_d_ip_smd_ev", "note"], pilot_coord_shift)
     local["outputs/physics_completion/cost/pilot_cost_ledger.csv"] = csv_text(
         ["job_id", "mol_id", "molecule", "state", "phase", "method", "cores", "wall_sec",
          "core_hours", "status"], pilot_cost)
@@ -1173,11 +1256,11 @@ def wp2():
         summary.append("| %s | %s | %s |" % (item["id"], "PASS" if item["ok"] else "FAIL", item["detail"]))
     summary += [
         "",
-        "## DMC/EMC 自由态 pilot（方案 15.5 / 15.6，新增计算）",
+        "## DMC/EMC 四主态 pilot（方案 15.5 / 15.6，新增计算）",
         "",
         "几何：%s；方法：%s。原始输出留在仓库外，不入交付镜像。" % (PILOT_GEOM_NOTE, PILOT_METHOD_NOTE),
         "",
-        "覆盖四主状态中的**自由态两态**（M、M+）；Li 配位两态（LiM_plus、LiM_2plus）留待后续。",
+        "覆盖 DMC/EMC 的**四主态**：自由态 M、M+ 与 Li 配位态 LiM_plus、LiM_2plus。",
         "",
         "| 分子 | 量 | 一致基组 | E(中性) Eh | E(阳离子) Eh | Eox_vertical (eV) |",
         "| --- | --- | --- | --- | --- | --- |",
@@ -1203,10 +1286,35 @@ def wp2():
         "成本账本：%d 个作业（ORCA %d / xTB %d），合计 **%.6f core-hours**（allocated cores × wall clock）。"
         % (len(pilot_cost), pilot_orca_jobs, pilot_xtb_jobs, pilot_core_hours),
         "",
+        "Li 配位两态（SMD，def2-TZVPD，Li 置于羰基 O 外侧 1.9 A 起点后 GFN2 优化）：",
+        "",
+        "| 记录 | 电荷/多重度 | 基函数 | SCF | 末单点 (Eh) | Li-O (A) | 非 Li 片段数 | 身份 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in PILOT_LI_STATE_ENERGIES:
+        summary.append("| %s | %s/%s | %s | %s | %s | %s | %s | %s |"
+                       % (row["record_id"].replace("|", "\\|"), row["charge"], row["multiplicity"],
+                          row["basis_functions"], row["scf_cycles"], row["final_sp_eh"],
+                          row["li_o_ang"], row["nonli_components"], row["identity"]))
+    summary += [
+        "",
+        "配位位移（SMD 自洽口径）：d_ip = IP(Li 复合物) - IP(自由分子)。",
+        "",
+        "| 分子 | E([LiM]+) Eh | E([LiM]2+) Eh | IP_Li (eV) | IP_free (eV) | d_ip (eV) | 冻结 C1 motif | 冻结 d_ip_smd (eV) | 说明 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in pilot_coord_shift:
+        summary.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+                       % (row["name"], row["e_liM_plus_eh"], row["e_liM_2plus_eh"], row["ip_li_ev"],
+                          row["ip_free_ev"], row["d_ip_ev"], row["frozen_c1_motif"] or "-",
+                          row["frozen_c1_d_ip_smd_ev"] or "-", row["note"]))
+    summary += [
+        "",
         "## 限制",
         "",
         "- 48 行**生产模板**的热校正仍为空（尚未做生产频率）；pilot 只单独给出 1 条 DMC 中性完整账本行。",
-        "- pilot 只覆盖 2 个分子的自由态两态，且几何来自 xTB GFN2 而非 r2SCAN-3c；不能替代完整生产。",
+        "- pilot 只覆盖 2 个分子（DMC/EMC）的四主态，且几何来自 xTB GFN2 而非 r2SCAN-3c；不能替代 12 主集完整生产。",
+        "- pilot 配位位移为 SMD 自洽口径；冻结 C1（DMC m1）把气相自由 IP 当作 SMD 参考，属混口径，两者不可直接相比；EMC 无冻结 C1 行。",
         "- 标准态项把理想气体 1 atm 自由能换到溶液 1 mol/L（RT ln V_m）；同一化学计量的 redox 差值中该项相消。",
         "- 既有 P1v/P1a/C1 数值是 r2SCAN-3c 气相电子能差，不能直接当作固定背景 SMD 自由能标签。",
         "- 采样窗口 6 kcal/mol 与上限 3 结构是**资源规则**，不是已经证明收敛的采样尺度。",

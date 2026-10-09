@@ -24,7 +24,7 @@ def _read_csv(path: Path):
 
 def test_every_artifact_is_byte_reproducible() -> None:
     files = batch.build_all()
-    assert len(files) == 74
+    assert len(files) == 76
     for rel, text in files.items():
         target = REPO_ROOT / rel
         assert target.is_file(), rel
@@ -100,13 +100,20 @@ def test_wp2_free_state_pilot_ledger_and_cost() -> None:
     assert ledger[0]["qrrho"] == "true" and ledger[0]["imaginary_modes"] == "0"
     assert float(ledger[0]["g_single_ev"]) < 0 and float(ledger[0]["std_state_corr_ev"]) > 0
     cost = _read_csv(REPO_ROOT / "outputs/physics_completion/cost/pilot_cost_ledger.csv")
-    assert len(cost) == 11
+    assert len(cost) == 19
     assert all(float(row["core_hours"]) > 0 for row in cost)
     assert any(row["phase"] == "orca_freq" for row in cost)
     energies = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_free_state_energies.csv")
     assert len(energies) == 6
     assert all(row["terminated"] == "true" for row in energies)
-    assert pilot["totals"]["orca_jobs"] == 7 and pilot["totals"]["xtb_jobs"] == 4
+    assert pilot["totals"]["orca_jobs"] == 11 and pilot["totals"]["xtb_jobs"] == 8
+    li = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_li_state_energies.csv")
+    assert len(li) == 4
+    assert all(row["terminated"] == "true" and row["nonli_components"] == "1" for row in li)
+    assert all(float(row["li_o_ang"]) < 2.2 for row in li)
+    shift = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_coordination_shift.csv")
+    assert {row["name"] for row in shift} == {"DMC", "EMC"}
+    assert all(float(row["d_ip_ev"]) > 0 for row in shift)
 
 
 def test_wp2_ledger_leaves_missing_fields_empty() -> None:

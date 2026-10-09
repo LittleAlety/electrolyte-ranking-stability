@@ -9,7 +9,7 @@
 - `ensemble_rules.csv`：7 条系综/窗口/去重规则。
 - `existing_electronic_layer.csv`：32 条既有电子能层数值（12 个分子），全部标注 `thermal_correction=absent`。
 
-## 验收（9/9 通过）
+## 验收（12/12 通过）
 
 | check | ok | detail |
 | --- | --- | --- |
@@ -21,13 +21,16 @@
 | pilot_free_state_jobs_all_converged | PASS | free-state rows=6; molecules=DMC,EMC |
 | pilot_vertical_ip_is_basis_consistent | PASS | DMC=8.958413 eV,EMC=8.538134 eV |
 | pilot_ledger_instance_is_complete | PASS | record=C01|M; G=-9354.960153462 eV |
-| pilot_cost_ledger_records_core_hours | PASS | jobs=11; total=1.568435 core-hours |
+| pilot_cost_ledger_records_core_hours | PASS | jobs=19; total=1.855470 core-hours |
+| pilot_li_states_converged_and_intact | PASS | li rows=4; Li-O 1.654-1.805 A |
+| pilot_covers_all_four_master_states | PASS | free-state rows=6 + li-state rows=4 over DMC,EMC |
+| pilot_coordination_shift_computed | PASS | DMC d_ip=0.553513 eV,EMC d_ip=0.724703 eV |
 
-## DMC/EMC 自由态 pilot（方案 15.5 / 15.6，新增计算）
+## DMC/EMC 四主态 pilot（方案 15.5 / 15.6，新增计算）
 
 几何：RDKit ETKDG+MMFF start -> xTB 6.7.1pre GFN2 Opt (gas)；方法：wB97X-D4/def2-TZVP (neutral); wB97X-D4/def2-TZVPD (cation, diffuse); SMD acetonitrile。原始输出留在仓库外，不入交付镜像。
 
-覆盖四主状态中的**自由态两态**（M、M+）；Li 配位两态（LiM_plus、LiM_2plus）留待后续。
+覆盖 DMC/EMC 的**四主态**：自由态 M、M+ 与 Li 配位态 LiM_plus、LiM_2plus。
 
 | 分子 | 量 | 一致基组 | E(中性) Eh | E(阳离子) Eh | Eox_vertical (eV) |
 | --- | --- | --- | --- | --- | --- |
@@ -40,12 +43,29 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | C01\|M | wB97X-D4/def2-TZVP SMD(acetonitrile) NumFreq (qRRHO) | -343.854211229029 | 0.09601496 | 0.06577493 | -0.03825196 | -343.78844462 | -9354.960153462 | 0.082148 | 0 |
 
-成本账本：11 个作业（ORCA 7 / xTB 4），合计 **1.568435 core-hours**（allocated cores × wall clock）。
+成本账本：19 个作业（ORCA 11 / xTB 8），合计 **1.855470 core-hours**（allocated cores × wall clock）。
+
+Li 配位两态（SMD，def2-TZVPD，Li 置于羰基 O 外侧 1.9 A 起点后 GFN2 优化）：
+
+| 记录 | 电荷/多重度 | 基函数 | SCF | 末单点 (Eh) | Li-O (A) | 非 Li 片段数 | 身份 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| C01\|LiM_plus | 1/1 | 302 | 20 | -351.306668533885 | 1.654 | 1 | intact_monodentate_carbonyl |
+| C01\|LiM_2plus | 2/2 | 302 | 20 | -350.957111705625 | 1.805 | 1 | intact_monodentate_carbonyl |
+| C02\|LiM_plus | 1/1 | 357 | 20 | -390.664261343481 | 1.659 | 1 | intact_monodentate_carbonyl |
+| C02\|LiM_2plus | 2/2 | 357 | 31 | -390.323858369572 | 1.782 | 1 | intact_monodentate_carbonyl |
+
+配位位移（SMD 自洽口径）：d_ip = IP(Li 复合物) - IP(自由分子)。
+
+| 分子 | E([LiM]+) Eh | E([LiM]2+) Eh | IP_Li (eV) | IP_free (eV) | d_ip (eV) | 冻结 C1 motif | 冻结 d_ip_smd (eV) | 说明 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DMC | -351.306668533885 | -350.957111705625 | 9.511926 | 8.958413 | 0.553513 | m1 | -1.75858 | frozen C1 value exists but mixes conventions; not directly comparable |
+| EMC | -390.664261343481 | -390.323858369572 | 9.262837 | 8.538134 | 0.724703 | - | - | no frozen C1 row for this molecule |
 
 ## 限制
 
 - 48 行**生产模板**的热校正仍为空（尚未做生产频率）；pilot 只单独给出 1 条 DMC 中性完整账本行。
-- pilot 只覆盖 2 个分子的自由态两态，且几何来自 xTB GFN2 而非 r2SCAN-3c；不能替代完整生产。
+- pilot 只覆盖 2 个分子（DMC/EMC）的四主态，且几何来自 xTB GFN2 而非 r2SCAN-3c；不能替代 12 主集完整生产。
+- pilot 配位位移为 SMD 自洽口径；冻结 C1（DMC m1）把气相自由 IP 当作 SMD 参考，属混口径，两者不可直接相比；EMC 无冻结 C1 行。
 - 标准态项把理想气体 1 atm 自由能换到溶液 1 mol/L（RT ln V_m）；同一化学计量的 redox 差值中该项相消。
 - 既有 P1v/P1a/C1 数值是 r2SCAN-3c 气相电子能差，不能直接当作固定背景 SMD 自由能标签。
 - 采样窗口 6 kcal/mol 与上限 3 结构是**资源规则**，不是已经证明收敛的采样尺度。
