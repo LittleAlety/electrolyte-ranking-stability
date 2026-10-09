@@ -16,9 +16,7 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import sys
-import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -112,12 +110,8 @@ def run_state(mol_id: str, name: str, state: str, method: str, charge: int, mult
     inp.write_text("! %s Opt NumFreq SMD(acetonitrile) TightOpt TightSCF SlowConv\n"
                    "%%maxcore 2000\n%%pal nprocs %d end\n%%scf MaxIter 300 end\n"
                    "* xyzfile %d %d geom.xyz\n" % (method, CORES, charge, mult), encoding="utf-8")
-    t0 = time.time()
-    proc = subprocess.run([str(ORCA), inp.name], cwd=str(d), capture_output=True,
-                          text=True, errors="replace")
-    wall = time.time() - t0
-    text = proc.stdout + "\n" + proc.stderr
-    (d / ("%s_%s.log" % (name, state))).write_text(text, encoding="utf-8")
+    _code, text, wall = rb.capture_run([str(ORCA), inp.name], d,
+                                       d / ("%s_%s.log" % (name, state)))
 
     def group(pattern):
         found = pattern.search(text)

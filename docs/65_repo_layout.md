@@ -2,7 +2,8 @@
 
 > 用途：给审阅者和新会话一张「目录 → 职责 → 产物落点」的对照图，并说清哪些东西**不可改**。
 > 本文档由 `tests/test_repo_layout.py` 强制覆盖：顶层目录、`scripts/` 子包、
-> `outputs/physics_completion/` 子包、`outputs/` 非周子目录，或新的 `outputs/weekNN/`
+> `outputs/physics_completion/` 子包、`outputs/` 非周子目录、新的 `outputs/weekNN/`、
+> `src/electrolyte_ranking/` 模块、`data/` 子目录，以及 `docs/NN_*.md` 的编号区间——
 > 只要没登记，测试就失败。
 
 ## 1. 顶层
@@ -11,10 +12,10 @@
 | --- | --- | --- |
 | `config/` | 版本化配置：`scientific_definitions.yaml`（旧定义，冻结）、`physics_completion_v1.yaml`（新阶段 WP0-WP6 的量名 / 样本 / 预算 / 停止规则）、`prereg.yaml` | 是（week37 收录 v1） |
 | `data/` | 输入与参考：`anchors/`（氧化锚点及其原始复核）、`metadata/`（样本集）、`references/`、`structures/` | 是 |
-| `docs/` | 文档：`NN_weekNN_*.md` 阶段报告（编号 50-64）、协议、结论迁移表、结题报告、本骨架图；`docs/assets/` 是终端站点的静态资源 | 是 |
+| `docs/` | 文档：`NN_*.md` 按编号区间分段（见 §2.2），协议、结论迁移表、结题报告、本骨架图；`docs/assets/` 是终端站点的静态资源 | 是 |
 | `outputs/` | 全部产物：`weekNN/` 逐阶段载荷 + `manifest.json`、`physics_completion/` 新阶段、`figures/`、`gate1/`、`state_identity/`、`decision_state/`、`phase2_p1a/`、`smoke/`、`_tools/`、`_weekNN_scratch/` | 是（镜像到仓库外 `成果输出（part2）`） |
 | `scripts/` | 入口脚本：顶层扁平入口 + `wp_production/` 生产子包 | 源码；生成器与关键测试随 week44 收录 |
-| `src/electrolyte_ranking/` | 可复用库：`orca`、`xtb`、`qc`、`provenance`、`uncertainty`、`ranking`、`robustness`、`decision_state`、`paper`、`pc_batch`、`toolchain`、`wp2`-`wp7` | 部分（`pc_batch.py` 随 week44 收录） |
+| `src/electrolyte_ranking/` | 可复用库（17 个模块）：`orca`、`xtb`、`qc`、`provenance`、`uncertainty`、`ranking`、`robustness`、`decision_state`、`paper`、`toolchain`、`pc_batch`、`wp2`、`wp3`、`wp4`、`wp5`、`wp6`、`wp7`（`wp2`–`wp7` 属**旧** WP 编号，见 §2.1） | 部分（`pc_batch.py` 随 week44 收录） |
 | `structures/` | 起始几何 | 是 |
 | `tests/` | pytest 契约：生成器 `--check`、镜像一致性、冻结哈希、脚本索引、骨架覆盖等 | 部分（`test_physics_completion_batch.py` 随 week44 收录） |
 | `work/` | 运行期暂存：队列 stdout、生成器基线缓存、监守单实例锁、ORCA scratch | **否**（`.gitignore` 忽略 `work/*`，仅 3 个文件白名单） |
@@ -51,6 +52,34 @@
 
 **仓库内没有 `outputs/week24/`、`outputs/week36/`、`outputs/week44/`**：week24 用 `outputs/week24_corealign/`，
 week36 与 week44 只存在于 part2 镜像。
+
+### 2.1 两套 WP 编号不是一回事（读者最常混的地方）
+
+仓库里同时存在**两套互不相干**的 WP 编号，代码与文档各按自己那套写，不要互相套用：
+
+| 编号体系 | WP 覆盖 | 落在哪一周 | 代码落点 | 产物 |
+| --- | --- | --- | --- | --- |
+| **评审实施方案**（旧的，WP1–WP7） | WP1 证据表 / WP2 电子结构响应 / WP3 配位机制 / WP4 决策可辨识性 / WP5 Δ-learning / WP6 主动学习预算 / WP7 外部参照边界 | `outputs/week28..week34`（周报 `docs/50`–`56`） | 可复用原语 `src/electrolyte_ranking/wp2.py` … `wp7.py`（WP1 只出表，没有原语模块） | `outputs/week28..week34/*.csv` |
+| **physics_completion_v1**（当前的，WP0–WP6） | WP0 定义迁移 / WP1 独立方法审计 / WP2 配对自由能标签 / WP3 排序证据与机制 / WP4 外部锚点可比性 / WP5 Δ-learning 与主动查询 / WP6 显式配体检查 | `outputs/week37..week43`（周报 `docs/58`–`64`） | 生产链 `scripts/wp_production/`（另有 `src/electrolyte_ranking/pc_batch.py`） | `outputs/physics_completion/**` |
+
+同名不同物：`src/electrolyte_ranking/wp3.py` 是**旧**体系的 WP3，与
+`docs/61_week40_wp3_pair_evidence_mechanism.md`（新体系 WP3）没有关系；
+`scripts/wp_production/` 里的一切只属于新体系。
+
+### 2.2 `docs/` 编号区间
+
+`docs/NN_*.md` 的两位数字前缀按区间分段，由 `tests/test_repo_layout.py` 强制覆盖：
+
+| 区间 | 内容 |
+| --- | --- |
+| `00-49` | 早期 stage / week 报告、协议与 QA |
+| `50-57` | 评审实施方案 WP1–WP7 与论文收敛（week28–35） |
+| `58-64` | physics_completion_v1 WP0–WP6（week37–43） |
+| `65-65` | 本骨架图 |
+
+不带数字前缀的文档（`claim_migration.md`、`gate1_negative_result.md`、
+`physics_completion_final_report.md`、`physics_completion_protocol.md`、
+`state_identity_protocol.md`、`p1v_vs_p1a.md`）是跨阶段的结论 / 协议，不受区间约束。
 
 ## 3. `scripts/` 约定
 

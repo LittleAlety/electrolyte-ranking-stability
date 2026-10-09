@@ -68,6 +68,33 @@ def test_layout_doc_covers_every_existing_week_directory():
     assert not uncovered, "outputs/weekN 未被任何区间覆盖：%s" % uncovered
 
 
+def test_layout_doc_covers_every_src_module():
+    doc = _doc()
+    for path in sorted((REPO_ROOT / "src" / "electrolyte_ranking").glob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        assert "`%s`" % path.stem in doc, "src 模块未登记到骨架图：%s.py" % path.stem
+
+
+def test_layout_doc_covers_every_data_subdirectory():
+    doc = _doc()
+    for path in sorted((REPO_ROOT / "data").iterdir()):
+        if path.is_dir() and path.name not in SKIP_DIRS:
+            assert "`%s/`" % path.name in doc, "data 子目录未登记：%s" % path.name
+
+
+def test_layout_doc_covers_every_numbered_docs_prefix():
+    doc = _doc()
+    ranges = [(int(lo), int(hi)) for lo, hi in re.findall(r"`(\d{2})-(\d{2})`", doc)]
+    assert ranges, "骨架图应给出 docs 编号区间（形如 `00-49`）"
+    numbered = sorted({int(match.group(1)) for match in
+                       (re.fullmatch(r"(\d{2})_.+\.md", path.name)
+                        for path in (REPO_ROOT / "docs").glob("*.md")) if match})
+    assert numbered, "docs/ 下应有带两位数字前缀的 markdown"
+    uncovered = [n for n in numbered if not any(lo <= n <= hi for lo, hi in ranges)]
+    assert not uncovered, "docs 编号未被任何区间覆盖：%s" % uncovered
+
+
 def test_layout_doc_names_the_pipeline_and_forced_indexes():
     doc = _doc()
     for token in ("finalize_wp2.ps1", "scripts/README.md", "wp_production/README.md",

@@ -193,6 +193,29 @@ def run_xtb(directory, geom, charge, uhf):
             "log": str(directory / "xtb.log")}
 
 
+def capture_run(argv, directory, log_path):
+    """跑外部命令，把这两个流**边走边落盘**，再按旧约定拼成 log 文本。
+
+    为什么不用 `subprocess.run(capture_output=True)`：那种写法下进程被杀（MPI 失联、
+    机器重启、系统内存压力）时，几小时的计算不留任何证据——2026-10-10 的 GBL|LiM_plus
+    就是这样整条腿丢掉、只能重跑。这里把两个流直接写进 `<log>.stdout.tmp` /
+    `<log>.stderr.tmp`，崩了也还能读到最后一个 SCF 步；正常结束时再按
+    `stdout + "\n" + stderr` 拼成 `<log>`，与既有 10 条腿的字节约定一致，
+    provenance / verify_archive 照样能哈希。两个 `.tmp` 刻意保留：它们就是现场。
+    """
+    out_tmp = Path(str(log_path) + ".stdout.tmp")
+    err_tmp = Path(str(log_path) + ".stderr.tmp")
+    t0 = time.time()
+    with open(out_tmp, "w", encoding="utf-8", newline="", errors="replace") as out, \
+            open(err_tmp, "w", encoding="utf-8", newline="", errors="replace") as err:
+        proc = subprocess.run(argv, cwd=str(directory), stdout=out, stderr=err)
+    wall = time.time() - t0
+    text = (out_tmp.read_text(encoding="utf-8", errors="replace") + "\n"
+            + err_tmp.read_text(encoding="utf-8", errors="replace"))
+    Path(log_path).write_text(text, encoding="utf-8")
+    return proc.returncode, text, wall
+
+
 SCF_CYCLES = re.compile(r"SCF CONVERGED AFTER\s+(\d+)\s+CYCLES")
 SP_ENERGY = re.compile(r"FINAL SINGLE POINT ENERGY\s+(-?\d+\.\d+)")
 NBASIS = re.compile(r"Number of basis functions\s*\.*\s*(\d+)")
