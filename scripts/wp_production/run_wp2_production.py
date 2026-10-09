@@ -1,7 +1,7 @@
 """WP2 生产驱动：主集分子 × 4 主状态的 SMD Opt+NumFreq+SP 与 G 账本行。
 
 用法:
-    .venv\\Scripts\\python.exe -X utf8 work\\pilot12\\run_wp2_production.py C01 C02 [--force]
+    .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\run_wp2_production.py C01 C02 [--force]
 
 产物（原始 ORCA 输出只留仓库外 work/，不入交付镜像）:
     work/wp2prod/<NAME>/<STATE>/<NAME>_<STATE>.json      账本行 + QC

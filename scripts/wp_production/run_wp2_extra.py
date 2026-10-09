@@ -5,14 +5,14 @@ def2-TZVPD；两者相减不是基组一致的自由分子 IP。补跑中性腿�
 之后，G(M+) - G(M) 才是在同一基组下的 Gox_single，也才能算 coordination shift。
 
 用法:
-    .venv\\Scripts\\python.exe -X utf8 work\\pilot12\\run_wp2_extra.py C01 C02 C13 C14 [--force]
+    .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\run_wp2_extra.py C01 C02 C13 C14 [--force]
 
 产物写进同一 work/wp2prod/<NAME>/M_tzvpd/ 目录，文件名 <NAME>_M_tzvpd.json / .log / _opt.xyz。
 
 原始语义（与 run_wp2_production.py 相同）：
 
 用法:
-    .venv\\Scripts\\python.exe -X utf8 work\\pilot12\\run_wp2_production.py C01 C02 [--force]
+    .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\run_wp2_production.py C01 C02 [--force]
 
 产物（原始 ORCA 输出只留仓库外 work/，不入交付镜像）:
     work/wp2prod/<NAME>/<STATE>/<NAME>_<STATE>.json      账本行 + QC

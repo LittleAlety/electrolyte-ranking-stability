@@ -1,6 +1,6 @@
 """收口七：把本机独立方法审计折进主生成器（一次性补丁）。
 
-读 work/pilot12/wp1_audit_src.txt 的分段源码 + work/audit/ 的派生 JSON，拼出 WP1
+读 scripts/wp_production/wp1_audit_src.txt 的分段源码 + work/audit/ 的派生 JSON，拼出 WP1
 常量块与新 wp1()，就地替换 scripts/build_physics_completion_batch.py 的 wp1 段落，
 把 WP3 的稳健翻转让位给方法审计认证结论，并同步 WP5 成本账本与结题报告口径。
 """
