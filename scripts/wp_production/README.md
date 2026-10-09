@@ -52,6 +52,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息（写 `work/_wp2_commit_msg.txt`） |
 | `finalize_wp2.ps1` | 上面那条一键收口链 |
 | `supervise_pending.ps1` | 无人值守监守：单实例锁 + 等其它驱动退出后调 `run_wp2_queue.py --run`（最多 3 轮） |
+| `archive_raw_outputs.py` | 把 provenance 里登记的原始作业文件打成**确定性、可复核的 zip 归档**（`--build` 生成，默认落在仓库外 `_compute_archive/`；`--check <zip>` 逐条复算 sha256） |
 | `scripts/wp_production/build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |
 | `scripts/wp_production/build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
 | `scripts/wp_production/build_compute_provenance.py` | 逐作业复现证据清单 + 从各自 `.log` 推导的 `failure_reason`（派生层） |
@@ -64,7 +65,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 * **原始 ORCA/xTB 输出不入库**：留在仓库外 `work/`（生产为 `work/wp2prod/`，审计为 `work/audit/`，
   队列的原始 stdout 为 `work/wp2prod/_queue_<NAME>_<STATE>.out`）。交付镜像里只有派生的
   CSV/JSON；派生数值与原始日志的对应关系见
-  `outputs/physics_completion/provenance/job_archive_manifest.csv`。
+  `outputs/physics_completion/provenance/job_archive_manifest.csv`。需要独立取得原始日志时，用 `scripts/wp_production/archive_raw_outputs.py --build` 生成确定性 zip 归档（默认落在仓库外 `_compute_archive/`），再用 `--check` 逐条复算 sha256；本轮已建 **816 作业 / 2460 文件 / 27.8 MB → 8.5 MB** 的归档并通过校验。
 * **生成器是派生物**：`scripts/build_physics_completion_batch.py` 由 `emit_wp2.py` 从
   「最近的未打补丁基线 + 补丁块」确定性重打；手工改它会失效。基线缓存在 `work/pilot12/gen_baseline.py`。
 * **`work/pilot12/` 只是暂存区**：`run_batch.py` 的原始输出与生成器基线缓存仍落在那里；
