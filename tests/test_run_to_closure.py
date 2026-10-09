@@ -1,7 +1,8 @@
 """队列收尾（run_to_closure）：腿算完 ≠ 交付层更新，这一步把两者接上。
 
-纪律是「20/20 全齐才折入」，所以这里钉住三件事：未齐时不跑收口链（退出码 3）、
-齐了才调用 finalize_wp2.ps1、`--commit` 只在显式给出时透传给收口链。
+纪律是方案的「不合格状态明确记录，不补数、不替换结构」，所以这里钉住：
+未齐的腿**照样折入但必须显式列出**（否则某条腿反复失败就会让交付层永远停在旧数），
+`--require-complete` 才拒绝折入，`--commit` 只在显式给出时透传给收口链。
 """
 
 from __future__ import annotations
@@ -33,6 +34,13 @@ def _rows(pending):
     return rows
 
 
+def _no_chain(monkeypatch):
+    module = _load()
+    called = []
+    monkeypatch.setattr(module.subprocess, "run", lambda *a, **k: called.append(a))
+    return module, called
+
+
 def test_pending_legs_reports_everything_not_computed(monkeypatch):
     module = _load()
     monkeypatch.setattr(module.queue, "inventory",
@@ -40,32 +48,37 @@ def test_pending_legs_reports_everything_not_computed(monkeypatch):
     assert module.pending_legs() == [("DMC", "M_tzvpd"), ("SL", "LiM_plus")]
 
 
-def test_missing_legs_do_not_run_the_chain(monkeypatch, capsys):
+def test_check_reports_pending_and_passes_when_complete(monkeypatch, capsys):
     module = _load()
     monkeypatch.setattr(module.queue, "inventory", lambda: _rows({("GBL", "LiM_2plus")}))
-    called = []
-    monkeypatch.setattr(module.subprocess, "run", lambda *a, **k: called.append(a))
-    assert module.main(["--commit"]) == module.PENDING_EXIT
-    assert called == [], "腿没齐就不应触碰收口链"
+    assert module.main(["--check"]) == module.PENDING_EXIT
     assert "GBL|LiM_2plus" in capsys.readouterr().out
 
-
-def test_check_passes_only_when_all_legs_are_computed(monkeypatch, capsys):
-    module = _load()
     monkeypatch.setattr(module.queue, "inventory", lambda: _rows(set()))
     assert module.main(["--check"]) == 0
     assert "all 20 legs computed" in capsys.readouterr().out
 
 
-def test_dry_run_prints_the_chain_without_running_it(monkeypatch, capsys):
+def test_require_complete_refuses_to_fold(monkeypatch, capsys):
     module = _load()
-    monkeypatch.setattr(module.queue, "inventory", lambda: _rows(set()))
+    monkeypatch.setattr(module.queue, "inventory", lambda: _rows({("GBL", "LiM_2plus")}))
     called = []
     monkeypatch.setattr(module.subprocess, "run", lambda *a, **k: called.append(a))
+    assert module.main(["--require-complete", "--commit"]) == module.PENDING_EXIT
+    assert called == [], "--require-complete 下腿没齐就不应触碰收口链"
+    assert "GBL|LiM_2plus" in capsys.readouterr().out
+
+
+def test_partial_legs_still_fold_and_are_flagged(monkeypatch, capsys):
+    """硬门禁的失败模式：一条腿反复失败就让交付层永远停在旧数。未齐也要折、但要写清。"""
+    module, called = _no_chain(monkeypatch)
+    monkeypatch.setattr(module.queue, "inventory",
+                        lambda: _rows({("SL", "LiM_2plus"), ("EMC", "M_tzvpd")}))
     assert module.main(["--dry-run"]) == 0
     out = capsys.readouterr().out
+    assert "部分" in out and "SL|LiM_2plus" in out and "EMC|M_tzvpd" in out
     assert "finalize_wp2.ps1" in out
-    assert called == []
+    assert called == [], "--dry-run 不应执行收口链"
 
 
 def test_commit_flag_is_the_only_thing_that_reaches_the_chain(monkeypatch):

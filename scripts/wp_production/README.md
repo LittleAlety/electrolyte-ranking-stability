@@ -51,7 +51,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `run_wp2_production.py` | 生产级 Opt+NumFreq 驱动（`M` / `M_plus` / `LiM_plus` / `LiM_2plus`） |
 | `run_wp2_extra.py` | 与带电腿**基组一致**的中性腿 `M_tzvpd`（def2-TZVPD）驱动 |
 | `run_wp2_queue.py` | 上面两条驱动的幂等队列器：20 条腿的统一调度、并发上限、断点续跑、逐次开跑与周期复查 smpd |
-| `run_to_closure.py` | 队列收尾：**只有 20/20 全 computed 才**跑一键收口链，把腿折进 production_ledger / 四分子闭环表 / 四分子标签 / week37-week44 镜像；未齐则退出码 3、不折入。`--check` 只报告，`--dry-run` 只打印，`--commit` 在 ALL GREEN 时提交（不 push） |
+| `run_to_closure.py` | 队列收尾：队列已停就把**已 computed 的腿**折进 production_ledger / 四分子闭环表 / 四分子标签 / week37-week44 镜像；未齐的腿在交付层留空并显式列出（不补数、不替换结构）——硬门禁会让某条反复失败的腿把交付层永远钉在旧数，那才是失败模式。`--check` 只报告，`--dry-run` 只打印，`--commit` 在 ALL GREEN 时提交（不 push），需要严格门禁时用 `--require-complete` |
 | `run_method_audit.py` | WP1 的 128 单点 / 32 弛豫腿本机方法审计驱动 |
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息（写 `work/_wp2_commit_msg.txt`） |
 | `finalize_wp2.ps1` | 上面那条一键收口链 |
