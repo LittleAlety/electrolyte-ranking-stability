@@ -7,7 +7,7 @@ window.HB = {
   "orca_out": 1535,
   "scripts": 168,
   "test_files": 74,
-  "tests_passed": 1363
+  "tests_passed": 1364
  },
  "pipeline": [
   {
@@ -1230,9 +1230,9 @@ window.HB = {
    "file": "F61_physics_completion_ladder.png",
    "week": 44,
    "caption": "E -> G -> ensemble 台阶（方案 WP3）：只有垂直->绝热这一级是冻结的（n=12，逐分子位移箭头），三态判定 55/9/2；G_single / G_ensemble / Li 支仍需 WP2 生产，故 ROBUST_INVERSION 只是标签不是已认证翻转",
-   "sha": "02836aa7b309bc894f1f4418ef700d1065584fc262888e87a3199fc7def6868b",
-   "bytes": 103486,
-   "w": 1856,
+   "sha": "4df2b2b204a557e3e608c8db5348fa134f5d5f901580af8f2e7ec3d007da8305",
+   "bytes": 179055,
+   "w": 2592,
    "h": 832
   },
   {

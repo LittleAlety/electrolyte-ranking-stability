@@ -50,6 +50,7 @@ MECH_CASES = REPO_ROOT / "outputs" / "physics_completion" / "pair_evidence" / "m
 MECH_GEOM = REPO_ROOT / "outputs" / "physics_completion" / "pair_evidence" / "mechanism_geometry.csv"
 IDENTITY = REPO_ROOT / "outputs" / "state_identity" / "state_identity_stratification.csv"
 BUDGET_CURVES = REPO_ROOT / "outputs" / "week33" / "budget_curves.csv"
+LADDER = REPO_ROOT / "outputs" / "physics_completion" / "pair_evidence" / "frozen_rung_ladder.csv"
 
 INK = "#111827"
 MUTED = "#6b7280"
@@ -206,8 +207,8 @@ def figure_ladder(path: Path):
     per_mol = rung["per_molecule"]
     counts = rung["decision_state_counts"]
 
-    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(11.6, 5.2),
-                                     gridspec_kw={"width_ratios": [1.35, 1.0]})
+    fig, (ax_a, ax_b, ax_c) = plt.subplots(1, 3, figsize=(16.2, 5.2),
+                                           gridspec_kw={"width_ratios": [1.45, 0.92, 1.05]})
     style(ax_a)
     order = sorted(per_mol, key=lambda row: float(row["ip_p1v_ev"]))
     xs = np.arange(len(order))
@@ -239,8 +240,34 @@ def figure_ladder(path: Path):
     ax_b.set_ylim(0, 63)
     ax_b.set_title("(b) Three-state verdicts on the frozen rung", fontsize=9.5, color=INK)
 
-    fig.suptitle("F61  E -> G -> ensemble ladder: only the electronic-energy rung is frozen "
-                 "(plan WP3; ROBUST_INVERSION is a label, not a certified flip)",
+    style(ax_c)
+    ladder = load_csv(LADDER)
+    rung_order = []
+    for row in ladder:
+        if row["rung"] not in rung_order:
+            rung_order.append(row["rung"])
+    for axis, colour in (("oxidation", BLUE), ("reduction", RED)):
+        series = [row for row in ladder if row["axis"] == axis]
+        series = sorted(series, key=lambda row: rung_order.index(row["rung"]))
+        xs_c = [rung_order.index(row["rung"]) for row in series]
+        ys_c = [float(row["kendall_tau_b"]) for row in series]
+        ax_c.plot(xs_c, ys_c, marker="o", markersize=4, linewidth=1.5, color=colour, label=axis)
+        for xi, row in zip(xs_c, series):
+            ax_c.annotate("f=%.2f" % float(row["f_unresolved_after"]), (xi, ys_c[xs_c.index(xi)]),
+                          textcoords="offset points", xytext=(0, -13), ha="center",
+                          fontsize=6.5, color=colour)
+    ax_c.axhline(0.90, color=MUTED, linestyle="--", linewidth=1.0)
+    ax_c.text(len(rung_order) - 1, 0.915, "ordering gate 0.90", ha="right", fontsize=7, color=MUTED)
+    ax_c.axhline(0.0, color="#d1d5db", linewidth=0.9)
+    ax_c.set_xticks(range(len(rung_order)))
+    ax_c.set_xticklabels(rung_order, fontsize=7.5, rotation=30, ha="right")
+    ax_c.set_ylabel("Kendall tau_b of the rung")
+    ax_c.set_ylim(-0.62, 1.06)
+    ax_c.legend(fontsize=8, frameon=False, loc="lower left")
+    ax_c.set_title("(c) Frozen 5-rung ladder (frozen aggregates)", fontsize=9.5, color=INK)
+
+    fig.suptitle("F61  E -> G -> ensemble ladder: the frozen evidence stops at the electronic-energy "
+                 "and geometry rungs (plan WP3; ROBUST_INVERSION is a label, not a certified flip)",
                  fontsize=10.5, color=INK)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     return finish(fig, path)
@@ -411,7 +438,7 @@ FIGURES = [
     ("F64", "F64_physics_completion_budget_curve.png", figure_budget),
 ]
 
-INPUTS = [RUNG, JOB_MATRIX, REUSABLE, PAIR_EVIDENCE, MECH_CASES, MECH_GEOM, IDENTITY, BUDGET_CURVES,
+INPUTS = [RUNG, JOB_MATRIX, REUSABLE, PAIR_EVIDENCE, MECH_CASES, MECH_GEOM, IDENTITY, BUDGET_CURVES, LADDER,
           REPO_ROOT / "config" / "physics_completion_v1.yaml",
           REPO_ROOT / "data" / "references" / "anchor_primary_audit.csv"]
 
@@ -419,8 +446,10 @@ CAPTIONS = {
     "F59": "Cohort sizes and the seven registered quantities with their objective direction.",
     "F60": "The WP1 audit matrix is registered (planned); the only reusable rows are the frozen "
            "electronic-energy layers. This is a design figure, not a result.",
-    "F61": "Only the vertical->adiabatic rung is frozen; G_single, G_ensemble and the Li branch "
-           "need WP2 production, so ROBUST_INVERSION stays uncertified.",
+    "F61": "Panel (c) is the frozen R15 five-rung ladder (n=18/18/12/10/10 per axis) with "
+           "tau_b and f_unresolved; the vertical->adiabatic rung is recomputed pairwise here. "
+           "G_single / G_ensemble and the reduction Li branch still need WP2 production, so "
+           "ROBUST_INVERSION stays uncertified.",
     "F62": "All 66 frozen pairs with their three-state verdict, next to the C1 state-identity "
            "stratification that gates the reduction axis.",
     "F63": "The two robust inversions sit on EMC, whose frozen relaxation geometry moves the most; "

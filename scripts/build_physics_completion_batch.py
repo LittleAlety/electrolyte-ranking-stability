@@ -999,6 +999,34 @@ def build_mechanism_geometry(cases):
     return rows, bond_rows
 
 
+FROZEN_LADDER = "outputs/week27/layer_independence.json"
+
+
+def build_frozen_rung_ladder():
+    """把既有 R15 台阶审计（5 级 x 2 轴）登记成方案 7.2 要求的逐级报告表。
+
+    这是冻结聚合值，不是新计算；它只覆盖「同一 cohort 的 n、tau_b、
+    resolved/unresolved 比例」，Top-k 重叠与 selection regret 仍只在
+    本批次逐对复算的那一级给出。
+    """
+    frozen = PB.load_json(REPO / FROZEN_LADDER)
+    rows = []
+    for rung in frozen["rungs"]:
+        for axis, payload in rung["axes"].items():
+            rows.append({
+                "rung": rung["key"], "label": rung["label"], "axis": axis,
+                "n_molecules": payload["n_molecules"],
+                "kendall_tau_b": "%.9f" % float(payload["kendall_tau_b"]),
+                "f_unresolved_before": "%.9f" % float(payload["f_unresolved_before"]),
+                "f_unresolved_after": "%.9f" % float(payload["f_unresolved_after"]),
+                "f_robust_inversion": "%.9f" % float(payload["f_robust_inv"]),
+                "dispersion_ev": "%.9f" % float(payload["dispersion_ev"]),
+                "cost_jobs": rung.get("cost_jobs", ""),
+                "new_physics": rung["new_physics"],
+            })
+    return rows, frozen
+
+
 def wp3():
     files = {}
     local = {}
@@ -1051,6 +1079,7 @@ def wp3():
         })
 
     geometry_rows, geometry_bonds = build_mechanism_geometry(cases)
+    ladder_rows, ladder_frozen = build_frozen_rung_ladder()
     unresolved_share = counts.get("UNRESOLVED", 0) / len(rows)
     payload_certified = False
     checks = [
@@ -1080,6 +1109,10 @@ def wp3():
          "detail": "%d 个案例分子；%s" % (len(geometry_rows), "、".join(
              "%s max|Δr|=%.3f Å (%s)" % (row["name"], float(row["max_abs_bond_change_ang"]),
                                          row["max_bond_pair"]) for row in geometry_rows))},
+        {"id": "frozen_ladder_covers_every_registered_rung", "description": "方案 7.2 的逐级报告覆盖全部冻结台阶与两个轴",
+         "ok": len(ladder_rows) == 2 * len(ladder_frozen["rungs"]),
+         "detail": "%d 级台阶 x 2 轴 = %d 行；Top-k 重叠与 selection regret 仍只在 P1v->P1a 一级给出"
+                   % (len(ladder_frozen["rungs"]), len(ladder_rows))},
         {"id": "mechanism_bond_table_covers_every_case_molecule", "description": "案例的键长变化表逐键覆盖每个案例分子",
          "ok": bool(geometry_bonds) and all(
              any(row["name"] == entry["name"] for row in geometry_bonds) for entry in geometry_rows),
@@ -1118,6 +1151,12 @@ def wp3():
         "resolution_curve_three_state": curve, "mechanism_cases": cases,
         "mechanism_geometry": geometry_rows,
         "mechanism_bond_changes": geometry_bonds,
+        "frozen_rung_ladder": ladder_rows,
+        "frozen_ladder_independence": {
+            "source": FROZEN_LADDER,
+            **{key: ladder_frozen["independence"][key] for key in
+               ("n_pairs", "max_abs_pearson", "median_abs_pearson", "n_pairs_above_0_7")},
+        },
         "mechanism_geometry_sources": {
             "neutral": PB.MECHANISM_NEUTRAL_GEOMETRY,
             "cation": PB.MECHANISM_CATION_GEOMETRY,
@@ -1146,6 +1185,10 @@ def wp3():
     local["outputs/physics_completion/pair_evidence/mechanism_bond_changes.csv"] = csv_text(
         ["name", "bond", "r_neutral_ang", "r_cation_ang", "dr_ang", "is_largest_change",
          "moved_over_0p01_ang"], geometry_bonds)
+    local["outputs/physics_completion/pair_evidence/frozen_rung_ladder.csv"] = csv_text(
+        ["rung", "label", "axis", "n_molecules", "kendall_tau_b", "f_unresolved_before",
+         "f_unresolved_after", "f_robust_inversion", "dispersion_ev", "cost_jobs",
+         "new_physics"], ladder_rows)
     local["outputs/physics_completion/pair_evidence/conservative_interval_protocol.md"] = (
         "# 保守区间与三态判据协议\n\n"
         "1. 对固定目标模型 m 与 pair i,j、每个预先接受的合理方法 r，得到 D_ij^(m,r)；自由态与 Li 态分别构造方法范围，\n"
@@ -1220,6 +1263,27 @@ def wp3():
         % ("/".join(str(z) for z in Z_BANDS), "、".join(item["f_unresolved"] for item in curve)),
         "- 机制案例：%d 个（规则：稳健翻转优先）" % len(cases),
         "",
+        "## 冻结台阶逐级报告（方案 7.2，零新增计算）",
+        "",
+        "| 台阶 | 轴 | n | tau_b | f_unresolved (前 -> 后) | f_robust_inversion | dispersion (eV) | 既有作业 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in ladder_rows:
+        summary.append(
+            "| %s | %s | %s | %s | %s -> %s | %s | %s | %s |"
+            % (row["rung"], row["axis"], row["n_molecules"], row["kendall_tau_b"],
+               row["f_unresolved_before"], row["f_unresolved_after"],
+               row["f_robust_inversion"], row["dispersion_ev"], row["cost_jobs"]))
+    summary += [
+        "",
+        "- 台阶间独立性（冻结 R15）：%d 对、max |Pearson| = %s、median |Pearson| = %s、>0.7 的 %d 对。"
+        % (ladder_frozen["independence"]["n_pairs"],
+           ladder_frozen["independence"]["max_abs_pearson"],
+           ladder_frozen["independence"]["median_abs_pearson"],
+           ladder_frozen["independence"]["n_pairs_above_0_7"]),
+        "- 逐级报告只用冻结聚合值；Top-k 重叠与 selection regret 目前只在 P1v->P1a 一级逐对给出，",
+        "  其余台阶要等 WP2 生产把同一 cohort 的自由能标签补齐。",
+        "",
         "## 验收（%d/%d 通过）" % (len(checks) - payload["n_failed"], len(checks)),
         "",
         "| check | ok | detail |",
@@ -1231,7 +1295,7 @@ def wp3():
         "",
         "## 限制",
         "",
-        "- 首轮只用**单一既有 rung**演示；多方法保守区间待 WP1 生产单点完成后才有真正的方法范围。",
+        "- 逐级报告（方案 7.2）复用冻结的 5 级台阶聚合值；多方法保守区间仍待 WP1 生产单点完成后才有真正的方法范围，Top-k/regret 只在 P1v->P1a 一级逐对给出。",
         "- 该 rung 的 12 个成员与主 cohort 差一个分子（SN 进、DEC 出）：它只作判据演示，不代表已登记的主集。",
         "- 稳健翻转**尚未认证**：本标签只表示「在该 rung 的位移 std 敏感性尺度下的翻转」，认证需 WP1 独立方法审计与采样界限（方案 2）。",
         "- 机制案例已补原始结构证据（既有冻结几何的重原子键长变化表，逐键列出中性/阳离子键长），但电子密度/自旋、配位变化与 G 层分解仍需 WP1/WP2 新计算。",

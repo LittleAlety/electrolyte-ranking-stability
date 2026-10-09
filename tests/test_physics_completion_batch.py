@@ -24,7 +24,7 @@ def _read_csv(path: Path):
 
 def test_every_artifact_is_byte_reproducible() -> None:
     files = batch.build_all()
-    assert len(files) == 66
+    assert len(files) == 67
     for rel, text in files.items():
         target = REPO_ROOT / rel
         assert target.is_file(), rel
@@ -234,6 +234,22 @@ def test_plan_section_14_figures_exist_and_are_registered() -> None:
         assert "| F%d |" % index in manifest
         assert "`%s`" % name in manifest
     assert len(list(figdir.glob("*_physics_completion_*.png"))) == 6
+
+
+def test_frozen_ladder_reports_every_rung_and_axis() -> None:
+    """方案 7.2 的逐级报告必须逐级逐轴与冻结 R15 台阶审计一致。"""
+    frozen = json.loads((REPO_ROOT / "outputs/week27/layer_independence.json").read_text(encoding="utf-8"))
+    rows = _read_csv(REPO_ROOT / "outputs/physics_completion/pair_evidence/frozen_rung_ladder.csv")
+    assert len(rows) == 2 * len(frozen["rungs"]) == 10
+    by_key = {(row["rung"], row["axis"]): row for row in rows}
+    for rung in frozen["rungs"]:
+        for axis, payload in rung["axes"].items():
+            row = by_key[(rung["key"], axis)]
+            assert int(row["n_molecules"]) == payload["n_molecules"]
+            assert abs(float(row["kendall_tau_b"]) - float(payload["kendall_tau_b"])) < 1e-9
+            assert abs(float(row["f_unresolved_after"])
+                       - float(payload["f_unresolved_after"])) < 1e-9
+            assert abs(float(row["f_robust_inversion"]) - float(payload["f_robust_inv"])) < 1e-9
 
 
 def _read_xyz(path: Path):
