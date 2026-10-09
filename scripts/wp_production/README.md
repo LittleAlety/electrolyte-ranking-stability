@@ -11,7 +11,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finali
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finalize_wp2.ps1 -Commit
 ```
 
-顺序：`anchors` → `emit-wp2` → `generator` → `closure` → `provenance` → `sampling` → `cost` →
+顺序：`anchors` → `emit-wp2` → `generator` → `closure` → `provenance` → `sampling` → `li-motif-plan` → `cost` →
 `recheck-plan` → `figures` → `mirror` → `site` → `freeze` → `clean-room` → 十个 `--check` → `pytest`。
 任一非零即 `ABORT`，不提交。
 
@@ -31,9 +31,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\superv
 
 并发纪律：队列器只做调度，最多同时 2 个 worker 子进程，每个 worker 内 ORCA 用 4 核
 （`run_batch.ORCA_CORES`），即全机最多 8 个 ORCA 核。`--run` 在开跑前会检查是否已有别的
-wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止叠加。开跑前还会检查本地
+wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止叠加。检查时会排除队列自身进程与父进程，否则队列会把自己数成一个「已在跑的驱动」而永远自锁，使只有队列负责的 `M_tzvpd` 腿排不上。开跑前还会检查本地
 `smpd`（Microsoft MPI）是否存活——2026-10-10 的一次重启就是因为它死掉，导致 5 条腿在
 0.2 秒内瞬败。
+
+`supervise_pending.ps1` 持单实例锁 `work/_supervisor.lock`（锁里 PID 仍存活则自己退出，陈旧则接管）：机器重启后只要再拉起一个监守即可继续，不会出现两个监守同时接管、把并发从 2 个 ORCA 叠成 4 个。
 
 ## 各脚本职责
 
@@ -49,10 +51,10 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `run_method_audit.py` | WP1 的 128 单点 / 32 弛豫腿本机方法审计驱动 |
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息（写 `work/_wp2_commit_msg.txt`） |
 | `finalize_wp2.ps1` | 上面那条一键收口链 |
-| `supervise_pending.ps1` | 无人值守监守：等其它驱动退出后调 `run_wp2_queue.py --run` |
+| `supervise_pending.ps1` | 无人值守监守：单实例锁 + 等其它驱动退出后调 `run_wp2_queue.py --run`（最多 3 轮） |
 | `scripts/wp_production/build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |
 | `scripts/wp_production/build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
-| `scripts/wp_production/build_compute_provenance.py` | 逐作业复现证据清单（派生层） |
+| `scripts/wp_production/build_compute_provenance.py` | 逐作业复现证据清单 + 从各自 `.log` 推导的 `failure_reason`（派生层） |
 | `scripts/wp_production/build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） |
 | `scripts/wp_production/build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的结果前预注册计划（派生层，零新增计算） |
 | `scripts/wp_production/build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） |
