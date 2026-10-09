@@ -181,6 +181,7 @@ C1/C2 的还原轴只让 `molecule_centered_redox` 进入主 ranking。
 - **`all` scope 里的 Li-centered 数据不是结论。** 它只用于复核 Week 5/6 的冻结数字。
 - **`state_registry` 的 G2 组只有 derived 数值。** `outputs/week4/t2_opt_freq.csv` 只存
   折算后的 `ip_g2_ev` / `ea_g2_ev`，没有逐态能量，因此这几行标 `energy_availability = derived_only`。
+- **`state_registry` 的 C1/C2 组有重复行（未携带上游 `job` 相位）。** 上游 `outputs/week5/c1_li_coordination.csv` 对同一 `(分子, motif, 电荷态)` 同时存有 `opt` 与 `sp` 两条记录（`final_energy_eh` 不同），而本表 schema 没有保留 `job` 字段，投影后成为无法区分的重复行：242 行里只有 186 个唯一 `state_id`（36 组重复），其中 51 行与另一行逐字段完全相同。该重复**不改变任何排序数字**（`property_table` 的 C1 取自 `c1_coord_shifts.csv`，键唯一；pair 构建只取双侧 `ok` 的行），但「每行对应一个可辨识计算对象」这一读法在 C1/C2 组需按本保留读。结构性修法（在 `state_registry` 增设 `job` 相位判别列并写进 `state_id`）已登记为后续改进，本阶段不改动冻结表。
 
 ---
 

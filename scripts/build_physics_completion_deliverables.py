@@ -67,7 +67,7 @@ WP_LABEL = {
 
 GATE_STATUS = ("Gate 0 CLOSED；Gate 1 NOT CLOSED 且 NOT CLOSABLE（本批次只登记与复算既有冻结数据："
                "不复核、不关闭、不跳过；排序/配对证据零新增电子结构计算、零数据剔除、零阈值改动；"
-               "WP1 另计 161 个本机独立方法审计作业（128 单点 + 32 弛豫腿 + 1 EMC Li 松弛）、WP2 另计 12 分子四主态 pilot 与 4 分子 x 4 主态生产 Opt/Freq（16 态），原始日志不入镜像）")
+               "WP1 另计 161 个本机独立方法审计作业（128 单点 + 32 弛豫腿 + 1 EMC Li 松弛）、WP2 另计 12 分子四主态 pilot，以及 4 分子 x 4 主态生产 Opt/Freq（目标 16 态，实际登记进度见 week39 载荷与 production_ledger.csv），原始日志不入镜像）")
 
 DISCIPLINE = (
     "三层表述（模型事实 / 统计判定 / 材料意义）不得混写；方向 ox = IP、red = -EA（均 maximise）；"
@@ -289,7 +289,9 @@ def build_submission(out, sources):
         "discipline": DISCIPLINE,
         "no_new_electronic_structure_jobs_on_ranking_layer": True,
         "new_jobs_note": ("no new job changes the frozen ranking/pair evidence; the WP1 local supportability probe "
-                          "and the WP2 DMC/EMC free-state pilot are separate and mirrored only as derived CSVs"),
+                          "the WP2 four-master-state pilot and the WP2 production first segment (4 main-set molecules x 4 "
+                          "master states, partial and marked as such) are separate and mirrored only "
+                          "as derived CSVs"),
         "source_manifest": [{"path": rel, "sha256": sha256_file(REPO / rel)} for rel in sorted(sources)],
     }
     (out / "SUBMISSION.json").write_text(
