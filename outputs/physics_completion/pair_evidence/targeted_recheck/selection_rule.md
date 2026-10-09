@@ -23,8 +23,8 @@
 | 第二泛函设定 | S3 (PBE0-D4/def2-TZVP) / S4 (PBE0-D4/def2-TZVPD) |
 | 计划单点总数 | 24 |
 | 方案 11 预算 | 16-32 |
-| 可用（生产腿已登记） | 10 |
-| 阻塞（生产腿未登记） | 14 |
+| 可用（生产腿已登记） | 12 |
+| 阻塞（生产腿未登记） | 12 |
 
 ## 作业计划（24 行，逐行登记）
 
@@ -48,8 +48,8 @@
 | C13|LiM_2plus|S4 | GBL | LiM_2plus | S4 | PBE0-D4/def2-TZVPD | `work/wp2prod/GBL/LiM_2plus/GBL_LiM_2plus_opt.xyz` | false | false | false | blocked_on_production_leg | C13|LiM_2plus |
 | C14|M|S3 | SL | M | S3 | PBE0-D4/def2-TZVP | `work/wp2prod/SL/M/SL_M_opt.xyz` | true | false | false | ready | - |
 | C14|M|S4 | SL | M | S4 | PBE0-D4/def2-TZVPD | `work/wp2prod/SL/M/SL_M_opt.xyz` | true | false | false | ready | - |
-| C14|M_plus|S3 | SL | M_plus | S3 | PBE0-D4/def2-TZVP | `work/wp2prod/SL/M_plus/SL_M_plus_opt.xyz` | false | false | false | blocked_on_production_leg | C14|M_plus |
-| C14|M_plus|S4 | SL | M_plus | S4 | PBE0-D4/def2-TZVPD | `work/wp2prod/SL/M_plus/SL_M_plus_opt.xyz` | false | false | false | blocked_on_production_leg | C14|M_plus |
+| C14|M_plus|S3 | SL | M_plus | S3 | PBE0-D4/def2-TZVP | `work/wp2prod/SL/M_plus/SL_M_plus_opt.xyz` | true | false | false | ready | - |
+| C14|M_plus|S4 | SL | M_plus | S4 | PBE0-D4/def2-TZVPD | `work/wp2prod/SL/M_plus/SL_M_plus_opt.xyz` | true | false | false | ready | - |
 | C14|LiM_plus|S3 | SL | LiM_plus | S3 | PBE0-D4/def2-TZVP | `work/wp2prod/SL/LiM_plus/SL_LiM_plus_opt.xyz` | false | false | false | blocked_on_production_leg | C14|LiM_plus |
 | C14|LiM_plus|S4 | SL | LiM_plus | S4 | PBE0-D4/def2-TZVPD | `work/wp2prod/SL/LiM_plus/SL_LiM_plus_opt.xyz` | false | false | false | blocked_on_production_leg | C14|LiM_plus |
 | C14|LiM_2plus|S3 | SL | LiM_2plus | S3 | PBE0-D4/def2-TZVP | `work/wp2prod/SL/LiM_2plus/SL_LiM_2plus_opt.xyz` | false | false | false | blocked_on_production_leg | C14|LiM_2plus |
@@ -62,11 +62,11 @@
 | registered_before_any_recheck_sp | PASS | status only takes ready / blocked_on_production_leg; 24 planned, 0 run |
 | scope_is_exactly_the_certified_pairs | PASS | pairs=EMC|GBL; EMC|SL; n_pairs_certified=2 |
 | molecules_are_the_certified_members_in_the_subcohort | PASS | pair members=EMC, GBL, SL; in scope=EMC, GBL, SL; outside the four-molecule subcohort=none |
-| planned_sp_matches_the_rule | PASS | 3 molecules x 4 states x 2 settings = 24 single points (ready 10 / blocked 14) |
+| planned_sp_matches_the_rule | PASS | 3 molecules x 4 states x 2 settings = 24 single points (ready 12 / blocked 12) |
 | planned_sp_inside_the_plan_11_budget | PASS | plan 11 row targeted_pair_second_method_single_points = 16-32; planned = 24 |
 | settings_are_the_frozen_second_functional | PASS | S3 = PBE0-D4/def2-TZVP (role=audit_control); S4 = PBE0-D4/def2-TZVPD (role=audit_control) |
-| production_registered_legs_are_ready | PASS | ready legs 5/12: C02|M, C02|M_plus, C13|M, C13|M_plus, C14|M |
-| unregistered_legs_are_blocked_and_named | PASS | blocked rows 14, each naming its missing leg: C02|LiM_2plus, C02|LiM_plus, C13|LiM_2plus, C13|LiM_plus, C14|LiM_2plus, C14|LiM_plus, C14|M_plus |
+| production_registered_legs_are_ready | PASS | ready legs 6/12: C02|M, C02|M_plus, C13|M, C13|M_plus, C14|M, C14|M_plus |
+| unregistered_legs_are_blocked_and_named | PASS | blocked rows 12, each naming its missing leg: C02|LiM_2plus, C02|LiM_plus, C13|LiM_2plus, C13|LiM_plus, C14|LiM_2plus, C14|LiM_plus |
 | no_new_geometry_no_new_frequency_no_result_columns | PASS | result-bearing columns: none |
 | budget_row_in_cost_ledger_still_planned | PASS | targeted_pair_second_method_single_points status=planned |
 

@@ -77,7 +77,7 @@ JOB_FIELDS = ("job_id", "cohort", "mol_id", "name", "state", "setting_id", "char
               "final_geometry_sha256", "raw_output_path", "raw_output_sha256", "raw_output_bytes",
               "orca_keyword", "orca_version", "final_sp_eh", "g_single_eh", "n_freq",
               "imaginary_modes", "lowest_freq_cm1", "opt_converged", "terminated",
-              "n_files_hashed", "retrieval_note")
+              "failure_reason", "n_files_hashed", "retrieval_note")
 
 MAP_FIELDS = ("derived_artifact", "derived_row_key", "job_id", "cohort", "evidence_kind")
 
@@ -182,6 +182,29 @@ def audit_cell(mol_token, state_token, setting):
     return {}
 
 
+#: 从该作业自己 .log 的文本推导失败类型；只用于解释非正常结束，不改变任何数值。
+FAILURE_SIGNATURES = (
+    ("mpi_smpd_unavailable",
+     ("unable to start the local smpd manager", "ReadFile() failed, error 109")),
+    ("mpi_smpd_communication_lost",
+     ("failed to communicate with smpd manager",)),
+    ("orca_cannot_open_scratch_file",
+     ("CANNOT OPEN FILE",)),
+)
+
+
+def classify_failure(job_state, terminated, has_log, raw_text):
+    """把 failed 的 ORCA 作业归到一类可复核的原因；不需要原因时返回空串。"""
+    if job_state != "failed" or terminated == "true":
+        return ""
+    if not has_log:
+        return "no_raw_output"
+    for label, needles in FAILURE_SIGNATURES:
+        if any(needle in raw_text for needle in needles):
+            return label
+    return "unclassified"
+
+
 def build_row(cohort, mol_token, job_token, directory):
     state_token, setting = split_token(job_token)
     record = {}
@@ -208,6 +231,8 @@ def build_row(cohort, mol_token, job_token, directory):
     log_path, log_sha, log_bytes = hash_entry(log)
     n_hashed = sum(1 for value in (input_sha, start_sha, final_sha, log_sha) if value)
     job_id = "%s/%s/%s" % ("wp2prod" if cohort == "wp2_production" else "audit", mol_token, job_token)
+    job_state = record.get("status") or ("in_flight" if log is None else "log_without_payload")
+    terminated = record.get("terminated", "true" if RE_TERMINATED.search(raw_text) else "false")
     row = {
         "job_id": job_id, "cohort": cohort,
         "mol_id": (record.get("mol_id", "")
@@ -215,7 +240,7 @@ def build_row(cohort, mol_token, job_token, directory):
         "name": record.get("name") or mol_token,
         "state": state_token, "setting_id": setting,
         "charge": record.get("charge", ""), "multiplicity": record.get("multiplicity", ""),
-        "job_state": (record.get("status") or ("in_flight" if log is None else "log_without_payload")),
+        "job_state": job_state,
         "archive_location": "outside-repo: work/%s/%s/%s/" % (
             "wp2prod" if cohort == "wp2_production" else "audit", mol_token, job_token),
         "engine": "ORCA", "engine_version": version,
@@ -229,7 +254,8 @@ def build_row(cohort, mol_token, job_token, directory):
         "n_freq": record.get("n_freq", ""), "imaginary_modes": record.get("imaginary_modes", ""),
         "lowest_freq_cm1": record.get("lowest_freq_cm1", ""),
         "opt_converged": record.get("opt_converged", "true" if RE_CONVERGED.search(raw_text) else ""),
-        "terminated": record.get("terminated", "true" if RE_TERMINATED.search(raw_text) else "false"),
+        "terminated": terminated,
+        "failure_reason": classify_failure(job_state, terminated, log is not None, raw_text),
         "n_files_hashed": str(n_hashed), "retrieval_note": ARCHIVE_NOTE,
     }
     if not log_path:
@@ -532,6 +558,15 @@ def acceptance(rows, mapping, cache, pools):
         "ok": str(bool(orca) and len(terminated) <= len(orca)).lower(),
         "detail": "%d/%d ORCA jobs terminated normally" % (len(terminated), len(orca)),
     })
+    failed_rows = [row for row in orca if row["job_state"] == "failed"]
+    coded = [row for row in failed_rows if row["failure_reason"] not in ("", "unclassified")]
+    checks.append({
+        "check_id": "every_failed_orca_job_carries_a_log_derived_failure_reason",
+        "description": "每个 failed 的 ORCA 作业都带一条从它自己 .log 文本推导的 failure_reason，"
+                       "把基础设施事故（smpd 缺失/失联、scratch 打不开）与物理结论分开",
+        "ok": str(len(coded) == len(failed_rows)).lower(),
+        "detail": "%d/%d failed jobs classified" % (len(coded), len(failed_rows)),
+    })
     checks.append({
         "check_id": "derived_values_map_to_a_job_id",
         "description": "每个派生数值都能映射回一个作业 ID（job_matrix / production_ledger / 采样原始缓存）",
@@ -635,6 +670,24 @@ def build():
         entry = by_cohort[cohort]
         md.append("| %s | %d | %d | %d |" % (cohort, entry["jobs"], entry["with_log"],
                                              entry["terminated"]))
+    failed_jobs = [row for row in rows if row["job_state"] == "failed"]
+    if failed_jobs:
+        md += [
+            "",
+            "## 未正常结束的作业",
+            "",
+            "| job_id | state | failure_reason |",
+            "| --- | --- | --- |",
+        ]
+        for row in failed_jobs:
+            md.append("| %s | %s | %s |" % (row["job_id"], row["state"], row["failure_reason"]))
+        md += [
+            "",
+            "* 分类只依据该作业自己 `.log` 里的字符串，不做外部推断。",
+            "* `mpi_smpd_*`：Microsoft MPI 的 smpd 在作业期间不可用或失联（主机重启后需要重新拉起，队列器 `ensure_smpd()` 已处理）。",
+            "* `orca_cannot_open_scratch_file`：ORCA 打不开自己的 scratch 文件。",
+            "* 这类残骸不构成任何物理结论，也不替代缺失的腿。",
+        ]
     md += [
         "",
         "## 读法",

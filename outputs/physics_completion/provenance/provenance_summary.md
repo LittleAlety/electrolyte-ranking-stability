@@ -10,8 +10,22 @@
 | --- | --- | --- | --- |
 | wp1_geometry_prep | 1 | 1 | 1 |
 | wp1_method_audit | 160 | 160 | 160 |
-| wp2_production | 15 | 13 | 8 |
+| wp2_production | 15 | 13 | 9 |
 | wp2_sampling | 640 | 640 | 640 |
+
+## 未正常结束的作业
+
+| job_id | state | failure_reason |
+| --- | --- | --- |
+| wp2prod/EMC/LiM_2plus | LiM_2plus | mpi_smpd_unavailable |
+| wp2prod/EMC/LiM_plus | LiM_plus | mpi_smpd_communication_lost |
+| wp2prod/SL/LiM_2plus | LiM_2plus | mpi_smpd_unavailable |
+| wp2prod/SL/LiM_plus | LiM_plus | mpi_smpd_communication_lost |
+
+* 分类只依据该作业自己 `.log` 里的字符串，不做外部推断。
+* `mpi_smpd_*`：Microsoft MPI 的 smpd 在作业期间不可用或失联（主机重启后需要重新拉起，队列器 `ensure_smpd()` 已处理）。
+* `orca_cannot_open_scratch_file`：ORCA 打不开自己的 scratch 文件。
+* 这类残骸不构成任何物理结论，也不替代缺失的腿。
 
 ## 读法
 
