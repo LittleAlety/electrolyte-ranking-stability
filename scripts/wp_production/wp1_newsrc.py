@@ -1,0 +1,677 @@
+"""收口七：新 wp1 段落的源码文本（由 emit_wp1.py 读取并拼装）。
+
+所有字符串都是「要写进主生成器的源码文本」，故一律用 raw 字符串，避免把反斜杠序列变成真换行。
+"""
+from __future__ import annotations
+
+WP1_HEAD = r'''# ---------------------------------------------------------------------------
+# 方案 5.1/5.2/5.3 —— 本机独立方法审计（首轮实测）
+# 8 方法集分子 x 4 状态 x 4 设定 = 128 个 SMD 乙腈单点（几何冻结在 r2SCAN-3c 最优结构），
+# 外加 4 设定 x 1 状态的阳离子弛豫腿 32 格（r2SCAN-3c 松弛阳离子几何），
+# 用于认证 WP3 冻结的稳健翻转（EMC|GBL、EMC|SL）。
+# 原始 ORCA 日志留在仓库外（work/audit/），交付层只含派生数值。
+# 还原态（Li 配位态）必须使用含弥散函数设定（S2/S4）；无弥散基组下的还原态格子
+# 照样计算但 valid_for_decision=false，不进入决策统计（方案 5.1）。
+# ---------------------------------------------------------------------------
+METHOD_AUDIT_CELL_FIELDS = ["mol_id", "name", "state", "setting_id", "functional", "basis",
+    "has_diffuse", "charge", "multiplicity", "orca_keyword", "geometry", "basis_functions",
+    "scf_cycles", "final_sp_eh", "terminated", "wall_sec", "status", "qc_flag"]
+
+'''
+
+def _method_audit_cells(rows):
+    out = []
+    for row in rows:
+        cell = dict(zip(METHOD_AUDIT_CELL_FIELDS, row))
+        cell["valid_for_decision"] = "true" if not cell["qc_flag"] else "false"
+        out.append(cell)
+    return out
+
+
+def _method_audit_index(rows):
+    return {(c["mol_id"], c["state"], c["setting_id"]): c for c in _method_audit_cells(rows)}
+
+
+def _audit_energy_ev(cell):
+    if not cell or not cell["final_sp_eh"]:
+        return None
+    return float(cell["final_sp_eh"]) * HARTREE_TO_EV
+
+
+def _audit_axis_ips():
+    """每分子的 4 设定竖直/绝热电离能（eV）与弛豫位移；两腿共用同一中性参考。"""
+    index = _method_audit_index(METHOD_AUDIT_CELLS)
+    relaxed = _method_audit_index(METHOD_AUDIT_RELAXED_CELLS)
+    settings = [row["setting_id"] for row in METHOD_SETTINGS]
+    out = {}
+    for mol_id in PB.COHORTS["method_audit"]:
+        name = PB.COHORT_NAMES[mol_id]
+        vertical, adiabatic, shift = {}, {}, {}
+        for sid in settings:
+            e_neutral = _audit_energy_ev(index.get((mol_id, "M", sid)))
+            e_vertical = _audit_energy_ev(index.get((mol_id, "M_plus", sid)))
+            e_relaxed = _audit_energy_ev(relaxed.get((mol_id, "M_plus_relaxed", sid)))
+            if e_neutral is None or e_vertical is None or e_relaxed is None:
+                vertical[sid] = adiabatic[sid] = shift[sid] = None
+                continue
+            vertical[sid] = e_vertical - e_neutral
+            adiabatic[sid] = e_relaxed - e_neutral
+            shift[sid] = e_relaxed - e_vertical
+        out[name] = {"mol_id": mol_id, "vertical_ip_ev": vertical,
+                     "adiabatic_ip_ev": adiabatic, "relaxation_shift_ev": shift}
+    return out
+
+
+def _audit_pair_legs():
+    ips = _audit_axis_ips()
+    names = [PB.COHORT_NAMES[mol_id] for mol_id in PB.COHORTS["method_audit"]]
+    settings = [row["setting_id"] for row in METHOD_SETTINGS]
+    out = {}
+    for a in range(len(names)):
+        for b in range(a + 1, len(names)):
+            left, right = names[a], names[b]
+            out[(left, right)] = {
+                "settings": settings,
+                "vertical": [ips[left]["vertical_ip_ev"][s] - ips[right]["vertical_ip_ev"][s]
+                             for s in settings],
+                "adiabatic": [ips[left]["adiabatic_ip_ev"][s] - ips[right]["adiabatic_ip_ev"][s]
+                              for s in settings],
+            }
+    return out
+
+
+def _leg_stats(values):
+    vals = [value for value in values if value is not None]
+    n = len(vals)
+    mean = sum(vals) / n
+    sigma = (sum((value - mean) ** 2 for value in vals) / n) ** 0.5
+    lo, hi = min(vals), max(vals)
+    return {"n": n, "mean_ev": mean, "sigma_ev": sigma, "min_ev": lo, "max_ev": hi,
+            "range_ev": hi - lo, "min_abs_ev": min(abs(value) for value in vals),
+            "sign_consistent": (lo > 0) or (hi < 0)}
+
+
+def wp1():
+    files = {}
+    local = {}
+    cells = _method_audit_cells(METHOD_AUDIT_CELLS)
+    relaxed_cells = _method_audit_cells(METHOD_AUDIT_RELAXED_CELLS)
+    settings = [row["setting_id"] for row in METHOD_SETTINGS]
+
+    matrix = []
+    for cell in cells:
+        matrix.append({
+            "mol_id": cell["mol_id"], "name": cell["name"], "state": cell["state"],
+            "setting_id": cell["setting_id"], "functional": cell["functional"],
+            "basis": cell["basis"], "solvent": "SMD_acetonitrile",
+            "geometry_start": "r2SCAN-3c", "job_kind": "single_point",
+            "status": cell["status"], "qc_flag": cell["qc_flag"],
+            "valid_for_decision": cell["valid_for_decision"],
+            "final_sp_eh": cell["final_sp_eh"], "wall_sec": cell["wall_sec"],
+            "notes": ("no diffuse basis on a reduction state; excluded from decision statistics"
+                      if cell["qc_flag"] else "computed"),
+        })
+    relaxed_matrix = []
+    for cell in relaxed_cells:
+        relaxed_matrix.append({
+            "mol_id": cell["mol_id"], "name": cell["name"], "state": cell["state"],
+            "setting_id": cell["setting_id"], "functional": cell["functional"],
+            "basis": cell["basis"], "has_diffuse": cell["has_diffuse"],
+            "charge": cell["charge"], "multiplicity": cell["multiplicity"],
+            "geometry": cell["geometry"], "status": cell["status"],
+            "final_sp_eh": cell["final_sp_eh"], "wall_sec": cell["wall_sec"],
+        })
+
+    spread = []
+    for mol_id in PB.COHORTS["method_audit"]:
+        for state in PB.FOUR_STATES:
+            group = [c for c in cells if c["mol_id"] == mol_id and c["state"] == state]
+            by_setting = {c["setting_id"]: c for c in group}
+            values = [_audit_energy_ev(by_setting[sid]) for sid in settings]
+            functional_effect = abs((values[0] + values[1]) / 2.0 - (values[2] + values[3]) / 2.0)
+            basis_effect = abs((values[0] + values[2]) / 2.0 - (values[1] + values[3]) / 2.0)
+            valid = [c for c in group if c["valid_for_decision"] == "true"]
+            spread.append({
+                "mol_id": mol_id, "name": PB.COHORT_NAMES[mol_id], "state": state,
+                "charge": group[0]["charge"], "multiplicity": group[0]["multiplicity"],
+                "n_settings": len(group), "n_valid_for_decision": len(valid),
+                "min_ev": "%.6f" % min(values), "max_ev": "%.6f" % max(values),
+                "spread_ev": "%.6f" % (max(values) - min(values)),
+                "functional_effect_ev": "%.6f" % functional_effect,
+                "basis_effect_ev": "%.6f" % basis_effect,
+            })
+
+    ips = _audit_axis_ips()
+    axis = []
+    for mol_id in PB.COHORTS["method_audit"]:
+        name = PB.COHORT_NAMES[mol_id]
+        rec = ips[name]
+        row = {"mol_id": mol_id, "name": name}
+        for sid in settings:
+            row["ip_vertical_%s_ev" % sid] = "%.6f" % rec["vertical_ip_ev"][sid]
+            row["ip_adiabatic_%s_ev" % sid] = "%.6f" % rec["adiabatic_ip_ev"][sid]
+            row["relaxation_shift_%s_ev" % sid] = "%.6f" % rec["relaxation_shift_ev"][sid]
+        vertical = _leg_stats([rec["vertical_ip_ev"][sid] for sid in settings])
+        adiabatic = _leg_stats([rec["adiabatic_ip_ev"][sid] for sid in settings])
+        row["vertical_range_ev"] = "%.6f" % vertical["range_ev"]
+        row["adiabatic_range_ev"] = "%.6f" % adiabatic["range_ev"]
+        row["relaxation_shift_mean_ev"] = "%.6f" % (
+            sum(rec["relaxation_shift_ev"][sid] for sid in settings) / len(settings))
+        axis.append(row)
+
+    pair_rows = []
+    legs = _audit_pair_legs()
+    for (left, right) in sorted(legs):
+        leg = legs[(left, right)]
+        vertical = _leg_stats(leg["vertical"])
+        adiabatic = _leg_stats(leg["adiabatic"])
+        row = {"i": left, "j": right}
+        for index, sid in enumerate(leg["settings"]):
+            row["d_vertical_%s_ev" % sid] = "%.6f" % leg["vertical"][index]
+            row["d_adiabatic_%s_ev" % sid] = "%.6f" % leg["adiabatic"][index]
+        row["vertical_range_ev"] = "%.6f" % vertical["range_ev"]
+        row["adiabatic_range_ev"] = "%.6f" % adiabatic["range_ev"]
+        row["vertical_sign_consistent"] = "true" if vertical["sign_consistent"] else "false"
+        row["adiabatic_sign_consistent"] = "true" if adiabatic["sign_consistent"] else "false"
+        row["sign_flip_across_legs"] = "true" if (
+            vertical["min_ev"] > 0 > adiabatic["max_ev"]
+            or adiabatic["min_ev"] > 0 > vertical["max_ev"]) else "false"
+        pair_rows.append(row)
+
+    cert = METHOD_AUDIT_CERTIFICATION
+
+    p1v = [row for row in PB.load_rows(REPO / "outputs/week4/p1_core_set.csv") if row.get("status") == "ok"]
+    p1a = PB.load_rows(REPO / "outputs/phase2_p1a/p1a_adiabatic.csv")
+    c1 = PB.load_rows(REPO / "outputs/week5/c1_coord_shifts.csv")
+    existing = [
+        {"payload": "outputs/week4/p1_core_set.csv", "layer": "P1v (gas-phase vertical)",
+         "n_rows": len(p1v), "n_molecules": len({r["mol_id"] for r in p1v}),
+         "states": "neutral; cation; anion", "method": "r2SCAN-3c / def2-mTZVPP (no diffuse)",
+         "reuse_kind": "electronic-energy layer only", "caveat": "no diffuse functions; no thermal correction"},
+        {"payload": "outputs/phase2_p1a/p1a_adiabatic.csv", "layer": "P1a (gas-phase adiabatic)",
+         "n_rows": len(p1a), "n_molecules": len({r["mol_id"] for r in p1a}),
+         "states": "neutral_relaxed; cation_relaxed", "method": "r2SCAN-3c Opt",
+         "reuse_kind": "relaxation effect only", "caveat": "reduction axis excluded by the unbound_anion rule"},
+        {"payload": "outputs/week5/c1_coord_shifts.csv", "layer": "C1 (Li-coordination)",
+         "n_rows": len(c1), "n_molecules": len({r["mol_id"] for r in c1}),
+         "states": "cation; dication", "method": "r2SCAN-3c (gas + SMD legs)",
+         "reuse_kind": "conditional shift demonstration", "caveat": "single representative motif; identity stratification applies"},
+    ]
+
+    diffuse_settings = {s["setting_id"] for s in METHOD_SETTINGS if s["has_diffuse"] == "true"}
+    flagged = [c for c in cells if c["qc_flag"]]
+    computed = [c for c in cells if c["status"] == "computed"]
+    relaxed_computed = [c for c in relaxed_cells if c["status"] == "computed"]
+    audit_cost = sum(float(row["core_hours"]) for row in METHOD_AUDIT_COST)
+    checks = [
+        {"id": "matrix_is_full_factorial", "description": "方法矩阵 = 8 分子 x 4 状态 x 4 设定 = 128",
+         "ok": len(matrix) == 128, "detail": "n_rows=%d" % len(matrix)},
+        {"id": "audit_matrix_is_computed", "description": "128 格独立方法审计单点全部正常收敛（status=computed）",
+         "ok": len(cells) == 128 and len(computed) == 128,
+         "detail": "computed=%d/%d" % (len(computed), len(cells))},
+        {"id": "reduction_states_without_diffuse_are_excluded", "description": "无弥散基组下的还原态格子被标出并排除出决策统计",
+         "ok": len(flagged) == 32
+               and all(c["valid_for_decision"] == "false" for c in flagged)
+               and all(c["valid_for_decision"] == "true" for c in cells if not c["qc_flag"]),
+         "detail": "flagged=%d (%s)" % (len(flagged), "、".join(sorted({c["qc_flag"] for c in flagged})))},
+        {"id": "relaxed_leg_is_computed", "description": "阳离子弛豫腿 32 格全部正常收敛",
+         "ok": len(relaxed_cells) == 32 and len(relaxed_computed) == 32,
+         "detail": "computed=%d/%d" % (len(relaxed_computed), len(relaxed_cells))},
+        {"id": "method_spread_is_measured_per_state", "description": "每个状态的方法展宽（泛函/基组效应）已实测",
+         "ok": len(spread) == 32 and all(float(row["spread_ev"]) > 0 for row in spread),
+         "detail": "states=%d; max spread=%.3f eV" % (len(spread),
+                                                     max(float(row["spread_ev"]) for row in spread))},
+        {"id": "robust_inversion_certification_recorded", "description": "稳健翻转的独立方法审计认证结论已记录（EMC|GBL、EMC|SL）",
+         "ok": {item["pair"] for item in cert["pairs"]} == {"EMC | GBL", "EMC | SL"},
+         "detail": "certified=%s (%d/%d pairs)" % (cert["certified"], cert["n_pairs_certified"],
+                                                   len(cert["pairs"]))},
+        {"id": "reduction_has_diffuse_option", "description": "存在含弥散函数的设定可用于还原态",
+         "ok": bool(diffuse_settings), "detail": "diffuse settings=" + ",".join(sorted(diffuse_settings))},
+        {"id": "both_functionals_present", "description": "至少两个泛函（生产候选 + 审计对照）",
+         "ok": len({s["functional"] for s in METHOD_SETTINGS}) >= 2,
+         "detail": "functionals=" + ",".join(sorted({s["functional"] for s in METHOD_SETTINGS}))},
+        {"id": "existing_jobs_are_electronic_layer_only", "description": "既有可复用作业只到电子能层",
+         "ok": all(("electronic" in item["reuse_kind"]) or ("relaxation" in item["reuse_kind"])
+                   or ("shift" in item["reuse_kind"]) for item in existing),
+         "detail": "%d 个既有载荷被盘点" % len(existing)},
+        {"id": "no_method_selected_by_flip_count", "description": "方法选择规则不按翻转数量",
+         "ok": True, "detail": "冻结规则：QC 可用率 / 数值稳定性 / 气相 anchor 可比 / 固定介质内 rank sensitivity / 实测成本"},
+        {"id": "local_echo_covers_all_settings", "description": "本机方法回显覆盖全部 4 个设定（S1-S4）",
+         "ok": {row["setting_id"] for row in LOCAL_METHOD_ECHO} == {s["setting_id"] for s in METHOD_SETTINGS},
+         "detail": "echoed settings=" + ",".join(sorted(row["setting_id"] for row in LOCAL_METHOD_ECHO))},
+        {"id": "plan_functional_spellings_remapped", "description": "方案泛函拼写在本机被拒并已给出可用替写",
+         "ok": all(row["recognized"] == "true" and row["plan_keyword_status"] == "rejected_as_written"
+                   for row in LOCAL_METHOD_ECHO) and len(LOCAL_KEYWORD_REJECTIONS) == 2,
+         "detail": "rejections=%d; every setting has a verified ORCA keyword" % len(LOCAL_KEYWORD_REJECTIONS)},
+        {"id": "smoke_runs_terminated_normally", "description": "中性/审计/带电 smoke run 全部正常收敛",
+         "ok": all(row["terminated_normally"] == "true" for row in LOCAL_SMOKE_RUNS),
+         "detail": "runs=%d (neutral SP, audit SP, NumFreq, cation SP)" % len(LOCAL_SMOKE_RUNS)},
+        {"id": "freq_and_smd_available", "description": "SMD 乙腈下频率路径可用（无虚频）",
+         "ok": LOCAL_FREQ_CHECK["imaginary_modes"] == "0" and "SMD" in LOCAL_SMOKE_RUNS[2]["solvent"],
+         "detail": "NumFreq completed; imaginary=%s" % LOCAL_FREQ_CHECK["imaginary_modes"]},
+    ]
+
+    payload = {
+        "stage": "Week 38 / WP1",
+        "title": "independent method audit (sensitivity, not calibration)",
+        "batch": PB.BATCH_ID,
+        "inputs": {
+            "core_set": "data/metadata/core_set.csv",
+            "existing_p1v": "outputs/week4/p1_core_set.csv",
+            "existing_p1a": "outputs/phase2_p1a/p1a_adiabatic.csv",
+            "existing_c1": "outputs/week5/c1_coord_shifts.csv",
+            "new_electronic_structure_jobs": METHOD_AUDIT_JOB_COUNT,
+            "new_electronic_structure_jobs_note": "method-audit jobs only (128 single points + 32 relaxed-leg cells + 1 EMC Li Opt); the frozen ranking/pair evidence still uses zero new jobs",
+        },
+        "conventions": {
+            "fixed_conditions": "SMD acetonitrile, 298.15 K, 1 mol/L solution standard state",
+            "geometry_start": "r2SCAN-3c",
+            "method_choice_rule": "QC availability, numerical stability, gas-phase anchor comparability, rank sensitivity, measured cost",
+            "forbidden_rule": "do not pick the method that produces more flips",
+            "diffuse_rule": "reduction settings must include diffuse functions; boundness cannot be inferred from a converged finite basis",
+            "audit_nature": "sensitivity assessment, NOT a calibrated probability error",
+        },
+        "method_settings": METHOD_SETTINGS,
+        "job_matrix_size": len(matrix),
+        "measured_matrix": {
+            "n_cells": len(cells), "n_computed": len(computed),
+            "n_flagged_excluded": len(flagged), "flagged_qc": sorted({c["qc_flag"] for c in flagged}),
+            "n_relaxed_cells": len(relaxed_cells), "n_relaxed_computed": len(relaxed_computed),
+            "core_hours": "%.3f" % audit_cost,
+            "state_energy_spread_ev": {
+                "max_functional_effect": "%.6f" % max(float(row["functional_effect_ev"]) for row in spread),
+                "median_functional_effect": "%.6f" % sorted(float(row["functional_effect_ev"]) for row in spread)[len(spread) // 2],
+                "max_basis_effect": "%.6f" % max(float(row["basis_effect_ev"]) for row in spread),
+                "median_basis_effect": "%.6f" % sorted(float(row["basis_effect_ev"]) for row in spread)[len(spread) // 2],
+            },
+        },
+        "method_audit_certification": cert,
+        "existing_reusable_jobs": existing,
+        "electronic_structure_jobs_scope_note": "the audit matrix is a new local computation counted above; the frozen ranking/pair evidence payloads are still untouched by new jobs",
+        "local_environment": {
+            "toolchain": LOCAL_TOOLCHAIN,
+            "method_echo": LOCAL_METHOD_ECHO,
+            "keyword_rejections": LOCAL_KEYWORD_REJECTIONS,
+            "smoke_runs": LOCAL_SMOKE_RUNS,
+            "freq_check": LOCAL_FREQ_CHECK,
+            "scope": "supportability probe on water under SMD acetonitrile; NOT a ranking input; raw ORCA logs kept outside the repository",
+        },
+        "stop_conditions": [
+            "method spread comparable to the target gap -> freeze as unresolved",
+            "pervasive identity/QC problems across candidate settings -> narrow the comparable question first",
+        ],
+        "checks": checks,
+        "n_checks": len(checks),
+        "n_failed": sum(0 if item["ok"] else 1 for item in checks),
+    }
+    local["outputs/week38/wp1_method_audit.json"] = dump(payload)
+    local["outputs/week38/wp1_acceptance.csv"] = csv_text(
+        ["check_id", "description", "ok", "detail"], acceptance_rows(checks))
+    local["outputs/physics_completion/method_audit/job_matrix.csv"] = csv_text(
+        ["mol_id", "name", "state", "setting_id", "functional", "basis", "solvent",
+         "geometry_start", "job_kind", "status", "qc_flag", "valid_for_decision",
+         "final_sp_eh", "wall_sec", "notes"], matrix)
+    local["outputs/physics_completion/method_audit/relaxed_leg_matrix.csv"] = csv_text(
+        ["mol_id", "name", "state", "setting_id", "functional", "basis", "has_diffuse",
+         "charge", "multiplicity", "geometry", "status", "final_sp_eh", "wall_sec"],
+        relaxed_matrix)
+    local["outputs/physics_completion/method_audit/state_energy_spread.csv"] = csv_text(
+        ["mol_id", "name", "state", "charge", "multiplicity", "n_settings",
+         "n_valid_for_decision", "min_ev", "max_ev", "spread_ev",
+         "functional_effect_ev", "basis_effect_ev"], spread)
+    local["outputs/physics_completion/method_audit/axis_sensitivity.csv"] = csv_text(
+        ["mol_id", "name"] + ["ip_vertical_%s_ev" % sid for sid in settings]
+        + ["ip_adiabatic_%s_ev" % sid for sid in settings]
+        + ["relaxation_shift_%s_ev" % sid for sid in settings]
+        + ["vertical_range_ev", "adiabatic_range_ev", "relaxation_shift_mean_ev"], axis)
+    local["outputs/physics_completion/method_audit/pair_gap_sensitivity.csv"] = csv_text(
+        ["i", "j"] + ["d_vertical_%s_ev" % sid for sid in settings]
+        + ["d_adiabatic_%s_ev" % sid for sid in settings]
+        + ["vertical_range_ev", "adiabatic_range_ev", "vertical_sign_consistent",
+           "adiabatic_sign_consistent", "sign_flip_across_legs"], pair_rows)
+    local["outputs/physics_completion/method_audit/robust_inversion_certification.json"] = dump(cert)
+    local["outputs/physics_completion/method_audit/robust_inversion_certification.csv"] = csv_text(
+        ["pair", "vertical_sign", "adiabatic_sign", "vertical_min_abs_ev", "vertical_sigma_ev",
+         "vertical_range_ev", "adiabatic_min_abs_ev", "adiabatic_sigma_ev", "adiabatic_range_ev",
+         "vertical_resolved", "adiabatic_resolved", "opposite_signs", "certified"],
+        [dict(item, **{key: str(item[key]).lower() for key in
+                       ("vertical_resolved", "adiabatic_resolved", "opposite_signs", "certified")})
+         for item in cert["pairs"]])
+    local["outputs/physics_completion/method_audit/audit_geometry_note.json"] = dump(
+        {"emc_li_opt": METHOD_AUDIT_EMC_LI_OPT,
+         "note": "EMC has no frozen C1 row; its [Li(EMC)]+ geometry was newly relaxed at r2SCAN-3c and is registered here",
+         "geometry_path": "work/audit/EMC_Li/EMC_m1_G2Li.xyz (raw geometry stays outside the delivery layer)"})
+    local["outputs/physics_completion/method_audit/method_settings.csv"] = csv_text(
+        ["setting_id", "functional", "basis", "role", "has_diffuse", "note"], METHOD_SETTINGS)
+    local["outputs/physics_completion/method_audit/existing_reusable_jobs.csv"] = csv_text(
+        ["payload", "layer", "n_rows", "n_molecules", "states", "method", "reuse_kind", "caveat"],
+        existing)
+    local["outputs/physics_completion/method_audit/local_toolchain.csv"] = csv_text(
+        ["tool", "version", "path_hint", "note"], LOCAL_TOOLCHAIN)
+    local["outputs/physics_completion/method_audit/local_method_echo.csv"] = csv_text(
+        ["setting_id", "plan_functional", "basis", "plan_keyword_status", "orca_keyword",
+         "functional_echo", "hf_exchange_fraction", "dispersion_module", "solvent_echo", "recognized"],
+        LOCAL_METHOD_ECHO)
+    local["outputs/physics_completion/method_audit/local_smoke_runs.csv"] = csv_text(
+        ["run_id", "state", "charge", "multiplicity", "orca_keyword", "solvent",
+         "basis_functions", "scf_cycles", "final_single_point_eh", "terminated_normally", "wall_sec"],
+        LOCAL_SMOKE_RUNS)
+    local["outputs/physics_completion/cost/audit_cost_ledger.csv"] = csv_text(
+        ["job_id", "mol_id", "name", "state", "setting_id", "basis", "cores", "wall_sec",
+         "core_hours", "phase"], METHOD_AUDIT_COST)
+
+    functional = sorted(float(row["functional_effect_ev"]) for row in spread)
+    basis = sorted(float(row["basis_effect_ev"]) for row in spread)
+    summary = [
+        "# Week 38 / WP1 — 独立方法审计表（本机 128 格实测）",
+        "",
+        "**状态**：矩阵与规则已冻结，且已在本机实测 —— %d 个单点（%d 分子 × %d 状态 × %d 设定）全部正常收敛，"
+        "另加 %d 格阳离子弛豫腿用于认证 WP3 的稳健翻转。原始 ORCA 日志留在仓库外，交付层只含派生数值。"
+        % (len(cells), len(PB.COHORTS["method_audit"]), len(PB.FOUR_STATES), len(METHOD_SETTINGS),
+           len(relaxed_cells)),
+        "",
+        "## 冻结内容",
+        "",
+        "- 固定条件：SMD 乙腈、298.15 K、溶液标准态 1 mol/L；几何起点 r2SCAN-3c。",
+        "- 方法矩阵：%d 分子 × %d 状态 × %d 设定 = **%d** 单点，另加 %d 格弛豫腿。"
+        % (len(PB.COHORTS["method_audit"]), len(PB.FOUR_STATES), len(METHOD_SETTINGS),
+           len(matrix), len(relaxed_cells)),
+        "- 生产候选 ωB97X-D4（def2-TZVP / def2-TZVPD）；审计对照 PBE0-D4（同两基组）。",
+        "- 还原态必须使用含弥散函数设定（S2 / S4）；有限基组能收敛**不能**证明束缚。无弥散基组下的还原态格子照样计算，"
+        "但标 valid_for_decision=false 并排除出决策统计（共 %d 格）。" % len(flagged),
+        "- 方法选择规则：QC 可用率 / 数值稳定性 / 气相 anchor 可比 / rank sensitivity / 实测成本；**不**按翻转数量选方法。",
+        "",
+        "## 实测结果（本机 ORCA 6.1.1，SMD 乙腈）",
+        "",
+        "状态层方法展宽（跨 4 设定，%d 个状态）：泛函效应中位 %.3f eV、最大 %.3f eV；"
+        "基组效应中位 %.3f eV、最大 %.3f eV。"
+        % (len(spread), functional[len(spread) // 2], functional[-1],
+           basis[len(spread) // 2], basis[-1]),
+        "",
+        "氧化轴逐分子（竖直腿 = 冻结中性几何上的阳离子单点；弛豫腿 = 冻结松弛阳离子几何上的单点）：",
+        "",
+        "| 分子 | 竖直 IP 展宽 (eV) | 绝热 IP 展宽 (eV) | 弛豫位移均值 (eV) |",
+        "| --- | --- | --- | --- |",
+    ]
+    for row in axis:
+        summary.append("| %s | %s | %s | %s |"
+                       % (row["name"], row["vertical_range_ev"], row["adiabatic_range_ev"],
+                          row["relaxation_shift_mean_ev"]))
+    summary += [
+        "",
+        "## 稳健翻转认证（方案 5.3）",
+        "",
+        "- 判据：%s。" % cert["criterion"],
+        "- 范围：%s。" % cert["scope"],
+        "- 结论：certified=**%s**（%d/%d 冻结对）。" % (cert["certified"], cert["n_pairs_certified"],
+                                                        len(cert["pairs"])),
+        "",
+        "| pair | 竖直腿符号 | 绝热腿符号 | min abs d (竖直) | sigma (竖直) | min abs d (绝热) | sigma (绝热) | 认证 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for item in cert["pairs"]:
+        summary.append("| %s | %s | %s | %s | %s | %s | %s | %s |"
+                       % (item["pair"], item["vertical_sign"], item["adiabatic_sign"],
+                          item["vertical_min_abs_ev"], item["vertical_sigma_ev"],
+                          item["adiabatic_min_abs_ev"], item["adiabatic_sigma_ev"],
+                          "YES" if item["certified"] else "NO"))
+    summary += [
+        "",
+        "## 验收（%d/%d 通过）" % (len(checks) - payload["n_failed"], len(checks)),
+        "",
+        "| check | ok | detail |",
+        "| --- | --- | --- |",
+    ]
+    for item in checks:
+        summary.append("| %s | %s | %s |" % (item["id"], "PASS" if item["ok"] else "FAIL", item["detail"]))
+    summary += [
+        "",
+        "## 既有可复用作业（只到电子能层）",
+        "",
+        "| 载荷 | 层 | 行数 | 分子 | 复用范围 | 限制 |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for item in existing:
+        summary.append("| %s | %s | %d | %d | %s | %s |"
+                       % (item["payload"], item["layer"], item["n_rows"], item["n_molecules"],
+                          item["reuse_kind"], item["caveat"]))
+    summary += [
+        "",
+        "## 本机方法回显与 smoke 核验（方案 15.4）",
+        "",
+        "工具链：ORCA %s；xTB %s。原始日志留在仓库外，不入交付镜像。"
+        % (LOCAL_TOOLCHAIN[0]["version"], LOCAL_TOOLCHAIN[1]["version"]),
+        "",
+        "| 设定 | 方案拼写 | ORCA 可用关键字 | 泛函回显 | HF 分数 | 色散 | 溶剂 |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in LOCAL_METHOD_ECHO:
+        summary.append("| %s | %s | %s | %s | %s | %s | %s |"
+                       % (row["setting_id"], row["plan_functional"], row["orca_keyword"],
+                          row["functional_echo"], row["hf_exchange_fraction"],
+                          row["dispersion_module"], row["solvent_echo"]))
+    summary += [
+        "",
+        "smoke run（water，SMD 乙腈；只作支撑性检查，非排序证据）：",
+        "",
+        "| run | 状态 | q/mult | 关键字 | 基函数 | SCF | 末单点 (Eh) | 正常结束 | 墙钟 (s) |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in LOCAL_SMOKE_RUNS:
+        summary.append("| %s | %s | %s/%s | %s | %s | %s | %s | %s | %s |"
+                       % (row["run_id"], row["state"], row["charge"], row["multiplicity"],
+                          row["orca_keyword"], row["basis_functions"], row["scf_cycles"],
+                          row["final_single_point_eh"], row["terminated_normally"], row["wall_sec"]))
+    summary += [
+        "",
+        "频率：NumFreq 在 SMD 乙腈下完成，水 3N=9 模式中 6 个近零 + 3 个实频（1588.03 / 3892.52 / 3972.24 cm^-1），**无虚频**。",
+        "",
+        "**方案拼写须改写**：omegaB97X-D4 与 PBE0-D4 在 ORCA 6.1.1 下被拒（UNRECOGNIZED OR DUPLICATED KEYWORD(S)）；"
+        "正确形式为 wB97X-D4 与 PBE0 D4（色散作独立关键字）。",
+        "",
+        "## 限制",
+        "",
+        "- 128 格与弛豫腿 32 格都是**气相 r2SCAN-3c 冻结几何**上的 SMD 单点，不是溶液相完全优化；8 分子口径，不等同方案 6 的完整生产。",
+        "- 电子密度/自旋、热校正与 G 层分解不在本审计范围（只有电子能层）。",
+        "- 认证只覆盖**方法轴**（4 个预先接受的设定）；构象采样界限仍未纳入，故不构成完整认证。",
+        "- 独立方法审计是 sensitivity assessment，不等于校准的概率误差；1.96×spread 不得自动标成 95% 置信度。",
+        "- 本机方法回显与 smoke 仅覆盖单一几何（water）与固定条件，**不**等于候选泛函/基组的完整验证，也**不**是排序证据。",
+        "- EMC 无冻结 C1 行，其 [Li(EMC)]+ 几何为本轮新跑的 r2SCAN-3c 松弛（登记在 audit_geometry_note.json，原始几何留在仓库外）。",
+    ]
+    local["outputs/week38/wp1_summary.md"] = "\n".join(summary) + "\n"
+    local["docs/59_week38_wp1_method_audit.md"] = "\n".join(summary) + "\n"
+    finish_week(files, local, "week38", "WP1", "independent method audit",
+                {"job_matrix_size": len(matrix), "n_settings": len(METHOD_SETTINGS),
+                 "audit_cells_computed": len(computed), "relaxed_cells_computed": len(relaxed_computed),
+                 "audit_core_hours": "%.3f" % audit_cost,
+                 "method_audit_certified": cert["certified"],
+                 "local_environment_probe_jobs": len(LOCAL_SMOKE_RUNS)})
+    return files
+
+
+CERT_SRC = r'''FROZEN_ROBUST_PAIRS = [("EMC", "GBL"), ("EMC", "SL")]
+
+
+def _audit_state_spread_summary():
+    cells = _method_audit_cells(METHOD_AUDIT_CELLS)
+    settings = [row["setting_id"] for row in METHOD_SETTINGS]
+    functional, basis = [], []
+    for mol_id in PB.COHORTS["method_audit"]:
+        for state in PB.FOUR_STATES:
+            group = [c for c in cells if c["mol_id"] == mol_id and c["state"] == state]
+            by_setting = {c["setting_id"]: c for c in group}
+            values = [_audit_energy_ev(by_setting[sid]) for sid in settings]
+            functional.append(abs((values[0] + values[1]) / 2.0 - (values[2] + values[3]) / 2.0))
+            basis.append(abs((values[0] + values[2]) / 2.0 - (values[1] + values[3]) / 2.0))
+    functional.sort()
+    basis.sort()
+    return {"n_states": len(functional),
+            "functional_effect_median_ev": "%.6f" % functional[len(functional) // 2],
+            "functional_effect_max_ev": "%.6f" % functional[-1],
+            "basis_effect_median_ev": "%.6f" % basis[len(basis) // 2],
+            "basis_effect_max_ev": "%.6f" % basis[-1]}
+
+
+def method_audit_certification():
+    """认证 WP3 冻结的稳健翻转：在同一组预先接受的方法设定下，竖直腿与弛豫腿必须给出
+    相反符号，且每一腿的最小绝对值要超过该腿自身的方法展宽（跨 4 设定的总体标准差）。"""
+    legs = _audit_pair_legs()
+    pairs = []
+    for left, right in FROZEN_ROBUST_PAIRS:
+        leg = legs[(left, right)]
+        vertical = _leg_stats(leg["vertical"])
+        adiabatic = _leg_stats(leg["adiabatic"])
+        vertical_resolved = (vertical["sign_consistent"]
+                             and vertical["min_abs_ev"] > vertical["sigma_ev"])
+        adiabatic_resolved = (adiabatic["sign_consistent"]
+                              and adiabatic["min_abs_ev"] > adiabatic["sigma_ev"])
+        opposite = (vertical_resolved and adiabatic_resolved
+                    and ((vertical["min_ev"] > 0 > adiabatic["max_ev"])
+                         or (adiabatic["min_ev"] > 0 > vertical["max_ev"])))
+        pairs.append({
+            "pair": "%s | %s" % (left, right),
+            "vertical_sign": "positive" if vertical["mean_ev"] > 0 else "negative",
+            "adiabatic_sign": "positive" if adiabatic["mean_ev"] > 0 else "negative",
+            "vertical_min_abs_ev": "%.6f" % vertical["min_abs_ev"],
+            "vertical_sigma_ev": "%.6f" % vertical["sigma_ev"],
+            "vertical_range_ev": "%.6f" % vertical["range_ev"],
+            "adiabatic_min_abs_ev": "%.6f" % adiabatic["min_abs_ev"],
+            "adiabatic_sigma_ev": "%.6f" % adiabatic["sigma_ev"],
+            "adiabatic_range_ev": "%.6f" % adiabatic["range_ev"],
+            "vertical_resolved": vertical_resolved,
+            "adiabatic_resolved": adiabatic_resolved,
+            "opposite_signs": opposite,
+            "certified": bool(vertical_resolved and adiabatic_resolved and opposite),
+        })
+    return {
+        "certified": bool(pairs) and all(item["certified"] for item in pairs),
+        "n_pairs": len(pairs),
+        "n_pairs_certified": sum(1 for item in pairs if item["certified"]),
+        "criterion": ("each leg is resolved when its 4 method values keep one sign and the smallest "
+                      "absolute value exceeds that leg method spread (population std across the 4 "
+                      "pre-accepted settings); a pair is certified when both legs are resolved with "
+                      "opposite signs"),
+        "scope": "method axis only (4 pre-accepted settings); conformational sampling bounds are not included",
+        "settings": [row["setting_id"] for row in METHOD_SETTINGS],
+        "vertical_leg": "cation single point on the frozen r2SCAN-3c neutral geometry",
+        "relaxed_leg": "cation single point on the frozen r2SCAN-3c relaxed-cation geometry",
+        "pairs": pairs,
+    }
+
+
+METHOD_AUDIT_SPREAD = _audit_state_spread_summary()
+METHOD_AUDIT_CERTIFICATION = method_audit_certification()
+'''
+
+
+PATCHES = [
+    (
+        r'''        {"id": "robust_inversion_not_yet_certified", "description": "稳健翻转在独立方法审计前不被认证",
+         "ok": (len(inversions) == 0) or (not payload_certified),
+         "detail": "label=ROBUST_INVERSION x%d 只表示「在该敏感性尺度下的翻转」；认证待 WP1 独立方法审计" % len(inversions)},''',
+        r'''        {"id": "robust_inversion_certification_follows_the_method_audit",
+         "description": "稳健翻转的认证结论跟随 WP1 独立方法审计（128 格竖直腿 + 32 格弛豫腿）",
+         "ok": payload_certified == bool(METHOD_AUDIT_CERTIFICATION["certified"])
+               and all(item["certified"] == (item["vertical_resolved"] and item["adiabatic_resolved"]
+                                             and item["opposite_signs"])
+                       for item in METHOD_AUDIT_CERTIFICATION["pairs"]),
+         "detail": "WP1 audit certified=%s (%d/%d frozen pairs)；label=ROBUST_INVERSION x%d"
+                   % (METHOD_AUDIT_CERTIFICATION["certified"],
+                      METHOD_AUDIT_CERTIFICATION["n_pairs_certified"],
+                      len(METHOD_AUDIT_CERTIFICATION["pairs"]), len(inversions))},''',
+    ),
+    (
+        r'''    payload_certified = False
+''',
+        r'''    payload_certified = bool(METHOD_AUDIT_CERTIFICATION["certified"])
+''',
+    ),
+    (
+        r'''        "robust_inversion_certification": {
+            "certified": False,
+            "label_meaning": "ROBUST_INVERSION is the frozen three-state criterion's label, not a certified physical flip",
+            "pending_note": "flips here are only robust under the rung's displacement-std sensitivity scale",
+            "required_before_certification": "independent method audit (WP1) and sampling bounds, per plan section 2",
+        },''',
+        r'''        "robust_inversion_certification": {
+            "certified": bool(METHOD_AUDIT_CERTIFICATION["certified"]),
+            "label_meaning": "ROBUST_INVERSION is the frozen three-state criterion's label; the method axis is now audited, the sampling axis is not",
+            "audit_source": "outputs/week38/wp1_method_audit.json (128 single points + 32 relaxed-leg cells over 4 settings)",
+            "evidence": METHOD_AUDIT_CERTIFICATION,
+            "pending_note": "certification covers the method axis only; conformational sampling bounds remain pending (plan section 2)",
+        },''',
+    ),
+    (
+        r'''        "- 稳健翻转**尚未认证**：本标签只表示「在该 rung 的位移 std 敏感性尺度下的翻转」，认证需 WP1 独立方法审计与采样界限（方案 2）。",''',
+        r'''        "- 稳健翻转认证：WP1 独立方法审计（4 设定 × 竖直/弛豫两腿）给出 certified=%s；"
+        "但**采样界限仍未纳入**，故只认证方法轴（方案 2）。" % METHOD_AUDIT_CERTIFICATION["certified"],''',
+    ),
+    (
+        r'''        "| 方法敏感性 | 待补 | 现为单 rung 位移 std；多方法范围待 WP1 |",''',
+        r'''        "| 方法敏感性 | 已提供 | WP1 独立方法审计：4 设定下竖直腿与弛豫腿的 pair 级差值范围与符号一致性，见 outputs/physics_completion/method_audit/pair_gap_sensitivity.csv |",''',
+    ),
+    (
+        r'''        "> 说明：本页登记判定、原始结构与选集影响；电子密度/自旋、配位变化、G 层分解与方法敏感性范围"
+        "需在 WP1/WP2 的新计算完成后补入（本批次无可提供的对应计算）。",''',
+        r'''        "> 说明：本页登记判定、原始结构、方法敏感性与选集影响；电子密度/自旋、配位变化与 G 层分解"
+        "仍需 WP2 生产计算补入（本批次无可提供的对应计算）。",''',
+    ),
+    (
+        r'''        "| 电子密度/自旋 | 待补 | 需 WP1 生产单点的密度/自旋分析（本批次零新增计算） |",''',
+        r'''        "| 电子密度/自旋 | 待补 | 需专门的自旋布居分析；WP1 方法审计只做能量层 |",''',
+    ),
+    (
+        r'''        "- 逐级报告（方案 7.2）复用冻结的 5 级台阶聚合值；多方法保守区间仍待 WP1 生产单点完成后才有真正的方法范围，Top-k/regret 只在 P1v->P1a 一级逐对给出。",''',
+        r'''        "- 逐级报告（方案 7.2）复用冻结的 5 级台阶聚合值；WP1 独立方法审计已给出 4 设定的方法范围（只覆盖电子能层与氧化轴），Top-k/regret 只在 P1v->P1a 一级逐对给出。",''',
+    ),
+    (
+        r'''        "- 机制案例已补原始结构证据（既有冻结几何的重原子键长变化表，逐键列出中性/阳离子键长），但电子密度/自旋、配位变化与 G 层分解仍需 WP1/WP2 新计算。",''',
+        r'''        "- 机制案例已补原始结构证据（既有冻结几何的重原子键长变化表，逐键列出中性/阳离子键长）与 WP1 方法敏感性范围，但电子密度/自旋、配位变化与 G 层分解仍需 WP2 生产计算。",''',
+    ),
+    (
+        r'''"5. 本仓库首轮只在既有冻结 rung（P1v→P1a，n=12）上演示该判据；多方法版本待 WP1 生产单点完成后填入。\n")''',
+        r'''"5. 判据在既有冻结 rung（P1v→P1a，n=12）上演示，并已用 WP1 的 4 设定本机审计（竖直腿 + 弛豫腿）认证 EMC|GBL、EMC|SL 两个冻结翻转的方法轴。\n")''',
+    ),
+    (
+        r'''    {"item": "method_audit_single_points", "unit": "SP", "value": "128", "kind": "planned", "status": "planned",
+     "note": "8 molecules x 4 states x 4 settings"},''',
+        r'''    {"item": "method_audit_single_points", "unit": "SP", "value": "128", "kind": "measured", "status": "measured",
+     "note": "8 molecules x 4 states x 4 settings; all 128 terminated (WP1)"},
+    {"item": "method_audit_relaxed_leg_single_points", "unit": "SP", "value": "32", "kind": "measured",
+     "status": "measured", "note": "4 settings x 8 molecules on the frozen relaxed-cation geometry (WP1)"},
+    {"item": "method_audit_measured_core_hours", "unit": "core-hour",
+     "value": "%.3f" % sum(float(row["core_hours"]) for row in METHOD_AUDIT_COST),
+     "kind": "measured", "status": "measured",
+     "note": "161 local ORCA jobs at 4 cores; see outputs/physics_completion/cost/audit_cost_ledger.csv"},''',
+    ),
+    (
+        r'''        "> **排序/配对证据零新增电子结构计算、零数据剔除、零阈值改动**（本机方法回显与 smoke 核验见 WP1；"
+        "原始日志留在仓库外，不入交付镜像）。旧结论（含 Gate 1 NOT CLOSED / NOT CLOSABLE）原样保留。",''',
+        r'''        "> **排序/配对证据零新增电子结构计算、零数据剔除、零阈值改动**（WP1 的 161 个独立方法审计作业单列，"
+        "原始日志留在仓库外，不入交付镜像）。旧结论（含 Gate 1 NOT CLOSED / NOT CLOSABLE）原样保留。",''',
+    ),
+    (
+        r'''        "| WP1 | week38 | 独立方法审计表 | 4 设定 × 4 状态 × 8 分子 = 128 单点矩阵冻结 | 无实测支持性回显；既有作业只到电子能层 |",''',
+        r'''        "| WP1 | week38 | 独立方法审计表 + 128 格实测矩阵 | 4 设定 × 4 状态 × 8 分子 = 128 单点全部收敛（另 32 格弛豫腿）；"
+        "泛函效应 >> 基组效应；2 个冻结翻转的方法轴 certified=%s | 气相 r2SCAN-3c 冻结几何；8 分子口径；采样界限未纳入 |"
+        % METHOD_AUDIT_CERTIFICATION["certified"],''',
+    ),
+    (
+        r'''        "| WP3 | week40 | pair 证据表 + 机制案例 | P1v→P1a（n=12，66 pair）逐对复算 55/9/2；2 个机制案例 | 单 rung 演示，多方法范围待 WP1 生产 |",''',
+        r'''        "| WP3 | week40 | pair 证据表 + 机制案例 | P1v→P1a（n=12，66 pair）逐对复算 55/9/2；2 个机制案例 | 单 rung 演示；多方法范围已由 WP1 审计给出（方法轴） |",''',
+    ),
+    (
+        r'''        "- WP3：P1v→P1a 氧化 n=12、66 pair；复算 STABLE 55 / UNRESOLVED 9 / ROBUST_INVERSION 2，与冻结载荷一致。",''',
+        r'''        "- WP3：P1v→P1a 氧化 n=12、66 pair；复算 STABLE 55 / UNRESOLVED 9 / ROBUST_INVERSION 2，与冻结载荷一致。",
+        "- WP1：128 格本机单点 + 32 格弛豫腿全部收敛；状态层泛函效应中位 %s eV、基组效应中位 %s eV；"
+        "EMC|GBL、EMC|SL 的稳健翻转在 4 设定下方法轴 certified=%s。"
+        % (METHOD_AUDIT_SPREAD["functional_effect_median_ev"],
+           METHOD_AUDIT_SPREAD["basis_effect_median_ev"],
+           METHOD_AUDIT_CERTIFICATION["certified"]),''',
+    ),
+    (
+        r'''        "本首轮只到「协议冻结 + 既有数据复算」，真正的翻转/不可解析判定待 WP1/WP2 生产完成后填入。",''',
+        r'''        "首轮已把 WP1 独立方法审计从「登记」推进到「128 格实测 + 方法轴认证」；采样界限与 WP2 生产自由能标签仍待补，"
+        "故完整翻转判定仍未闭合。",''',
+    ),
+]

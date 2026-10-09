@@ -901,7 +901,7 @@ WP2_PRODUCTION_GEOM_NOTE = ("per-state frozen r2SCAN-3c start structure: M -> <n
 
 WP2_PRODUCTION_LEDGER_CSV_FIELDS = [
     "record_id", "mol_id", "name", "state", "charge", "multiplicity", "basis", "level",
-    "geometry_start", "e_sp_eh", "zpe_eh", "e_to_g_thermal_eh", "enthalpy_eh",
+    "geometry_start", "e_sp_eh", "e_sp_solution_ev", "zpe_eh", "e_to_g_thermal_eh", "enthalpy_eh",
     "entropy_corr_eh", "g_single_eh", "g_single_ev", "std_state_corr_eh", "std_state_corr_ev",
     "zpe_ev", "thermal_corr_ev", "qrrho", "temp_k", "pressure_atm", "cutoff_cm1",
     "lowest_freq_cm1", "n_freq", "imaginary_modes", "wall_sec", "cores", "status", "notes",
