@@ -1,6 +1,6 @@
 # Week 39 / WP2 — 固定背景配对自由能标签
 
-**状态**：账本与系综规则已冻结；48 行生产模板中已登记 4/16 个主态的真实 Opt+Freq 账本行（其余行热校正保持为空，缺值不写 0）。已另跑 12 主集自由态 + Li 配位态 pilot（新增计算，方案 15.5/15.6），见下节。
+**状态**：账本与系综规则已冻结；48 行生产模板中已登记 5/16 个主态的真实 Opt+Freq 账本行（其余行热校正保持为空，缺值不写 0）。已另跑 12 主集自由态 + Li 配位态 pilot（新增计算，方案 15.5/15.6），见下节。
 
 ## 交付
 
@@ -14,7 +14,7 @@
 | check | ok | detail |
 | --- | --- | --- |
 | ledger_covers_main_x_four_states | PASS | n_rows=48 |
-| thermal_fields_left_empty_not_zero | PASS | planned=44 行留空；produced=4 行有值（无 0 填充） |
+| thermal_fields_left_empty_not_zero | PASS | planned=43 行留空；produced=5 行有值（无 0 填充） |
 | sampling_plan_has_escalation_rule | PASS | n_rows=16 |
 | existing_electronic_layer_is_labelled | PASS | 32 条既有数值 / 12 个分子 |
 | ensemble_rules_frozen | PASS | n_rules=7 |
@@ -28,13 +28,13 @@
 | pilot_covers_all_twelve_main_molecules | PASS | molecules=12 |
 | pilot_coordination_shift_computed | PASS | 10 interpretable + 2 dissociated(not interpretable); d_ip 0.357-0.897 eV over interpretable |
 | pilot_flags_dissociated_dication_states | PASS | dissociated=[DME,AN] |
-| wp2_production_states_terminated_without_imaginary | PASS | 4 个已生产状态全部 terminated / Opt 收敛 / 无虚频 |
-| wp2_production_gibbs_decomposes_from_the_solution_sp | PASS | max |G - (E_SP + G-E(el))| = 1.000e-08 Eh over 4 state(s) |
-| wp2_production_is_a_registered_subset | PASS | states 4/16 over 4/4 molecules; extra legs 0 |
-| wp2_production_fills_only_the_produced_template_rows | PASS | produced=4 planned=44; planned rows carry empty G |
+| wp2_production_states_terminated_without_imaginary | PASS | 5 个已生产状态全部 terminated / Opt 收敛 / 无虚频 |
+| wp2_production_gibbs_decomposes_from_the_solution_sp | PASS | max |G - (E_SP + G-E(el))| = 1.000e-08 Eh over 5 state(s) |
+| wp2_production_is_a_registered_subset | PASS | states 5/16 over 4/4 molecules; extra legs 0 |
+| wp2_production_fills_only_the_produced_template_rows | PASS | produced=5 planned=43; planned rows carry empty G |
 | wp2_production_li_states_record_binding_metrics | PASS | li_states=0 bound=0 |
-| wp2_production_cost_records_allocated_core_hours | PASS | jobs=4; total=24.708111 core-hours |
-| wp2_production_redox_registered_without_numbers | PASS | production states=4; redox rows=4 (all not_computed) |
+| wp2_production_cost_records_allocated_core_hours | PASS | jobs=5; total=36.354000 core-hours |
+| wp2_production_redox_registered_without_numbers | PASS | production states=5; redox rows=4 (all not_computed) |
 
 ## 12 主集四主态 pilot（方案 15.5 / 15.6，新增计算）
 
@@ -114,7 +114,7 @@ Li 配位两态（SMD，def2-TZVPD，Li 按给体类型沿外侧 1.9 A 起点后
 ## 生产首段：4 主集分子 x 4 主态的真实 Opt+Freq 自由能
 
 级别：wB97X-D4 (= omegaB97X-D4) / def2-TZVP for the neutral leg and def2-TZVPD for the charged/Li legs; SMD acetonitrile; Opt NumFreq TightOpt TightSCF SlowConv；几何起点为既有冻结 r2SCAN-3c 结构，每态一个代表结构。
-进度：已登记 **4/16** 个主态（完成分子 -）；未完成的状态不出现在表里，也不写成 0。
+进度：已登记 **5/16** 个主态（完成分子 -）；未完成的状态不出现在表里，也不写成 0。
 账本 G = E_SP + (G - E(el)) + 标准态项（RT ln V_m，1 atm -> 1 mol/L）；标准态项在同一化学计量差值中相消。
 
 | 记录 | E_SP (Eh) | ZPE (Eh) | E->G 热项 (Eh) | G_single (Eh) | G (eV) | 虚频 | 最低频 (cm^-1) | Li-O/N (A) | 非 Li 片段 | 身份 |
@@ -122,14 +122,15 @@ Li 配位两态（SMD，def2-TZVPD，Li 按给体类型沿外侧 1.9 A 起点后
 | C01|M | -343.85476184 | 0.09586398 | 0.06520269 | -343.78955915 | -9354.990481369 | 0 | 116.03 | - | - | intact |
 | C02|M | -383.21194726 | 0.12437320 | 0.09205369 | -383.11989357 | -10425.223402455 | 0 | 77.89 | - | - | intact |
 | C13|M | -306.73708477 | 0.09943860 | 0.07086694 | -306.66621783 | -8344.812901968 | 0 | 150.06 | - | - | intact |
+| C13|M_plus | -306.45395804 | 0.09748803 | 0.06823672 | -306.38572132 | -8337.180203094 | 0 | 164.90 | - | - | intact |
 | C14|M | -706.15322084 | 0.12428876 | 0.09358347 | -706.05963738 | -19212.861505449 | 0 | 37.15 | - | - | intact |
 
-成本：4 个 Opt+Freq 作业，合计 24.708111 core-hours（allocated cores x wall clock）。
+成本：5 个 Opt+Freq 作业，合计 36.354000 core-hours（allocated cores x wall clock）。
 
 基组一致的 Gox_single 与配位位移**未计算**：需要一条 def2-TZVPD 的中性腿；登记为下一批作业，不把 def2-TZVP 中性腿与 def2-TZVPD 阳离子腿相减充数。
 
 ## 限制
-- 生产模板只回填已跑完的主态（本次 4/16）：中性腿 def2-TZVP、带电/Li 腿 def2-TZVPD，两腿相减不是基组一致的自由分子 IP，本报告不据此计算 Eox；其余行热校正保持为空（未把缺值写成 0）。
+- 生产模板只回填已跑完的主态（本次 5/16）：中性腿 def2-TZVP、带电/Li 腿 def2-TZVPD，两腿相减不是基组一致的自由分子 IP，本报告不据此计算 Eox；其余行热校正保持为空（未把缺值写成 0）。
 - 生产首段每态只有**单一代表结构**（n_conformers = 1），不是方案 6.1 的多构象/多 motif 系综；6 kcal/mol 窗口与 3 结构上限仍是资源规则。
 - pilot 覆盖 12 主集全部分子，但每态只有单一构象（GFN2 起点），不是方案 6 的多构象系综生产；几何来自 GFN2 而非 r2SCAN-3c。
 - DME 与 AN 的 2+ 态在 GFN2 弛豫中 Li 解离（Li-O/N > 10 A），故其 d_ip 记为不可解释、不进入结论；这本身是 GFN2 下 2+ 复合物不稳定的 QC 结果。
