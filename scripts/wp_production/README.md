@@ -31,8 +31,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\superv
 
 并发纪律：队列器只做调度，最多同时 2 个 worker 子进程，每个 worker 内 ORCA 用 4 核
 （`run_batch.ORCA_CORES`），即全机最多 8 个 ORCA 核。`--run` 在开跑前会检查是否已有别的
-wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止叠加。检查时会排除队列自身进程与父进程，否则队列会把自己数成一个「已在跑的驱动」而永远自锁，使只有队列负责的 `M_tzvpd` 腿排不上。开跑前还会检查本地
-`smpd`（Microsoft MPI）是否存活——2026-10-10 的一次重启就是因为它死掉，导致 5 条腿在
+wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止叠加。检查时会排除队列自身进程与父进程，否则队列会把自己数成一个「已在跑的驱动」而永远自锁，使只有队列负责的 `M_tzvpd` 腿排不上。
+本地 `smpd`（Microsoft MPI）在开跑前、**每个作业开跑前**、以及长跑期间每
+`SMPD_RECHECK_POLLS`（15 次轮询，约 5 分钟）都复查一次：死掉就拉起；
+连可执行文件都找不到时本轮**不新开作业**，既不白烧 `MAX_ATTEMPTS`，也不占机器。
+2026-10-10 的一次重启就是因为它中途死掉、而队列只在启动时查过一次，导致 5 条腿在
 0.2 秒内瞬败。
 
 `supervise_pending.ps1` 持单实例锁 `work/_supervisor.lock`（锁里 PID 仍存活则自己退出，陈旧则接管）：机器重启后只要再拉起一个监守即可继续，不会出现两个监守同时接管、把并发从 2 个 ORCA 叠成 4 个。
@@ -47,7 +50,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `run_batch.py` | 12 主集分子 × 4 主态的 xTB/ORCA 批量驱动与公共工具（几何、ORCA/xTB 路径、片段分析） |
 | `run_wp2_production.py` | 生产级 Opt+NumFreq 驱动（`M` / `M_plus` / `LiM_plus` / `LiM_2plus`） |
 | `run_wp2_extra.py` | 与带电腿**基组一致**的中性腿 `M_tzvpd`（def2-TZVPD）驱动 |
-| `run_wp2_queue.py` | 上面两条驱动的幂等队列器：20 条腿的统一调度、并发上限、断点续跑 |
+| `run_wp2_queue.py` | 上面两条驱动的幂等队列器：20 条腿的统一调度、并发上限、断点续跑、逐次开跑与周期复查 smpd |
 | `run_method_audit.py` | WP1 的 128 单点 / 32 弛豫腿本机方法审计驱动 |
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息（写 `work/_wp2_commit_msg.txt`） |
 | `finalize_wp2.ps1` | 上面那条一键收口链 |
@@ -59,6 +62,8 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `scripts/wp_production/build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） |
 | `scripts/wp_production/build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的结果前预注册计划（派生层，零新增计算） |
 | `scripts/wp_production/build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） |
+| `scripts/wp_production/make_physics_completion_figures.py` | 方案 14 的六张主图（F59-F64）与图清单 |
+| `scripts/wp_production/build_physics_completion_deliverables.py` | 建交付镜像（仓库外 `成果输出（part2）/week37..week44`）；week44 结题提交包收录结题报告、协议、配置、样本、锚点审计、`docs/65_repo_layout.md` 骨架图、生成器源码、测试与全部 `outputs/physics_completion/**`；`--check` 逐文件复核 byte-identical |
 
 ## 边界
 
@@ -71,3 +76,4 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 * **`work/pilot12/` 只是暂存区**：`run_batch.py` 的原始输出与生成器基线缓存仍落在那里；
   它被 `.gitignore`/提交时排除，不是交付物来源。
 * **零新增电子结构**：除 WP1/WP2 两段显式登记的本机作业外，收口链不引入任何新的电子结构计算。
+* **仓库骨架**：目录职责、阶段编号与 WP 的对应、收口链与不可改清单见 `docs/65_repo_layout.md`；新增顶层目录/子包不登记会被 `tests/test_repo_layout.py` 拦下。

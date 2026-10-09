@@ -5,7 +5,7 @@
 只写镜像目录与 part2 根索引，绝不动仓库源路径。`--check` 逐文件复核 byte-identical。
 
   * week37..week43：逐周（WP0-WP6）镜像，源路径从 `outputs/weekNN/manifest.json` 读回；
-  * week44：结题提交包，收录结题报告、协议、配置、样本、锚点审计、
+  * week44：结题提交包，收录结题报告、协议、配置、样本、锚点审计、仓库骨架图、
     生成器源码、测试，以及全部 outputs/physics_completion/** 与逐周载荷。
 
 用法
@@ -115,7 +115,8 @@ def submission_sources():
     items = []
     seen = set()
     roots = (["docs/physics_completion_final_report.md", "docs/physics_completion_protocol.md",
-              "docs/claim_migration.md", "config/physics_completion_v1.yaml",
+              "docs/claim_migration.md", "docs/65_repo_layout.md",
+              "config/physics_completion_v1.yaml",
               "data/metadata/physics_completion_set.csv",
               "data/references/anchor_primary_audit.csv"] + WEEK_COMMON)
     for rel in roots:

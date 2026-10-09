@@ -17,8 +17,11 @@
     避免叠加成 4 个 ORCA 作业。
 
 断点续跑：所有状态都在 work/wp2prod/<NAME>/<STATE>/<NAME>_<STATE>.json，
-机器重启后重跑 --run 即可。开跑前检查本地 smpd（Microsoft MPI）是否存活，缺失就拉起，
-避免整批作业在 0.2 秒内瞬败（2026-10-10 重启事故的根因）。
+机器重启后重跑 --run 即可。smpd（Microsoft MPI）在开跑前、每个作业开跑前、以及长跑期间
+每 SMPD_RECHECK_POLLS 次轮询（约 5 分钟）都复查一次，缺失就拉起，
+避免整批作业在 0.2 秒内瞬败（2026-10-10 重启事故的根因：smpd 中途死亡后，
+后续腿全部在几秒内失败，白等一轮调度）。smpd 拉不起来时本轮不新开作业，
+既不白烧 MAX_ATTEMPTS，也不占机器。
 """
 from __future__ import annotations
 
@@ -52,6 +55,24 @@ LEGS = (
 )
 OWNER = {"prod": prod, "extra": extra}
 MAX_ATTEMPTS = 2
+#: 长跑期间复查 smpd 的轮询节拍；主循环每 20 秒算一次轮询，15 次约 5 分钟。
+SMPD_RECHECK_POLLS = 15
+
+
+def smpd_recheck_due(poll_index):
+    """轮询节拍：开跑前（第 0 次）与每 SMPD_RECHECK_POLLS 次都要复查 smpd。"""
+    return poll_index % SMPD_RECHECK_POLLS == 0
+
+
+def guard_smpd(where):
+    """复查 Microsoft MPI 的 smpd，不在就拉起；只在需要动手或拉不起来时打印。
+
+    返回 smpd 是否可用（活着或已成功拉起为 True；连可执行文件都找不到为 False）。
+    """
+    status = ensure_smpd()
+    if status != "smpd alive":
+        print("    smpd guard (%s): %s" % (where, status))
+    return not status.startswith("smpd NOT found")
 
 
 def name_of(mol_id):
@@ -139,8 +160,12 @@ def schedule(max_jobs):
     print("pending %d legs, max_jobs=%d" % (len(pending), max_jobs))
     attempts = {}
     running = []
+    poll_index = 0
     while pending or running:
         while pending and len(running) < max_jobs:
+            if not guard_smpd("before launch"):
+                print("    smpd unavailable: 本轮不新开作业，等待基础设施恢复")
+                break
             row = pending.pop(0)
             key = "%s|%s" % (row["name"], row["state"])
             attempts[key] = attempts.get(key, 0) + 1
@@ -154,6 +179,9 @@ def schedule(max_jobs):
                                                          popen.pid, attempts[key]))
             running.append((popen, row, handle))
         time.sleep(20)
+        poll_index += 1
+        if smpd_recheck_due(poll_index):
+            guard_smpd("poll %d" % poll_index)
         still = []
         for popen, row, handle in running:
             code = popen.poll()
