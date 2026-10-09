@@ -1,0 +1,429 @@
+{
+  "stage": "Week 32 / WP5",
+  "title": "delta-learning and cross-family generalization (RQ4, part 1)",
+  "plane": "next-phase implementation plan, work package WP5 (RQ4 first half)",
+  "inputs": {
+    "predictions": "outputs/week7/stage7_ml_predictions.csv",
+    "frozen_results": "outputs/week7/stage7_ml_results.csv",
+    "state_identity": "outputs/week5/c1_state_identity.csv",
+    "tasks": [
+      "M",
+      "E",
+      "C"
+    ],
+    "splits": [
+      "random",
+      "group",
+      "lofo"
+    ],
+    "shapes": [
+      "direct",
+      "shift"
+    ],
+    "models": [
+      "constant",
+      "ridge",
+      "krr",
+      "gpr",
+      "rf",
+      "gbdt"
+    ],
+    "storage_resolution": 2e-05,
+    "new_electronic_structure_jobs": 0
+  },
+  "conventions": {
+    "direct": "predict the target layer P_T from cheap features",
+    "shift": "predict the displacement Delta = P_T - P_cheap, then add the cheap reference back",
+    "splits": "random = interpolation baseline; group = scaffold-like leakage guard; lofo = cross-family extrapolation",
+    "feature_cost": "X0 = pre-query; X1 = after free-molecule DFT; X2 = after Li-complex DFT (mechanism only, never an input)",
+    "identity_gate": "C1 reduction: only molecule_centered_redox is interpretable (R13)",
+    "reconciliation": "rank metrics can only be reproduced when no two stored predictions are within the storage resolution",
+    "gate1_status": "Gate 1 remains NOT CLOSED; WP5 is a computational-target statement"
+  },
+  "reconciliation": {
+    "max_abs_diff": {
+      "mae_ev": 3.8000000000537604e-05,
+      "kendall_tau_b": 0.030257519960791623,
+      "top_k_overlap_20": 0.0,
+      "jaccard_20": 3.3333333332441484e-07,
+      "selection_regret_20": 0.2931269999999998
+    },
+    "n_exactly_identical": {
+      "mae_ev": 8,
+      "kendall_tau_b": 24,
+      "top_k_overlap_20": 288,
+      "jaccard_20": 169,
+      "selection_regret_20": 36
+    },
+    "n_rows_compared": 288,
+    "missing_keys": [],
+    "n_near_tie_keys": 35,
+    "near_tie_keys": [
+      "C|X0|oxidation|constant|group|direct",
+      "C|X0|oxidation|constant|lofo|direct",
+      "C|X0|oxidation|constant|random|direct",
+      "C|X0|oxidation|gpr|lofo|direct",
+      "C|X0|oxidation|gpr|random|direct",
+      "C|X0|reduction|constant|group|direct",
+      "C|X0|reduction|constant|lofo|direct",
+      "C|X0|reduction|constant|random|direct",
+      "C|X0|reduction|gpr|lofo|direct",
+      "C|X0|reduction|gpr|random|direct",
+      "C|X0+X1|oxidation|constant|group|direct",
+      "C|X0+X1|oxidation|constant|lofo|direct",
+      "C|X0+X1|oxidation|constant|random|direct",
+      "C|X0+X1|oxidation|gpr|random|direct",
+      "C|X0+X1|reduction|constant|group|direct",
+      "C|X0+X1|reduction|constant|lofo|direct",
+      "C|X0+X1|reduction|constant|random|direct",
+      "C|X0+X1|reduction|gpr|group|direct",
+      "C|X0+X1|reduction|gpr|lofo|direct",
+      "C|X0+X1|reduction|gpr|random|direct",
+      "E|X0+P1|oxidation|constant|group|direct",
+      "E|X0+P1|oxidation|constant|lofo|direct",
+      "E|X0+P1|oxidation|constant|random|direct",
+      "E|X0+P1|oxidation|ridge|random|direct",
+      "E|X0+P1|reduction|constant|group|direct",
+      "E|X0+P1|reduction|constant|lofo|direct",
+      "E|X0+P1|reduction|constant|random|direct",
+      "M|X0|oxidation|constant|group|direct",
+      "M|X0|oxidation|constant|lofo|direct",
+      "M|X0|oxidation|constant|random|direct",
+      "M|X0|oxidation|gpr|random|direct",
+      "M|X0|reduction|constant|group|direct",
+      "M|X0|reduction|constant|lofo|direct",
+      "M|X0|reduction|constant|random|direct",
+      "M|X0|reduction|gpr|group|shift"
+    ],
+    "tau_mismatch_keys": [
+      "M|X0|oxidation|gpr|random|direct",
+      "C|X0|oxidation|gpr|random|direct",
+      "C|X0|reduction|gpr|random|direct",
+      "C|X0+X1|oxidation|gpr|random|direct",
+      "C|X0+X1|reduction|gpr|random|direct",
+      "C|X0+X1|reduction|gpr|group|direct",
+      "C|X0+X1|reduction|gpr|lofo|direct"
+    ],
+    "regret_outlier_keys": [
+      "C|X0+X1|reduction|gpr|lofo|direct"
+    ],
+    "tau_mismatches_explained": true,
+    "regret_outliers_explained": true
+  },
+  "checks": [
+    {
+      "id": "feature_cost_hard_constraint_holds",
+      "ok": true,
+      "detail": "4 个 (任务,特征集) 组合全部不含 X2 列；C 任务只用 X0/X0+X1（Li-donor 距离 / 电荷重排永不进入输入）",
+      "x2_violations": []
+    },
+    {
+      "id": "oof_metrics_reconciled_with_stage7",
+      "ok": true,
+      "detail": "从 stage7 的逐分子 OOF 预测独立重算 288 个 (任务,特征集,轴,模型,拆分,形状)：Top-20% overlap 逐位相同；Jaccard 差 3.333e-07；MAE 差 3.800e-05；tau_b 分歧 7 个、regret 离群 1 个，全部落在「两条预测之差 <= 存储分辨率 2e-05」的 35 个组合上",
+      "max_abs_diff": {
+        "mae_ev": 3.8000000000537604e-05,
+        "kendall_tau_b": 0.030257519960791623,
+        "top_k_overlap_20": 0.0,
+        "jaccard_20": 3.3333333332441484e-07,
+        "selection_regret_20": 0.2931269999999998
+      },
+      "n_near_tie_keys": 35,
+      "tau_mismatch_keys": [
+        "M|X0|oxidation|gpr|random|direct",
+        "C|X0|oxidation|gpr|random|direct",
+        "C|X0|reduction|gpr|random|direct",
+        "C|X0+X1|oxidation|gpr|random|direct",
+        "C|X0+X1|reduction|gpr|random|direct",
+        "C|X0+X1|reduction|gpr|group|direct",
+        "C|X0+X1|reduction|gpr|lofo|direct"
+      ],
+      "regret_outlier_keys": [
+        "C|X0+X1|reduction|gpr|lofo|direct"
+      ]
+    },
+    {
+      "id": "every_frozen_cell_recomputed",
+      "ok": true,
+      "detail": "冻结 stage7_ml_results 的 288 行全部被重算覆盖，缺失 0",
+      "n_recomputed": 288
+    },
+    {
+      "id": "state_identity_gate_matches_week30",
+      "ok": true,
+      "detail": "C0->C1 状态身份分层：氧化轴 molecule_centered 6 个 / no_intact_minimum 4 个；还原轴 Li_centered 9 个 / molecule_centered 1 个（SN）——与 Week 30 的 R13 闸门一致",
+      "primary_oxidation": [
+        "DMC",
+        "DME",
+        "EC",
+        "GBL",
+        "SL",
+        "TMP"
+      ],
+      "primary_reduction": [
+        "SN"
+      ]
+    },
+    {
+      "id": "delta_learning_direction_reported",
+      "ok": true,
+      "detail": "4 个验收问题都给出结论、支撑数与反例：Q1_label_efficiency; Q2_holds_under_lofo; Q3_screening_conversion; Q4_metric_vs_selection",
+      "verdicts": [
+        "部分成立：6/8 个 (任务,特征集,轴) 在 LOFO 下 Delta-learning 的 tau_b 更高",
+        "6/8 个 (任务,特征集,轴) 在 random/group/LOFO 三种拆分下符号一致",
+        "LOFO 下 6/6 个 tau_b 更好的组合同时不劣于 direct 的筛选指标",
+        "19/48 个组里 MAE 最优的模型同时是 tau_b 最优（29 个组不是）；2 个组的 Spearman(MAE, tau_b) 为正 —— 数值越好、选择反而越差"
+      ]
+    },
+    {
+      "id": "screening_conversion_checked",
+      "ok": true,
+      "detail": "48 个 (任务,特征集,轴,拆分,形状) 组内各 6 个模型都算了 MAE 排名与 tau_b/overlap 排名的秩相关；MAE 最优同时是 tau_b 最优的有 19 个组"
+    },
+    {
+      "id": "cross_family_optimism_quantified",
+      "ok": true,
+      "detail": "96 个 (任务,特征集,轴,模型,形状) 都给出 random/group/LOFO 三个 tau_b 与两个乐观偏差量"
+    },
+    {
+      "id": "zero_new_electronic_structure",
+      "ok": true,
+      "detail": "唯一输入是 outputs/week7 的 Stage 7 冻结产物与 outputs/week5 的 C1 状态身份表；未运行任何电子结构作业",
+      "inputs": [
+        "outputs/week7/stage7_ml_predictions.csv",
+        "outputs/week7/stage7_ml_results.csv",
+        "outputs/week5/c1_state_identity.csv"
+      ]
+    }
+  ],
+  "checks_by_id": {
+    "feature_cost_hard_constraint_holds": {
+      "id": "feature_cost_hard_constraint_holds",
+      "ok": true,
+      "detail": "4 个 (任务,特征集) 组合全部不含 X2 列；C 任务只用 X0/X0+X1（Li-donor 距离 / 电荷重排永不进入输入）",
+      "x2_violations": []
+    },
+    "oof_metrics_reconciled_with_stage7": {
+      "id": "oof_metrics_reconciled_with_stage7",
+      "ok": true,
+      "detail": "从 stage7 的逐分子 OOF 预测独立重算 288 个 (任务,特征集,轴,模型,拆分,形状)：Top-20% overlap 逐位相同；Jaccard 差 3.333e-07；MAE 差 3.800e-05；tau_b 分歧 7 个、regret 离群 1 个，全部落在「两条预测之差 <= 存储分辨率 2e-05」的 35 个组合上",
+      "max_abs_diff": {
+        "mae_ev": 3.8000000000537604e-05,
+        "kendall_tau_b": 0.030257519960791623,
+        "top_k_overlap_20": 0.0,
+        "jaccard_20": 3.3333333332441484e-07,
+        "selection_regret_20": 0.2931269999999998
+      },
+      "n_near_tie_keys": 35,
+      "tau_mismatch_keys": [
+        "M|X0|oxidation|gpr|random|direct",
+        "C|X0|oxidation|gpr|random|direct",
+        "C|X0|reduction|gpr|random|direct",
+        "C|X0+X1|oxidation|gpr|random|direct",
+        "C|X0+X1|reduction|gpr|random|direct",
+        "C|X0+X1|reduction|gpr|group|direct",
+        "C|X0+X1|reduction|gpr|lofo|direct"
+      ],
+      "regret_outlier_keys": [
+        "C|X0+X1|reduction|gpr|lofo|direct"
+      ]
+    },
+    "every_frozen_cell_recomputed": {
+      "id": "every_frozen_cell_recomputed",
+      "ok": true,
+      "detail": "冻结 stage7_ml_results 的 288 行全部被重算覆盖，缺失 0",
+      "n_recomputed": 288
+    },
+    "state_identity_gate_matches_week30": {
+      "id": "state_identity_gate_matches_week30",
+      "ok": true,
+      "detail": "C0->C1 状态身份分层：氧化轴 molecule_centered 6 个 / no_intact_minimum 4 个；还原轴 Li_centered 9 个 / molecule_centered 1 个（SN）——与 Week 30 的 R13 闸门一致",
+      "primary_oxidation": [
+        "DMC",
+        "DME",
+        "EC",
+        "GBL",
+        "SL",
+        "TMP"
+      ],
+      "primary_reduction": [
+        "SN"
+      ]
+    },
+    "delta_learning_direction_reported": {
+      "id": "delta_learning_direction_reported",
+      "ok": true,
+      "detail": "4 个验收问题都给出结论、支撑数与反例：Q1_label_efficiency; Q2_holds_under_lofo; Q3_screening_conversion; Q4_metric_vs_selection",
+      "verdicts": [
+        "部分成立：6/8 个 (任务,特征集,轴) 在 LOFO 下 Delta-learning 的 tau_b 更高",
+        "6/8 个 (任务,特征集,轴) 在 random/group/LOFO 三种拆分下符号一致",
+        "LOFO 下 6/6 个 tau_b 更好的组合同时不劣于 direct 的筛选指标",
+        "19/48 个组里 MAE 最优的模型同时是 tau_b 最优（29 个组不是）；2 个组的 Spearman(MAE, tau_b) 为正 —— 数值越好、选择反而越差"
+      ]
+    },
+    "screening_conversion_checked": {
+      "id": "screening_conversion_checked",
+      "ok": true,
+      "detail": "48 个 (任务,特征集,轴,拆分,形状) 组内各 6 个模型都算了 MAE 排名与 tau_b/overlap 排名的秩相关；MAE 最优同时是 tau_b 最优的有 19 个组"
+    },
+    "cross_family_optimism_quantified": {
+      "id": "cross_family_optimism_quantified",
+      "ok": true,
+      "detail": "96 个 (任务,特征集,轴,模型,形状) 都给出 random/group/LOFO 三个 tau_b 与两个乐观偏差量"
+    },
+    "zero_new_electronic_structure": {
+      "id": "zero_new_electronic_structure",
+      "ok": true,
+      "detail": "唯一输入是 outputs/week7 的 Stage 7 冻结产物与 outputs/week5 的 C1 状态身份表；未运行任何电子结构作业",
+      "inputs": [
+        "outputs/week7/stage7_ml_predictions.csv",
+        "outputs/week7/stage7_ml_results.csv",
+        "outputs/week5/c1_state_identity.csv"
+      ]
+    }
+  },
+  "manifest": {
+    "feature_cost_audit": {
+      "file": "outputs/week32/feature_cost_audit.csv",
+      "n_rows": 4,
+      "columns": [
+        "task",
+        "feature_set",
+        "feature_cost_level",
+        "max_cost_index",
+        "n_features",
+        "x2_columns_used",
+        "x2_free",
+        "allowed",
+        "columns",
+        "note"
+      ],
+      "sha256": "5751c0591c9c235332613bc90ebaed071a4db3483fae8ed09fdad80c28df42b3"
+    },
+    "cross_family_generalization": {
+      "file": "outputs/week32/cross_family_generalization.csv",
+      "n_rows": 96,
+      "columns": [
+        "task",
+        "feature_set",
+        "axis",
+        "model",
+        "shape",
+        "tau_random",
+        "tau_group",
+        "tau_lofo",
+        "optimism_lofo_minus_random",
+        "optimism_lofo_minus_group",
+        "o20_lofo",
+        "r20_lofo"
+      ],
+      "sha256": "333d17aa5d073e63701c861e81d4b1b01b3e617e3cbba8010b4d662d249b2c4f"
+    },
+    "delta_vs_direct": {
+      "file": "outputs/week32/delta_vs_direct.csv",
+      "n_rows": 24,
+      "columns": [
+        "task",
+        "feature_set",
+        "axis",
+        "split",
+        "n_molecules",
+        "best_direct_model",
+        "best_shift_model",
+        "tau_direct",
+        "tau_shift",
+        "delta_tau",
+        "mae_direct",
+        "mae_shift",
+        "delta_mae",
+        "o20_direct",
+        "o20_shift",
+        "delta_o20",
+        "r20_direct",
+        "r20_shift",
+        "delta_r20",
+        "shift_better_tau"
+      ],
+      "sha256": "b56ccfd550afd49fa99fbc1600442c2ed670a971bfbb045a919556a60b68ea5b"
+    },
+    "screening_conversion": {
+      "file": "outputs/week32/screening_conversion.csv",
+      "n_rows": 48,
+      "columns": [
+        "task",
+        "feature_set",
+        "axis",
+        "split",
+        "shape",
+        "n_models",
+        "rank_corr_mae_vs_tau",
+        "rank_corr_mae_vs_o20",
+        "model_best_mae",
+        "model_best_tau",
+        "model_best_o20",
+        "mae_winner_is_tau_winner",
+        "mae_winner_is_o20_winner",
+        "best_mae_ev",
+        "best_tau",
+        "best_o20"
+      ],
+      "sha256": "14bd97343defe1d25dd4ab870db7c804589d08ce8e64ecb5a324bd1c0da9170b"
+    },
+    "state_identity_stratification": {
+      "file": "outputs/week32/state_identity_stratification.csv",
+      "n_rows": 20,
+      "columns": [
+        "axis",
+        "name",
+        "state_identity_label",
+        "labels",
+        "n_records",
+        "in_primary_ranking"
+      ],
+      "sha256": "9b7120117bc7ab585b4ff35b15f84dd18aa4a2d4d1eeb92e378d85009d31f7e5"
+    },
+    "oof_metrics_reconciliation": {
+      "file": "outputs/week32/oof_metrics_reconciliation.csv",
+      "n_rows": 288,
+      "columns": [
+        "task",
+        "feature_set",
+        "axis",
+        "model",
+        "split",
+        "shape",
+        "n_molecules",
+        "n_replicates",
+        "near_tie",
+        "mae_ev",
+        "mae_ev_frozen",
+        "d_mae",
+        "kendall_tau_b",
+        "kendall_tau_b_frozen",
+        "d_tau",
+        "top_k_overlap_20",
+        "top_k_overlap_20_frozen",
+        "d_o20",
+        "selection_regret_20",
+        "selection_regret_20_frozen",
+        "d_r20"
+      ],
+      "sha256": "c8894b8a6254e58a9ed4edf4d91395470a28693f74c15b6917fa309b72051397"
+    },
+    "wp5_acceptance": {
+      "file": "outputs/week32/wp5_acceptance.csv",
+      "n_rows": 4,
+      "columns": [
+        "question_id",
+        "question",
+        "verdict",
+        "n_supporting",
+        "n_cells",
+        "evidence",
+        "counterexamples"
+      ],
+      "sha256": "8649c45779fea6ccf481c521e71f068a9dd85c72132b84a3c262b2ecc95048f5"
+    }
+  },
+  "n_rows_total": 484
+}

@@ -1,0 +1,284 @@
+{
+  "stage": "Week 29 / WP2",
+  "title": "which electronic-structure and medium physics change the candidate ranking",
+  "plane": "next-phase implementation plan, work package WP2 (RQ1)",
+  "inputs": {
+    "master_table": "outputs/week28/evidence_master_table.json",
+    "comparisons": [
+      "P0_to_P1v",
+      "P1v_to_P1a",
+      "P1v_to_P2a",
+      "P1v_to_P2eps10",
+      "P0_to_P2a"
+    ],
+    "k_fractions": [
+      0.1,
+      0.2,
+      0.3
+    ],
+    "bootstrap": {
+      "n_boot": 2000,
+      "seed": 0,
+      "resample_unit": "molecule"
+    },
+    "new_electronic_structure_jobs": 0
+  },
+  "conventions": {
+    "delta": "delta_i(A->B) = P_B(i) - P_A(i)",
+    "pair_identity": "dP_ij^B = dP_ij^A + (delta_i - delta_j)",
+    "direction": "oxidation: IP (eV) maximise; reduction: -EA (eV) maximise",
+    "top_k": "k = round(k_fraction * n); ties broken by ascending name (stable)",
+    "ranking_metrics": "electrolyte_ranking.ranking (tau_b, rho, top_k_overlap, jaccard_at_k, selection_regret)",
+    "gate1_status": "Gate 1 remains NOT CLOSED; WP2 is a computational-target statement"
+  },
+  "checks": [
+    {
+      "id": "displacement_reproduces_pairwise_shift",
+      "ok": true,
+      "detail": "delta_i - delta_j 与 pairwise_table.delta_shift_ev 的最大绝对误差 1.332e-15 eV（1116 个 pair 行）",
+      "max_abs_error_ev": 1.3322676295501878e-15,
+      "n_pairs_checked": 1116
+    },
+    {
+      "id": "decision_metrics_match_week28",
+      "ok": true,
+      "detail": "重算的 Top-k overlap / Jaccard / regret / tau_b / rho 对齐 Week 28 decision_table，最大绝对差 overlap=0.000e+00, jaccard=0.000e+00, selection_regret_ev=0.000e+00, kendall_tau_b=0.000e+00, spearman_rho=0.000e+00",
+      "max_abs_diff": {
+        "overlap": 0.0,
+        "jaccard": 0.0,
+        "selection_regret_ev": 0.0,
+        "kendall_tau_b": 0.0,
+        "spearman_rho": 0.0
+      },
+      "n_metric_rows": 135
+    },
+    {
+      "id": "molecule_model_is_exact",
+      "ok": true,
+      "detail": "分子级校正残差 RMSE 最大值 5.946e-16 eV（恒等式应精确成立）",
+      "max_rmse_ev": 5.94562924072085e-16
+    },
+    {
+      "id": "family_variance_identity",
+      "ok": true,
+      "detail": "SS_between + SS_within = SS_total 最大偏差 0.000e+00；R2_family 与族效应占比最大偏差 3.331e-16（无序完全对下二者恒等）",
+      "max_ss_identity_error": 0.0,
+      "max_r2_gap": 3.3306690738754696e-16
+    },
+    {
+      "id": "ladder_additivity_exact",
+      "ok": true,
+      "detail": "delta(P0->P2a) - [delta(P0->P1v) + delta(P1v->P2a)] 最大绝对误差 8.882e-16 eV",
+      "max_abs_error_ev": 8.881784197001252e-16
+    },
+    {
+      "id": "p1a_reduction_is_rule_excluded",
+      "ok": true,
+      "detail": "P1v_to_P1a 还原轴在 WP2 里 0 行：气相阴离子不是束缚态，该轴按 unbound_anion 规则被排除（不读成「稳定」）",
+      "n_rows": 0
+    },
+    {
+      "id": "zero_new_electronic_structure",
+      "ok": true,
+      "detail": "唯一输入是 outputs/week28/*.csv；本阶段未读取任何 ORCA / xTB 原始输出，未运行任何电子结构作业",
+      "inputs": [
+        "outputs/week28/property_table.csv",
+        "outputs/week28/pairwise_table.csv",
+        "outputs/week28/decision_table.csv",
+        "outputs/week28/molecule_registry.csv"
+      ]
+    }
+  ],
+  "checks_by_id": {
+    "displacement_reproduces_pairwise_shift": {
+      "id": "displacement_reproduces_pairwise_shift",
+      "ok": true,
+      "detail": "delta_i - delta_j 与 pairwise_table.delta_shift_ev 的最大绝对误差 1.332e-15 eV（1116 个 pair 行）",
+      "max_abs_error_ev": 1.3322676295501878e-15,
+      "n_pairs_checked": 1116
+    },
+    "decision_metrics_match_week28": {
+      "id": "decision_metrics_match_week28",
+      "ok": true,
+      "detail": "重算的 Top-k overlap / Jaccard / regret / tau_b / rho 对齐 Week 28 decision_table，最大绝对差 overlap=0.000e+00, jaccard=0.000e+00, selection_regret_ev=0.000e+00, kendall_tau_b=0.000e+00, spearman_rho=0.000e+00",
+      "max_abs_diff": {
+        "overlap": 0.0,
+        "jaccard": 0.0,
+        "selection_regret_ev": 0.0,
+        "kendall_tau_b": 0.0,
+        "spearman_rho": 0.0
+      },
+      "n_metric_rows": 135
+    },
+    "molecule_model_is_exact": {
+      "id": "molecule_model_is_exact",
+      "ok": true,
+      "detail": "分子级校正残差 RMSE 最大值 5.946e-16 eV（恒等式应精确成立）",
+      "max_rmse_ev": 5.94562924072085e-16
+    },
+    "family_variance_identity": {
+      "id": "family_variance_identity",
+      "ok": true,
+      "detail": "SS_between + SS_within = SS_total 最大偏差 0.000e+00；R2_family 与族效应占比最大偏差 3.331e-16（无序完全对下二者恒等）",
+      "max_ss_identity_error": 0.0,
+      "max_r2_gap": 3.3306690738754696e-16
+    },
+    "ladder_additivity_exact": {
+      "id": "ladder_additivity_exact",
+      "ok": true,
+      "detail": "delta(P0->P2a) - [delta(P0->P1v) + delta(P1v->P2a)] 最大绝对误差 8.882e-16 eV",
+      "max_abs_error_ev": 8.881784197001252e-16
+    },
+    "p1a_reduction_is_rule_excluded": {
+      "id": "p1a_reduction_is_rule_excluded",
+      "ok": true,
+      "detail": "P1v_to_P1a 还原轴在 WP2 里 0 行：气相阴离子不是束缚态，该轴按 unbound_anion 规则被排除（不读成「稳定」）",
+      "n_rows": 0
+    },
+    "zero_new_electronic_structure": {
+      "id": "zero_new_electronic_structure",
+      "ok": true,
+      "detail": "唯一输入是 outputs/week28/*.csv；本阶段未读取任何 ORCA / xTB 原始输出，未运行任何电子结构作业",
+      "inputs": [
+        "outputs/week28/property_table.csv",
+        "outputs/week28/pairwise_table.csv",
+        "outputs/week28/decision_table.csv",
+        "outputs/week28/molecule_registry.csv"
+      ]
+    }
+  },
+  "manifest": {
+    "displacement_table": {
+      "file": "outputs/week29/displacement_table.csv",
+      "n_rows": 144,
+      "columns": [
+        "comparison",
+        "scope",
+        "axis",
+        "common_set_label",
+        "rung_lower",
+        "rung_upper",
+        "name",
+        "family",
+        "p_lower_ev",
+        "p_upper_ev",
+        "delta_ev"
+      ],
+      "sha256": "15a45212bc39588fe4614dca3644b30ddc8a309baecd0f68f493e00d5641eaa6"
+    },
+    "family_displacement": {
+      "file": "outputs/week29/family_displacement.csv",
+      "n_rows": 72,
+      "columns": [
+        "comparison",
+        "axis",
+        "family",
+        "n",
+        "mean_delta_ev",
+        "std_delta_ev",
+        "median_delta_ev",
+        "min_delta_ev",
+        "max_delta_ev"
+      ],
+      "sha256": "b7933cd9a98530ba577f9d9178fba750380769587b5c4bcec9de312f0e592ff1"
+    },
+    "shift_models": {
+      "file": "outputs/week29/shift_models.csv",
+      "n_rows": 9,
+      "columns": [
+        "comparison",
+        "scope",
+        "axis",
+        "n_molecules",
+        "n_pairs",
+        "rmse_common_ev",
+        "rmse_family_ev",
+        "rmse_molecule_ev",
+        "r2_family_vs_common",
+        "ss_total_delta",
+        "ss_between_family",
+        "ss_within_family",
+        "family_effect_fraction"
+      ],
+      "sha256": "51c053cf47cd50aed4e98baf15f0dacd916a90deeb1fcecd4732df00171d81bc"
+    },
+    "decision_response": {
+      "file": "outputs/week29/decision_response.csv",
+      "n_rows": 27,
+      "columns": [
+        "comparison",
+        "scope",
+        "axis",
+        "common_set_label",
+        "n_molecules",
+        "n_pairs",
+        "k_fraction",
+        "k",
+        "overlap",
+        "jaccard",
+        "selection_regret_ev",
+        "kendall_tau_b",
+        "spearman_rho",
+        "entries",
+        "leaves",
+        "swapped_pairs",
+        "swapped_pairs_resolved_both",
+        "f_unresolved_lower",
+        "f_unresolved_upper",
+        "n_stable",
+        "n_unresolved",
+        "n_robust_inversion",
+        "frozen_overlap",
+        "frozen_jaccard",
+        "frozen_regret_ev",
+        "frozen_kendall_tau_b",
+        "frozen_spearman_rho"
+      ],
+      "sha256": "847e1b52ef102fb8c68bc9fe6ab7764d0ebe60fcecc3d4d384533b35ff635bd2"
+    },
+    "bootstrap_ci": {
+      "file": "outputs/week29/bootstrap_ci.csv",
+      "n_rows": 27,
+      "columns": [
+        "comparison",
+        "scope",
+        "axis",
+        "n_molecules",
+        "n_boot",
+        "seed",
+        "metric",
+        "point",
+        "ci_low",
+        "ci_high"
+      ],
+      "sha256": "c7222a93b75421598c78b9fcb987d0624125487c6754015dc56f96c54b837c92"
+    },
+    "ladder_incremental": {
+      "file": "outputs/week29/ladder_incremental.csv",
+      "n_rows": 18,
+      "columns": [
+        "axis",
+        "scope",
+        "common_set_label",
+        "rung",
+        "terminal_rung",
+        "k_fraction",
+        "k",
+        "top_k_overlap_vs_terminal",
+        "marginal_overlap_vs_previous"
+      ],
+      "sha256": "961897c5af09708af222b9e31d6b1ae449b5245c691592549e6896aa6484f02e"
+    },
+    "ladder_additivity": {
+      "file": "outputs/week29/ladder_additivity.csv",
+      "n_rows": 2,
+      "columns": [
+        "axis",
+        "n_molecules",
+        "max_abs_error_ev"
+      ],
+      "sha256": "7934619b116e4fdab19cc6e4fc788bc19e197840433c835164ce5e640c8fe762"
+    }
+  },
+  "n_rows_total": 299
+}

@@ -1,0 +1,410 @@
+{
+  "stage": "Week 33 / WP6",
+  "title": "minimum expensive-information budget (RQ4, part 2)",
+  "plane": "next-phase implementation plan, work package WP6 (RQ4 second half)",
+  "inputs": {
+    "curves": "outputs/week7/stage8_al_curves.csv",
+    "runs": "outputs/week7/stage8_al_runs.csv",
+    "trajectories": "outputs/week7/stage8_al_trajectories.csv",
+    "ledger": "outputs/week7/stage8_al_results.json",
+    "held_out_reference": "outputs/week7/stage7_ml_results.csv",
+    "baselines": [
+      "random",
+      "diversity",
+      "uncertainty",
+      "ranking_aware"
+    ],
+    "tasks": [
+      "M",
+      "E",
+      "C"
+    ],
+    "axes": [
+      "oxidation",
+      "reduction"
+    ],
+    "k_fractions": [
+      0.1,
+      0.2,
+      0.3
+    ],
+    "new_electronic_structure_jobs": 0,
+    "acquisition_reruns": 0
+  },
+  "conventions": {
+    "budget": "n_T = number of expensive target labels acquired (initial seed 4, batch 1)",
+    "metrics": "n_T -> {kendall tau_b, Top-k overlap, selection regret}; k = 10/20/30%",
+    "bands": "median and 2.5/97.5 percentiles over 20 acquisition repeats",
+    "success_standard": "operational, internally motivated (no external calibration): median tau_b >= 0.80, Top-20% overlap complete, regret <= 5% of the in-pool target range, and the result must hold in >= 80% of the repeats (not only on the median curve)",
+    "storage_precision": "frozen curves are written with %.6g; bands can only be reproduced to publication precision",
+    "scenarios": "in-pool interpolation is available; family-held-out AL curves are NOT available without re-running acquisition and are declared as a gap",
+    "gate1_status": "Gate 1 remains NOT CLOSED; WP6 is a computational-target statement"
+  },
+  "reconciliation": {
+    "n_cells": 296,
+    "max_abs_diff": {
+      "tau_b": 8.500000000521979e-07,
+      "o20": 3.3306690738754696e-16,
+      "o30": 1.7499999999115445e-07,
+      "r20": 6.999999999868223e-06
+    },
+    "max_ratio_vs_storage_step": 3.000000001803643,
+    "tolerances": {
+      "tau_b": 1e-06,
+      "o20": 1e-06,
+      "o30": 1e-06,
+      "r20": 1e-05
+    },
+    "n_outside_tolerance": 0,
+    "outside_keys": []
+  },
+  "counts": {
+    "n_run_rows": 5920,
+    "n_curve_rows": 296,
+    "n_trajectory_rows": 7360,
+    "n_fit_fallbacks": 0,
+    "elapsed_s": 98.55
+  },
+  "checks": [
+    {
+      "id": "curves_recomputed_from_runs_within_storage_precision",
+      "ok": true,
+      "detail": "从逐 repeat 记录重算 296 个曲线单元格的 median 与 2.5/97.5 百分位，全部落在发布精度容差内（max |diff| tau_b=8.500e-07, overlap=1.750e-07, regret=7.000e-06；最大残差仅相当于 3.00 个 6 存储步长）；超容差 0",
+      "max_abs_diff": {
+        "tau_b": 8.500000000521979e-07,
+        "o20": 3.3306690738754696e-16,
+        "o30": 1.7499999999115445e-07,
+        "r20": 6.999999999868223e-06
+      },
+      "tolerances": {
+        "tau_b": 1e-06,
+        "o20": 1e-06,
+        "o30": 1e-06,
+        "r20": 1e-05
+      },
+      "n_outside_tolerance": 0
+    },
+    {
+      "id": "every_frozen_curve_cell_recombined",
+      "ok": true,
+      "detail": "冻结曲线的 296 个 (task, axis, baseline, n_T) 单元格全部被重算覆盖，缺失 0",
+      "n_cells": 296
+    },
+    {
+      "id": "protocol_matches_frozen_ledger",
+      "ok": true,
+      "detail": "池大小 / n_T 范围 / repeats=20 / 四 baseline / k=10,20,30%% / acquisition 特征 = X0 only 与 stage8_al_results.json 一致；计数 296 curves / 5920 runs / 7360 trajectories，GPR 回落 0 次",
+      "counts": {
+        "n_run_rows": 5920,
+        "n_curve_rows": 296,
+        "n_trajectory_rows": 7360,
+        "n_fit_fallbacks": 0,
+        "elapsed_s": 98.55
+      },
+      "settings_repeats": 20
+    },
+    {
+      "id": "sequential_acquisition_prefix_property",
+      "ok": true,
+      "detail": "480 条 (task, axis, baseline, repeat) 采集轨迹，step 连续且每一步是全新分子（无重复 query），因此 n_T 的已查询集合严格是 n_T+1 的前缀",
+      "bad_keys": []
+    },
+    {
+      "id": "success_criteria_preregistered_and_uniform",
+      "ok": true,
+      "detail": "四个成功判据（tau_b >= 0.80；Top-20% overlap 全中；regret <= 池内目标极差的 5%；且在 >= 80% 重复中成立）写死在代码里、对所有 296 个单元格一律适用；容忍值由公式推出（每 target 一个值），无逐格调参",
+      "criteria": {
+        "target_tau": 0.8,
+        "strong_tau": 0.9,
+        "regret_target_scale": 0.05,
+        "success_fraction": 0.8
+      }
+    },
+    {
+      "id": "bands_ordered_and_bracketing",
+      "ok": true,
+      "detail": "全部 296 个单元格满足 2.5% <= median <= 97.5%（反例 0）"
+    },
+    {
+      "id": "strategy_effect_quantified",
+      "ok": true,
+      "detail": "18 个 (task, axis, 非random baseline) 组都在同一 (repeat, n_T) 上与 random 配对比较，给出胜负率与 tau_b 收益中位数"
+    },
+    {
+      "id": "family_coverage_computed",
+      "ok": true,
+      "detail": "296 个单元格都算了已查询集合覆盖的家族数（中位数/最小/最大）；覆盖数随 n_T 单调不减且不超过池内家族数"
+    },
+    {
+      "id": "family_heldout_gap_declared",
+      "ok": true,
+      "detail": "6 个 target 的池内端点 tau_b 恒为 1.0（自检端点，不是成绩）；静态 LOFO 参照最高 0.843；**AL family-held-out 曲线不可用**（需要重跑 acquisition），已逐行标注"
+    },
+    {
+      "id": "zero_new_electronic_structure",
+      "ok": true,
+      "detail": "唯一输入是 outputs/week7 的 Stage 8 冻结 replay 与 Stage 7 冻结 ML 结果；未运行任何电子结构作业，也未重跑 acquisition loop"
+    }
+  ],
+  "checks_by_id": {
+    "curves_recomputed_from_runs_within_storage_precision": {
+      "id": "curves_recomputed_from_runs_within_storage_precision",
+      "ok": true,
+      "detail": "从逐 repeat 记录重算 296 个曲线单元格的 median 与 2.5/97.5 百分位，全部落在发布精度容差内（max |diff| tau_b=8.500e-07, overlap=1.750e-07, regret=7.000e-06；最大残差仅相当于 3.00 个 6 存储步长）；超容差 0",
+      "max_abs_diff": {
+        "tau_b": 8.500000000521979e-07,
+        "o20": 3.3306690738754696e-16,
+        "o30": 1.7499999999115445e-07,
+        "r20": 6.999999999868223e-06
+      },
+      "tolerances": {
+        "tau_b": 1e-06,
+        "o20": 1e-06,
+        "o30": 1e-06,
+        "r20": 1e-05
+      },
+      "n_outside_tolerance": 0
+    },
+    "every_frozen_curve_cell_recombined": {
+      "id": "every_frozen_curve_cell_recombined",
+      "ok": true,
+      "detail": "冻结曲线的 296 个 (task, axis, baseline, n_T) 单元格全部被重算覆盖，缺失 0",
+      "n_cells": 296
+    },
+    "protocol_matches_frozen_ledger": {
+      "id": "protocol_matches_frozen_ledger",
+      "ok": true,
+      "detail": "池大小 / n_T 范围 / repeats=20 / 四 baseline / k=10,20,30%% / acquisition 特征 = X0 only 与 stage8_al_results.json 一致；计数 296 curves / 5920 runs / 7360 trajectories，GPR 回落 0 次",
+      "counts": {
+        "n_run_rows": 5920,
+        "n_curve_rows": 296,
+        "n_trajectory_rows": 7360,
+        "n_fit_fallbacks": 0,
+        "elapsed_s": 98.55
+      },
+      "settings_repeats": 20
+    },
+    "sequential_acquisition_prefix_property": {
+      "id": "sequential_acquisition_prefix_property",
+      "ok": true,
+      "detail": "480 条 (task, axis, baseline, repeat) 采集轨迹，step 连续且每一步是全新分子（无重复 query），因此 n_T 的已查询集合严格是 n_T+1 的前缀",
+      "bad_keys": []
+    },
+    "success_criteria_preregistered_and_uniform": {
+      "id": "success_criteria_preregistered_and_uniform",
+      "ok": true,
+      "detail": "四个成功判据（tau_b >= 0.80；Top-20% overlap 全中；regret <= 池内目标极差的 5%；且在 >= 80% 重复中成立）写死在代码里、对所有 296 个单元格一律适用；容忍值由公式推出（每 target 一个值），无逐格调参",
+      "criteria": {
+        "target_tau": 0.8,
+        "strong_tau": 0.9,
+        "regret_target_scale": 0.05,
+        "success_fraction": 0.8
+      }
+    },
+    "bands_ordered_and_bracketing": {
+      "id": "bands_ordered_and_bracketing",
+      "ok": true,
+      "detail": "全部 296 个单元格满足 2.5% <= median <= 97.5%（反例 0）"
+    },
+    "strategy_effect_quantified": {
+      "id": "strategy_effect_quantified",
+      "ok": true,
+      "detail": "18 个 (task, axis, 非random baseline) 组都在同一 (repeat, n_T) 上与 random 配对比较，给出胜负率与 tau_b 收益中位数"
+    },
+    "family_coverage_computed": {
+      "id": "family_coverage_computed",
+      "ok": true,
+      "detail": "296 个单元格都算了已查询集合覆盖的家族数（中位数/最小/最大）；覆盖数随 n_T 单调不减且不超过池内家族数"
+    },
+    "family_heldout_gap_declared": {
+      "id": "family_heldout_gap_declared",
+      "ok": true,
+      "detail": "6 个 target 的池内端点 tau_b 恒为 1.0（自检端点，不是成绩）；静态 LOFO 参照最高 0.843；**AL family-held-out 曲线不可用**（需要重跑 acquisition），已逐行标注"
+    },
+    "zero_new_electronic_structure": {
+      "id": "zero_new_electronic_structure",
+      "ok": true,
+      "detail": "唯一输入是 outputs/week7 的 Stage 8 冻结 replay 与 Stage 7 冻结 ML 结果；未运行任何电子结构作业，也未重跑 acquisition loop"
+    }
+  },
+  "manifest": {
+    "al_protocol_audit": {
+      "file": "outputs/week33/al_protocol_audit.csv",
+      "n_rows": 6,
+      "columns": [
+        "task",
+        "axis",
+        "pool_size",
+        "initial_seed_size",
+        "batch_size",
+        "repeats",
+        "n_T_min",
+        "n_T_max",
+        "n_curve_points",
+        "k_fractions",
+        "acquisition_features",
+        "hidden_label_replay",
+        "in_loop_hygiene",
+        "ranking_rule",
+        "target_min",
+        "target_max",
+        "target_range",
+        "regret_tolerance_ev"
+      ],
+      "sha256": "fbb2f650f70a8bffc41d87880b6188c582b802678ea07d554137152ab8515208"
+    },
+    "budget_curves": {
+      "file": "outputs/week33/budget_curves.csv",
+      "n_rows": 296,
+      "columns": [
+        "task",
+        "axis",
+        "baseline",
+        "n_T",
+        "tau_b",
+        "tau_b_lo",
+        "tau_b_hi",
+        "o20",
+        "o20_lo",
+        "o20_hi",
+        "o30",
+        "r20",
+        "r20_lo",
+        "r20_hi"
+      ],
+      "sha256": "680e60ea54878f87b43ba85c1fc5787fab1176889e8b6fe86a9eebca1df66343"
+    },
+    "curve_reconciliation": {
+      "file": "outputs/week33/curve_reconciliation.csv",
+      "n_rows": 296,
+      "columns": [
+        "task",
+        "axis",
+        "baseline",
+        "n_T",
+        "d_tau_b_median",
+        "d_tau_b_lo",
+        "d_tau_b_hi",
+        "d_o20_median",
+        "d_o20_lo",
+        "d_o20_hi",
+        "d_o30_median",
+        "d_o30_lo",
+        "d_o30_hi",
+        "d_r20_median",
+        "d_r20_lo",
+        "d_r20_hi",
+        "max_ratio_vs_storage_step",
+        "within_tolerance"
+      ],
+      "sha256": "7302da2d6491843a55aad19d824ca9c4ba3f6154f7227c670c17c5047cb094d4"
+    },
+    "budget_to_threshold": {
+      "file": "outputs/week33/budget_to_threshold.csv",
+      "n_rows": 24,
+      "columns": [
+        "task",
+        "axis",
+        "baseline",
+        "n_T_points",
+        "n_T_median_tau080",
+        "n_T_median_tau090"
+      ],
+      "sha256": "b6d31c55f2dee2ec7975bbd6f40032f2f283310fea1802046befad47030cf72b"
+    },
+    "success_criteria": {
+      "file": "outputs/week33/success_criteria.csv",
+      "n_rows": 296,
+      "columns": [
+        "task",
+        "axis",
+        "baseline",
+        "n_T",
+        "n_repeats",
+        "regret_tolerance_ev",
+        "pass_frac_tau080",
+        "pass_frac_o20_full",
+        "pass_frac_regret",
+        "pass_frac_combined"
+      ],
+      "sha256": "1ce13f1bdb0e7f2adac1019e0e50ae5461b3d77bfd3f30d639722604c11198da"
+    },
+    "success_budget": {
+      "file": "outputs/week33/success_budget.csv",
+      "n_rows": 24,
+      "columns": [
+        "task",
+        "axis",
+        "baseline",
+        "n_T_median_tau080",
+        "n_T_majority_tau080",
+        "n_T_majority_combined",
+        "median_overstates_majority",
+        "regret_tolerance_ev"
+      ],
+      "sha256": "5e07f59e352350288a4614b2cf42364a2189a6a4b6ea74ba19123312597fa530"
+    },
+    "strategy_comparison": {
+      "file": "outputs/week33/strategy_comparison.csv",
+      "n_rows": 18,
+      "columns": [
+        "task",
+        "axis",
+        "baseline",
+        "n_pairs",
+        "matched_n_min",
+        "matched_n_max",
+        "win_rate_tau",
+        "tie_rate_tau",
+        "median_gain_tau"
+      ],
+      "sha256": "1a59066f5903996bd7154096921cf96f6eeae27946a0350e04b9c7558f82d203"
+    },
+    "family_coverage": {
+      "file": "outputs/week33/family_coverage.csv",
+      "n_rows": 296,
+      "columns": [
+        "task",
+        "axis",
+        "baseline",
+        "n_T",
+        "median_families",
+        "min_families",
+        "max_families",
+        "pool_families"
+      ],
+      "sha256": "8b8389f4624decd7568d5052f8b5ed25a61c0af7547ead5d5196ef02f5a714fe"
+    },
+    "holdout_vs_inpool": {
+      "file": "outputs/week33/holdout_vs_inpool.csv",
+      "n_rows": 6,
+      "columns": [
+        "task",
+        "axis",
+        "pool_size",
+        "inpool_endpoint_tau_b",
+        "static_lofo_tau_b",
+        "static_lofo_model",
+        "static_lofo_feature_set",
+        "al_family_heldout_available",
+        "note"
+      ],
+      "sha256": "5be5e43f3378f6b60943b661d965ccd14397f943ee277c9875c523e3910ac8a2"
+    },
+    "wp6_acceptance": {
+      "file": "outputs/week33/wp6_acceptance.csv",
+      "n_rows": 4,
+      "columns": [
+        "question_id",
+        "question",
+        "verdict",
+        "n_supporting",
+        "n_cells",
+        "evidence",
+        "counterexamples"
+      ],
+      "sha256": "b5684d3cd1e1910a528583154b0834934f6d846df58f0f92e9086824f2e59b07"
+    }
+  },
+  "n_rows_total": 1266
+}

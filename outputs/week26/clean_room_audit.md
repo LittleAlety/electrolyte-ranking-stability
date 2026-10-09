@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | C1 | PASS | in-repo reproducibility surface | 12/12 top-level entries present |
 | C2 | PASS | verification entry points | 7/7 present |
-| C3 | INFO | scripts reaching outside the repository | 6 script(s) reference the out-of-repo delivery layer (the auditor itself is excluded by construction); none of them is a verification entry point. analyze_w24_alignment.py; analyze_w24_audit.py; analyze_w24_decision.py; build_compute_budget_ledger.py; build_week25_deliverables.py; scan_stage15_anchor_literature.py |
+| C3 | INFO | scripts reaching outside the repository | 16 script(s) reference the out-of-repo delivery layer (the auditor itself is excluded by construction); none of them is a verification entry point. analyze_w24_alignment.py; analyze_w24_audit.py; analyze_w24_decision.py; build_compute_budget_ledger.py; build_week25_deliverables.py; build_week28_deliverables.py; build_week29_deliverables.py; build_week30_deliverables.py; build_week31_deliverables.py; build_week32_deliverables.py; build_week33_deliverables.py; build_week34_deliverables.py; build_week35_deliverables.py; build_week35_paper_convergence.py; build_week36_final_submission.py; scan_stage15_anchor_literature.py |
 | C4 | PASS | tests never reach outside the repository | 0 references |
 | C5 | INFO | external binaries are optional for verification | no verification entry point needs ORCA or xTB; they are required only for NEW electronic structure. Their presence is printed to stdout, not written into this report, so the report stays machine-independent and --check works in a clean clone. |
 | C6 | PASS | frozen manifests recompute | 7480/7480 rows match; broken: none |
@@ -33,6 +33,16 @@
 - `scripts/analyze_w24_decision.py`（1 处）
 - `scripts/build_compute_budget_ledger.py`（1 处）
 - `scripts/build_week25_deliverables.py`（1 处）
+- `scripts/build_week28_deliverables.py`（1 处）
+- `scripts/build_week29_deliverables.py`（1 处）
+- `scripts/build_week30_deliverables.py`（1 处）
+- `scripts/build_week31_deliverables.py`（1 处）
+- `scripts/build_week32_deliverables.py`（1 处）
+- `scripts/build_week33_deliverables.py`（1 处）
+- `scripts/build_week34_deliverables.py`（1 处）
+- `scripts/build_week35_deliverables.py`（2 处）
+- `scripts/build_week35_paper_convergence.py`（1 处）
+- `scripts/build_week36_final_submission.py`（2 处）
 - `scripts/scan_stage15_anchor_literature.py`（1 处）
 
 ## 纪律声明
