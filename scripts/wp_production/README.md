@@ -58,6 +58,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `supervise_pending.ps1` | 无人值守监守：单实例锁 + 等其它驱动退出后调 `run_wp2_queue.py --run`（最多 3 轮），队列结束后再调 `run_to_closure.py --commit` 把结果折进交付层 |
 | `watch_smpd.ps1` | 轻量 smpd 看护（常驻、约 0 CPU）：每 `-IntervalSeconds`（默认 300）检查 Microsoft MPI 的 smpd，缺失就拉起，日志写 `work/_smpd_watch.log`。用途是兜住**已在跑的**旧驱动——它们没有队列的逐次复查，smpd 一死就会级联秒败；停止：`Get-CimInstance Win32_Process | Where-Object CommandLine -like '*watch_smpd*'` 取 PID 后 `Stop-Process` |
 | `archive_raw_outputs.py` | 把 provenance 里登记的原始作业文件打成**确定性、可复核的 zip 归档**（`--build` 生成，默认落在仓库外 `_compute_archive/`；`--check <zip>` 逐条复算 sha256） |
+| `verify_archive.py` | 归档的**可重新解析性**核验：拿归档里的原始日志按仓库口径重算登记值，与该作业在 `job_archive_manifest.csv` 里的值逐字段比对；`--ledger` 再用同一份归档重算交付账本 `production_ledger.csv` 的数值列。缺条目 / sha256 不符 / 数值不符都算失败（退出码 1），`--limit N` 调试、`--strict` 把「算不出来」也算失败。生产在跑期间归档必然落后于 manifest，报的是「登记晚于归档」的预期漂移；队列停掉后重建归档再跑才应回到 0 |
 | `build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |
 | `build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
 | `build_compute_provenance.py` | 逐作业复现证据清单 + 从各自 `.log` 推导的 `failure_reason`（派生层） |
@@ -72,7 +73,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 * **原始 ORCA/xTB 输出不入库**：留在仓库外 `work/`（生产为 `work/wp2prod/`，审计为 `work/audit/`，
   队列的原始 stdout 为 `work/wp2prod/_queue_<NAME>_<STATE>.out`）。交付镜像里只有派生的
   CSV/JSON；派生数值与原始日志的对应关系见
-  `outputs/physics_completion/provenance/job_archive_manifest.csv`。需要独立取得原始日志时，用 `scripts/wp_production/archive_raw_outputs.py --build` 生成确定性 zip 归档（默认落在仓库外 `_compute_archive/`），再用 `--check` 逐条复算 sha256；本轮已建 **816 作业 / 2460 文件 / 27.8 MB → 8.5 MB** 的归档并通过校验。
+  `outputs/physics_completion/provenance/job_archive_manifest.csv`。需要独立取得原始日志时，用 `archive_raw_outputs.py --build` 生成确定性 zip 归档（默认落在仓库外 `_compute_archive/`），`--check` 逐条复算 sha256，`verify_archive.py [--ledger]` 再拿归档里的原始日志按仓库口径**重算**登记值（`job_archive_manifest.csv` 与交付账本 `production_ledger.csv`）。当前归档 **817 作业 / 2464 文件 / 29.1 MB → 8.8 MB**，`--check` 与 `verify_archive.py --ledger` 均 0 不符；规模随队列推进增长——生产在跑期间归档必然落后于 manifest，队列停掉后要重建归档再核验。
 * **生成器是派生物**：`scripts/build_physics_completion_batch.py` 由 `emit_wp2.py` 从
   「最近的未打补丁基线 + 补丁块」确定性重打；手工改它会失效。基线缓存在 `work/pilot12/gen_baseline.py`。
 * **`work/pilot12/` 只是暂存区**：`run_batch.py` 的原始输出与生成器基线缓存仍落在那里；

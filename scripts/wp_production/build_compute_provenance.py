@@ -233,6 +233,10 @@ def build_row(cohort, mol_token, job_token, directory):
     job_id = "%s/%s/%s" % ("wp2prod" if cohort == "wp2_production" else "audit", mol_token, job_token)
     job_state = record.get("status") or ("in_flight" if log is None else "log_without_payload")
     terminated = record.get("terminated", "true" if RE_TERMINATED.search(raw_text) else "false")
+    # 跑失败的腿不能把 n_freq=0 / imaginary_modes=0 登记成「干净的极小值」——
+    # 那读起来像「无虚频的极小」，实际上频率计算根本没跑完。生产的 QC 列只登记
+    # computed 的作业；其余留空（不补数），失败原因仍由 failure_reason 记录。
+    qc_echo = cohort != "wp2_production" or job_state == "computed"
     row = {
         "job_id": job_id, "cohort": cohort,
         "mol_id": (record.get("mol_id", "")
@@ -249,10 +253,17 @@ def build_row(cohort, mol_token, job_token, directory):
         "final_geometry_path": final_path, "final_geometry_sha256": final_sha,
         "raw_output_path": log_path, "raw_output_sha256": log_sha, "raw_output_bytes": log_bytes,
         "orca_keyword": keyword, "orca_version": version,
-        "final_sp_eh": record.get("final_sp_eh", "") or record.get("e_sp_eh", ""),
-        "g_single_eh": record.get("g_single_eh", ""),
-        "n_freq": record.get("n_freq", ""), "imaginary_modes": record.get("imaginary_modes", ""),
-        "lowest_freq_cm1": record.get("lowest_freq_cm1", ""),
+        # wp2 生产作业的载荷没有 final_sp_eh 字段，只有两个同义列：e_sp_eh 与
+        # electronic_eh（热化学段的 Electronic energy）。早期驱动的 e_sp_eh 记的是
+        # 起始几何的 SP，与交付账本的口径不同；优先取 electronic_eh，让这张表与
+        # production_ledger.csv 的 e_sp_eh 同义（wp1 审计载荷两者都没有）。
+        "final_sp_eh": ("" if not qc_echo else
+                        record.get("final_sp_eh", "") or record.get("electronic_eh", "")
+                        or record.get("e_sp_eh", "")),
+        "g_single_eh": record.get("g_single_eh", "") if qc_echo else "",
+        "n_freq": record.get("n_freq", "") if qc_echo else "",
+        "imaginary_modes": record.get("imaginary_modes", "") if qc_echo else "",
+        "lowest_freq_cm1": record.get("lowest_freq_cm1", "") if qc_echo else "",
         "opt_converged": record.get("opt_converged", "true" if RE_CONVERGED.search(raw_text) else ""),
         "terminated": terminated,
         "failure_reason": classify_failure(job_state, terminated, log is not None, raw_text),

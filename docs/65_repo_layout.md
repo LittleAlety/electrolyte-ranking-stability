@@ -59,7 +59,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（23 个跟踪文件），脚本表与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（26 个跟踪文件），脚本表与边界见 `scripts/wp_production/README.md`。
 
 ## 4. 收口链
 
