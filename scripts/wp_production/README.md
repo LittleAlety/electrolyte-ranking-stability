@@ -11,8 +11,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finali
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finalize_wp2.ps1 -Commit
 ```
 
-顺序：`anchors` → `emit-wp2` → `generator` → `closure` → `provenance` → `sampling` →
-`figures` → `mirror` → `site` → `freeze` → `clean-room` → 七个 `--check` → `pytest`。
+顺序：`anchors` → `emit-wp2` → `generator` → `closure` → `provenance` → `sampling` → `cost` →
+`figures` → `mirror` → `site` → `freeze` → `clean-room` → 八个 `--check` → `pytest`。
 任一非零即 `ABORT`，不提交。
 
 ## 生产队列：查状态与断点续跑
@@ -50,6 +50,10 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息（写 `work/_wp2_commit_msg.txt`） |
 | `finalize_wp2.ps1` | 上面那条一键收口链 |
 | `supervise_pending.ps1` | 无人值守监守：等其它驱动退出后调 `run_wp2_queue.py --run` |
+| `scripts/build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |
+| `scripts/build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
+| `scripts/build_compute_provenance.py` | 逐作业复现证据清单（派生层） |
+| `scripts/build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） |
 
 ## 边界
 

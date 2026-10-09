@@ -433,6 +433,24 @@ SCOPE_BLOCK = ('"new_electronic_structure_jobs_scope": "jobs that change the fro
                'the WP1 supportability probe, the WP2 free-state pilot and the WP2 production '
                'first segment are counted separately",')
 
+ANCHOR_COST_NOTES = '''    {"item": "cpu_core_hours", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
+     "note": "repository has no CPU-core-hours field (known gap, Q9)"},
+    {"item": "p90_job_cost", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
+     "note": "p90 job cost not recorded anywhere in the repo"},
+    {"item": "frequency_only_cost", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
+     "note": "frequency-only cost not recorded"},
+'''
+COST_NOTES_BLOCK = '''    {"item": "cpu_core_hours", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
+     "note": "allocated core-hours are recorded per job in the production / audit / pilot cost ledgers; "
+             "this project-level scalar stays empty until the four-molecule loop closes"},
+    {"item": "p90_job_cost", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
+     "note": "per-class median and p90 are reported in outputs/physics_completion/cost/"
+             "remaining_cost_scenarios.csv; the headline p90 stays empty until the loop closes"},
+    {"item": "frequency_only_cost", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
+     "note": "a measured frequency-only job exists in pilot_cost_ledger.csv (C01|M|orca_freq, "
+             "wB97X-D4/def2-TZVP SMD NumFreq, 1.254556 core-hours); the headline figure stays empty "
+             "until the loop closes"},
+'''
 ANCHOR_CONST = "PILOT_RT_EH = 0.000944183\nPILOT_LN_VM = 3.197365\n"
 ANCHOR_LEDGER_LOOP = '                "n_conformers": "", "identity_label": "", "status": "planned",\n            })\n'
 ANCHOR_OUTPUTS = '    local["outputs/physics_completion/free_states/sampling_plan.csv"] = csv_text(\n'
@@ -591,6 +609,7 @@ def main():
     src = sub_once(src, ANCHOR_V_LIMITS, LIMITS_SECTION_BLOCK + ANCHOR_V_LIMITS)
     src = sub_once(src, ANCHOR_LASTPARA, LASTPARA_BLOCK)
     src = sub_once(src, ANCHOR_SCOPE, SCOPE_BLOCK)
+    src = sub_once(src, ANCHOR_COST_NOTES, COST_NOTES_BLOCK)
 
     if GEN.exists():
         GEN.with_suffix(".py.bak-wp2").write_text(GEN.read_text(encoding="utf-8"), encoding="utf-8")

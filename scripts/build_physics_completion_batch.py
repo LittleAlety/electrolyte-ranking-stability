@@ -3322,11 +3322,15 @@ COST_LEDGER = [
     {"item": "targeted_pair_second_method_single_points", "unit": "SP", "value": "16-32", "kind": "planned",
      "status": "planned", "note": "explicit selection rule; targeted re-check"},
     {"item": "cpu_core_hours", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
-     "note": "repository has no CPU-core-hours field (known gap, Q9)"},
+     "note": "allocated core-hours are recorded per job in the production / audit / pilot cost ledgers; "
+             "this project-level scalar stays empty until the four-molecule loop closes"},
     {"item": "p90_job_cost", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
-     "note": "p90 job cost not recorded anywhere in the repo"},
+     "note": "per-class median and p90 are reported in outputs/physics_completion/cost/"
+             "remaining_cost_scenarios.csv; the headline p90 stays empty until the loop closes"},
     {"item": "frequency_only_cost", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
-     "note": "frequency-only cost not recorded"},
+     "note": "a measured frequency-only job exists in pilot_cost_ledger.csv (C01|M|orca_freq, "
+             "wB97X-D4/def2-TZVP SMD NumFreq, 1.254556 core-hours); the headline figure stays empty "
+             "until the loop closes"},
 ]
 
 
