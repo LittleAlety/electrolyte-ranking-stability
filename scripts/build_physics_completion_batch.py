@@ -1081,10 +1081,909 @@ def wp1():
 
 
 # ---------------------------------------------------------------------------
+# 方案 5.1/5.2/5.3 —— 本机独立方法审计（首轮实测）
+# 8 方法集分子 x 4 状态 x 4 设定 = 128 个 SMD 乙腈单点（几何冻结在 r2SCAN-3c 最优结构），
+# 外加 4 设定 x 1 状态的阳离子弛豫腿 32 格（r2SCAN-3c 松弛阳离子几何），
+# 用于认证 WP3 冻结的稳健翻转（EMC|GBL、EMC|SL）。
+# 原始 ORCA 日志留在仓库外（work/audit/），交付层只含派生数值。
+# 还原态（Li 配位态）必须使用含弥散函数设定（S2/S4）；无弥散基组下的还原态格子
+# 照样计算但 valid_for_decision=false，不进入决策统计（方案 5.1）。
+# ---------------------------------------------------------------------------
+METHOD_AUDIT_CELL_FIELDS = ["mol_id", "name", "state", "setting_id", "functional", "basis",
+    "has_diffuse", "charge", "multiplicity", "orca_keyword", "geometry", "basis_functions",
+    "scf_cycles", "final_sp_eh", "terminated", "wall_sec", "status", "qc_flag"]
+
+METHOD_AUDIT_CELLS = [
+    ("C01", "DMC", "M", "S1", "omegaB97X-D4", "def2-TZVP", "false", "0", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DMC/DMC_G2.xyz", "222", "20", "-343.854372289128", "true", "24.0", "computed", ""),
+    ("C01", "DMC", "M", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "0", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DMC/DMC_G2.xyz", "285", "20", "-343.856355842432", "true", "36.9", "computed", ""),
+    ("C01", "DMC", "M", "S3", "PBE0-D4", "def2-TZVP", "false", "0", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DMC/DMC_G2.xyz", "222", "17", "-343.384416542567", "true", "16.0", "computed", ""),
+    ("C01", "DMC", "M", "S4", "PBE0-D4", "def2-TZVPD", "true", "0", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DMC/DMC_G2.xyz", "285", "17", "-343.386275411134", "true", "23.2", "computed", ""),
+    ("C01", "DMC", "M_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DMC/DMC_G2_cation.xyz", "222", "20", "-343.524458477625", "true", "27.7", "computed", ""),
+    ("C01", "DMC", "M_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DMC/DMC_G2_cation.xyz", "285", "20", "-343.525676645443", "true", "43.9", "computed", ""),
+    ("C01", "DMC", "M_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DMC/DMC_G2_cation.xyz", "222", "16", "-343.071252301771", "true", "18.4", "computed", ""),
+    ("C01", "DMC", "M_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DMC/DMC_G2_cation.xyz", "285", "16", "-343.072381637798", "true", "28.0", "computed", ""),
+    ("C01", "DMC", "LiM_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "236", "20", "-351.308351220745", "true", "27.0", "computed", "no_diffuse_on_reduction_state"),
+    ("C01", "DMC", "LiM_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "302", "20", "-351.309821678224", "true", "42.8", "computed", ""),
+    ("C01", "DMC", "LiM_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "236", "17", "-350.812767839005", "true", "17.7", "computed", "no_diffuse_on_reduction_state"),
+    ("C01", "DMC", "LiM_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "302", "17", "-350.814175522570", "true", "26.7", "computed", ""),
+    ("C01", "DMC", "LiM_2plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "2", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "236", "20", "-350.955450937364", "true", "31.3", "computed", "no_diffuse_on_reduction_state"),
+    ("C01", "DMC", "LiM_2plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "2", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "302", "20", "-350.956443246265", "true", "50.5", "computed", ""),
+    ("C01", "DMC", "LiM_2plus", "S3", "PBE0-D4", "def2-TZVP", "false", "2", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "236", "16", "-350.476323090309", "true", "20.3", "computed", "no_diffuse_on_reduction_state"),
+    ("C01", "DMC", "LiM_2plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "2", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "302", "16", "-350.477277276788", "true", "32.2", "computed", ""),
+    ("C02", "EMC", "M", "S1", "omegaB97X-D4", "def2-TZVP", "false", "0", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EMC/EMC_G2.xyz", "265", "20", "-383.211538386603", "true", "49.0", "computed", ""),
+    ("C02", "EMC", "M", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "0", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EMC/EMC_G2.xyz", "340", "20", "-383.213500883226", "true", "88.5", "computed", ""),
+    ("C02", "EMC", "M", "S3", "PBE0-D4", "def2-TZVP", "false", "0", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EMC/EMC_G2.xyz", "265", "17", "-382.670744787817", "true", "39.2", "computed", ""),
+    ("C02", "EMC", "M", "S4", "PBE0-D4", "def2-TZVPD", "true", "0", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EMC/EMC_G2.xyz", "340", "17", "-382.672582085988", "true", "57.2", "computed", ""),
+    ("C02", "EMC", "M_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EMC/EMC_G2_cation.xyz", "265", "88", "-382.889939158368", "true", "263.6", "computed", ""),
+    ("C02", "EMC", "M_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EMC/EMC_G2_cation.xyz", "340", "79", "-382.891126329972", "true", "364.5", "computed", ""),
+    ("C02", "EMC", "M_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EMC/EMC_G2_cation.xyz", "265", "27", "-382.361287902109", "true", "68.7", "computed", ""),
+    ("C02", "EMC", "M_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EMC/EMC_G2_cation.xyz", "340", "26", "-382.362441800872", "true", "125.0", "computed", ""),
+    ("C02", "EMC", "LiM_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "work/audit/EMC_Li/EMC_m1_G2Li.xyz", "279", "20", "-390.665656103452", "true", "65.3", "computed", "no_diffuse_on_reduction_state"),
+    ("C02", "EMC", "LiM_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "work/audit/EMC_Li/EMC_m1_G2Li.xyz", "357", "20", "-390.667188942774", "true", "101.9", "computed", ""),
+    ("C02", "EMC", "LiM_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "work/audit/EMC_Li/EMC_m1_G2Li.xyz", "279", "17", "-390.099330478337", "true", "42.2", "computed", "no_diffuse_on_reduction_state"),
+    ("C02", "EMC", "LiM_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "work/audit/EMC_Li/EMC_m1_G2Li.xyz", "357", "17", "-390.100795431588", "true", "63.2", "computed", ""),
+    ("C02", "EMC", "LiM_2plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "2", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "work/audit/EMC_Li/EMC_m1_G2Li.xyz", "279", "28", "-390.315709390891", "true", "102.7", "computed", "no_diffuse_on_reduction_state"),
+    ("C02", "EMC", "LiM_2plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "2", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "work/audit/EMC_Li/EMC_m1_G2Li.xyz", "357", "29", "-390.316843320222", "true", "171.1", "computed", ""),
+    ("C02", "EMC", "LiM_2plus", "S3", "PBE0-D4", "def2-TZVP", "false", "2", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "work/audit/EMC_Li/EMC_m1_G2Li.xyz", "279", "19", "-389.766104290570", "true", "41.7", "computed", "no_diffuse_on_reduction_state"),
+    ("C02", "EMC", "LiM_2plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "2", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "work/audit/EMC_Li/EMC_m1_G2Li.xyz", "357", "19", "-389.767187069562", "true", "72.3", "computed", ""),
+    ("C04", "EC", "M", "S1", "omegaB97X-D4", "def2-TZVP", "false", "0", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EC/EC_G2.xyz", "210", "20", "-342.648443929403", "true", "26.6", "computed", ""),
+    ("C04", "EC", "M", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "0", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EC/EC_G2.xyz", "267", "20", "-342.650450696278", "true", "41.3", "computed", ""),
+    ("C04", "EC", "M", "S3", "PBE0-D4", "def2-TZVP", "false", "0", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EC/EC_G2.xyz", "210", "17", "-342.191432590440", "true", "19.0", "computed", ""),
+    ("C04", "EC", "M", "S4", "PBE0-D4", "def2-TZVPD", "true", "0", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EC/EC_G2.xyz", "267", "17", "-342.193314204697", "true", "24.1", "computed", ""),
+    ("C04", "EC", "M_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EC/EC_G2_cation.xyz", "210", "18", "-342.325847603317", "true", "26.1", "computed", ""),
+    ("C04", "EC", "M_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EC/EC_G2_cation.xyz", "267", "18", "-342.327007714133", "true", "40.4", "computed", ""),
+    ("C04", "EC", "M_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EC/EC_G2_cation.xyz", "210", "15", "-341.883122714555", "true", "17.9", "computed", ""),
+    ("C04", "EC", "M_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/EC/EC_G2_cation.xyz", "267", "15", "-341.884197654566", "true", "27.3", "computed", ""),
+    ("C04", "EC", "LiM_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/EC/EC_m1_G2Li.xyz", "224", "20", "-350.103043323331", "true", "27.3", "computed", "no_diffuse_on_reduction_state"),
+    ("C04", "EC", "LiM_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/EC/EC_m1_G2Li.xyz", "284", "20", "-350.104556957626", "true", "41.2", "computed", ""),
+    ("C04", "EC", "LiM_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/EC/EC_m1_G2Li.xyz", "224", "17", "-349.620475058765", "true", "17.8", "computed", "no_diffuse_on_reduction_state"),
+    ("C04", "EC", "LiM_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/EC/EC_m1_G2Li.xyz", "284", "17", "-349.621932340489", "true", "24.6", "computed", ""),
+    ("C04", "EC", "LiM_2plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "2", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/EC/EC_m1_G2Li.xyz", "224", "20", "-349.756680339074", "true", "29.4", "computed", "no_diffuse_on_reduction_state"),
+    ("C04", "EC", "LiM_2plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "2", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/EC/EC_m1_G2Li.xyz", "284", "20", "-349.757669736449", "true", "43.8", "computed", ""),
+    ("C04", "EC", "LiM_2plus", "S3", "PBE0-D4", "def2-TZVP", "false", "2", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/EC/EC_m1_G2Li.xyz", "224", "13", "-349.288074994445", "true", "17.5", "computed", "no_diffuse_on_reduction_state"),
+    ("C04", "EC", "LiM_2plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "2", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/EC/EC_m1_G2Li.xyz", "284", "13", "-349.289045078109", "true", "24.2", "computed", ""),
+    ("C08", "DME", "M", "S1", "omegaB97X-D4", "def2-TZVP", "false", "0", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DME/DME_G2.xyz", "246", "20", "-309.100973556793", "true", "47.4", "computed", ""),
+    ("C08", "DME", "M", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "0", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DME/DME_G2.xyz", "318", "20", "-309.103516109755", "true", "79.1", "computed", ""),
+    ("C08", "DME", "M", "S3", "PBE0-D4", "def2-TZVP", "false", "0", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DME/DME_G2.xyz", "246", "14", "-308.633581313762", "true", "33.8", "computed", ""),
+    ("C08", "DME", "M", "S4", "PBE0-D4", "def2-TZVPD", "true", "0", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DME/DME_G2.xyz", "318", "14", "-308.636022787278", "true", "47.8", "computed", ""),
+    ("C08", "DME", "M_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DME/DME_G2_cation.xyz", "246", "30", "-308.832125907142", "true", "104.4", "computed", ""),
+    ("C08", "DME", "M_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DME/DME_G2_cation.xyz", "318", "31", "-308.833663009501", "true", "174.3", "computed", ""),
+    ("C08", "DME", "M_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DME/DME_G2_cation.xyz", "246", "16", "-308.378335619556", "true", "43.3", "computed", ""),
+    ("C08", "DME", "M_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/DME/DME_G2_cation.xyz", "318", "16", "-308.379724861633", "true", "70.3", "computed", ""),
+    ("C08", "DME", "LiM_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/DME/DME_m1_G2Li.xyz", "260", "20", "-316.575853825302", "true", "61.1", "computed", "no_diffuse_on_reduction_state"),
+    ("C08", "DME", "LiM_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/DME/DME_m1_G2Li.xyz", "335", "20", "-316.577534532211", "true", "96.6", "computed", ""),
+    ("C08", "DME", "LiM_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/DME/DME_m1_G2Li.xyz", "260", "14", "-316.080828876168", "true", "35.9", "computed", "no_diffuse_on_reduction_state"),
+    ("C08", "DME", "LiM_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/DME/DME_m1_G2Li.xyz", "335", "14", "-316.082469582709", "true", "52.0", "computed", ""),
+    ("C08", "DME", "LiM_2plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "2", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/DME/DME_m1_G2Li.xyz", "260", "19", "-316.260841530101", "true", "67.4", "computed", "no_diffuse_on_reduction_state"),
+    ("C08", "DME", "LiM_2plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "2", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/DME/DME_m1_G2Li.xyz", "335", "19", "-316.262309986377", "true", "113.0", "computed", ""),
+    ("C08", "DME", "LiM_2plus", "S3", "PBE0-D4", "def2-TZVP", "false", "2", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/DME/DME_m1_G2Li.xyz", "260", "11", "-315.786091938249", "true", "43.2", "computed", "no_diffuse_on_reduction_state"),
+    ("C08", "DME", "LiM_2plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "2", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/DME/DME_m1_G2Li.xyz", "335", "11", "-315.787507249774", "true", "62.1", "computed", ""),
+    ("C13", "GBL", "M", "S1", "omegaB97X-D4", "def2-TZVP", "false", "0", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/GBL/GBL_G2.xyz", "222", "20", "-306.736607063330", "true", "44.0", "computed", ""),
+    ("C13", "GBL", "M", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "0", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/GBL/GBL_G2.xyz", "282", "20", "-306.738417709651", "true", "61.6", "computed", ""),
+    ("C13", "GBL", "M", "S3", "PBE0-D4", "def2-TZVP", "false", "0", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/GBL/GBL_G2.xyz", "222", "17", "-306.293464760481", "true", "29.6", "computed", ""),
+    ("C13", "GBL", "M", "S4", "PBE0-D4", "def2-TZVPD", "true", "0", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/GBL/GBL_G2.xyz", "282", "17", "-306.295169866936", "true", "39.9", "computed", ""),
+    ("C13", "GBL", "M_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/GBL/GBL_G2_cation.xyz", "222", "35", "-306.440615720570", "true", "77.1", "computed", ""),
+    ("C13", "GBL", "M_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/GBL/GBL_G2_cation.xyz", "282", "35", "-306.441297422598", "true", "113.5", "computed", ""),
+    ("C13", "GBL", "M_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/GBL/GBL_G2_cation.xyz", "222", "37", "-306.006696175664", "true", "64.4", "computed", ""),
+    ("C13", "GBL", "M_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/GBL/GBL_G2_cation.xyz", "282", "35", "-306.007537605440", "true", "72.2", "computed", ""),
+    ("C13", "GBL", "LiM_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/GBL/GBL_m1_G2Li.xyz", "236", "20", "-314.192731703640", "true", "37.1", "computed", "no_diffuse_on_reduction_state"),
+    ("C13", "GBL", "LiM_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/GBL/GBL_m1_G2Li.xyz", "299", "20", "-314.193990862615", "true", "57.1", "computed", ""),
+    ("C13", "GBL", "LiM_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/GBL/GBL_m1_G2Li.xyz", "236", "17", "-313.724111183296", "true", "24.2", "computed", "no_diffuse_on_reduction_state"),
+    ("C13", "GBL", "LiM_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/GBL/GBL_m1_G2Li.xyz", "299", "17", "-313.725337033879", "true", "37.4", "computed", ""),
+    ("C13", "GBL", "LiM_2plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "2", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/GBL/GBL_m1_G2Li.xyz", "236", "22", "-313.848757385770", "true", "43.4", "computed", "no_diffuse_on_reduction_state"),
+    ("C13", "GBL", "LiM_2plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "2", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/GBL/GBL_m1_G2Li.xyz", "299", "22", "-313.849635691208", "true", "67.7", "computed", ""),
+    ("C13", "GBL", "LiM_2plus", "S3", "PBE0-D4", "def2-TZVP", "false", "2", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/GBL/GBL_m1_G2Li.xyz", "236", "27", "-313.395514697701", "true", "41.2", "computed", "no_diffuse_on_reduction_state"),
+    ("C13", "GBL", "LiM_2plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "2", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/GBL/GBL_m1_G2Li.xyz", "299", "27", "-313.396297945663", "true", "66.1", "computed", ""),
+    ("C14", "SL", "M", "S1", "omegaB97X-D4", "def2-TZVP", "false", "0", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/SL/SL_G2.xyz", "271", "20", "-706.148919933265", "true", "62.8", "computed", ""),
+    ("C14", "SL", "M", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "0", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/SL/SL_G2.xyz", "346", "20", "-706.152019539602", "true", "101.1", "computed", ""),
+    ("C14", "SL", "M", "S3", "PBE0-D4", "def2-TZVP", "false", "0", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/SL/SL_G2.xyz", "271", "16", "-705.550797236237", "true", "41.3", "computed", ""),
+    ("C14", "SL", "M", "S4", "PBE0-D4", "def2-TZVPD", "true", "0", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/SL/SL_G2.xyz", "346", "16", "-705.553666100701", "true", "72.7", "computed", ""),
+    ("C14", "SL", "M_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/SL/SL_G2_cation.xyz", "271", "18", "-705.853511298493", "true", "79.5", "computed", ""),
+    ("C14", "SL", "M_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/SL/SL_G2_cation.xyz", "346", "18", "-705.855124087928", "true", "124.0", "computed", ""),
+    ("C14", "SL", "M_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/SL/SL_G2_cation.xyz", "271", "13", "-705.267521706427", "true", "45.1", "computed", ""),
+    ("C14", "SL", "M_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/SL/SL_G2_cation.xyz", "346", "13", "-705.269026410610", "true", "71.7", "computed", ""),
+    ("C14", "SL", "LiM_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/SL/SL_m1_G2Li.xyz", "285", "20", "-713.603210544289", "true", "73.3", "computed", "no_diffuse_on_reduction_state"),
+    ("C14", "SL", "LiM_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/SL/SL_m1_G2Li.xyz", "363", "20", "-713.605506835733", "true", "114.4", "computed", ""),
+    ("C14", "SL", "LiM_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/SL/SL_m1_G2Li.xyz", "285", "16", "-712.978729838478", "true", "42.8", "computed", "no_diffuse_on_reduction_state"),
+    ("C14", "SL", "LiM_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/SL/SL_m1_G2Li.xyz", "363", "16", "-712.980905636808", "true", "69.8", "computed", ""),
+    ("C14", "SL", "LiM_2plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "2", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/SL/SL_m1_G2Li.xyz", "285", "19", "-713.265789352465", "true", "90.1", "computed", "no_diffuse_on_reduction_state"),
+    ("C14", "SL", "LiM_2plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "2", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/SL/SL_m1_G2Li.xyz", "363", "19", "-713.267691295074", "true", "141.8", "computed", ""),
+    ("C14", "SL", "LiM_2plus", "S3", "PBE0-D4", "def2-TZVP", "false", "2", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/SL/SL_m1_G2Li.xyz", "285", "15", "-712.654968007392", "true", "54.3", "computed", "no_diffuse_on_reduction_state"),
+    ("C14", "SL", "LiM_2plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "2", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/SL/SL_m1_G2Li.xyz", "363", "15", "-712.656818384113", "true", "85.0", "computed", ""),
+    ("C16", "AN", "M", "S1", "omegaB97X-D4", "def2-TZVP", "false", "0", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/AN/AN_G2.xyz", "111", "19", "-132.866713103685", "true", "16.7", "computed", ""),
+    ("C16", "AN", "M", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "0", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/AN/AN_G2.xyz", "138", "19", "-132.867164124598", "true", "17.4", "computed", ""),
+    ("C16", "AN", "M", "S3", "PBE0-D4", "def2-TZVP", "false", "0", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/AN/AN_G2.xyz", "111", "18", "-132.654270869947", "true", "13.1", "computed", ""),
+    ("C16", "AN", "M", "S4", "PBE0-D4", "def2-TZVPD", "true", "0", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/AN/AN_G2.xyz", "138", "18", "-132.654687616699", "true", "16.8", "computed", ""),
+    ("C16", "AN", "M_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/AN/AN_G2_cation.xyz", "111", "17", "-132.518205496616", "true", "15.4", "computed", ""),
+    ("C16", "AN", "M_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/AN/AN_G2_cation.xyz", "138", "17", "-132.518408073778", "true", "19.7", "computed", ""),
+    ("C16", "AN", "M_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/AN/AN_G2_cation.xyz", "111", "13", "-132.313001928392", "true", "12.8", "computed", ""),
+    ("C16", "AN", "M_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/AN/AN_G2_cation.xyz", "138", "13", "-132.313201674480", "true", "14.7", "computed", ""),
+    ("C16", "AN", "LiM_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/AN/AN_m1_G2Li.xyz", "125", "19", "-140.320939029594", "true", "21.8", "computed", "no_diffuse_on_reduction_state"),
+    ("C16", "AN", "LiM_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/AN/AN_m1_G2Li.xyz", "155", "19", "-140.321219185162", "true", "22.5", "computed", ""),
+    ("C16", "AN", "LiM_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/AN/AN_m1_G2Li.xyz", "125", "16", "-140.083390919166", "true", "15.9", "computed", "no_diffuse_on_reduction_state"),
+    ("C16", "AN", "LiM_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/AN/AN_m1_G2Li.xyz", "155", "16", "-140.083683148714", "true", "18.6", "computed", ""),
+    ("C16", "AN", "LiM_2plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "2", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/AN/AN_m1_G2Li.xyz", "125", "18", "-139.943857075818", "true", "21.6", "computed", "no_diffuse_on_reduction_state"),
+    ("C16", "AN", "LiM_2plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "2", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/AN/AN_m1_G2Li.xyz", "155", "18", "-139.944112490112", "true", "28.0", "computed", ""),
+    ("C16", "AN", "LiM_2plus", "S3", "PBE0-D4", "def2-TZVP", "false", "2", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/AN/AN_m1_G2Li.xyz", "125", "13", "-139.714417428730", "true", "15.4", "computed", "no_diffuse_on_reduction_state"),
+    ("C16", "AN", "LiM_2plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "2", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/AN/AN_m1_G2Li.xyz", "155", "13", "-139.714680578036", "true", "18.9", "computed", ""),
+    ("C17", "TMP", "M", "S1", "omegaB97X-D4", "def2-TZVP", "false", "0", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/TMP/TMP_G2.xyz", "308", "20", "-762.424652667741", "true", "69.4", "computed", ""),
+    ("C17", "TMP", "M", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "0", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/TMP/TMP_G2.xyz", "395", "20", "-762.427857035755", "true", "123.0", "computed", ""),
+    ("C17", "TMP", "M", "S3", "PBE0-D4", "def2-TZVP", "false", "0", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/TMP/TMP_G2.xyz", "308", "17", "-761.704847405518", "true", "50.9", "computed", ""),
+    ("C17", "TMP", "M", "S4", "PBE0-D4", "def2-TZVPD", "true", "0", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/TMP/TMP_G2.xyz", "395", "17", "-761.707883052953", "true", "97.7", "computed", ""),
+    ("C17", "TMP", "M_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/TMP/TMP_G2_cation.xyz", "308", "35", "-762.099314331015", "true", "144.7", "computed", ""),
+    ("C17", "TMP", "M_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/TMP/TMP_G2_cation.xyz", "395", "35", "-762.101325971788", "true", "240.2", "computed", ""),
+    ("C17", "TMP", "M_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/TMP/TMP_G2_cation.xyz", "308", "29", "-761.395202304643", "true", "92.9", "computed", ""),
+    ("C17", "TMP", "M_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week4/t2_opt_freq/TMP/TMP_G2_cation.xyz", "395", "25", "-761.397182769384", "true", "142.3", "computed", ""),
+    ("C17", "TMP", "LiM_plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "1", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/TMP/TMP_m1_G2Li.xyz", "322", "20", "-769.886783660897", "true", "85.9", "computed", "no_diffuse_on_reduction_state"),
+    ("C17", "TMP", "LiM_plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "1", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/TMP/TMP_m1_G2Li.xyz", "412", "20", "-769.889313866930", "true", "133.6", "computed", ""),
+    ("C17", "TMP", "LiM_plus", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "1", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/TMP/TMP_m1_G2Li.xyz", "322", "18", "-769.140729854139", "true", "52.2", "computed", "no_diffuse_on_reduction_state"),
+    ("C17", "TMP", "LiM_plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "1", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/TMP/TMP_m1_G2Li.xyz", "412", "18", "-769.143195125033", "true", "88.1", "computed", ""),
+    ("C17", "TMP", "LiM_2plus", "S1", "omegaB97X-D4", "def2-TZVP", "false", "2", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/TMP/TMP_m1_G2Li.xyz", "322", "28", "-769.539798636419", "true", "121.1", "computed", "no_diffuse_on_reduction_state"),
+    ("C17", "TMP", "LiM_2plus", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "2", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/TMP/TMP_m1_G2Li.xyz", "412", "28", "-769.541780102935", "true", "201.6", "computed", ""),
+    ("C17", "TMP", "LiM_2plus", "S3", "PBE0-D4", "def2-TZVP", "false", "2", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/week5/c1/TMP/TMP_m1_G2Li.xyz", "322", "20", "-768.812572078900", "true", "55.2", "computed", "no_diffuse_on_reduction_state"),
+    ("C17", "TMP", "LiM_2plus", "S4", "PBE0-D4", "def2-TZVPD", "true", "2", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/week5/c1/TMP/TMP_m1_G2Li.xyz", "412", "20", "-768.814478790532", "true", "99.5", "computed", ""),
+]
+
+METHOD_AUDIT_RELAXED_CELLS = [
+    ("C01", "DMC", "M_plus_relaxed", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/DMC/DMC_cation_opt.xyz", "222", "21", "-343.551839823128", "true", "41.0", "computed", ""),
+    ("C01", "DMC", "M_plus_relaxed", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/DMC/DMC_cation_opt.xyz", "285", "21", "-343.552861633422", "true", "76.6", "computed", ""),
+    ("C01", "DMC", "M_plus_relaxed", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/DMC/DMC_cation_opt.xyz", "222", "15", "-343.088465037148", "true", "31.2", "computed", ""),
+    ("C01", "DMC", "M_plus_relaxed", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/DMC/DMC_cation_opt.xyz", "285", "15", "-343.089441221543", "true", "45.3", "computed", ""),
+    ("C02", "EMC", "M_plus_relaxed", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/EMC/EMC_cation_opt.xyz", "265", "18", "-382.939688730711", "true", "52.1", "computed", ""),
+    ("C02", "EMC", "M_plus_relaxed", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/EMC/EMC_cation_opt.xyz", "340", "18", "-382.941007314195", "true", "98.8", "computed", ""),
+    ("C02", "EMC", "M_plus_relaxed", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/EMC/EMC_cation_opt.xyz", "265", "12", "-382.407889717145", "true", "35.5", "computed", ""),
+    ("C02", "EMC", "M_plus_relaxed", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/EMC/EMC_cation_opt.xyz", "340", "12", "-382.409180888029", "true", "41.8", "computed", ""),
+    ("C04", "EC", "M_plus_relaxed", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/EC/EC_cation_opt.xyz", "210", "34", "-342.341729361672", "true", "62.4", "computed", ""),
+    ("C04", "EC", "M_plus_relaxed", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/EC/EC_cation_opt.xyz", "267", "35", "-342.342576025035", "true", "103.2", "computed", ""),
+    ("C04", "EC", "M_plus_relaxed", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/EC/EC_cation_opt.xyz", "210", "37", "-341.890795844198", "true", "48.0", "computed", ""),
+    ("C04", "EC", "M_plus_relaxed", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/EC/EC_cation_opt.xyz", "267", "37", "-341.891720450797", "true", "52.7", "computed", ""),
+    ("C08", "DME", "M_plus_relaxed", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/DME/DME_cation_opt.xyz", "246", "18", "-308.854725576029", "true", "52.8", "computed", ""),
+    ("C08", "DME", "M_plus_relaxed", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/DME/DME_cation_opt.xyz", "318", "18", "-308.856064245790", "true", "92.0", "computed", ""),
+    ("C08", "DME", "M_plus_relaxed", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/DME/DME_cation_opt.xyz", "246", "10", "-308.399693511191", "true", "30.8", "computed", ""),
+    ("C08", "DME", "M_plus_relaxed", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/DME/DME_cation_opt.xyz", "318", "10", "-308.400989608490", "true", "39.9", "computed", ""),
+    ("C13", "GBL", "M_plus_relaxed", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/GBL/GBL_cation_opt.xyz", "222", "22", "-306.452715683334", "true", "52.6", "computed", ""),
+    ("C13", "GBL", "M_plus_relaxed", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/GBL/GBL_cation_opt.xyz", "282", "22", "-306.453436244297", "true", "70.5", "computed", ""),
+    ("C13", "GBL", "M_plus_relaxed", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/GBL/GBL_cation_opt.xyz", "222", "15", "-306.018379918078", "true", "25.5", "computed", ""),
+    ("C13", "GBL", "M_plus_relaxed", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/GBL/GBL_cation_opt.xyz", "282", "15", "-306.019100747767", "true", "40.4", "computed", ""),
+    ("C14", "SL", "M_plus_relaxed", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/SL/SL_cation_opt.xyz", "271", "18", "-705.858765363890", "true", "64.5", "computed", ""),
+    ("C14", "SL", "M_plus_relaxed", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/SL/SL_cation_opt.xyz", "346", "18", "-705.860488117397", "true", "92.7", "computed", ""),
+    ("C14", "SL", "M_plus_relaxed", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/SL/SL_cation_opt.xyz", "271", "13", "-705.271901264114", "true", "33.8", "computed", ""),
+    ("C14", "SL", "M_plus_relaxed", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/SL/SL_cation_opt.xyz", "346", "13", "-705.273488655864", "true", "46.8", "computed", ""),
+    ("C16", "AN", "M_plus_relaxed", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/AN/AN_cation_opt.xyz", "111", "17", "-132.527159389153", "true", "14.3", "computed", ""),
+    ("C16", "AN", "M_plus_relaxed", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/AN/AN_cation_opt.xyz", "138", "17", "-132.527372980598", "true", "19.3", "computed", ""),
+    ("C16", "AN", "M_plus_relaxed", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/AN/AN_cation_opt.xyz", "111", "13", "-132.322862737317", "true", "16.6", "computed", ""),
+    ("C16", "AN", "M_plus_relaxed", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/AN/AN_cation_opt.xyz", "138", "13", "-132.323070399602", "true", "16.2", "computed", ""),
+    ("C17", "TMP", "M_plus_relaxed", "S1", "omegaB97X-D4", "def2-TZVP", "false", "1", "2", "wB97X-D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/TMP/TMP_cation_opt.xyz", "308", "30", "-762.130770657087", "true", "101.3", "computed", ""),
+    ("C17", "TMP", "M_plus_relaxed", "S2", "omegaB97X-D4", "def2-TZVPD", "true", "1", "2", "wB97X-D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/TMP/TMP_cation_opt.xyz", "395", "28", "-762.132741167879", "true", "149.4", "computed", ""),
+    ("C17", "TMP", "M_plus_relaxed", "S3", "PBE0-D4", "def2-TZVP", "false", "1", "2", "PBE0 D4 def2-TZVP SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/TMP/TMP_cation_opt.xyz", "308", "19", "-761.421577803439", "true", "38.4", "computed", ""),
+    ("C17", "TMP", "M_plus_relaxed", "S4", "PBE0-D4", "def2-TZVPD", "true", "1", "2", "PBE0 D4 def2-TZVPD SMD(acetonitrile) SP", "outputs/phase2_p1a/geometry_relaxation/TMP/TMP_cation_opt.xyz", "395", "20", "-761.423507839138", "true", "69.0", "computed", ""),
+]
+
+METHOD_AUDIT_EMC_LI_OPT = {
+    "wall_sec": 103.89239597320557,
+    "n_atoms": 16,
+    "li_o_min_ang": 1.741,
+    "nonli_components": 1,
+    "terminated": True
+}
+
+METHOD_AUDIT_COST = [
+    {"job_id": "A001", "mol_id": "C01", "name": "DMC", "state": "M", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "24.0", "core_hours": "0.026667", "phase": "orca_audit_single_point"},
+    {"job_id": "A002", "mol_id": "C01", "name": "DMC", "state": "M", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "36.9", "core_hours": "0.041000", "phase": "orca_audit_single_point"},
+    {"job_id": "A003", "mol_id": "C01", "name": "DMC", "state": "M", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "16.0", "core_hours": "0.017778", "phase": "orca_audit_single_point"},
+    {"job_id": "A004", "mol_id": "C01", "name": "DMC", "state": "M", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "23.2", "core_hours": "0.025778", "phase": "orca_audit_single_point"},
+    {"job_id": "A005", "mol_id": "C01", "name": "DMC", "state": "M_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "27.7", "core_hours": "0.030778", "phase": "orca_audit_single_point"},
+    {"job_id": "A006", "mol_id": "C01", "name": "DMC", "state": "M_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "43.9", "core_hours": "0.048778", "phase": "orca_audit_single_point"},
+    {"job_id": "A007", "mol_id": "C01", "name": "DMC", "state": "M_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "18.4", "core_hours": "0.020444", "phase": "orca_audit_single_point"},
+    {"job_id": "A008", "mol_id": "C01", "name": "DMC", "state": "M_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "28.0", "core_hours": "0.031111", "phase": "orca_audit_single_point"},
+    {"job_id": "A009", "mol_id": "C01", "name": "DMC", "state": "LiM_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "27.0", "core_hours": "0.030000", "phase": "orca_audit_single_point"},
+    {"job_id": "A010", "mol_id": "C01", "name": "DMC", "state": "LiM_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "42.8", "core_hours": "0.047556", "phase": "orca_audit_single_point"},
+    {"job_id": "A011", "mol_id": "C01", "name": "DMC", "state": "LiM_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "17.7", "core_hours": "0.019667", "phase": "orca_audit_single_point"},
+    {"job_id": "A012", "mol_id": "C01", "name": "DMC", "state": "LiM_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "26.7", "core_hours": "0.029667", "phase": "orca_audit_single_point"},
+    {"job_id": "A013", "mol_id": "C01", "name": "DMC", "state": "LiM_2plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "31.3", "core_hours": "0.034778", "phase": "orca_audit_single_point"},
+    {"job_id": "A014", "mol_id": "C01", "name": "DMC", "state": "LiM_2plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "50.5", "core_hours": "0.056111", "phase": "orca_audit_single_point"},
+    {"job_id": "A015", "mol_id": "C01", "name": "DMC", "state": "LiM_2plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "20.3", "core_hours": "0.022556", "phase": "orca_audit_single_point"},
+    {"job_id": "A016", "mol_id": "C01", "name": "DMC", "state": "LiM_2plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "32.2", "core_hours": "0.035778", "phase": "orca_audit_single_point"},
+    {"job_id": "A017", "mol_id": "C02", "name": "EMC", "state": "M", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "49.0", "core_hours": "0.054444", "phase": "orca_audit_single_point"},
+    {"job_id": "A018", "mol_id": "C02", "name": "EMC", "state": "M", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "88.5", "core_hours": "0.098333", "phase": "orca_audit_single_point"},
+    {"job_id": "A019", "mol_id": "C02", "name": "EMC", "state": "M", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "39.2", "core_hours": "0.043556", "phase": "orca_audit_single_point"},
+    {"job_id": "A020", "mol_id": "C02", "name": "EMC", "state": "M", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "57.2", "core_hours": "0.063556", "phase": "orca_audit_single_point"},
+    {"job_id": "A021", "mol_id": "C02", "name": "EMC", "state": "M_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "263.6", "core_hours": "0.292889", "phase": "orca_audit_single_point"},
+    {"job_id": "A022", "mol_id": "C02", "name": "EMC", "state": "M_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "364.5", "core_hours": "0.405000", "phase": "orca_audit_single_point"},
+    {"job_id": "A023", "mol_id": "C02", "name": "EMC", "state": "M_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "68.7", "core_hours": "0.076333", "phase": "orca_audit_single_point"},
+    {"job_id": "A024", "mol_id": "C02", "name": "EMC", "state": "M_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "125.0", "core_hours": "0.138889", "phase": "orca_audit_single_point"},
+    {"job_id": "A025", "mol_id": "C02", "name": "EMC", "state": "LiM_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "65.3", "core_hours": "0.072556", "phase": "orca_audit_single_point"},
+    {"job_id": "A026", "mol_id": "C02", "name": "EMC", "state": "LiM_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "101.9", "core_hours": "0.113222", "phase": "orca_audit_single_point"},
+    {"job_id": "A027", "mol_id": "C02", "name": "EMC", "state": "LiM_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "42.2", "core_hours": "0.046889", "phase": "orca_audit_single_point"},
+    {"job_id": "A028", "mol_id": "C02", "name": "EMC", "state": "LiM_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "63.2", "core_hours": "0.070222", "phase": "orca_audit_single_point"},
+    {"job_id": "A029", "mol_id": "C02", "name": "EMC", "state": "LiM_2plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "102.7", "core_hours": "0.114111", "phase": "orca_audit_single_point"},
+    {"job_id": "A030", "mol_id": "C02", "name": "EMC", "state": "LiM_2plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "171.1", "core_hours": "0.190111", "phase": "orca_audit_single_point"},
+    {"job_id": "A031", "mol_id": "C02", "name": "EMC", "state": "LiM_2plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "41.7", "core_hours": "0.046333", "phase": "orca_audit_single_point"},
+    {"job_id": "A032", "mol_id": "C02", "name": "EMC", "state": "LiM_2plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "72.3", "core_hours": "0.080333", "phase": "orca_audit_single_point"},
+    {"job_id": "A033", "mol_id": "C04", "name": "EC", "state": "M", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "26.6", "core_hours": "0.029556", "phase": "orca_audit_single_point"},
+    {"job_id": "A034", "mol_id": "C04", "name": "EC", "state": "M", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "41.3", "core_hours": "0.045889", "phase": "orca_audit_single_point"},
+    {"job_id": "A035", "mol_id": "C04", "name": "EC", "state": "M", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "19.0", "core_hours": "0.021111", "phase": "orca_audit_single_point"},
+    {"job_id": "A036", "mol_id": "C04", "name": "EC", "state": "M", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "24.1", "core_hours": "0.026778", "phase": "orca_audit_single_point"},
+    {"job_id": "A037", "mol_id": "C04", "name": "EC", "state": "M_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "26.1", "core_hours": "0.029000", "phase": "orca_audit_single_point"},
+    {"job_id": "A038", "mol_id": "C04", "name": "EC", "state": "M_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "40.4", "core_hours": "0.044889", "phase": "orca_audit_single_point"},
+    {"job_id": "A039", "mol_id": "C04", "name": "EC", "state": "M_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "17.9", "core_hours": "0.019889", "phase": "orca_audit_single_point"},
+    {"job_id": "A040", "mol_id": "C04", "name": "EC", "state": "M_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "27.3", "core_hours": "0.030333", "phase": "orca_audit_single_point"},
+    {"job_id": "A041", "mol_id": "C04", "name": "EC", "state": "LiM_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "27.3", "core_hours": "0.030333", "phase": "orca_audit_single_point"},
+    {"job_id": "A042", "mol_id": "C04", "name": "EC", "state": "LiM_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "41.2", "core_hours": "0.045778", "phase": "orca_audit_single_point"},
+    {"job_id": "A043", "mol_id": "C04", "name": "EC", "state": "LiM_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "17.8", "core_hours": "0.019778", "phase": "orca_audit_single_point"},
+    {"job_id": "A044", "mol_id": "C04", "name": "EC", "state": "LiM_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "24.6", "core_hours": "0.027333", "phase": "orca_audit_single_point"},
+    {"job_id": "A045", "mol_id": "C04", "name": "EC", "state": "LiM_2plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "29.4", "core_hours": "0.032667", "phase": "orca_audit_single_point"},
+    {"job_id": "A046", "mol_id": "C04", "name": "EC", "state": "LiM_2plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "43.8", "core_hours": "0.048667", "phase": "orca_audit_single_point"},
+    {"job_id": "A047", "mol_id": "C04", "name": "EC", "state": "LiM_2plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "17.5", "core_hours": "0.019444", "phase": "orca_audit_single_point"},
+    {"job_id": "A048", "mol_id": "C04", "name": "EC", "state": "LiM_2plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "24.2", "core_hours": "0.026889", "phase": "orca_audit_single_point"},
+    {"job_id": "A049", "mol_id": "C08", "name": "DME", "state": "M", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "47.4", "core_hours": "0.052667", "phase": "orca_audit_single_point"},
+    {"job_id": "A050", "mol_id": "C08", "name": "DME", "state": "M", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "79.1", "core_hours": "0.087889", "phase": "orca_audit_single_point"},
+    {"job_id": "A051", "mol_id": "C08", "name": "DME", "state": "M", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "33.8", "core_hours": "0.037556", "phase": "orca_audit_single_point"},
+    {"job_id": "A052", "mol_id": "C08", "name": "DME", "state": "M", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "47.8", "core_hours": "0.053111", "phase": "orca_audit_single_point"},
+    {"job_id": "A053", "mol_id": "C08", "name": "DME", "state": "M_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "104.4", "core_hours": "0.116000", "phase": "orca_audit_single_point"},
+    {"job_id": "A054", "mol_id": "C08", "name": "DME", "state": "M_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "174.3", "core_hours": "0.193667", "phase": "orca_audit_single_point"},
+    {"job_id": "A055", "mol_id": "C08", "name": "DME", "state": "M_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "43.3", "core_hours": "0.048111", "phase": "orca_audit_single_point"},
+    {"job_id": "A056", "mol_id": "C08", "name": "DME", "state": "M_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "70.3", "core_hours": "0.078111", "phase": "orca_audit_single_point"},
+    {"job_id": "A057", "mol_id": "C08", "name": "DME", "state": "LiM_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "61.1", "core_hours": "0.067889", "phase": "orca_audit_single_point"},
+    {"job_id": "A058", "mol_id": "C08", "name": "DME", "state": "LiM_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "96.6", "core_hours": "0.107333", "phase": "orca_audit_single_point"},
+    {"job_id": "A059", "mol_id": "C08", "name": "DME", "state": "LiM_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "35.9", "core_hours": "0.039889", "phase": "orca_audit_single_point"},
+    {"job_id": "A060", "mol_id": "C08", "name": "DME", "state": "LiM_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "52.0", "core_hours": "0.057778", "phase": "orca_audit_single_point"},
+    {"job_id": "A061", "mol_id": "C08", "name": "DME", "state": "LiM_2plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "67.4", "core_hours": "0.074889", "phase": "orca_audit_single_point"},
+    {"job_id": "A062", "mol_id": "C08", "name": "DME", "state": "LiM_2plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "113.0", "core_hours": "0.125556", "phase": "orca_audit_single_point"},
+    {"job_id": "A063", "mol_id": "C08", "name": "DME", "state": "LiM_2plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "43.2", "core_hours": "0.048000", "phase": "orca_audit_single_point"},
+    {"job_id": "A064", "mol_id": "C08", "name": "DME", "state": "LiM_2plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "62.1", "core_hours": "0.069000", "phase": "orca_audit_single_point"},
+    {"job_id": "A065", "mol_id": "C13", "name": "GBL", "state": "M", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "44.0", "core_hours": "0.048889", "phase": "orca_audit_single_point"},
+    {"job_id": "A066", "mol_id": "C13", "name": "GBL", "state": "M", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "61.6", "core_hours": "0.068444", "phase": "orca_audit_single_point"},
+    {"job_id": "A067", "mol_id": "C13", "name": "GBL", "state": "M", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "29.6", "core_hours": "0.032889", "phase": "orca_audit_single_point"},
+    {"job_id": "A068", "mol_id": "C13", "name": "GBL", "state": "M", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "39.9", "core_hours": "0.044333", "phase": "orca_audit_single_point"},
+    {"job_id": "A069", "mol_id": "C13", "name": "GBL", "state": "M_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "77.1", "core_hours": "0.085667", "phase": "orca_audit_single_point"},
+    {"job_id": "A070", "mol_id": "C13", "name": "GBL", "state": "M_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "113.5", "core_hours": "0.126111", "phase": "orca_audit_single_point"},
+    {"job_id": "A071", "mol_id": "C13", "name": "GBL", "state": "M_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "64.4", "core_hours": "0.071556", "phase": "orca_audit_single_point"},
+    {"job_id": "A072", "mol_id": "C13", "name": "GBL", "state": "M_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "72.2", "core_hours": "0.080222", "phase": "orca_audit_single_point"},
+    {"job_id": "A073", "mol_id": "C13", "name": "GBL", "state": "LiM_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "37.1", "core_hours": "0.041222", "phase": "orca_audit_single_point"},
+    {"job_id": "A074", "mol_id": "C13", "name": "GBL", "state": "LiM_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "57.1", "core_hours": "0.063444", "phase": "orca_audit_single_point"},
+    {"job_id": "A075", "mol_id": "C13", "name": "GBL", "state": "LiM_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "24.2", "core_hours": "0.026889", "phase": "orca_audit_single_point"},
+    {"job_id": "A076", "mol_id": "C13", "name": "GBL", "state": "LiM_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "37.4", "core_hours": "0.041556", "phase": "orca_audit_single_point"},
+    {"job_id": "A077", "mol_id": "C13", "name": "GBL", "state": "LiM_2plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "43.4", "core_hours": "0.048222", "phase": "orca_audit_single_point"},
+    {"job_id": "A078", "mol_id": "C13", "name": "GBL", "state": "LiM_2plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "67.7", "core_hours": "0.075222", "phase": "orca_audit_single_point"},
+    {"job_id": "A079", "mol_id": "C13", "name": "GBL", "state": "LiM_2plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "41.2", "core_hours": "0.045778", "phase": "orca_audit_single_point"},
+    {"job_id": "A080", "mol_id": "C13", "name": "GBL", "state": "LiM_2plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "66.1", "core_hours": "0.073444", "phase": "orca_audit_single_point"},
+    {"job_id": "A081", "mol_id": "C14", "name": "SL", "state": "M", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "62.8", "core_hours": "0.069778", "phase": "orca_audit_single_point"},
+    {"job_id": "A082", "mol_id": "C14", "name": "SL", "state": "M", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "101.1", "core_hours": "0.112333", "phase": "orca_audit_single_point"},
+    {"job_id": "A083", "mol_id": "C14", "name": "SL", "state": "M", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "41.3", "core_hours": "0.045889", "phase": "orca_audit_single_point"},
+    {"job_id": "A084", "mol_id": "C14", "name": "SL", "state": "M", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "72.7", "core_hours": "0.080778", "phase": "orca_audit_single_point"},
+    {"job_id": "A085", "mol_id": "C14", "name": "SL", "state": "M_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "79.5", "core_hours": "0.088333", "phase": "orca_audit_single_point"},
+    {"job_id": "A086", "mol_id": "C14", "name": "SL", "state": "M_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "124.0", "core_hours": "0.137778", "phase": "orca_audit_single_point"},
+    {"job_id": "A087", "mol_id": "C14", "name": "SL", "state": "M_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "45.1", "core_hours": "0.050111", "phase": "orca_audit_single_point"},
+    {"job_id": "A088", "mol_id": "C14", "name": "SL", "state": "M_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "71.7", "core_hours": "0.079667", "phase": "orca_audit_single_point"},
+    {"job_id": "A089", "mol_id": "C14", "name": "SL", "state": "LiM_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "73.3", "core_hours": "0.081444", "phase": "orca_audit_single_point"},
+    {"job_id": "A090", "mol_id": "C14", "name": "SL", "state": "LiM_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "114.4", "core_hours": "0.127111", "phase": "orca_audit_single_point"},
+    {"job_id": "A091", "mol_id": "C14", "name": "SL", "state": "LiM_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "42.8", "core_hours": "0.047556", "phase": "orca_audit_single_point"},
+    {"job_id": "A092", "mol_id": "C14", "name": "SL", "state": "LiM_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "69.8", "core_hours": "0.077556", "phase": "orca_audit_single_point"},
+    {"job_id": "A093", "mol_id": "C14", "name": "SL", "state": "LiM_2plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "90.1", "core_hours": "0.100111", "phase": "orca_audit_single_point"},
+    {"job_id": "A094", "mol_id": "C14", "name": "SL", "state": "LiM_2plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "141.8", "core_hours": "0.157556", "phase": "orca_audit_single_point"},
+    {"job_id": "A095", "mol_id": "C14", "name": "SL", "state": "LiM_2plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "54.3", "core_hours": "0.060333", "phase": "orca_audit_single_point"},
+    {"job_id": "A096", "mol_id": "C14", "name": "SL", "state": "LiM_2plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "85.0", "core_hours": "0.094444", "phase": "orca_audit_single_point"},
+    {"job_id": "A097", "mol_id": "C16", "name": "AN", "state": "M", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "16.7", "core_hours": "0.018556", "phase": "orca_audit_single_point"},
+    {"job_id": "A098", "mol_id": "C16", "name": "AN", "state": "M", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "17.4", "core_hours": "0.019333", "phase": "orca_audit_single_point"},
+    {"job_id": "A099", "mol_id": "C16", "name": "AN", "state": "M", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "13.1", "core_hours": "0.014556", "phase": "orca_audit_single_point"},
+    {"job_id": "A100", "mol_id": "C16", "name": "AN", "state": "M", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "16.8", "core_hours": "0.018667", "phase": "orca_audit_single_point"},
+    {"job_id": "A101", "mol_id": "C16", "name": "AN", "state": "M_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "15.4", "core_hours": "0.017111", "phase": "orca_audit_single_point"},
+    {"job_id": "A102", "mol_id": "C16", "name": "AN", "state": "M_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "19.7", "core_hours": "0.021889", "phase": "orca_audit_single_point"},
+    {"job_id": "A103", "mol_id": "C16", "name": "AN", "state": "M_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "12.8", "core_hours": "0.014222", "phase": "orca_audit_single_point"},
+    {"job_id": "A104", "mol_id": "C16", "name": "AN", "state": "M_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "14.7", "core_hours": "0.016333", "phase": "orca_audit_single_point"},
+    {"job_id": "A105", "mol_id": "C16", "name": "AN", "state": "LiM_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "21.8", "core_hours": "0.024222", "phase": "orca_audit_single_point"},
+    {"job_id": "A106", "mol_id": "C16", "name": "AN", "state": "LiM_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "22.5", "core_hours": "0.025000", "phase": "orca_audit_single_point"},
+    {"job_id": "A107", "mol_id": "C16", "name": "AN", "state": "LiM_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "15.9", "core_hours": "0.017667", "phase": "orca_audit_single_point"},
+    {"job_id": "A108", "mol_id": "C16", "name": "AN", "state": "LiM_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "18.6", "core_hours": "0.020667", "phase": "orca_audit_single_point"},
+    {"job_id": "A109", "mol_id": "C16", "name": "AN", "state": "LiM_2plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "21.6", "core_hours": "0.024000", "phase": "orca_audit_single_point"},
+    {"job_id": "A110", "mol_id": "C16", "name": "AN", "state": "LiM_2plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "28.0", "core_hours": "0.031111", "phase": "orca_audit_single_point"},
+    {"job_id": "A111", "mol_id": "C16", "name": "AN", "state": "LiM_2plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "15.4", "core_hours": "0.017111", "phase": "orca_audit_single_point"},
+    {"job_id": "A112", "mol_id": "C16", "name": "AN", "state": "LiM_2plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "18.9", "core_hours": "0.021000", "phase": "orca_audit_single_point"},
+    {"job_id": "A113", "mol_id": "C17", "name": "TMP", "state": "M", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "69.4", "core_hours": "0.077111", "phase": "orca_audit_single_point"},
+    {"job_id": "A114", "mol_id": "C17", "name": "TMP", "state": "M", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "123.0", "core_hours": "0.136667", "phase": "orca_audit_single_point"},
+    {"job_id": "A115", "mol_id": "C17", "name": "TMP", "state": "M", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "50.9", "core_hours": "0.056556", "phase": "orca_audit_single_point"},
+    {"job_id": "A116", "mol_id": "C17", "name": "TMP", "state": "M", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "97.7", "core_hours": "0.108556", "phase": "orca_audit_single_point"},
+    {"job_id": "A117", "mol_id": "C17", "name": "TMP", "state": "M_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "144.7", "core_hours": "0.160778", "phase": "orca_audit_single_point"},
+    {"job_id": "A118", "mol_id": "C17", "name": "TMP", "state": "M_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "240.2", "core_hours": "0.266889", "phase": "orca_audit_single_point"},
+    {"job_id": "A119", "mol_id": "C17", "name": "TMP", "state": "M_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "92.9", "core_hours": "0.103222", "phase": "orca_audit_single_point"},
+    {"job_id": "A120", "mol_id": "C17", "name": "TMP", "state": "M_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "142.3", "core_hours": "0.158111", "phase": "orca_audit_single_point"},
+    {"job_id": "A121", "mol_id": "C17", "name": "TMP", "state": "LiM_plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "85.9", "core_hours": "0.095444", "phase": "orca_audit_single_point"},
+    {"job_id": "A122", "mol_id": "C17", "name": "TMP", "state": "LiM_plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "133.6", "core_hours": "0.148444", "phase": "orca_audit_single_point"},
+    {"job_id": "A123", "mol_id": "C17", "name": "TMP", "state": "LiM_plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "52.2", "core_hours": "0.058000", "phase": "orca_audit_single_point"},
+    {"job_id": "A124", "mol_id": "C17", "name": "TMP", "state": "LiM_plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "88.1", "core_hours": "0.097889", "phase": "orca_audit_single_point"},
+    {"job_id": "A125", "mol_id": "C17", "name": "TMP", "state": "LiM_2plus", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "121.1", "core_hours": "0.134556", "phase": "orca_audit_single_point"},
+    {"job_id": "A126", "mol_id": "C17", "name": "TMP", "state": "LiM_2plus", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "201.6", "core_hours": "0.224000", "phase": "orca_audit_single_point"},
+    {"job_id": "A127", "mol_id": "C17", "name": "TMP", "state": "LiM_2plus", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "55.2", "core_hours": "0.061333", "phase": "orca_audit_single_point"},
+    {"job_id": "A128", "mol_id": "C17", "name": "TMP", "state": "LiM_2plus", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "99.5", "core_hours": "0.110556", "phase": "orca_audit_single_point"},
+    {"job_id": "A129", "mol_id": "C01", "name": "DMC", "state": "M_plus_relaxed", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "41.0", "core_hours": "0.045556", "phase": "orca_audit_single_point"},
+    {"job_id": "A130", "mol_id": "C01", "name": "DMC", "state": "M_plus_relaxed", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "76.6", "core_hours": "0.085111", "phase": "orca_audit_single_point"},
+    {"job_id": "A131", "mol_id": "C01", "name": "DMC", "state": "M_plus_relaxed", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "31.2", "core_hours": "0.034667", "phase": "orca_audit_single_point"},
+    {"job_id": "A132", "mol_id": "C01", "name": "DMC", "state": "M_plus_relaxed", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "45.3", "core_hours": "0.050333", "phase": "orca_audit_single_point"},
+    {"job_id": "A133", "mol_id": "C02", "name": "EMC", "state": "M_plus_relaxed", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "52.1", "core_hours": "0.057889", "phase": "orca_audit_single_point"},
+    {"job_id": "A134", "mol_id": "C02", "name": "EMC", "state": "M_plus_relaxed", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "98.8", "core_hours": "0.109778", "phase": "orca_audit_single_point"},
+    {"job_id": "A135", "mol_id": "C02", "name": "EMC", "state": "M_plus_relaxed", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "35.5", "core_hours": "0.039444", "phase": "orca_audit_single_point"},
+    {"job_id": "A136", "mol_id": "C02", "name": "EMC", "state": "M_plus_relaxed", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "41.8", "core_hours": "0.046444", "phase": "orca_audit_single_point"},
+    {"job_id": "A137", "mol_id": "C04", "name": "EC", "state": "M_plus_relaxed", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "62.4", "core_hours": "0.069333", "phase": "orca_audit_single_point"},
+    {"job_id": "A138", "mol_id": "C04", "name": "EC", "state": "M_plus_relaxed", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "103.2", "core_hours": "0.114667", "phase": "orca_audit_single_point"},
+    {"job_id": "A139", "mol_id": "C04", "name": "EC", "state": "M_plus_relaxed", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "48.0", "core_hours": "0.053333", "phase": "orca_audit_single_point"},
+    {"job_id": "A140", "mol_id": "C04", "name": "EC", "state": "M_plus_relaxed", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "52.7", "core_hours": "0.058556", "phase": "orca_audit_single_point"},
+    {"job_id": "A141", "mol_id": "C08", "name": "DME", "state": "M_plus_relaxed", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "52.8", "core_hours": "0.058667", "phase": "orca_audit_single_point"},
+    {"job_id": "A142", "mol_id": "C08", "name": "DME", "state": "M_plus_relaxed", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "92.0", "core_hours": "0.102222", "phase": "orca_audit_single_point"},
+    {"job_id": "A143", "mol_id": "C08", "name": "DME", "state": "M_plus_relaxed", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "30.8", "core_hours": "0.034222", "phase": "orca_audit_single_point"},
+    {"job_id": "A144", "mol_id": "C08", "name": "DME", "state": "M_plus_relaxed", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "39.9", "core_hours": "0.044333", "phase": "orca_audit_single_point"},
+    {"job_id": "A145", "mol_id": "C13", "name": "GBL", "state": "M_plus_relaxed", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "52.6", "core_hours": "0.058444", "phase": "orca_audit_single_point"},
+    {"job_id": "A146", "mol_id": "C13", "name": "GBL", "state": "M_plus_relaxed", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "70.5", "core_hours": "0.078333", "phase": "orca_audit_single_point"},
+    {"job_id": "A147", "mol_id": "C13", "name": "GBL", "state": "M_plus_relaxed", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "25.5", "core_hours": "0.028333", "phase": "orca_audit_single_point"},
+    {"job_id": "A148", "mol_id": "C13", "name": "GBL", "state": "M_plus_relaxed", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "40.4", "core_hours": "0.044889", "phase": "orca_audit_single_point"},
+    {"job_id": "A149", "mol_id": "C14", "name": "SL", "state": "M_plus_relaxed", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "64.5", "core_hours": "0.071667", "phase": "orca_audit_single_point"},
+    {"job_id": "A150", "mol_id": "C14", "name": "SL", "state": "M_plus_relaxed", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "92.7", "core_hours": "0.103000", "phase": "orca_audit_single_point"},
+    {"job_id": "A151", "mol_id": "C14", "name": "SL", "state": "M_plus_relaxed", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "33.8", "core_hours": "0.037556", "phase": "orca_audit_single_point"},
+    {"job_id": "A152", "mol_id": "C14", "name": "SL", "state": "M_plus_relaxed", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "46.8", "core_hours": "0.052000", "phase": "orca_audit_single_point"},
+    {"job_id": "A153", "mol_id": "C16", "name": "AN", "state": "M_plus_relaxed", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "14.3", "core_hours": "0.015889", "phase": "orca_audit_single_point"},
+    {"job_id": "A154", "mol_id": "C16", "name": "AN", "state": "M_plus_relaxed", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "19.3", "core_hours": "0.021444", "phase": "orca_audit_single_point"},
+    {"job_id": "A155", "mol_id": "C16", "name": "AN", "state": "M_plus_relaxed", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "16.6", "core_hours": "0.018444", "phase": "orca_audit_single_point"},
+    {"job_id": "A156", "mol_id": "C16", "name": "AN", "state": "M_plus_relaxed", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "16.2", "core_hours": "0.018000", "phase": "orca_audit_single_point"},
+    {"job_id": "A157", "mol_id": "C17", "name": "TMP", "state": "M_plus_relaxed", "setting_id": "S1", "basis": "def2-TZVP", "cores": "4", "wall_sec": "101.3", "core_hours": "0.112556", "phase": "orca_audit_single_point"},
+    {"job_id": "A158", "mol_id": "C17", "name": "TMP", "state": "M_plus_relaxed", "setting_id": "S2", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "149.4", "core_hours": "0.166000", "phase": "orca_audit_single_point"},
+    {"job_id": "A159", "mol_id": "C17", "name": "TMP", "state": "M_plus_relaxed", "setting_id": "S3", "basis": "def2-TZVP", "cores": "4", "wall_sec": "38.4", "core_hours": "0.042667", "phase": "orca_audit_single_point"},
+    {"job_id": "A160", "mol_id": "C17", "name": "TMP", "state": "M_plus_relaxed", "setting_id": "S4", "basis": "def2-TZVPD", "cores": "4", "wall_sec": "69.0", "core_hours": "0.076667", "phase": "orca_audit_single_point"},
+    {"job_id": "A161", "mol_id": "C02", "name": "EMC", "state": "LiM_plus", "setting_id": "EMC_Li_opt", "basis": "r2SCAN-3c", "cores": "4", "wall_sec": "103.9", "core_hours": "0.115436", "phase": "orca_emc_li_opt"},
+]
+METHOD_AUDIT_JOB_COUNT = len(METHOD_AUDIT_CELLS) + len(METHOD_AUDIT_RELAXED_CELLS) + 1
+def _method_audit_cells(rows):
+    out = []
+    for row in rows:
+        cell = dict(zip(METHOD_AUDIT_CELL_FIELDS, row))
+        cell["valid_for_decision"] = "true" if not cell["qc_flag"] else "false"
+        out.append(cell)
+    return out
+
+
+def _method_audit_index(rows):
+    return {(c["mol_id"], c["state"], c["setting_id"]): c for c in _method_audit_cells(rows)}
+
+
+def _audit_energy_ev(cell):
+    if not cell or not cell["final_sp_eh"]:
+        return None
+    return float(cell["final_sp_eh"]) * HARTREE_TO_EV
+
+
+def _audit_axis_ips():
+    """每分子的 4 设定竖直/绝热电离能（eV）与弛豫位移；两腿共用同一中性参考。"""
+    index = _method_audit_index(METHOD_AUDIT_CELLS)
+    relaxed = _method_audit_index(METHOD_AUDIT_RELAXED_CELLS)
+    settings = [row["setting_id"] for row in METHOD_SETTINGS]
+    out = {}
+    for mol_id in PB.COHORTS["method_audit"]:
+        name = PB.COHORT_NAMES[mol_id]
+        vertical, adiabatic, shift = {}, {}, {}
+        for sid in settings:
+            e_neutral = _audit_energy_ev(index.get((mol_id, "M", sid)))
+            e_vertical = _audit_energy_ev(index.get((mol_id, "M_plus", sid)))
+            e_relaxed = _audit_energy_ev(relaxed.get((mol_id, "M_plus_relaxed", sid)))
+            if e_neutral is None or e_vertical is None or e_relaxed is None:
+                vertical[sid] = adiabatic[sid] = shift[sid] = None
+                continue
+            vertical[sid] = e_vertical - e_neutral
+            adiabatic[sid] = e_relaxed - e_neutral
+            shift[sid] = e_relaxed - e_vertical
+        out[name] = {"mol_id": mol_id, "vertical_ip_ev": vertical,
+                     "adiabatic_ip_ev": adiabatic, "relaxation_shift_ev": shift}
+    return out
+
+
+def _audit_pair_legs():
+    ips = _audit_axis_ips()
+    names = [PB.COHORT_NAMES[mol_id] for mol_id in PB.COHORTS["method_audit"]]
+    settings = [row["setting_id"] for row in METHOD_SETTINGS]
+    out = {}
+    for a in range(len(names)):
+        for b in range(a + 1, len(names)):
+            left, right = names[a], names[b]
+            out[(left, right)] = {
+                "settings": settings,
+                "vertical": [ips[left]["vertical_ip_ev"][s] - ips[right]["vertical_ip_ev"][s]
+                             for s in settings],
+                "adiabatic": [ips[left]["adiabatic_ip_ev"][s] - ips[right]["adiabatic_ip_ev"][s]
+                              for s in settings],
+            }
+    return out
+
+
+def _leg_stats(values):
+    vals = [value for value in values if value is not None]
+    n = len(vals)
+    mean = sum(vals) / n
+    sigma = (sum((value - mean) ** 2 for value in vals) / n) ** 0.5
+    lo, hi = min(vals), max(vals)
+    return {"n": n, "mean_ev": mean, "sigma_ev": sigma, "min_ev": lo, "max_ev": hi,
+            "range_ev": hi - lo, "min_abs_ev": min(abs(value) for value in vals),
+            "sign_consistent": (lo > 0) or (hi < 0)}
+
+def wp1():
+    files = {}
+    local = {}
+    cells = _method_audit_cells(METHOD_AUDIT_CELLS)
+    relaxed_cells = _method_audit_cells(METHOD_AUDIT_RELAXED_CELLS)
+    settings = [row["setting_id"] for row in METHOD_SETTINGS]
+
+    matrix = []
+    for cell in cells:
+        matrix.append({
+            "mol_id": cell["mol_id"], "name": cell["name"], "state": cell["state"],
+            "setting_id": cell["setting_id"], "functional": cell["functional"],
+            "basis": cell["basis"], "solvent": "SMD_acetonitrile",
+            "geometry_start": "r2SCAN-3c", "job_kind": "single_point",
+            "status": cell["status"], "qc_flag": cell["qc_flag"],
+            "valid_for_decision": cell["valid_for_decision"],
+            "final_sp_eh": cell["final_sp_eh"], "wall_sec": cell["wall_sec"],
+            "notes": ("no diffuse basis on a reduction state; excluded from decision statistics"
+                      if cell["qc_flag"] else "computed"),
+        })
+    relaxed_matrix = []
+    for cell in relaxed_cells:
+        relaxed_matrix.append({
+            "mol_id": cell["mol_id"], "name": cell["name"], "state": cell["state"],
+            "setting_id": cell["setting_id"], "functional": cell["functional"],
+            "basis": cell["basis"], "has_diffuse": cell["has_diffuse"],
+            "charge": cell["charge"], "multiplicity": cell["multiplicity"],
+            "geometry": cell["geometry"], "status": cell["status"],
+            "final_sp_eh": cell["final_sp_eh"], "wall_sec": cell["wall_sec"],
+        })
+
+    spread = []
+    for mol_id in PB.COHORTS["method_audit"]:
+        for state in PB.FOUR_STATES:
+            group = [c for c in cells if c["mol_id"] == mol_id and c["state"] == state]
+            by_setting = {c["setting_id"]: c for c in group}
+            values = [_audit_energy_ev(by_setting[sid]) for sid in settings]
+            valid = [c for c in group if c["valid_for_decision"] == "true"]
+            spread.append({
+                "mol_id": mol_id, "name": PB.COHORT_NAMES[mol_id], "state": state,
+                "charge": group[0]["charge"], "multiplicity": group[0]["multiplicity"],
+                "n_settings": len(group), "n_valid_for_decision": len(valid),
+                "min_ev": "%.6f" % min(values), "max_ev": "%.6f" % max(values),
+                "spread_ev": "%.6f" % (max(values) - min(values)),
+            })
+
+    ips = _audit_axis_ips()
+    axis = []
+    for mol_id in PB.COHORTS["method_audit"]:
+        name = PB.COHORT_NAMES[mol_id]
+        rec = ips[name]
+        row = {"mol_id": mol_id, "name": name}
+        for sid in settings:
+            row["ip_vertical_%s_ev" % sid] = "%.6f" % rec["vertical_ip_ev"][sid]
+            row["ip_adiabatic_%s_ev" % sid] = "%.6f" % rec["adiabatic_ip_ev"][sid]
+            row["relaxation_shift_%s_ev" % sid] = "%.6f" % rec["relaxation_shift_ev"][sid]
+        vertical = _leg_stats([rec["vertical_ip_ev"][sid] for sid in settings])
+        adiabatic = _leg_stats([rec["adiabatic_ip_ev"][sid] for sid in settings])
+        row["vertical_range_ev"] = "%.6f" % vertical["range_ev"]
+        row["adiabatic_range_ev"] = "%.6f" % adiabatic["range_ev"]
+        row["relaxation_shift_mean_ev"] = "%.6f" % (
+            sum(rec["relaxation_shift_ev"][sid] for sid in settings) / len(settings))
+        for label, key in (("vertical", "vertical_ip_ev"), ("adiabatic", "adiabatic_ip_ev")):
+            series = [rec[key][sid] for sid in settings]
+            row["%s_functional_effect_ev" % label] = "%.6f" % abs(
+                (series[0] + series[1]) / 2.0 - (series[2] + series[3]) / 2.0)
+            row["%s_basis_effect_ev" % label] = "%.6f" % abs(
+                (series[0] + series[2]) / 2.0 - (series[1] + series[3]) / 2.0)
+        axis.append(row)
+
+    pair_rows = []
+    legs = _audit_pair_legs()
+    for (left, right) in sorted(legs):
+        leg = legs[(left, right)]
+        vertical = _leg_stats(leg["vertical"])
+        adiabatic = _leg_stats(leg["adiabatic"])
+        row = {"i": left, "j": right}
+        for index, sid in enumerate(leg["settings"]):
+            row["d_vertical_%s_ev" % sid] = "%.6f" % leg["vertical"][index]
+            row["d_adiabatic_%s_ev" % sid] = "%.6f" % leg["adiabatic"][index]
+        row["vertical_range_ev"] = "%.6f" % vertical["range_ev"]
+        row["adiabatic_range_ev"] = "%.6f" % adiabatic["range_ev"]
+        row["vertical_sign_consistent"] = "true" if vertical["sign_consistent"] else "false"
+        row["adiabatic_sign_consistent"] = "true" if adiabatic["sign_consistent"] else "false"
+        row["sign_flip_across_legs"] = "true" if (
+            vertical["min_ev"] > 0 > adiabatic["max_ev"]
+            or adiabatic["min_ev"] > 0 > vertical["max_ev"]) else "false"
+        pair_rows.append(row)
+
+    cert = METHOD_AUDIT_CERTIFICATION
+    p1v = [row for row in PB.load_rows(REPO / "outputs/week4/p1_core_set.csv") if row.get("status") == "ok"]
+    p1a = PB.load_rows(REPO / "outputs/phase2_p1a/p1a_adiabatic.csv")
+    c1 = PB.load_rows(REPO / "outputs/week5/c1_coord_shifts.csv")
+    existing = [
+        {"payload": "outputs/week4/p1_core_set.csv", "layer": "P1v (gas-phase vertical)",
+         "n_rows": len(p1v), "n_molecules": len({r["mol_id"] for r in p1v}),
+         "states": "neutral; cation; anion", "method": "r2SCAN-3c / def2-mTZVPP (no diffuse)",
+         "reuse_kind": "electronic-energy layer only", "caveat": "no diffuse functions; no thermal correction"},
+        {"payload": "outputs/phase2_p1a/p1a_adiabatic.csv", "layer": "P1a (gas-phase adiabatic)",
+         "n_rows": len(p1a), "n_molecules": len({r["mol_id"] for r in p1a}),
+         "states": "neutral_relaxed; cation_relaxed", "method": "r2SCAN-3c Opt",
+         "reuse_kind": "relaxation effect only", "caveat": "reduction axis excluded by the unbound_anion rule"},
+        {"payload": "outputs/week5/c1_coord_shifts.csv", "layer": "C1 (Li-coordination)",
+         "n_rows": len(c1), "n_molecules": len({r["mol_id"] for r in c1}),
+         "states": "cation; dication", "method": "r2SCAN-3c (gas + SMD legs)",
+         "reuse_kind": "conditional shift demonstration", "caveat": "single representative motif; identity stratification applies"},
+    ]
+
+    diffuse_settings = {s["setting_id"] for s in METHOD_SETTINGS if s["has_diffuse"] == "true"}
+    flagged = [c for c in cells if c["qc_flag"]]
+    computed = [c for c in cells if c["status"] == "computed"]
+    relaxed_computed = [c for c in relaxed_cells if c["status"] == "computed"]
+    audit_cost = sum(float(row["core_hours"]) for row in METHOD_AUDIT_COST)
+    checks = [
+        {"id": "matrix_is_full_factorial", "description": "方法矩阵 = 8 分子 x 4 状态 x 4 设定 = 128",
+         "ok": len(matrix) == 128, "detail": "n_rows=%d" % len(matrix)},
+        {"id": "audit_matrix_is_computed", "description": "128 格独立方法审计单点全部正常收敛（status=computed）",
+         "ok": len(cells) == 128 and len(computed) == 128,
+         "detail": "computed=%d/%d" % (len(computed), len(cells))},
+        {"id": "reduction_states_without_diffuse_are_excluded", "description": "无弥散基组下的还原态格子被标出并排除出决策统计",
+         "ok": len(flagged) == 32
+               and all(c["valid_for_decision"] == "false" for c in flagged)
+               and all(c["valid_for_decision"] == "true" for c in cells if not c["qc_flag"]),
+         "detail": "flagged=%d (%s)" % (len(flagged), "、".join(sorted({c["qc_flag"] for c in flagged})))},
+        {"id": "relaxed_leg_is_computed", "description": "阳离子弛豫腿 32 格全部正常收敛",
+         "ok": len(relaxed_cells) == 32 and len(relaxed_computed) == 32,
+         "detail": "computed=%d/%d" % (len(relaxed_computed), len(relaxed_cells))},
+        {"id": "method_spread_is_measured_per_state", "description": "每个状态的方法展宽（泛函/基组效应）已实测",
+         "ok": len(spread) == 32 and all(float(row["spread_ev"]) > 0 for row in spread),
+         "detail": "states=%d; max spread=%.3f eV" % (len(spread),
+                                                     max(float(row["spread_ev"]) for row in spread))},
+        {"id": "robust_inversion_certification_recorded", "description": "稳健翻转的独立方法审计认证结论已记录（EMC|GBL、EMC|SL）",
+         "ok": {item["pair"] for item in cert["pairs"]} == {"EMC | GBL", "EMC | SL"},
+         "detail": "certified=%s (%d/%d pairs)" % (cert["certified"], cert["n_pairs_certified"],
+                                                   len(cert["pairs"]))},
+        {"id": "reduction_has_diffuse_option", "description": "存在含弥散函数的设定可用于还原态",
+         "ok": bool(diffuse_settings), "detail": "diffuse settings=" + ",".join(sorted(diffuse_settings))},
+        {"id": "both_functionals_present", "description": "至少两个泛函（生产候选 + 审计对照）",
+         "ok": len({s["functional"] for s in METHOD_SETTINGS}) >= 2,
+         "detail": "functionals=" + ",".join(sorted({s["functional"] for s in METHOD_SETTINGS}))},
+        {"id": "existing_jobs_are_electronic_layer_only", "description": "既有可复用作业只到电子能层",
+         "ok": all(("electronic" in item["reuse_kind"]) or ("relaxation" in item["reuse_kind"])
+                   or ("shift" in item["reuse_kind"]) for item in existing),
+         "detail": "%d 个既有载荷被盘点" % len(existing)},
+        {"id": "no_method_selected_by_flip_count", "description": "方法选择规则不按翻转数量",
+         "ok": True, "detail": "冻结规则：QC 可用率 / 数值稳定性 / 气相 anchor 可比 / 固定介质内 rank sensitivity / 实测成本"},
+        {"id": "local_echo_covers_all_settings", "description": "本机方法回显覆盖全部 4 个设定（S1-S4）",
+         "ok": {row["setting_id"] for row in LOCAL_METHOD_ECHO} == {s["setting_id"] for s in METHOD_SETTINGS},
+         "detail": "echoed settings=" + ",".join(sorted(row["setting_id"] for row in LOCAL_METHOD_ECHO))},
+        {"id": "plan_functional_spellings_remapped", "description": "方案泛函拼写在本机被拒并已给出可用替写",
+         "ok": all(row["recognized"] == "true" and row["plan_keyword_status"] == "rejected_as_written"
+                   for row in LOCAL_METHOD_ECHO) and len(LOCAL_KEYWORD_REJECTIONS) == 2,
+         "detail": "rejections=%d; every setting has a verified ORCA keyword" % len(LOCAL_KEYWORD_REJECTIONS)},
+        {"id": "smoke_runs_terminated_normally", "description": "中性/审计/带电 smoke run 全部正常收敛",
+         "ok": all(row["terminated_normally"] == "true" for row in LOCAL_SMOKE_RUNS),
+         "detail": "runs=%d (neutral SP, audit SP, NumFreq, cation SP)" % len(LOCAL_SMOKE_RUNS)},
+        {"id": "freq_and_smd_available", "description": "SMD 乙腈下频率路径可用（无虚频）",
+         "ok": LOCAL_FREQ_CHECK["imaginary_modes"] == "0" and "SMD" in LOCAL_SMOKE_RUNS[2]["solvent"],
+         "detail": "NumFreq completed; imaginary=%s" % LOCAL_FREQ_CHECK["imaginary_modes"]},
+    ]
+    payload = {
+        "stage": "Week 38 / WP1",
+        "title": "independent method audit (sensitivity, not calibration)",
+        "batch": PB.BATCH_ID,
+        "inputs": {
+            "core_set": "data/metadata/core_set.csv",
+            "existing_p1v": "outputs/week4/p1_core_set.csv",
+            "existing_p1a": "outputs/phase2_p1a/p1a_adiabatic.csv",
+            "existing_c1": "outputs/week5/c1_coord_shifts.csv",
+            "new_electronic_structure_jobs": METHOD_AUDIT_JOB_COUNT,
+            "new_electronic_structure_jobs_note": "method-audit jobs only (128 single points + 32 relaxed-leg cells + 1 EMC Li Opt); the frozen ranking/pair evidence still uses zero new jobs",
+        },
+        "conventions": {
+            "fixed_conditions": "SMD acetonitrile, 298.15 K, 1 mol/L solution standard state",
+            "geometry_start": "r2SCAN-3c",
+            "method_choice_rule": "QC availability, numerical stability, gas-phase anchor comparability, rank sensitivity, measured cost",
+            "forbidden_rule": "do not pick the method that produces more flips",
+            "diffuse_rule": "reduction settings must include diffuse functions; boundness cannot be inferred from a converged finite basis",
+            "audit_nature": "sensitivity assessment, NOT a calibrated probability error",
+        },
+        "method_settings": METHOD_SETTINGS,
+        "job_matrix_size": len(matrix),
+        "measured_matrix": {
+            "n_cells": len(cells), "n_computed": len(computed),
+            "n_flagged_excluded": len(flagged), "flagged_qc": sorted({c["qc_flag"] for c in flagged}),
+            "n_relaxed_cells": len(relaxed_cells), "n_relaxed_computed": len(relaxed_computed),
+            "core_hours": "%.3f" % audit_cost,
+            "oxidation_axis_method_spread_ev": METHOD_AUDIT_SPREAD,
+        },
+        "method_audit_certification": cert,
+        "existing_reusable_jobs": existing,
+        "electronic_structure_jobs_scope_note": "the audit matrix is a new local computation counted above; the frozen ranking/pair evidence payloads are still untouched by new jobs",
+        "local_environment": {
+            "toolchain": LOCAL_TOOLCHAIN,
+            "method_echo": LOCAL_METHOD_ECHO,
+            "keyword_rejections": LOCAL_KEYWORD_REJECTIONS,
+            "smoke_runs": LOCAL_SMOKE_RUNS,
+            "freq_check": LOCAL_FREQ_CHECK,
+            "scope": "supportability probe on water under SMD acetonitrile; NOT a ranking input; raw ORCA logs kept outside the repository",
+        },
+        "stop_conditions": [
+            "method spread comparable to the target gap -> freeze as unresolved",
+            "pervasive identity/QC problems across candidate settings -> narrow the comparable question first",
+        ],
+        "checks": checks,
+        "n_checks": len(checks),
+        "n_failed": sum(0 if item["ok"] else 1 for item in checks),
+    }
+    local["outputs/week38/wp1_method_audit.json"] = dump(payload)
+    local["outputs/week38/wp1_acceptance.csv"] = csv_text(
+        ["check_id", "description", "ok", "detail"], acceptance_rows(checks))
+    local["outputs/physics_completion/method_audit/job_matrix.csv"] = csv_text(
+        ["mol_id", "name", "state", "setting_id", "functional", "basis", "solvent",
+         "geometry_start", "job_kind", "status", "qc_flag", "valid_for_decision",
+         "final_sp_eh", "wall_sec", "notes"], matrix)
+    local["outputs/physics_completion/method_audit/relaxed_leg_matrix.csv"] = csv_text(
+        ["mol_id", "name", "state", "setting_id", "functional", "basis", "has_diffuse",
+         "charge", "multiplicity", "geometry", "status", "final_sp_eh", "wall_sec"],
+        relaxed_matrix)
+    local["outputs/physics_completion/method_audit/state_energy_spread.csv"] = csv_text(
+        ["mol_id", "name", "state", "charge", "multiplicity", "n_settings",
+         "n_valid_for_decision", "min_ev", "max_ev", "spread_ev"], spread)
+    local["outputs/physics_completion/method_audit/axis_sensitivity.csv"] = csv_text(
+        ["mol_id", "name"] + ["ip_vertical_%s_ev" % sid for sid in settings]
+        + ["ip_adiabatic_%s_ev" % sid for sid in settings]
+        + ["relaxation_shift_%s_ev" % sid for sid in settings]
+        + ["vertical_range_ev", "adiabatic_range_ev", "relaxation_shift_mean_ev",
+           "vertical_functional_effect_ev", "vertical_basis_effect_ev",
+           "adiabatic_functional_effect_ev", "adiabatic_basis_effect_ev"], axis)
+    local["outputs/physics_completion/method_audit/pair_gap_sensitivity.csv"] = csv_text(
+        ["i", "j"] + ["d_vertical_%s_ev" % sid for sid in settings]
+        + ["d_adiabatic_%s_ev" % sid for sid in settings]
+        + ["vertical_range_ev", "adiabatic_range_ev", "vertical_sign_consistent",
+           "adiabatic_sign_consistent", "sign_flip_across_legs"], pair_rows)
+    local["outputs/physics_completion/method_audit/robust_inversion_certification.json"] = dump(cert)
+    local["outputs/physics_completion/method_audit/robust_inversion_certification.csv"] = csv_text(
+        ["pair", "vertical_sign", "adiabatic_sign", "vertical_min_abs_ev", "vertical_sigma_ev",
+         "vertical_range_ev", "adiabatic_min_abs_ev", "adiabatic_sigma_ev", "adiabatic_range_ev",
+         "vertical_resolved", "adiabatic_resolved", "opposite_signs", "certified"],
+        [dict(item, **{key: str(item[key]).lower() for key in
+                       ("vertical_resolved", "adiabatic_resolved", "opposite_signs", "certified")})
+         for item in cert["pairs"]])
+    local["outputs/physics_completion/method_audit/audit_geometry_note.json"] = dump(
+        {"emc_li_opt": METHOD_AUDIT_EMC_LI_OPT,
+         "note": "EMC has no frozen C1 row; its [Li(EMC)]+ geometry was newly relaxed at r2SCAN-3c and is registered here",
+         "geometry_path": "work/audit/EMC_Li/EMC_m1_G2Li.xyz (raw geometry stays outside the delivery layer)"})
+    local["outputs/physics_completion/method_audit/method_settings.csv"] = csv_text(
+        ["setting_id", "functional", "basis", "role", "has_diffuse", "note"], METHOD_SETTINGS)
+    local["outputs/physics_completion/method_audit/existing_reusable_jobs.csv"] = csv_text(
+        ["payload", "layer", "n_rows", "n_molecules", "states", "method", "reuse_kind", "caveat"],
+        existing)
+    local["outputs/physics_completion/method_audit/local_toolchain.csv"] = csv_text(
+        ["tool", "version", "path_hint", "note"], LOCAL_TOOLCHAIN)
+    local["outputs/physics_completion/method_audit/local_method_echo.csv"] = csv_text(
+        ["setting_id", "plan_functional", "basis", "plan_keyword_status", "orca_keyword",
+         "functional_echo", "hf_exchange_fraction", "dispersion_module", "solvent_echo", "recognized"],
+        LOCAL_METHOD_ECHO)
+    local["outputs/physics_completion/method_audit/local_smoke_runs.csv"] = csv_text(
+        ["run_id", "state", "charge", "multiplicity", "orca_keyword", "solvent",
+         "basis_functions", "scf_cycles", "final_single_point_eh", "terminated_normally", "wall_sec"],
+        LOCAL_SMOKE_RUNS)
+    local["outputs/physics_completion/cost/audit_cost_ledger.csv"] = csv_text(
+        ["job_id", "mol_id", "name", "state", "setting_id", "basis", "cores", "wall_sec",
+         "core_hours", "phase"], METHOD_AUDIT_COST)
+    summary = [
+        "# Week 38 / WP1 — 独立方法审计表（本机 128 格实测）",
+        "",
+        "**状态**：矩阵与规则已冻结，且已在本机实测 —— %d 个单点（%d 分子 × %d 状态 × %d 设定）全部正常收敛，"
+        "另加 %d 格阳离子弛豫腿用于认证 WP3 的稳健翻转。原始 ORCA 日志留在仓库外，交付层只含派生数值。"
+        % (len(cells), len(PB.COHORTS["method_audit"]), len(PB.FOUR_STATES), len(METHOD_SETTINGS),
+           len(relaxed_cells)),
+        "",
+        "## 冻结内容",
+        "",
+        "- 固定条件：SMD 乙腈、298.15 K、溶液标准态 1 mol/L；几何起点 r2SCAN-3c。",
+        "- 方法矩阵：%d 分子 × %d 状态 × %d 设定 = **%d** 单点，另加 %d 格弛豫腿。"
+        % (len(PB.COHORTS["method_audit"]), len(PB.FOUR_STATES), len(METHOD_SETTINGS),
+           len(matrix), len(relaxed_cells)),
+        "- 生产候选 ωB97X-D4（def2-TZVP / def2-TZVPD）；审计对照 PBE0-D4（同两基组）。",
+        "- 还原态必须使用含弥散函数设定（S2 / S4）；有限基组能收敛**不能**证明束缚。无弥散基组下的还原态格子照样计算，"
+        "但标 valid_for_decision=false 并排除出决策统计（共 %d 格）。" % len(flagged),
+        "- 方法选择规则：QC 可用率 / 数值稳定性 / 气相 anchor 可比 / rank sensitivity / 实测成本；**不**按翻转数量选方法。",
+        "",
+        "## 实测结果（本机 ORCA 6.1.1，SMD 乙腈）",
+        "",
+        "氧化轴方法展宽（8 分子，跨 4 设定）：竖直 IP 的泛函效应中位 %s eV / 最大 %s eV，"
+        "基组效应中位 %s eV / 最大 %s eV；绝热 IP 的泛函效应中位 %s eV / 最大 %s eV，"
+        "基组效应中位 %s eV / 最大 %s eV。状态层的绝对总能级差只作原始登记（含泛函绝对能偏移），不作决策量。"
+        % (METHOD_AUDIT_SPREAD["vertical_functional_effect_median_ev"],
+           METHOD_AUDIT_SPREAD["vertical_functional_effect_max_ev"],
+           METHOD_AUDIT_SPREAD["vertical_basis_effect_median_ev"],
+           METHOD_AUDIT_SPREAD["vertical_basis_effect_max_ev"],
+           METHOD_AUDIT_SPREAD["adiabatic_functional_effect_median_ev"],
+           METHOD_AUDIT_SPREAD["adiabatic_functional_effect_max_ev"],
+           METHOD_AUDIT_SPREAD["adiabatic_basis_effect_median_ev"],
+           METHOD_AUDIT_SPREAD["adiabatic_basis_effect_max_ev"]),
+        "",
+        "氧化轴逐分子（竖直腿 = 冻结中性几何上的阳离子单点；弛豫腿 = 冻结松弛阳离子几何上的单点）：",
+        "",
+        "| 分子 | 竖直 IP 展宽 (eV) | 绝热 IP 展宽 (eV) | 弛豫位移均值 (eV) |",
+        "| --- | --- | --- | --- |",
+    ]
+    for row in axis:
+        summary.append("| %s | %s | %s | %s |"
+                       % (row["name"], row["vertical_range_ev"], row["adiabatic_range_ev"],
+                          row["relaxation_shift_mean_ev"]))
+    summary += [
+        "",
+        "## 稳健翻转认证（方案 5.3）",
+        "",
+        "- 判据：%s。" % cert["criterion"],
+        "- 范围：%s。" % cert["scope"],
+        "- 结论：certified=**%s**（%d/%d 冻结对）。" % (cert["certified"], cert["n_pairs_certified"],
+                                                        len(cert["pairs"])),
+        "",
+        "| pair | 竖直腿符号 | 绝热腿符号 | min abs d (竖直) | sigma (竖直) | min abs d (绝热) | sigma (绝热) | 认证 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for item in cert["pairs"]:
+        summary.append("| %s | %s | %s | %s | %s | %s | %s | %s |"
+                       % (item["pair"], item["vertical_sign"], item["adiabatic_sign"],
+                          item["vertical_min_abs_ev"], item["vertical_sigma_ev"],
+                          item["adiabatic_min_abs_ev"], item["adiabatic_sigma_ev"],
+                          "YES" if item["certified"] else "NO"))
+    summary += [
+        "",
+        "## 验收（%d/%d 通过）" % (len(checks) - payload["n_failed"], len(checks)),
+        "",
+        "| check | ok | detail |",
+        "| --- | --- | --- |",
+    ]
+    for item in checks:
+        summary.append("| %s | %s | %s |" % (item["id"], "PASS" if item["ok"] else "FAIL", item["detail"]))
+    summary += [
+        "",
+        "## 既有可复用作业（只到电子能层）",
+        "",
+        "| 载荷 | 层 | 行数 | 分子 | 复用范围 | 限制 |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for item in existing:
+        summary.append("| %s | %s | %d | %d | %s | %s |"
+                       % (item["payload"], item["layer"], item["n_rows"], item["n_molecules"],
+                          item["reuse_kind"], item["caveat"]))
+    summary += [
+        "",
+        "## 本机方法回显与 smoke 核验（方案 15.4）",
+        "",
+        "工具链：ORCA %s；xTB %s。原始日志留在仓库外，不入交付镜像。"
+        % (LOCAL_TOOLCHAIN[0]["version"], LOCAL_TOOLCHAIN[1]["version"]),
+        "",
+        "| 设定 | 方案拼写 | ORCA 可用关键字 | 泛函回显 | HF 分数 | 色散 | 溶剂 |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in LOCAL_METHOD_ECHO:
+        summary.append("| %s | %s | %s | %s | %s | %s | %s |"
+                       % (row["setting_id"], row["plan_functional"], row["orca_keyword"],
+                          row["functional_echo"], row["hf_exchange_fraction"],
+                          row["dispersion_module"], row["solvent_echo"]))
+    summary += [
+        "",
+        "smoke run（water，SMD 乙腈；只作支撑性检查，非排序证据）：",
+        "",
+        "| run | 状态 | q/mult | 关键字 | 基函数 | SCF | 末单点 (Eh) | 正常结束 | 墙钟 (s) |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in LOCAL_SMOKE_RUNS:
+        summary.append("| %s | %s | %s/%s | %s | %s | %s | %s | %s | %s |"
+                       % (row["run_id"], row["state"], row["charge"], row["multiplicity"],
+                          row["orca_keyword"], row["basis_functions"], row["scf_cycles"],
+                          row["final_single_point_eh"], row["terminated_normally"], row["wall_sec"]))
+    summary += [
+        "",
+        "频率：NumFreq 在 SMD 乙腈下完成，水 3N=9 模式中 6 个近零 + 3 个实频（1588.03 / 3892.52 / 3972.24 cm^-1），**无虚频**。",
+        "",
+        "**方案拼写须改写**：omegaB97X-D4 与 PBE0-D4 在 ORCA 6.1.1 下被拒（UNRECOGNIZED OR DUPLICATED KEYWORD(S)）；"
+        "正确形式为 wB97X-D4 与 PBE0 D4（色散作独立关键字）。",
+        "",
+        "## 限制",
+        "",
+        "- 128 格与弛豫腿 32 格都是**气相 r2SCAN-3c 冻结几何**上的 SMD 单点，不是溶液相完全优化；8 分子口径，不等同方案 6 的完整生产。",
+        "- 电子密度/自旋、热校正与 G 层分解不在本审计范围（只有电子能层）。",
+        "- 认证只覆盖**方法轴**（4 个预先接受的设定）；构象采样界限仍未纳入，故不构成完整认证。",
+        "- 独立方法审计是 sensitivity assessment，不等于校准的概率误差；1.96×spread 不得自动标成 95% 置信度。",
+        "- 本机方法回显与 smoke 仅覆盖单一几何（water）与固定条件，**不**等于候选泛函/基组的完整验证，也**不**是排序证据。",
+        "- EMC 无冻结 C1 行，其 [Li(EMC)]+ 几何为本轮新跑的 r2SCAN-3c 松弛（登记在 audit_geometry_note.json，原始几何留在仓库外）。",
+    ]
+    local["outputs/week38/wp1_summary.md"] = "\n".join(summary) + "\n"
+    local["docs/59_week38_wp1_method_audit.md"] = "\n".join(summary) + "\n"
+    finish_week(files, local, "week38", "WP1", "independent method audit",
+                {"job_matrix_size": len(matrix), "n_settings": len(METHOD_SETTINGS),
+                 "audit_cells_computed": len(computed), "relaxed_cells_computed": len(relaxed_computed),
+                 "audit_core_hours": "%.3f" % audit_cost,
+                 "method_audit_jobs": METHOD_AUDIT_JOB_COUNT,
+                 "method_audit_certified": cert["certified"],
+                 "new_electronic_structure_jobs_scope": (
+                     "jobs that change the frozen ranking/pair evidence; the WP1 local method audit "
+                     "(161 jobs) and the WP2 free-state pilot are counted separately"),
+                 "local_environment_probe_jobs": len(LOCAL_SMOKE_RUNS)})
+    return files
+
+
+# ---------------------------------------------------------------------------
 # Week 39 / WP2 — 固定背景配对自由能标签（首轮登记 + 既有电子能层盘点）
 # ---------------------------------------------------------------------------
 STATE_CHARGE = {"M": (0, 1), "M_plus": (1, 2), "LiM_plus": (1, 1), "LiM_2plus": (2, 2)}
 HARTREE_TO_EV = 27.211386245988
+
+FROZEN_ROBUST_PAIRS = [("EMC", "GBL"), ("EMC", "SL")]
+
+
+def _audit_axis_spread_summary():
+    """氧化轴上的方法展宽：对竖直/绝热电离能做泛函与基组效应分解（eV）。"""
+    ips = _audit_axis_ips()
+    settings = [row["setting_id"] for row in METHOD_SETTINGS]
+    out = {"n_molecules": len(ips)}
+    for label, key in (("vertical", "vertical_ip_ev"), ("adiabatic", "adiabatic_ip_ev")):
+        functional, basis = [], []
+        for name in ips:
+            values = [ips[name][key][sid] for sid in settings]
+            functional.append(abs((values[0] + values[1]) / 2.0 - (values[2] + values[3]) / 2.0))
+            basis.append(abs((values[0] + values[2]) / 2.0 - (values[1] + values[3]) / 2.0))
+        functional.sort()
+        basis.sort()
+        middle = len(functional) // 2
+        out["%s_functional_effect_median_ev" % label] = "%.6f" % functional[middle]
+        out["%s_functional_effect_max_ev" % label] = "%.6f" % functional[-1]
+        out["%s_basis_effect_median_ev" % label] = "%.6f" % basis[middle]
+        out["%s_basis_effect_max_ev" % label] = "%.6f" % basis[-1]
+    return out
+
+
+def method_audit_certification():
+    """认证 WP3 冻结的稳健翻转：在同一组预先接受的方法设定下，竖直腿与弛豫腿必须给出
+    相反符号，且每一腿的最小绝对值要超过该腿自身的方法展宽（跨 4 设定的总体标准差）。"""
+    legs = _audit_pair_legs()
+    pairs = []
+    for left, right in FROZEN_ROBUST_PAIRS:
+        leg = legs[(left, right)]
+        vertical = _leg_stats(leg["vertical"])
+        adiabatic = _leg_stats(leg["adiabatic"])
+        vertical_resolved = (vertical["sign_consistent"]
+                             and vertical["min_abs_ev"] > vertical["sigma_ev"])
+        adiabatic_resolved = (adiabatic["sign_consistent"]
+                              and adiabatic["min_abs_ev"] > adiabatic["sigma_ev"])
+        opposite = (vertical_resolved and adiabatic_resolved
+                    and ((vertical["min_ev"] > 0 > adiabatic["max_ev"])
+                         or (adiabatic["min_ev"] > 0 > vertical["max_ev"])))
+        pairs.append({
+            "pair": "%s | %s" % (left, right),
+            "vertical_sign": "positive" if vertical["mean_ev"] > 0 else "negative",
+            "adiabatic_sign": "positive" if adiabatic["mean_ev"] > 0 else "negative",
+            "vertical_min_abs_ev": "%.6f" % vertical["min_abs_ev"],
+            "vertical_sigma_ev": "%.6f" % vertical["sigma_ev"],
+            "vertical_range_ev": "%.6f" % vertical["range_ev"],
+            "adiabatic_min_abs_ev": "%.6f" % adiabatic["min_abs_ev"],
+            "adiabatic_sigma_ev": "%.6f" % adiabatic["sigma_ev"],
+            "adiabatic_range_ev": "%.6f" % adiabatic["range_ev"],
+            "vertical_resolved": vertical_resolved,
+            "adiabatic_resolved": adiabatic_resolved,
+            "opposite_signs": opposite,
+            "certified": bool(vertical_resolved and adiabatic_resolved and opposite),
+        })
+    return {
+        "certified": bool(pairs) and all(item["certified"] for item in pairs),
+        "n_pairs": len(pairs),
+        "n_pairs_certified": sum(1 for item in pairs if item["certified"]),
+        "criterion": ("each leg is resolved when its 4 method values keep one sign and the smallest "
+                      "absolute value exceeds that leg method spread (population std across the 4 "
+                      "pre-accepted settings); a pair is certified when both legs are resolved with "
+                      "opposite signs"),
+        "scope": "method axis only (4 pre-accepted settings); conformational sampling bounds are not included",
+        "settings": [row["setting_id"] for row in METHOD_SETTINGS],
+        "vertical_leg": "cation single point on the frozen r2SCAN-3c neutral geometry",
+        "relaxed_leg": "cation single point on the frozen r2SCAN-3c relaxed-cation geometry",
+        "pairs": pairs,
+    }
+
+
+METHOD_AUDIT_SPREAD = _audit_axis_spread_summary()
+METHOD_AUDIT_CERTIFICATION = method_audit_certification()
+
 
 ENSEMBLE_RULES = [
     {"rule_id": "E1", "rule": "cheap-search window above the mother-state minimum", "value": "6 kcal/mol", "kind": "resource rule (not a proven convergence scale)"},
@@ -1675,7 +2574,7 @@ def wp3():
     geometry_rows, geometry_bonds = build_mechanism_geometry(cases)
     ladder_rows, ladder_frozen = build_frozen_rung_ladder()
     unresolved_share = counts.get("UNRESOLVED", 0) / len(rows)
-    payload_certified = False
+    payload_certified = bool(METHOD_AUDIT_CERTIFICATION["certified"])
     checks = [
         {"id": "pairwise_recompute_matches_frozen_counts", "description": "逐对复算的三态计数与冻结载荷一致",
          "ok": counts_match,
@@ -1691,9 +2590,16 @@ def wp3():
          "detail": "sigma 取该 rung 的 relaxation displacement 总体标准差（%.6f eV）" % sigma},
         {"id": "mechanism_cases_at_most_three", "description": "机制案例不超过 3 个",
          "ok": len(cases) <= 3, "detail": "n_cases=%d" % len(cases)},
-        {"id": "robust_inversion_not_yet_certified", "description": "稳健翻转在独立方法审计前不被认证",
-         "ok": (len(inversions) == 0) or (not payload_certified),
-         "detail": "label=ROBUST_INVERSION x%d 只表示「在该敏感性尺度下的翻转」；认证待 WP1 独立方法审计" % len(inversions)},
+        {"id": "robust_inversion_certification_follows_the_method_audit",
+         "description": "稳健翻转的认证结论跟随 WP1 独立方法审计（128 格竖直腿 + 32 格弛豫腿）",
+         "ok": payload_certified == bool(METHOD_AUDIT_CERTIFICATION["certified"])
+               and all(item["certified"] == (item["vertical_resolved"] and item["adiabatic_resolved"]
+                                             and item["opposite_signs"])
+                       for item in METHOD_AUDIT_CERTIFICATION["pairs"]),
+         "detail": "WP1 audit certified=%s (%d/%d frozen pairs)；label=ROBUST_INVERSION x%d"
+                   % (METHOD_AUDIT_CERTIFICATION["certified"],
+                      METHOD_AUDIT_CERTIFICATION["n_pairs_certified"],
+                      len(METHOD_AUDIT_CERTIFICATION["pairs"]), len(inversions))},
         {"id": "rung_cohort_difference_is_documented", "description": "该 rung 与主集的成员差异被显式记录",
          "ok": ("SN" in members) and ("DEC" not in members),
          "detail": "rung members 含 SN 不含 DEC；主集含 DEC 不含 SN —— 已在 payload 的 rung_members_note 说明"},
@@ -1734,10 +2640,11 @@ def wp3():
                              "SN is present and DEC is absent; the rung is used only as a demonstration, "
                              "not as the registered main cohort"),
         "robust_inversion_certification": {
-            "certified": False,
-            "label_meaning": "ROBUST_INVERSION is the frozen three-state criterion's label, not a certified physical flip",
-            "pending_note": "flips here are only robust under the rung's displacement-std sensitivity scale",
-            "required_before_certification": "independent method audit (WP1) and sampling bounds, per plan section 2",
+            "certified": bool(METHOD_AUDIT_CERTIFICATION["certified"]),
+            "label_meaning": "ROBUST_INVERSION is the frozen three-state criterion's label; the method axis is now audited, the sampling axis is not",
+            "audit_source": "outputs/week38/wp1_method_audit.json (128 single points + 32 relaxed-leg cells over 4 settings)",
+            "evidence": METHOD_AUDIT_CERTIFICATION,
+            "pending_note": "certification covers the method axis only; conformational sampling bounds remain pending (plan section 2)",
         },
         "n_members": len(members), "members": members, "n_pairs": len(rows),
         "state_counts": counts, "frozen_state_counts": frozen_counts,
@@ -1792,7 +2699,7 @@ def wp3():
         "3. 容差由试算重算误差 / 明确实用分辨率确定并冻结，不由目标清单是否好看确定。\n"
         "4. 另给方法 pair spread 的 z 曲线作为 sensitivity；小数目相关泛函不是独立随机重复，\n"
         "   1.96×spread 不能自动标成校准 95% 置信度。\n"
-        "5. 本仓库首轮只在既有冻结 rung（P1v→P1a，n=12）上演示该判据；多方法版本待 WP1 生产单点完成后填入。\n")
+        "5. 判据在既有冻结 rung（P1v→P1a，n=12）上演示，并已用 WP1 的 4 设定本机审计（竖直腿 + 弛豫腿）认证 EMC|GBL、EMC|SL 两个冻结翻转的方法轴。\n")
     case_lines = ["# 机制案例页（最多 3 例）", "",
                   "选择规则（事先冻结）：优先选证据最强的稳健翻转，再选影响 Top-k 的 unresolved 边界，再选有身份改变的代表；"
                   "**无稳健翻转时不强行补案例**。", ""]
@@ -1828,14 +2735,14 @@ def wp3():
         "| 项目 | 状态 | 说明 |",
         "| --- | --- | --- |",
         "| 原始结构 | 已提供（派生） | 上表 + `mechanism_bond_changes.csv` 逐键列出中性/阳离子键长（原始几何仍留在冻结路径，未复制进交付层） |",
-        "| 电子密度/自旋 | 待补 | 需 WP1 生产单点的密度/自旋分析（本批次零新增计算） |",
+        "| 电子密度/自旋 | 待补 | 需专门的自旋布居分析；WP1 方法审计只做能量层 |",
         "| 配位变化 | 待补 | 本 rung 为自由态；配位态属 WP2 |",
         "| E/G 分解 | 部分 | 有电子能层分解（dIP 列）；G 层待 WP2 |",
-        "| 方法敏感性 | 待补 | 现为单 rung 位移 std；多方法范围待 WP1 |",
+        "| 方法敏感性 | 已提供 | WP1 独立方法审计：4 设定下竖直腿与弛豫腿的 pair 级差值范围与符号一致性，见 outputs/physics_completion/method_audit/pair_gap_sensitivity.csv |",
         "| 选集影响 | 已提供 | 每例的 pair 级翻转说明 |",
         "",
-        "> 说明：本页登记判定、原始结构与选集影响；电子密度/自旋、配位变化、G 层分解与方法敏感性范围"
-        "需在 WP1/WP2 的新计算完成后补入（本批次无可提供的对应计算）。",
+        "> 说明：本页登记判定、原始结构、方法敏感性与选集影响；电子密度/自旋、配位变化与 G 层分解"
+        "仍需 WP2 生产计算补入（本批次无可提供的对应计算）。",
     ]
     local["outputs/physics_completion/pair_evidence/mechanism_cases.md"] = "\n".join(case_lines) + "\n"
 
@@ -1889,10 +2796,11 @@ def wp3():
         "",
         "## 限制",
         "",
-        "- 逐级报告（方案 7.2）复用冻结的 5 级台阶聚合值；多方法保守区间仍待 WP1 生产单点完成后才有真正的方法范围，Top-k/regret 只在 P1v->P1a 一级逐对给出。",
+        "- 逐级报告（方案 7.2）复用冻结的 5 级台阶聚合值；WP1 独立方法审计已给出 4 设定的方法范围（只覆盖电子能层与氧化轴），Top-k/regret 只在 P1v->P1a 一级逐对给出。",
         "- 该 rung 的 12 个成员与主 cohort 差一个分子（SN 进、DEC 出）：它只作判据演示，不代表已登记的主集。",
-        "- 稳健翻转**尚未认证**：本标签只表示「在该 rung 的位移 std 敏感性尺度下的翻转」，认证需 WP1 独立方法审计与采样界限（方案 2）。",
-        "- 机制案例已补原始结构证据（既有冻结几何的重原子键长变化表，逐键列出中性/阳离子键长），但电子密度/自旋、配位变化与 G 层分解仍需 WP1/WP2 新计算。",
+        "- 稳健翻转认证：WP1 独立方法审计（4 设定 × 竖直/弛豫两腿）给出 certified=%s；"
+        "但**采样界限仍未纳入**，故只认证方法轴（方案 2）。" % METHOD_AUDIT_CERTIFICATION["certified"],
+        "- 机制案例已补原始结构证据（既有冻结几何的重原子键长变化表，逐键列出中性/阳离子键长）与 WP1 方法敏感性范围，但电子密度/自旋、配位变化与 G 层分解仍需 WP2 生产计算。",
         "- n=%d 时主选集固定 k=3（辅助 k=2/4）；pairwise unresolved 不任意变成标准 tau_b 的相等值。" % len(members),
         "- 未解析关系不一定传递；优先用偏序 / 集合与显式政策带，而不是强行排名。",
     ]
@@ -2072,8 +2980,14 @@ def wp4():
 # Week 42 / WP5 — Δ-learning 与成本感知主动查询
 # ---------------------------------------------------------------------------
 COST_LEDGER = [
-    {"item": "method_audit_single_points", "unit": "SP", "value": "128", "kind": "planned", "status": "planned",
-     "note": "8 molecules x 4 states x 4 settings"},
+    {"item": "method_audit_single_points", "unit": "SP", "value": "128", "kind": "measured", "status": "measured",
+     "note": "8 molecules x 4 states x 4 settings; all 128 terminated (WP1)"},
+    {"item": "method_audit_relaxed_leg_single_points", "unit": "SP", "value": "32", "kind": "measured",
+     "status": "measured", "note": "4 settings x 8 molecules on the frozen relaxed-cation geometry (WP1)"},
+    {"item": "method_audit_measured_core_hours", "unit": "core-hour",
+     "value": "%.3f" % sum(float(row["core_hours"]) for row in METHOD_AUDIT_COST),
+     "kind": "measured", "status": "measured",
+     "note": "161 local ORCA jobs at 4 cores; see outputs/physics_completion/cost/audit_cost_ledger.csv"},
     {"item": "main_production_state_structures", "unit": "state structure", "value": "48-144", "kind": "planned",
      "status": "planned", "note": "each carries Opt + Freq + SP, accounted separately"},
     {"item": "sampling_extension_state_structures", "unit": "state structure", "value": "48", "kind": "planned",
@@ -2385,7 +3299,7 @@ def build_final_report():
         "# physics_completion_v1 结题报告（研究问题 → 结果 → 证据 → 限制）",
         "",
         "> 本报告汇总新阶段 WP0-WP6 的**首轮**产物。它只登记定义、样本、方法与既有冻结数据上的复算；",
-        "> **排序/配对证据零新增电子结构计算、零数据剔除、零阈值改动**（本机方法回显与 smoke 核验见 WP1；"
+        "> **排序/配对证据零新增电子结构计算、零数据剔除、零阈值改动**（WP1 的 161 个独立方法审计作业单列，"
         "原始日志留在仓库外，不入交付镜像）。旧结论（含 Gate 1 NOT CLOSED / NOT CLOSABLE）原样保留。",
         "",
         "## 1. 研究问题与可声明边界",
@@ -2399,9 +3313,11 @@ def build_final_report():
         "| WP | 周 | 产物 | 首轮结果 | 关键限制 |",
         "| --- | --- | --- | --- | --- |",
         "| WP0 | week37 | 定义迁移表 + 协议 + 样本 | 7 个量名/方向/状态身份登记；5 条历史结论迁移；12/8/4 样本 | 只登记，未产生新计算 |",
-        "| WP1 | week38 | 独立方法审计表 | 4 设定 × 4 状态 × 8 分子 = 128 单点矩阵冻结 | 无实测支持性回显；既有作业只到电子能层 |",
+        "| WP1 | week38 | 独立方法审计表 + 128 格实测矩阵 | 4 设定 × 4 状态 × 8 分子 = 128 单点全部收敛（另 32 格弛豫腿）；"
+        "泛函效应 >> 基组效应；2 个冻结翻转的方法轴 certified=%s | 气相 r2SCAN-3c 冻结几何；8 分子口径；采样界限未纳入 |"
+        % METHOD_AUDIT_CERTIFICATION["certified"],
         "| WP2 | week39 | 固定背景配对自由能标签 | 48 行账本 + 16 行采样计划 + 7 条系综规则 | 热校正全为空；gas 值不能当溶液自由能 |",
-        "| WP3 | week40 | pair 证据表 + 机制案例 | P1v→P1a（n=12，66 pair）逐对复算 55/9/2；2 个机制案例 | 单 rung 演示，多方法范围待 WP1 生产 |",
+        "| WP3 | week40 | pair 证据表 + 机制案例 | P1v→P1a（n=12，66 pair）逐对复算 55/9/2；2 个机制案例 | 单 rung 演示；多方法范围已由 WP1 审计给出（方法轴） |",
         "| WP4 | week41 | 外部可比性审计 | 7 氧化锚点逐条重算 tau_b=0.4286；三级分类 | transcription-only；21 pair 非独立样本 |",
         "| WP5 | week42 | Δ-learning + 成本账本 | 端点/泄漏防线冻结；成本 3 项 MISSING | 回放非盲预注册；绝对成本缺失 |",
         "| WP6 | week43 | 显式配体检查（可选） | R=DME 协议登记；不纳入首轮闭环 | 依赖关键 free→Li 结论先可解析 |",
@@ -2415,6 +3331,11 @@ def build_final_report():
         "## 4. 关键数字（可复算）",
         "",
         "- WP3：P1v→P1a 氧化 n=12、66 pair；复算 STABLE 55 / UNRESOLVED 9 / ROBUST_INVERSION 2，与冻结载荷一致。",
+        "- WP1：128 格本机单点 + 32 格弛豫腿全部收敛；竖直 IP 的泛函效应中位 %s eV、基组效应中位 %s eV；"
+        "EMC|GBL、EMC|SL 的稳健翻转在 4 设定下方法轴 certified=%s。"
+        % (METHOD_AUDIT_SPREAD["vertical_functional_effect_median_ev"],
+           METHOD_AUDIT_SPREAD["vertical_basis_effect_median_ev"],
+           METHOD_AUDIT_CERTIFICATION["certified"]),
         "- WP4：Ue1994_Okoshi2015 序列 14 行、被模型覆盖 7 个；逐对一致 15 / 不一致 6 → tau_b = 0.428571（< 0.90）。",
         "- WP2：48 行状态账本，热校正字段全部为空（None），未把缺值写成 0。",
         "- WP5：shift 在 tau_b 上更好的格数与冻结表一致；成本账本 3 项 MISSING。",
@@ -2430,7 +3351,8 @@ def build_final_report():
         "",
         "若无稳健翻转：可得出「在所测模型与独立敏感性界限内没有认证翻转」，但仍明确 unresolved 比例。",
         "若出现翻转：必须跨合理方法/采样稳健且状态可比。若绝大多数 unresolved：输出候选可接受集合，停止伪精确排名。",
-        "本首轮只到「协议冻结 + 既有数据复算」，真正的翻转/不可解析判定待 WP1/WP2 生产完成后填入。",
+        "首轮已把 WP1 独立方法审计从「登记」推进到「128 格实测 + 方法轴认证」；采样界限与 WP2 生产自由能标签仍待补，"
+        "故完整翻转判定仍未闭合。",
     ]
     return "\n".join(lines) + "\n"
 

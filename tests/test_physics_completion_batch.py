@@ -24,7 +24,7 @@ def _read_csv(path: Path):
 
 def test_every_artifact_is_byte_reproducible() -> None:
     files = batch.build_all()
-    assert len(files) == 76
+    assert len(files) == 84
     for rel, text in files.items():
         target = REPO_ROOT / rel
         assert target.is_file(), rel
@@ -71,6 +71,35 @@ def test_wp1_job_matrix_is_full_factorial_with_diffuse_option() -> None:
     assert len({s["functional"] for s in payload["method_settings"]}) >= 2
     rows = _read_csv(REPO_ROOT / "outputs/physics_completion/method_audit/job_matrix.csv")
     assert len(rows) == 128
+    assert all(row["status"] == "computed" for row in rows)
+    flagged = [row for row in rows if row["qc_flag"]]
+    assert len(flagged) == 32
+    assert {row["qc_flag"] for row in flagged} == {"no_diffuse_on_reduction_state"}
+    assert all(row["valid_for_decision"] == "false" for row in flagged)
+    assert all(row["valid_for_decision"] == "true" for row in rows if not row["qc_flag"])
+    relaxed = _read_csv(REPO_ROOT / "outputs/physics_completion/method_audit/relaxed_leg_matrix.csv")
+    assert len(relaxed) == 32
+    assert all(row["status"] == "computed" for row in relaxed)
+    axis = _read_csv(REPO_ROOT / "outputs/physics_completion/method_audit/axis_sensitivity.csv")
+    assert len(axis) == 8
+    assert all(float(row["vertical_functional_effect_ev"]) > 0 for row in axis)
+    pairs = _read_csv(REPO_ROOT / "outputs/physics_completion/method_audit/pair_gap_sensitivity.csv")
+    assert len(pairs) == 28
+    frozen_pairs = {("EMC", "GBL"), ("EMC", "SL")}
+    assert frozen_pairs <= {(row["i"], row["j"]) for row in pairs}
+    for row in pairs:
+        if (row["i"], row["j"]) in frozen_pairs:
+            assert row["sign_flip_across_legs"] == "true"
+    cert = json.loads((REPO_ROOT / "outputs/physics_completion/method_audit/"
+                       "robust_inversion_certification.json").read_text(encoding="utf-8"))
+    assert {item["pair"] for item in cert["pairs"]} == {"EMC | GBL", "EMC | SL"}
+    assert cert["certified"] == all(item["certified"] for item in cert["pairs"])
+    assert all(item["vertical_resolved"] and item["adiabatic_resolved"] and item["opposite_signs"]
+               for item in cert["pairs"])
+    ledger = _read_csv(REPO_ROOT / "outputs/physics_completion/cost/audit_cost_ledger.csv")
+    assert len(ledger) == 161
+    assert all(float(row["core_hours"]) > 0 for row in ledger)
+    assert payload["inputs"]["new_electronic_structure_jobs"] == 161
 
 
 def test_wp1_local_method_echo_and_smoke_runs() -> None:
@@ -136,6 +165,10 @@ def test_wp2_ledger_leaves_missing_fields_empty() -> None:
 def test_wp3_three_state_recompute_matches_frozen() -> None:
     payload = json.loads((REPO_ROOT / "outputs/week40/wp3_pair_evidence.json").read_text(encoding="utf-8"))
     assert payload["n_pairs"] == 66
+    certification = payload["robust_inversion_certification"]
+    assert certification["certified"] is True
+    assert certification["evidence"]["n_pairs_certified"] == 2
+    assert certification["audit_source"].startswith("outputs/week38/wp1_method_audit.json")
     assert payload["state_counts"] == payload["frozen_state_counts"] == {
         "STABLE": 55, "UNRESOLVED": 9, "ROBUST_INVERSION": 2}
     assert len(payload["mechanism_cases"]) == 2

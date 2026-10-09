@@ -105,7 +105,7 @@ FIGURES = [
     ("F59", "F59_physics_completion_definition.png", 44,
      "新批次 physics_completion_v1（方案 WP0）：七个登记量名与目标方向 + 12/8/4 队列与 6 条写明原因的排除（零新增电子结构计算）"),
     ("F60", "F60_physics_completion_method_audit.png", 44,
-     "独立方法审计（方案 WP1）：128 个单点作业只登记为 planned（8 分子 x 4 状态 x 4 设定），可复用的既有行只到电子能层——这是设计图不是结果图"),
+     "独立方法审计（方案 WP1）已实测：128 个单点（8 分子 x 4 状态 x 4 设定，全收敛）+ 32 格阳离子弛豫腿；32 个无弥散还原态格子被标出并排除出决策统计（琥珀）；(b) 竖直 IP 的方法展宽显示泛函效应约比基组效应大一个数量级"),
     ("F61", "F61_physics_completion_ladder.png", 44,
      "E -> G -> ensemble 台阶（方案 WP3）：只有垂直->绝热这一级是冻结的（n=12，逐分子位移箭头），三态判定 55/9/2；G_single / G_ensemble / Li 支仍需 WP2 生产，故 ROBUST_INVERSION 只是标签不是已认证翻转"),
     ("F62", "F62_physics_completion_pair_identity.png", 44,

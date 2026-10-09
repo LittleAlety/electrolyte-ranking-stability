@@ -1,12 +1,12 @@
 """physics_completion_v1 main figures F59-F64 (plan section 14).
 
-Six figures, all built from FROZEN artefacts only: no new electronic-structure
-job is run here.  Every panel states which rungs are frozen evidence and which
-ones are still pending WP1/WP2 production, so the set cannot be mistaken for a
-finished method audit.
+Six figures built from registered batch artefacts only: this script runs no
+electronic-structure job.  F60 plots the measured WP1 audit matrix; every other
+panel states which rungs are frozen evidence and which are still pending WP2
+production, so the set cannot be mistaken for a finished method audit.
 
     F59  model / conditional-state definition and cohort membership
-    F60  independent method audit: registered job matrix vs reusable layers
+    F60  independent method audit: measured 128-cell matrix and axis spread
     F61  E -> G -> ensemble decision change on the one frozen rung
     F62  fixed-background pair evidence and state-identity outcome
     F63  mechanism cases (with the frozen relaxation-geometry evidence)
@@ -45,6 +45,7 @@ MANIFEST = FIGDIR / "figure_manifest_week45_physics_completion.md"
 RUNG = REPO_ROOT / "outputs" / "phase2_p1a" / "p1v_vs_p1a.json"
 JOB_MATRIX = REPO_ROOT / "outputs" / "physics_completion" / "method_audit" / "job_matrix.csv"
 REUSABLE = REPO_ROOT / "outputs" / "physics_completion" / "method_audit" / "existing_reusable_jobs.csv"
+AXIS = REPO_ROOT / "outputs" / "physics_completion" / "method_audit" / "axis_sensitivity.csv"
 PAIR_EVIDENCE = REPO_ROOT / "outputs" / "physics_completion" / "pair_evidence" / "pair_evidence.csv"
 MECH_CASES = REPO_ROOT / "outputs" / "physics_completion" / "pair_evidence" / "mechanism_cases.csv"
 MECH_GEOM = REPO_ROOT / "outputs" / "physics_completion" / "pair_evidence" / "mechanism_geometry.csv"
@@ -146,7 +147,7 @@ def figure_definition(path: Path):
 # ----------------------------------------------------------------- F60
 def figure_method_audit(path: Path):
     matrix = load_csv(JOB_MATRIX)
-    reusable = load_csv(REUSABLE)
+    axis = load_csv(AXIS)
     names = []
     for row in matrix:
         if row["name"] not in names:
@@ -154,15 +155,24 @@ def figure_method_audit(path: Path):
     states = PB.FOUR_STATES
     settings = sorted({row["setting_id"] for row in matrix})
     grid = np.zeros((len(names), len(states) * len(settings)))
+    computed = 0
+    flagged = 0
     for row in matrix:
         r = names.index(row["name"])
         c = states.index(row["state"]) * len(settings) + settings.index(row["setting_id"])
-        grid[r, c] = 1.0 if row["status"] == "planned" else 2.0
+        if row["valid_for_decision"] == "false":
+            grid[r, c] = 2.0
+            flagged += 1
+        else:
+            grid[r, c] = 1.0
+        if row["status"] == "computed":
+            computed += 1
 
     fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(12.4, 5.0),
-                                     gridspec_kw={"width_ratios": [3.1, 1.0]})
+                                     gridspec_kw={"width_ratios": [3.1, 1.25]})
     ax_a.imshow(grid, aspect="auto",
-                cmap=matplotlib.colors.ListedColormap(["#ffffff", "#dbeafe"]), vmin=0, vmax=2)
+                cmap=matplotlib.colors.ListedColormap(["#ffffff", "#dbeafe", "#fde68a"]),
+                vmin=0, vmax=3)
     for c in range(len(states) * len(settings)):
         ax_a.axvline(c + 0.5, color="#f3f4f6", linewidth=0.6)
     for index, state in enumerate(states):
@@ -178,25 +188,30 @@ def figure_method_audit(path: Path):
     ax_a.set_xlim(-0.5, grid.shape[1] - 0.5)
     ax_a.set_ylim(len(names) - 0.5, -2.1)
     ax_a.grid(False)
-    ax_a.set_title("(a) Registered WP1 single-point matrix: %d jobs, all status=planned" % len(matrix),
-                   fontsize=9.5, color=INK)
+    ax_a.set_title("(a) WP1 single-point matrix: %d/%d computed; %d reduction-state cells "
+                   "flagged no-diffuse (amber)"
+                   % (computed, len(matrix), flagged), fontsize=9.5, color=INK)
 
     style(ax_b)
-    labels = ["%s\n%s" % (row["payload"].split("/")[-1], row["layer"].split(" ")[0])
-              for row in reusable[:3]]
-    values = [int(row["n_rows"]) for row in reusable[:3]]
-    xs = np.arange(len(values))
-    ax_b.bar(xs, values, 0.55, color=[BLUE, PURPLE, GREEN], edgecolor="white", linewidth=0.8)
-    for xi, value in zip(xs, values):
-        ax_b.text(xi, value + 0.8, str(value), ha="center", fontsize=9, color=INK)
+    labels = [row["name"] for row in axis]
+    functional = [float(row["vertical_functional_effect_ev"]) for row in axis]
+    basis = [float(row["vertical_basis_effect_ev"]) for row in axis]
+    xs = np.arange(len(labels))
+    ax_b.bar(xs - 0.19, functional, 0.36, color=BLUE, edgecolor="white", linewidth=0.8,
+             label="functional")
+    ax_b.bar(xs + 0.19, basis, 0.36, color=AMBER, edgecolor="white", linewidth=0.8,
+             label="basis")
+    top = max(max(functional), max(basis))
     ax_b.set_xticks(xs)
-    ax_b.set_xticklabels(labels, fontsize=7)
-    ax_b.set_ylim(0, 62)
-    ax_b.set_ylabel("frozen rows")
-    ax_b.set_title("(b) Existing reusable rows\n(layer-wise, no new jobs)", fontsize=9.5, color=INK)
+    ax_b.set_xticklabels(labels, fontsize=7, rotation=60, ha="right")
+    ax_b.set_ylim(0, top * 1.30)
+    ax_b.set_ylabel("vertical-IP method spread (eV)")
+    ax_b.legend(fontsize=7, frameon=False, loc="upper right")
+    ax_b.set_title("(b) Oxidation-axis method spread\n(4 settings x 8 molecules)",
+                   fontsize=9.5, color=INK)
 
-    fig.suptitle("F60  independent method audit is registered, not yet measured (plan WP1; zero new electronic structure)",
-                 fontsize=10.5, color=INK)
+    fig.suptitle("F60  independent method audit measured: 128 single points + 32 relaxed-leg cells; "
+                 "functional effect dominates the basis-set effect", fontsize=10.5, color=INK)
     fig.tight_layout(rect=(0, 0, 1, 0.92))
     return finish(fig, path)
 
@@ -438,14 +453,16 @@ FIGURES = [
     ("F64", "F64_physics_completion_budget_curve.png", figure_budget),
 ]
 
-INPUTS = [RUNG, JOB_MATRIX, REUSABLE, PAIR_EVIDENCE, MECH_CASES, MECH_GEOM, IDENTITY, BUDGET_CURVES, LADDER,
+INPUTS = [RUNG, JOB_MATRIX, AXIS, REUSABLE, PAIR_EVIDENCE, MECH_CASES, MECH_GEOM, IDENTITY, BUDGET_CURVES, LADDER,
           REPO_ROOT / "config" / "physics_completion_v1.yaml",
           REPO_ROOT / "data" / "references" / "anchor_primary_audit.csv"]
 
 CAPTIONS = {
     "F59": "Cohort sizes and the seven registered quantities with their objective direction.",
-    "F60": "The WP1 audit matrix is registered (planned); the only reusable rows are the frozen "
-           "electronic-energy layers. This is a design figure, not a result.",
+    "F60": "The WP1 audit matrix is measured: all 128 single points plus the 32 relaxed-leg cells "
+           "terminated. The 32 no-diffuse reduction-state cells are excluded from the decision "
+           "statistics. Panel (b) shows the vertical-IP method spread; the functional effect is about "
+           "an order of magnitude larger than the basis-set effect.",
     "F61": "Panel (c) is the frozen R15 five-rung ladder (n=18/18/12/10/10 per axis) with "
            "tau_b and f_unresolved; the vertical->adiabatic rung is recomputed pairwise here. "
            "G_single / G_ensemble and the reduction Li branch still need WP2 production, so "
@@ -468,8 +485,9 @@ def build(check: bool) -> int:
     lines = [
         "# Figure manifest - physics_completion_v1 main figures (F59-F64)",
         "",
-        "Six figures from plan section 14. Every input is a frozen repository artefact;",
-        "this batch runs zero new electronic-structure jobs.",
+        "Six figures from plan section 14; every plotted number comes from a registered batch artefact.",
+        "The 128 WP1 audit cells and the 32 relaxed-leg cells are derived-only deliveries: the raw ORCA",
+        "logs stay outside the repository and outside the delivery mirror.",
         "",
         "| figure | file | inputs (SHA256) |",
         "| --- | --- | --- |",
@@ -483,8 +501,9 @@ def build(check: bool) -> int:
         lines.append("| %s | %s |" % (tag, CAPTIONS[tag]))
     lines += [
         "",
-        "Scope note: F60 is a registration/design figure (status=planned). F61 carries only the",
-        "electronic-energy rung, so its ROBUST_INVERSION label is not a certified physical flip.",
+        "Scope note: F60 reports the measured audit matrix and the oxidation-axis method spread; the",
+        "certification covers the method axis only (4 settings), not conformational sampling. F61 carries",
+        "only the electronic-energy rung, so its ROBUST_INVERSION label is a method-axis-only certification.",
         "F64 is an in-pool replay of already-known data, not a blind pre-registration; R_3 is not",
         "tabulated in the frozen curve, so panel (b) uses the Top-3 overlap instead.",
         "",

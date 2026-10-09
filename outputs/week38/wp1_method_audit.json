@@ -7,7 +7,8 @@
     "existing_p1v": "outputs/week4/p1_core_set.csv",
     "existing_p1a": "outputs/phase2_p1a/p1a_adiabatic.csv",
     "existing_c1": "outputs/week5/c1_coord_shifts.csv",
-    "new_electronic_structure_jobs": 0
+    "new_electronic_structure_jobs": 161,
+    "new_electronic_structure_jobs_note": "method-audit jobs only (128 single points + 32 relaxed-leg cells + 1 EMC Li Opt); the frozen ranking/pair evidence still uses zero new jobs"
   },
   "conventions": {
     "fixed_conditions": "SMD acetonitrile, 298.15 K, 1 mol/L solution standard state",
@@ -52,6 +53,75 @@
     }
   ],
   "job_matrix_size": 128,
+  "measured_matrix": {
+    "n_cells": 128,
+    "n_computed": 128,
+    "n_flagged_excluded": 32,
+    "flagged_qc": [
+      "no_diffuse_on_reduction_state"
+    ],
+    "n_relaxed_cells": 32,
+    "n_relaxed_computed": 32,
+    "core_hours": "10.951",
+    "oxidation_axis_method_spread_ev": {
+      "n_molecules": 8,
+      "vertical_functional_effect_median_ev": "0.369492",
+      "vertical_functional_effect_max_ev": "0.456267",
+      "vertical_basis_effect_median_ev": "0.027111",
+      "vertical_basis_effect_max_ev": "0.038790",
+      "adiabatic_functional_effect_median_ev": "0.246086",
+      "adiabatic_functional_effect_max_ev": "0.337134",
+      "adiabatic_basis_effect_median_ev": "0.028805",
+      "adiabatic_basis_effect_max_ev": "0.036168"
+    }
+  },
+  "method_audit_certification": {
+    "certified": true,
+    "n_pairs": 2,
+    "n_pairs_certified": 2,
+    "criterion": "each leg is resolved when its 4 method values keep one sign and the smallest absolute value exceeds that leg method spread (population std across the 4 pre-accepted settings); a pair is certified when both legs are resolved with opposite signs",
+    "scope": "method axis only (4 pre-accepted settings); conformational sampling bounds are not included",
+    "settings": [
+      "S1",
+      "S2",
+      "S3",
+      "S4"
+    ],
+    "vertical_leg": "cation single point on the frozen r2SCAN-3c neutral geometry",
+    "relaxed_leg": "cation single point on the frozen r2SCAN-3c relaxed-cation geometry",
+    "pairs": [
+      {
+        "pair": "EMC | GBL",
+        "vertical_sign": "positive",
+        "adiabatic_sign": "negative",
+        "vertical_min_abs_ev": "0.612475",
+        "vertical_sigma_ev": "0.038732",
+        "vertical_range_ev": "0.084352",
+        "adiabatic_min_abs_ev": "0.327672",
+        "adiabatic_sigma_ev": "0.006516",
+        "adiabatic_range_ev": "0.017040",
+        "vertical_resolved": true,
+        "adiabatic_resolved": true,
+        "opposite_signs": true,
+        "certified": true
+      },
+      {
+        "pair": "EMC | SL",
+        "vertical_sign": "positive",
+        "adiabatic_sign": "negative",
+        "vertical_min_abs_ev": "0.693322",
+        "vertical_sigma_ev": "0.009474",
+        "vertical_range_ev": "0.019361",
+        "adiabatic_min_abs_ev": "0.436495",
+        "adiabatic_sigma_ev": "0.032367",
+        "adiabatic_range_ev": "0.081551",
+        "vertical_resolved": true,
+        "adiabatic_resolved": true,
+        "opposite_signs": true,
+        "certified": true
+      }
+    ]
+  },
   "existing_reusable_jobs": [
     {
       "payload": "outputs/week4/p1_core_set.csv",
@@ -84,7 +154,7 @@
       "caveat": "single representative motif; identity stratification applies"
     }
   ],
-  "electronic_structure_jobs_scope_note": "ranking/pair evidence only; the separate local_environment supportability probe is not counted here",
+  "electronic_structure_jobs_scope_note": "the audit matrix is a new local computation counted above; the frozen ranking/pair evidence payloads are still untouched by new jobs",
   "local_environment": {
     "toolchain": [
       {
@@ -238,6 +308,36 @@
       "detail": "n_rows=128"
     },
     {
+      "id": "audit_matrix_is_computed",
+      "description": "128 格独立方法审计单点全部正常收敛（status=computed）",
+      "ok": true,
+      "detail": "computed=128/128"
+    },
+    {
+      "id": "reduction_states_without_diffuse_are_excluded",
+      "description": "无弥散基组下的还原态格子被标出并排除出决策统计",
+      "ok": true,
+      "detail": "flagged=32 (no_diffuse_on_reduction_state)"
+    },
+    {
+      "id": "relaxed_leg_is_computed",
+      "description": "阳离子弛豫腿 32 格全部正常收敛",
+      "ok": true,
+      "detail": "computed=32/32"
+    },
+    {
+      "id": "method_spread_is_measured_per_state",
+      "description": "每个状态的方法展宽（泛函/基组效应）已实测",
+      "ok": true,
+      "detail": "states=32; max spread=20.370 eV"
+    },
+    {
+      "id": "robust_inversion_certification_recorded",
+      "description": "稳健翻转的独立方法审计认证结论已记录（EMC|GBL、EMC|SL）",
+      "ok": true,
+      "detail": "certified=True (2/2 pairs)"
+    },
+    {
       "id": "reduction_has_diffuse_option",
       "description": "存在含弥散函数的设定可用于还原态",
       "ok": true,
@@ -286,6 +386,6 @@
       "detail": "NumFreq completed; imaginary=0"
     }
   ],
-  "n_checks": 9,
+  "n_checks": 14,
   "n_failed": 0
 }
