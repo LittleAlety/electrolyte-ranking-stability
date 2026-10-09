@@ -5,9 +5,9 @@ window.HB = {
   "weeks": 25,
   "figures": 59,
   "orca_out": 1535,
-  "scripts": 165,
-  "test_files": 73,
-  "tests_passed": 1341
+  "scripts": 167,
+  "test_files": 74,
+  "tests_passed": 1357
  },
  "pipeline": [
   {

@@ -1,0 +1,125 @@
+{
+  "stage": "Week 38 / WP1",
+  "title": "independent method audit (sensitivity, not calibration)",
+  "batch": "physics_completion_v1",
+  "inputs": {
+    "core_set": "data/metadata/core_set.csv",
+    "existing_p1v": "outputs/week4/p1_core_set.csv",
+    "existing_p1a": "outputs/phase2_p1a/p1a_adiabatic.csv",
+    "existing_c1": "outputs/week5/c1_coord_shifts.csv",
+    "new_electronic_structure_jobs": 0
+  },
+  "conventions": {
+    "fixed_conditions": "SMD acetonitrile, 298.15 K, 1 mol/L solution standard state",
+    "geometry_start": "r2SCAN-3c",
+    "method_choice_rule": "QC availability, numerical stability, gas-phase anchor comparability, rank sensitivity, measured cost",
+    "forbidden_rule": "do not pick the method that produces more flips",
+    "diffuse_rule": "reduction settings must include diffuse functions; boundness cannot be inferred from a converged finite basis",
+    "audit_nature": "sensitivity assessment, NOT a calibrated probability error"
+  },
+  "method_settings": [
+    {
+      "setting_id": "S1",
+      "functional": "omegaB97X-D4",
+      "basis": "def2-TZVP",
+      "role": "production_candidate",
+      "has_diffuse": "false",
+      "note": "range-separated hybrid; triple-zeta; no diffuse functions"
+    },
+    {
+      "setting_id": "S2",
+      "functional": "omegaB97X-D4",
+      "basis": "def2-TZVPD",
+      "role": "production_candidate",
+      "has_diffuse": "true",
+      "note": "adds diffuse functions; required for reduction states"
+    },
+    {
+      "setting_id": "S3",
+      "functional": "PBE0-D4",
+      "basis": "def2-TZVP",
+      "role": "audit_control",
+      "has_diffuse": "false",
+      "note": "second functional for sensitivity assessment"
+    },
+    {
+      "setting_id": "S4",
+      "functional": "PBE0-D4",
+      "basis": "def2-TZVPD",
+      "role": "audit_control",
+      "has_diffuse": "true",
+      "note": "second functional with diffuse functions"
+    }
+  ],
+  "job_matrix_size": 128,
+  "existing_reusable_jobs": [
+    {
+      "payload": "outputs/week4/p1_core_set.csv",
+      "layer": "P1v (gas-phase vertical)",
+      "n_rows": 54,
+      "n_molecules": 18,
+      "states": "neutral; cation; anion",
+      "method": "r2SCAN-3c / def2-mTZVPP (no diffuse)",
+      "reuse_kind": "electronic-energy layer only",
+      "caveat": "no diffuse functions; no thermal correction"
+    },
+    {
+      "payload": "outputs/phase2_p1a/p1a_adiabatic.csv",
+      "layer": "P1a (gas-phase adiabatic)",
+      "n_rows": 12,
+      "n_molecules": 12,
+      "states": "neutral_relaxed; cation_relaxed",
+      "method": "r2SCAN-3c Opt",
+      "reuse_kind": "relaxation effect only",
+      "caveat": "reduction axis excluded by the unbound_anion rule"
+    },
+    {
+      "payload": "outputs/week5/c1_coord_shifts.csv",
+      "layer": "C1 (Li-coordination)",
+      "n_rows": 12,
+      "n_molecules": 10,
+      "states": "cation; dication",
+      "method": "r2SCAN-3c (gas + SMD legs)",
+      "reuse_kind": "conditional shift demonstration",
+      "caveat": "single representative motif; identity stratification applies"
+    }
+  ],
+  "stop_conditions": [
+    "method spread comparable to the target gap -> freeze as unresolved",
+    "pervasive identity/QC problems across candidate settings -> narrow the comparable question first"
+  ],
+  "checks": [
+    {
+      "id": "matrix_is_full_factorial",
+      "description": "方法矩阵 = 8 分子 x 4 状态 x 4 设定 = 128",
+      "ok": true,
+      "detail": "n_rows=128"
+    },
+    {
+      "id": "reduction_has_diffuse_option",
+      "description": "存在含弥散函数的设定可用于还原态",
+      "ok": true,
+      "detail": "diffuse settings=S2,S4"
+    },
+    {
+      "id": "both_functionals_present",
+      "description": "至少两个泛函（生产候选 + 审计对照）",
+      "ok": true,
+      "detail": "functionals=PBE0-D4,omegaB97X-D4"
+    },
+    {
+      "id": "existing_jobs_are_electronic_layer_only",
+      "description": "既有可复用作业只到电子能层",
+      "ok": true,
+      "detail": "3 个既有载荷被盘点"
+    },
+    {
+      "id": "no_method_selected_by_flip_count",
+      "description": "方法选择规则不按翻转数量",
+      "ok": true,
+      "detail": "冻结规则：QC 可用率 / 数值稳定性 / 气相 anchor 可比 / 固定介质内 rank sensitivity / 实测成本"
+    }
+  ],
+  "n_checks": 5,
+  "n_failed": 0
+}

@@ -1,0 +1,126 @@
+{
+  "stage": "Week 39 / WP2",
+  "title": "fixed-background paired free-energy labels",
+  "batch": "physics_completion_v1",
+  "inputs": {
+    "core_set": "data/metadata/core_set.csv",
+    "existing_p1v": "outputs/week4/p1_core_set.csv",
+    "existing_p1a": "outputs/phase2_p1a/p1a_adiabatic.csv",
+    "existing_c1": "outputs/week5/c1_coord_shifts.csv",
+    "new_electronic_structure_jobs": 0
+  },
+  "conventions": {
+    "states": [
+      "M",
+      "M_plus",
+      "LiM_plus",
+      "LiM_2plus"
+    ],
+    "ledger": "G = E_SP,solution + (G_thermal,solution - E_geometry_level,solution) + standard-state term",
+    "no_double_counting": "the bracketed thermal term must come from a stated method; no implicit solvent term added twice",
+    "ensemble": "G_ens = -RT ln sum g_i exp(-G_i/RT)",
+    "charge_spin": {
+      "M": {
+        "charge": 0,
+        "mult": 1
+      },
+      "M_plus": {
+        "charge": 1,
+        "mult": 2
+      },
+      "LiM_plus": {
+        "charge": 1,
+        "mult": 1
+      },
+      "LiM_2plus": {
+        "charge": 2,
+        "mult": 2
+      }
+    },
+    "gate1_status": "Gate 1 NOT CLOSED / NOT CLOSABLE (unchanged)"
+  },
+  "ensemble_rules": [
+    {
+      "rule_id": "E1",
+      "rule": "cheap-search window above the mother-state minimum",
+      "value": "6 kcal/mol",
+      "kind": "resource rule (not a proven convergence scale)"
+    },
+    {
+      "rule_id": "E2",
+      "rule": "deduplicate by connectivity / coordination mode / heavy-atom RMSD / torsion",
+      "value": "keep 3 lowest independent",
+      "kind": "resource rule"
+    },
+    {
+      "rule_id": "E3",
+      "rule": "ensemble free energy",
+      "value": "G_ens = -RT ln sum g_i exp(-G_i/RT)",
+      "kind": "definition"
+    },
+    {
+      "rule_id": "E4",
+      "rule": "statistical degeneracy g_i",
+      "value": "only when provable",
+      "kind": "definition"
+    },
+    {
+      "rule_id": "E5",
+      "rule": "do not mix different stoichiometries in one ensemble",
+      "value": "hard rule",
+      "kind": "definition"
+    },
+    {
+      "rule_id": "E6",
+      "rule": "sampling audit extension",
+      "value": "up to 6 structures for the 4 sampling molecules; second round only if unstable",
+      "kind": "resource rule"
+    },
+    {
+      "rule_id": "E7",
+      "rule": "low-frequency treatment",
+      "value": "single reproducible scheme (e.g. qRRHO), frozen before analysis",
+      "kind": "definition"
+    }
+  ],
+  "counts": {
+    "ledger_rows": 48,
+    "sampling_rows": 16,
+    "existing_electronic_rows": 32,
+    "existing_molecules": 12
+  },
+  "checks": [
+    {
+      "id": "ledger_covers_main_x_four_states",
+      "description": "自由能账本登记 12 主集 x 4 主状态 = 48 行",
+      "ok": true,
+      "detail": "n_rows=48"
+    },
+    {
+      "id": "thermal_fields_left_empty_not_zero",
+      "description": "尚未计算的热校正字段留空而非 0",
+      "ok": true,
+      "detail": "48 行的 g_single_ev / thermal_corr_ev 均为空串"
+    },
+    {
+      "id": "sampling_plan_has_escalation_rule",
+      "description": "采样审计集给出 3->6 升级规则",
+      "ok": true,
+      "detail": "n_rows=16"
+    },
+    {
+      "id": "existing_electronic_layer_is_labelled",
+      "description": "既有数值标明只到电子能层、缺热校正",
+      "ok": true,
+      "detail": "32 条既有数值 / 12 个分子"
+    },
+    {
+      "id": "ensemble_rules_frozen",
+      "description": "系综规则在观察目标排名前冻结",
+      "ok": true,
+      "detail": "n_rules=7"
+    }
+  ],
+  "n_checks": 5,
+  "n_failed": 0
+}

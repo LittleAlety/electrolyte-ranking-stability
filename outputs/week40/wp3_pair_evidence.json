@@ -1,0 +1,213 @@
+{
+  "stage": "Week 40 / WP3",
+  "title": "ordering, independent uncertainty and mechanism",
+  "batch": "physics_completion_v1",
+  "inputs": {
+    "frozen_rung": "outputs/phase2_p1a/p1v_vs_p1a.json",
+    "new_electronic_structure_jobs": 0
+  },
+  "conventions": {
+    "criterion": "resolved(i,j) iff |d| >= max(z*sigma_ij, delta_m); here sigma is the rung relaxation-displacement population std",
+    "z_primary": 1.0,
+    "z_bands": [
+      1.0,
+      1.645,
+      1.96,
+      2.576
+    ],
+    "three_state": "STABLE / UNRESOLVED / ROBUST_INVERSION",
+    "multi_method_interval": "all pre-accepted methods and sampling bounds must share sign and exceed tolerance -> resolved; both sides resolved with opposite sign -> robust inversion; else unresolved",
+    "not_independent_repeats": "a small set of correlated functionals is not an independent random repeat; 1.96x spread is not automatically a calibrated 95% interval",
+    "cases_rule": "strongest robust inversion first, then Top-k-relevant unresolved boundary, then identity change; no case if none exists"
+  },
+  "n_members": 12,
+  "members": [
+    "EC",
+    "PC",
+    "DMC",
+    "EMC",
+    "DME",
+    "DOL",
+    "GBL",
+    "AN",
+    "SN",
+    "DMSO",
+    "SL",
+    "TMP"
+  ],
+  "n_pairs": 66,
+  "state_counts": {
+    "UNRESOLVED": 9,
+    "STABLE": 55,
+    "ROBUST_INVERSION": 2
+  },
+  "frozen_state_counts": {
+    "STABLE": 55,
+    "UNRESOLVED": 9,
+    "ROBUST_INVERSION": 2
+  },
+  "unresolved_fraction": "0.136363636",
+  "resolution_curve_three_state": [
+    {
+      "z": 1.0,
+      "n_pairs": 66,
+      "n_unresolved": 9,
+      "f_unresolved": "0.136363636"
+    },
+    {
+      "z": 1.645,
+      "n_pairs": 66,
+      "n_unresolved": 13,
+      "f_unresolved": "0.196969697"
+    },
+    {
+      "z": 1.96,
+      "n_pairs": 66,
+      "n_unresolved": 15,
+      "f_unresolved": "0.227272727"
+    },
+    {
+      "z": 2.576,
+      "n_pairs": 66,
+      "n_unresolved": 22,
+      "f_unresolved": "0.333333333"
+    }
+  ],
+  "mechanism_cases": [
+    {
+      "case_id": "CASE1",
+      "rule": "strongest robust inversion (pre-declared order: robust inversion first)",
+      "pair": "EMC | GBL",
+      "axis": "oxidation (P1v -> P1a vertical-to-adiabatic)",
+      "d_lower_ev": "0.250050009",
+      "d_upper_ev": "-0.455791550",
+      "sigma_ev": "0.206521142",
+      "label": "ROBUST_INVERSION",
+      "selection_impact": "flips the relative oxidation order of the pair under relaxation"
+    },
+    {
+      "case_id": "CASE2",
+      "rule": "strongest robust inversion (pre-declared order: robust inversion first)",
+      "pair": "EMC | SL",
+      "axis": "oxidation (P1v -> P1a vertical-to-adiabatic)",
+      "d_lower_ev": "0.408539433",
+      "d_upper_ev": "-0.277578589",
+      "sigma_ev": "0.206521142",
+      "label": "ROBUST_INVERSION",
+      "selection_impact": "flips the relative oxidation order of the pair under relaxation"
+    }
+  ],
+  "frozen_resolution_curve_per_model": {
+    "p1v": {
+      "z_bands": [
+        1.0,
+        1.645,
+        1.96,
+        2.576
+      ],
+      "rows": [
+        {
+          "z": 1.0,
+          "n_pairs": 66,
+          "n_unresolved": 6,
+          "f_unresolved": 0.09090909090909091
+        },
+        {
+          "z": 1.645,
+          "n_pairs": 66,
+          "n_unresolved": 10,
+          "f_unresolved": 0.15151515151515152
+        },
+        {
+          "z": 1.96,
+          "n_pairs": 66,
+          "n_unresolved": 11,
+          "f_unresolved": 0.16666666666666666
+        },
+        {
+          "z": 2.576,
+          "n_pairs": 66,
+          "n_unresolved": 17,
+          "f_unresolved": 0.25757575757575757
+        }
+      ]
+    },
+    "p1a": {
+      "z_bands": [
+        1.0,
+        1.645,
+        1.96,
+        2.576
+      ],
+      "rows": [
+        {
+          "z": 1.0,
+          "n_pairs": 66,
+          "n_unresolved": 7,
+          "f_unresolved": 0.10606060606060606
+        },
+        {
+          "z": 1.645,
+          "n_pairs": 66,
+          "n_unresolved": 11,
+          "f_unresolved": 0.16666666666666666
+        },
+        {
+          "z": 1.96,
+          "n_pairs": 66,
+          "n_unresolved": 12,
+          "f_unresolved": 0.18181818181818182
+        },
+        {
+          "z": 2.576,
+          "n_pairs": 66,
+          "n_unresolved": 16,
+          "f_unresolved": 0.24242424242424243
+        }
+      ]
+    }
+  },
+  "frozen_ranking": {
+    "kendall_tau_b": 0.7878787878787878,
+    "spearman_rho": 0.9230769230769231,
+    "top_k_overlap": {
+      "k=0.10": 1.0,
+      "k=0.20": 1.0,
+      "k=0.30": 0.75
+    }
+  },
+  "checks": [
+    {
+      "id": "pairwise_recompute_matches_frozen_counts",
+      "description": "逐对复算的三态计数与冻结载荷一致",
+      "ok": true,
+      "detail": "recomputed={\"ROBUST_INVERSION\": 2, \"STABLE\": 55, \"UNRESOLVED\": 9} frozen={\"ROBUST_INVERSION\": 2, \"STABLE\": 55, \"UNRESOLVED\": 9}"
+    },
+    {
+      "id": "no_robust_inversion_hidden_by_rounding",
+      "description": "robust inversion 逐对可列，未被四舍五入吞掉",
+      "ok": true,
+      "detail": "n_robust_inversion=2"
+    },
+    {
+      "id": "resolution_curve_monotone",
+      "description": "两模型三态曲线的 f_unresolved 随 z 增大单调不减",
+      "ok": true,
+      "detail": "f_unresolved=0.136363636,0.196969697,0.227272727,0.333333333"
+    },
+    {
+      "id": "sigma_not_from_free_Li_difference",
+      "description": "sigma 不由 free/Li 物理差值定义",
+      "ok": true,
+      "detail": "sigma 取该 rung 的 relaxation displacement 总体标准差（0.206521 eV）"
+    },
+    {
+      "id": "mechanism_cases_at_most_three",
+      "description": "机制案例不超过 3 个",
+      "ok": true,
+      "detail": "n_cases=2"
+    }
+  ],
+  "n_checks": 5,
+  "n_failed": 0
+}

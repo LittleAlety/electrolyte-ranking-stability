@@ -1,0 +1,246 @@
+{
+  "stage": "Week 37 / WP0",
+  "title": "definition migration and historical-claim synchronisation",
+  "batch": "physics_completion_v1",
+  "baseline_commit": "d5217a1f1f7e85c3e117b29d734efc2a8e535ecd",
+  "inputs": {
+    "scientific_definitions": "config/scientific_definitions.yaml",
+    "prereg": "config/prereg.yaml",
+    "core_set": "data/metadata/core_set.csv",
+    "final_conclusions": "FINAL_CONCLUSIONS.md",
+    "new_electronic_structure_jobs": 0
+  },
+  "conventions": {
+    "append_only": "旧定义不被覆写；新量名与旧别名并列登记",
+    "direction": "ox = maximize; reduction_resistance_score Sred = -EA = maximize; raw EA = minimize",
+    "missing_rule": "缺值/不合格态记为 None，绝不替换成 0",
+    "state_identity": "还原轴主 ranking 只允许 molecule_centered_redox",
+    "gate1_status": "Gate 1 NOT CLOSED / NOT CLOSABLE（本批次不改动）"
+  },
+  "quantities": [
+    {
+      "name": "Eox_vertical",
+      "definition": "E(M+) - E(M) on the same initial geometry",
+      "unit": "eV",
+      "quantity_kind": "electronic_energy_difference",
+      "objective_direction": "maximize",
+      "geometry_policy": "single shared geometry (vertical)",
+      "thermal_policy": "none",
+      "ensemble_policy": "none",
+      "solvent": "gas_phase",
+      "state_identity_eligibility": "any",
+      "analysis_cohort": "cheap_reference",
+      "role": "cheap / vertical reference"
+    },
+    {
+      "name": "Eox_adiabatic",
+      "definition": "electronic-energy difference between the two relaxed states",
+      "unit": "eV",
+      "quantity_kind": "electronic_energy_difference",
+      "objective_direction": "maximize",
+      "geometry_policy": "each charge state relaxed independently",
+      "thermal_policy": "none",
+      "ensemble_policy": "single lowest structure per state",
+      "solvent": "gas_phase",
+      "state_identity_eligibility": "any",
+      "analysis_cohort": "relaxation_effect",
+      "role": "relaxation effect"
+    },
+    {
+      "name": "Gox_single",
+      "definition": "free-energy difference from one representative minimum per state",
+      "unit": "eV",
+      "quantity_kind": "gibbs_free_energy_difference",
+      "objective_direction": "maximize",
+      "geometry_policy": "each charge state relaxed independently",
+      "thermal_policy": "qRRHO thermal correction on solution frequencies",
+      "ensemble_policy": "single lowest structure per state",
+      "solvent": "SMD_acetonitrile",
+      "state_identity_eligibility": "any",
+      "analysis_cohort": "thermochemical_correction",
+      "role": "thermal correction check"
+    },
+    {
+      "name": "Gox_ensemble",
+      "definition": "conformer-ensemble free-energy difference, -RT ln sum g_i exp(-G_i/RT)",
+      "unit": "eV",
+      "quantity_kind": "gibbs_free_energy_difference",
+      "objective_direction": "maximize",
+      "geometry_policy": "each charge state relaxed independently",
+      "thermal_policy": "qRRHO thermal correction on solution frequencies",
+      "ensemble_policy": "conformer ensemble within a frozen energy window",
+      "solvent": "SMD_acetonitrile",
+      "state_identity_eligibility": "any",
+      "analysis_cohort": "main_target",
+      "role": "main target"
+    },
+    {
+      "name": "Gox_Li_ensemble",
+      "definition": "G([LiM]2+) - G([LiM]+) using per-state ensembles",
+      "unit": "eV",
+      "quantity_kind": "gibbs_free_energy_difference",
+      "objective_direction": "maximize",
+      "geometry_policy": "each charge state relaxed independently",
+      "thermal_policy": "qRRHO thermal correction on solution frequencies",
+      "ensemble_policy": "conformer/motif ensemble within a frozen energy window",
+      "solvent": "SMD_acetonitrile",
+      "state_identity_eligibility": "molecule_centered_oxidation",
+      "analysis_cohort": "conditional_coordination_target",
+      "role": "conditional Li-coordination target"
+    },
+    {
+      "name": "coordination_shift",
+      "definition": "Gox_Li_ensemble - Gox_free_ensemble",
+      "unit": "eV",
+      "quantity_kind": "conditional_shift",
+      "objective_direction": "maximize",
+      "geometry_policy": "difference of two independently relaxed conditional species",
+      "thermal_policy": "inherits both legs",
+      "ensemble_policy": "inherits both legs",
+      "solvent": "SMD_acetonitrile",
+      "state_identity_eligibility": "molecule_centered_oxidation",
+      "analysis_cohort": "conditional_coordination_target",
+      "role": "environment response"
+    },
+    {
+      "name": "Sred",
+      "definition": "G(reduced) - G(parent) = -EA (unified reduction-resistance score)",
+      "unit": "eV",
+      "quantity_kind": "gibbs_free_energy_difference",
+      "objective_direction": "maximize",
+      "geometry_policy": "each charge state relaxed independently",
+      "thermal_policy": "qRRHO thermal correction on solution frequencies",
+      "ensemble_policy": "conformer ensemble within a frozen energy window",
+      "solvent": "SMD_acetonitrile",
+      "state_identity_eligibility": "molecule_centered_redox",
+      "analysis_cohort": "conditional_reduction_secondary",
+      "role": "conditional secondary axis"
+    }
+  ],
+  "legacy_aliases": {
+    "P1": "P1v",
+    "P2": "P2a",
+    "EA_raw": "raw electron affinity (stored separately; minimize)",
+    "reduction_resistance_score": "Sred"
+  },
+  "cohorts": {
+    "main": [
+      "C01",
+      "C02",
+      "C03",
+      "C04",
+      "C05",
+      "C08",
+      "C09",
+      "C13",
+      "C14",
+      "C15",
+      "C16",
+      "C17"
+    ],
+    "method_audit": [
+      "C01",
+      "C02",
+      "C04",
+      "C08",
+      "C13",
+      "C14",
+      "C16",
+      "C17"
+    ],
+    "sampling_audit": [
+      "C02",
+      "C03",
+      "C08",
+      "C17"
+    ]
+  },
+  "claim_migration": [
+    {
+      "id": "M1",
+      "question": "Q3",
+      "historical": "C1 全态负 tau 被当作分子还原排序脆弱性的证据",
+      "source": "FINAL_CONCLUSIONS.md Q3; outputs/week5/c1_decision_stability.json",
+      "new_statement": "C1 全态负 tau 不再用于分子还原排序脆弱性的确认性判断；还原排序在 C1 条件下因身份分层而无定义（n=1）。",
+      "risk_if_unmigrated": "把身份混合当成物理脆弱性，得出不可认证的还原排序结论。"
+    },
+    {
+      "id": "M2",
+      "question": "Q7",
+      "historical": "构象敏感性与 method 主导的 tolerance 被合并解释",
+      "source": "FINAL_CONCLUSIONS.md Q7; outputs/week6/t6_conformer_spread.json",
+      "new_statement": "构象敏感性（p90）与 method 主导的 tolerance 分开解释、分开计数；二者不同量纲，不得互相标定。",
+      "risk_if_unmigrated": "用构象 p90 冒充方法误差，或用方法 sigma 抹掉构象不确定性。"
+    },
+    {
+      "id": "M3",
+      "question": "Q10",
+      "historical": "Gate 1 措辞可被读成世界范围不存在合格数据",
+      "source": "FINAL_CONCLUSIONS.md Q10; docs/gate1_negative_result.md",
+      "new_statement": "统一为：在既定检索标准下未定位到合格数据，不能断言世界范围不存在；NOT CLOSABLE != NO SUCH DATA EXIST ANYWHERE。",
+      "risk_if_unmigrated": "把检索失败的负结果读成普适的不可能性断言。"
+    },
+    {
+      "id": "M4",
+      "question": "R15",
+      "historical": "R15 的代数恒等式被读成独立物理机制验证",
+      "source": "docs/49_round3_adversarial_audit.md; FINAL_CONCLUSIONS.md 读前必读",
+      "new_statement": "区分定义性零翻转（代数恒等式）与经验未观测；计算成本最多与改排序相关，不声称因果定律。",
+      "risk_if_unmigrated": "把判据分析当成物理定律，夸大结论强度。"
+    },
+    {
+      "id": "M5",
+      "question": "P1a",
+      "historical": "P1a 的电子能差被 thermodynamics 标签掩盖缺失热校正",
+      "source": "config/scientific_definitions.yaml#P1a; 计划.md 第 2 节",
+      "new_statement": "写明 P1a 处在电子能层；不以其 thermodynamics 措辞掩盖缺失的热校正，新批次显式区分 E / E+ZPE / G_single / G_ensemble。",
+      "risk_if_unmigrated": "用热力学术语包装纯电子能差，误导可比性与精度预期。"
+    }
+  ],
+  "checks": [
+    {
+      "id": "quantity_names_unique",
+      "description": "新批次量名互不重复",
+      "ok": true,
+      "detail": "7 个量名 / 7 个唯一"
+    },
+    {
+      "id": "quantity_fields_complete",
+      "description": "每个量都登记了全部必填字段",
+      "ok": true,
+      "detail": "required=name,definition,unit,quantity_kind,objective_direction,geometry_policy,thermal_policy,ensemble_policy,solvent,state_identity_eligibility,analysis_cohort,role"
+    },
+    {
+      "id": "legacy_alias_never_a_new_quantity_name",
+      "description": "旧别名不被当作新量名",
+      "ok": true,
+      "detail": "clash=none"
+    },
+    {
+      "id": "direction_selects_the_same_set",
+      "description": "maximise Sred 与 minimise EA 选出同一集合",
+      "ok": true,
+      "detail": "EA pick=a ; Sred pick=a"
+    },
+    {
+      "id": "missing_state_never_coerced_to_zero",
+      "description": "缺值/不合格态记为 None 而非 0",
+      "ok": true,
+      "detail": "mixed pick=a ; all-missing pick=None"
+    },
+    {
+      "id": "claim_migration_covers_required",
+      "description": "结论迁移覆盖 Q3/Q7/Q10/R15/P1a",
+      "ok": true,
+      "detail": "covered=P1a,Q10,Q3,Q7,R15"
+    },
+    {
+      "id": "cohorts_nested_in_core_set",
+      "description": "三个 cohort 均落在既有 core set 内",
+      "ok": true,
+      "detail": "main=12 audit=8 sampling=4"
+    }
+  ],
+  "n_checks": 7,
+  "n_failed": 0
+}
