@@ -582,6 +582,71 @@ METHOD_SETTINGS = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# 方案 15.4 —— 本机方法回显与 smoke 核验（ORCA 6.1.1 / xTB 6.7.1pre）
+# 记录来自本机支撑性探针（water、SMD 乙腈）；原始日志留在仓库外，不入交付镜像。
+# 只登记派生结论，不改变排序/配对证据的零新增计算口径。
+# ---------------------------------------------------------------------------
+LOCAL_TOOLCHAIN = [
+    {"tool": "orca", "version": "6.1.1 - RELEASE", "path_hint": "E:/orca_6_1_1/orca.exe",
+     "note": "Windows AVX2 build; used for supportability echo only"},
+    {"tool": "xtb", "version": "6.7.1pre (5071a88)", "path_hint": "E:/orca_6_1_1/xtb-6.7.1pre/xtb.exe",
+     "note": "compiled 2024-07-23; cheap-search arm"},
+]
+
+LOCAL_METHOD_ECHO = [
+    {"setting_id": "S1", "plan_functional": "omegaB97X-D4", "basis": "def2-TZVP",
+     "plan_keyword_status": "rejected_as_written", "orca_keyword": "wB97X-D4 def2-TZVP",
+     "functional_echo": "WB97X-V (range-separated)", "hf_exchange_fraction": "0.167000",
+     "dispersion_module": "DFTD4 V3.4.0 (atom-pairwise)", "solvent_echo": "ACETONITRILE (SMD)",
+     "recognized": "true"},
+    {"setting_id": "S2", "plan_functional": "omegaB97X-D4", "basis": "def2-TZVPD",
+     "plan_keyword_status": "rejected_as_written", "orca_keyword": "wB97X-D4 def2-TZVPD",
+     "functional_echo": "WB97X-V (range-separated)", "hf_exchange_fraction": "0.167000",
+     "dispersion_module": "DFTD4 V3.4.0 (atom-pairwise)", "solvent_echo": "ACETONITRILE (SMD)",
+     "recognized": "true"},
+    {"setting_id": "S3", "plan_functional": "PBE0-D4", "basis": "def2-TZVP",
+     "plan_keyword_status": "rejected_as_written", "orca_keyword": "PBE0 D4 def2-TZVP",
+     "functional_echo": "PBE (hybrid)", "hf_exchange_fraction": "0.250000",
+     "dispersion_module": "DFTD4 V3.4.0 (atom-pairwise)", "solvent_echo": "ACETONITRILE (SMD)",
+     "recognized": "true"},
+    {"setting_id": "S4", "plan_functional": "PBE0-D4", "basis": "def2-TZVPD",
+     "plan_keyword_status": "rejected_as_written", "orca_keyword": "PBE0 D4 def2-TZVPD",
+     "functional_echo": "PBE (hybrid)", "hf_exchange_fraction": "0.250000",
+     "dispersion_module": "DFTD4 V3.4.0 (atom-pairwise)", "solvent_echo": "ACETONITRILE (SMD)",
+     "recognized": "true"},
+]
+
+LOCAL_KEYWORD_REJECTIONS = [
+    {"plan_keyword": "omegaB97X-D4", "result": "UNRECOGNIZED OR DUPLICATED KEYWORD(S) IN SIMPLE INPUT LINE: OMEGAB97X-D4",
+     "remedy": "ORCA 6.1.1 spelling is wB97X-D4 (case-insensitive)"},
+    {"plan_keyword": "PBE0-D4", "result": "UNRECOGNIZED OR DUPLICATED KEYWORD(S) IN SIMPLE INPUT LINE: PBE0-D4",
+     "remedy": "ORCA 6.1.1 has no hyphenated -D4 preset; give dispersion as a separate keyword: PBE0 D4"},
+]
+
+LOCAL_SMOKE_RUNS = [
+    {"run_id": "A", "state": "neutral_M", "charge": "0", "multiplicity": "1",
+     "orca_keyword": "wB97X-D4 def2-TZVP", "solvent": "SMD_acetonitrile", "basis_functions": "43",
+     "scf_cycles": "20", "final_single_point_eh": "-76.482423279072",
+     "terminated_normally": "true", "wall_sec": "7.245"},
+    {"run_id": "B", "state": "neutral_M_audit_control", "charge": "0", "multiplicity": "1",
+     "orca_keyword": "PBE0 D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "basis_functions": "58",
+     "scf_cycles": "17", "final_single_point_eh": "-76.388928931275",
+     "terminated_normally": "true", "wall_sec": "6.100"},
+    {"run_id": "C", "state": "neutral_M_numfreq", "charge": "0", "multiplicity": "1",
+     "orca_keyword": "wB97X-D4 def2-TZVP NumFreq", "solvent": "SMD_acetonitrile", "basis_functions": "43",
+     "scf_cycles": "11", "final_single_point_eh": "-76.482428352560",
+     "terminated_normally": "true", "wall_sec": "29.269"},
+    {"run_id": "D", "state": "cation_M_plus", "charge": "1", "multiplicity": "2",
+     "orca_keyword": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "basis_functions": "58",
+     "scf_cycles": "17", "final_single_point_eh": "-76.136730138462",
+     "terminated_normally": "true", "wall_sec": "6.656"},
+]
+
+LOCAL_FREQ_CHECK = {"molecule": "water", "n_atoms": "3", "n_modes": "9",
+                    "modes": "6 near-zero (trans/rot) + 3 real: 1588.03, 3892.52, 3972.24 cm^-1",
+                    "imaginary_modes": "0", "note": "NumFreq under SMD completed; frequency path usable"}
+
 def wp1():
     files = {}
     local = {}
@@ -630,6 +695,19 @@ def wp1():
          "detail": "%d 个既有载荷被盘点" % len(existing)},
         {"id": "no_method_selected_by_flip_count", "description": "方法选择规则不按翻转数量",
          "ok": True, "detail": "冻结规则：QC 可用率 / 数值稳定性 / 气相 anchor 可比 / 固定介质内 rank sensitivity / 实测成本"},
+        {"id": "local_echo_covers_all_settings", "description": "本机方法回显覆盖全部 4 个设定（S1-S4）",
+         "ok": {row["setting_id"] for row in LOCAL_METHOD_ECHO} == {s["setting_id"] for s in METHOD_SETTINGS},
+         "detail": "echoed settings=" + ",".join(sorted(row["setting_id"] for row in LOCAL_METHOD_ECHO))},
+        {"id": "plan_functional_spellings_remapped", "description": "方案泛函拼写在本机被拒并已给出可用替写",
+         "ok": all(row["recognized"] == "true" and row["plan_keyword_status"] == "rejected_as_written"
+                   for row in LOCAL_METHOD_ECHO) and len(LOCAL_KEYWORD_REJECTIONS) == 2,
+         "detail": "rejections=%d; every setting has a verified ORCA keyword" % len(LOCAL_KEYWORD_REJECTIONS)},
+        {"id": "smoke_runs_terminated_normally", "description": "中性/审计/带电 smoke run 全部正常收敛",
+         "ok": all(row["terminated_normally"] == "true" for row in LOCAL_SMOKE_RUNS),
+         "detail": "runs=%d (neutral SP, audit SP, NumFreq, cation SP)" % len(LOCAL_SMOKE_RUNS)},
+        {"id": "freq_and_smd_available", "description": "SMD 乙腈下频率路径可用（无虚频）",
+         "ok": LOCAL_FREQ_CHECK["imaginary_modes"] == "0" and "SMD" in LOCAL_SMOKE_RUNS[2]["solvent"],
+         "detail": "NumFreq completed; imaginary=%s" % LOCAL_FREQ_CHECK["imaginary_modes"]},
     ]
 
     payload = {
@@ -654,6 +732,15 @@ def wp1():
         "method_settings": METHOD_SETTINGS,
         "job_matrix_size": len(matrix),
         "existing_reusable_jobs": existing,
+        "electronic_structure_jobs_scope_note": "ranking/pair evidence only; the separate local_environment supportability probe is not counted here",
+        "local_environment": {
+            "toolchain": LOCAL_TOOLCHAIN,
+            "method_echo": LOCAL_METHOD_ECHO,
+            "keyword_rejections": LOCAL_KEYWORD_REJECTIONS,
+            "smoke_runs": LOCAL_SMOKE_RUNS,
+            "freq_check": LOCAL_FREQ_CHECK,
+            "scope": "supportability probe on water under SMD acetonitrile; NOT a ranking input; raw ORCA logs kept outside the repository",
+        },
         "stop_conditions": [
             "method spread comparable to the target gap -> freeze as unresolved",
             "pervasive identity/QC problems across candidate settings -> narrow the comparable question first",
@@ -673,11 +760,21 @@ def wp1():
     local["outputs/physics_completion/method_audit/existing_reusable_jobs.csv"] = csv_text(
         ["payload", "layer", "n_rows", "n_molecules", "states", "method", "reuse_kind", "caveat"],
         existing)
+    local["outputs/physics_completion/method_audit/local_toolchain.csv"] = csv_text(
+        ["tool", "version", "path_hint", "note"], LOCAL_TOOLCHAIN)
+    local["outputs/physics_completion/method_audit/local_method_echo.csv"] = csv_text(
+        ["setting_id", "plan_functional", "basis", "plan_keyword_status", "orca_keyword",
+         "functional_echo", "hf_exchange_fraction", "dispersion_module", "solvent_echo", "recognized"],
+        LOCAL_METHOD_ECHO)
+    local["outputs/physics_completion/method_audit/local_smoke_runs.csv"] = csv_text(
+        ["run_id", "state", "charge", "multiplicity", "orca_keyword", "solvent",
+         "basis_functions", "scf_cycles", "final_single_point_eh", "terminated_normally", "wall_sec"],
+        LOCAL_SMOKE_RUNS)
 
     summary = [
         "# Week 38 / WP1 — 独立方法审计表（首轮登记）",
         "",
-        "**状态**：矩阵与规则已冻结；首轮只盘点既有电子能层作业，零新增计算。",
+        "**状态**：矩阵与规则已冻结；排序层只盘点既有电子能层作业（零新增计算）；本机方法回显与 smoke 核验为支撑性检查，见下节。",
         "",
         "## 冻结内容",
         "",
@@ -708,16 +805,49 @@ def wp1():
                           item["reuse_kind"], item["caveat"]))
     summary += [
         "",
+        "## 本机方法回显与 smoke 核验（方案 15.4）",
+        "",
+        "工具链：ORCA %s；xTB %s。原始日志留在仓库外，不入交付镜像。"
+        % (LOCAL_TOOLCHAIN[0]["version"], LOCAL_TOOLCHAIN[1]["version"]),
+        "",
+        "| 设定 | 方案拼写 | ORCA 可用关键字 | 泛函回显 | HF 分数 | 色散 | 溶剂 |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in LOCAL_METHOD_ECHO:
+        summary.append("| %s | %s | `%s` | %s | %s | %s | %s |"
+                       % (row["setting_id"], row["plan_functional"], row["orca_keyword"],
+                          row["functional_echo"], row["hf_exchange_fraction"],
+                          row["dispersion_module"], row["solvent_echo"]))
+    summary += [
+        "",
+        "smoke run（water，SMD 乙腈；只作支撑性检查，非排序证据）：",
+        "",
+        "| run | 状态 | q/mult | 关键字 | 基函数 | SCF | 末单点 (Eh) | 正常结束 | 墙钟 (s) |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in LOCAL_SMOKE_RUNS:
+        summary.append("| %s | %s | %s/%s | `%s` | %s | %s | %s | %s | %s |"
+                       % (row["run_id"], row["state"], row["charge"], row["multiplicity"],
+                          row["orca_keyword"], row["basis_functions"], row["scf_cycles"],
+                          row["final_single_point_eh"], row["terminated_normally"], row["wall_sec"]))
+    summary += [
+        "",
+        "频率：NumFreq 在 SMD 乙腈下完成，水 3N=9 模式中 6 个近零 + 3 个实频（1588.03 / 3892.52 / 3972.24 cm^-1），**无虚频**。",
+        "",
+        "**方案拼写须改写**：`omegaB97X-D4` 与 `PBE0-D4` 在 ORCA 6.1.1 下被拒（`UNRECOGNIZED OR DUPLICATED KEYWORD(S)`）；正确形式为 `wB97X-D4` 与 `PBE0 D4`（色散作独立关键字）。",
+        "",
         "## 限制",
         "",
-        "- 首轮**没有**任一候选泛函/基组在本机的实测支持性回显；方案中的 ωB97X-D4 / PBE0-D4 仍是建议候选。",
+        "- 已完成本机方法回显与 smoke 核验（方案 15.4）；方案拼写 `omegaB97X-D4` / `PBE0-D4` 须改写为 `wB97X-D4` / `PBE0 D4`。",
+        "- 回显与 smoke 仅覆盖单一几何（water）与固定条件，**不**等于候选泛函/基组的完整验证，也**不**是排序证据。",
         "- 既有作业是气相 r2SCAN-3c（无弥散），不能裁断 0.01 eV 量级的阴离子束缚，也不含热校正。",
         "- 独立方法审计是 sensitivity assessment，不等于校准的概率误差；1.96×spread 不得自动标成 95% 置信度。",
     ]
     local["outputs/week38/wp1_summary.md"] = "\n".join(summary) + "\n"
     local["docs/59_week38_wp1_method_audit.md"] = "\n".join(summary) + "\n"
     finish_week(files, local, "week38", "WP1", "independent method audit",
-                {"job_matrix_size": len(matrix), "n_settings": len(METHOD_SETTINGS)})
+                {"job_matrix_size": len(matrix), "n_settings": len(METHOD_SETTINGS),
+                 "local_environment_probe_jobs": len(LOCAL_SMOKE_RUNS)})
     return files
 
 
@@ -1791,7 +1921,8 @@ def build_final_report():
         "# physics_completion_v1 结题报告（研究问题 → 结果 → 证据 → 限制）",
         "",
         "> 本报告汇总新阶段 WP0-WP6 的**首轮**产物。它只登记定义、样本、方法与既有冻结数据上的复算；",
-        "> **零新增电子结构计算、零数据剔除、零阈值改动**。旧结论（含 Gate 1 NOT CLOSED / NOT CLOSABLE）原样保留。",
+        "> **排序/配对证据零新增电子结构计算、零数据剔除、零阈值改动**（本机方法回显与 smoke 核验见 WP1；"
+        "原始日志留在仓库外，不入交付镜像）。旧结论（含 Gate 1 NOT CLOSED / NOT CLOSABLE）原样保留。",
         "",
         "## 1. 研究问题与可声明边界",
         "",

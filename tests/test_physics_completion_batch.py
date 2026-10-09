@@ -24,7 +24,7 @@ def _read_csv(path: Path):
 
 def test_every_artifact_is_byte_reproducible() -> None:
     files = batch.build_all()
-    assert len(files) == 67
+    assert len(files) == 70
     for rel, text in files.items():
         target = REPO_ROOT / rel
         assert target.is_file(), rel
@@ -71,6 +71,21 @@ def test_wp1_job_matrix_is_full_factorial_with_diffuse_option() -> None:
     assert len({s["functional"] for s in payload["method_settings"]}) >= 2
     rows = _read_csv(REPO_ROOT / "outputs/physics_completion/method_audit/job_matrix.csv")
     assert len(rows) == 128
+
+
+def test_wp1_local_method_echo_and_smoke_runs() -> None:
+    payload = json.loads((REPO_ROOT / "outputs/week38/wp1_method_audit.json").read_text(encoding="utf-8"))
+    env = payload["local_environment"]
+    echo = _read_csv(REPO_ROOT / "outputs/physics_completion/method_audit/local_method_echo.csv")
+    assert {row["setting_id"] for row in echo} == {"S1", "S2", "S3", "S4"}
+    assert all(row["plan_keyword_status"] == "rejected_as_written" for row in echo)
+    assert all(row["recognized"] == "true" for row in echo)
+    assert {item["plan_keyword"] for item in env["keyword_rejections"]} == {"omegaB97X-D4", "PBE0-D4"}
+    runs = _read_csv(REPO_ROOT / "outputs/physics_completion/method_audit/local_smoke_runs.csv")
+    assert len(runs) == 4
+    assert all(row["terminated_normally"] == "true" for row in runs)
+    assert any(row["charge"] == "1" for row in runs)
+    assert env["freq_check"]["imaginary_modes"] == "0"
 
 
 def test_wp2_ledger_leaves_missing_fields_empty() -> None:
