@@ -16,6 +16,36 @@
     "single_conformer_representative": 3,
     "sampling_sensitive": 5
   },
+  "round2": {
+    "level": "xTB GFN2 (gas phase) conformer screening",
+    "protocol": {
+      "n_conformers_requested": 64,
+      "seed": 20261011,
+      "note": "one uniform larger pool for all 8 states; the round-1 rows are untouched so the two rounds stay separately auditable"
+    },
+    "totals": {
+      "states_screened": 8,
+      "states_total": 8
+    }
+  },
+  "conformer_pool": {
+    "pool": "union of round 1 (16 starts) and round 2 (64 starts)",
+    "duplicate_tolerance_kcal": 0.1,
+    "keep_round1": 3,
+    "max_pool": 6,
+    "structures_kept": 10,
+    "states_registered": 8,
+    "pool_limited_states": [
+      "DMC|M",
+      "DMC|M_plus",
+      "EMC|M",
+      "EMC|M_plus",
+      "GBL|M",
+      "GBL|M_plus",
+      "SL|M",
+      "SL|M_plus"
+    ]
+  },
   "li_motif_sampling": [
     {
       "mol_id": "C01",
@@ -115,8 +145,32 @@
       "description": "Li 配位 motif 采样单列登记（本轮未做），不并进自由态结论",
       "ok": "true",
       "detail": "8 Li entries registered"
+    },
+    {
+      "check_id": "conformer_set_structures_come_from_the_registered_pool",
+      "description": "结构集合的每个结构都来自登记的两轮采样池，不引入池外几何",
+      "ok": "true",
+      "detail": "10 structures kept"
+    },
+    {
+      "check_id": "conformer_set_geometries_are_hash_recorded",
+      "description": "每个入选结构的几何文件存在且逐条记录 sha256（可原样复核与重跑）",
+      "ok": "true",
+      "detail": "10/10 hashed"
+    },
+    {
+      "check_id": "round2_uses_one_uniform_pool_across_states",
+      "description": "第 2 轮对所有分子-态用同一 seed 与同一起点数（统一池、不逐态调参）",
+      "ok": "true",
+      "detail": "round-2 optimised counts: 64"
+    },
+    {
+      "check_id": "escalation_is_registered_not_decided_by_outcome",
+      "description": "3 -> 6 升级只登记待判（等第 1 轮自由能），不按结果事后决定",
+      "ok": "true",
+      "detail": "8 states registered / 8 pool-limited"
     }
   ],
-  "n_checks": 4,
+  "n_checks": 8,
   "n_failed": 0
 }

@@ -4,17 +4,22 @@
 两级：
   * 计算级（--run）：RDKit ETKDG/MMFF 撒 n_conformers 个起点 -> 各态在其电荷与自旋下跑
     xTB GFN2 Opt，原始结果缓存到仓库外 work/sampling/**（同时作为复现证据被 provenance 收录）；
-  * 派生级（默认 / --check）：只从缓存读回，写出 outputs/physics_completion/sampling/**。
+  * 计算级（--run2）：对所有 8 个分子-态**统一**扩到一个更大的池（64 起点、另一个登记 seed），
+    结果按 kind=conformer_r2 追加进同一缓存，绝不覆盖第 1 轮的行；
+  * 派生级（默认 / --check）：只从缓存读回，写出 outputs/physics_completion/sampling/**，
+    包括两轮逐态判定、每态独立低能结构集合（含几何路径与 sha256）与 3 -> 6 升级登记。
 
 口径纪律：
   * 采样层是**气相 GFN2-xTB 筛选**，不是生产级的 wB97X-D4/SMD(acetonitrile)；
     它只回答「单一代表结构是否落在同一极小附近」，不用于给出生产自由能；
-  * 每个态保留最多 3 个独立低能极小；只有当 3 个极小之间跨过容差才升级到 6；
+  * 每个态保留最多 3 个独立低能极小（池里不足 3 个就保留实际数量，并登记 pool_limited）；
+    3 -> 6 的升级只有在算出第 1 轮自由能、且变化跨过独立容差时才触发；
   * Li 配位态的 motif 采样不在本轮：它需要单独的配位起点构造，显式登记为 not_computed。
 
 用法
 ----
     .venv\\Scripts\\python.exe scripts\\build_wp2_sampling.py --run
+    .venv\\Scripts\\python.exe scripts\\build_wp2_sampling.py --run2
     .venv\\Scripts\\python.exe scripts\\build_wp2_sampling.py
     .venv\\Scripts\\python.exe scripts\\build_wp2_sampling.py --check
 """
@@ -44,6 +49,19 @@ SEED = 20261010
 KEEP = 3
 DUP_TOL_KCAL = 0.10
 ESCALATE_TOL_KCAL = 1.00
+# 第 2 轮：对所有分子-态统一用更大的池（同一 seed 与起点数），不逐态调参。
+NUM_CONFS_REQUEST_R2 = 64
+SEED_R2 = 20261011
+KIND_R1 = "conformer"
+KIND_R2 = "conformer_r2"
+PREFIX_R1 = "c"
+PREFIX_R2 = "r2_c"
+MAX_POOL = 6
+ESCALATION_RULE = ("extend 3 -> 6 only if the 3 -> 6 free-energy change crosses the independent "
+                   "tolerance or the Top-k set")
+POOL_NOTE = ("a gas-phase GFN2 minimum kept as a ready-to-run structure; running it at the "
+             "production level is a registered 3 -> 6 escalation, not a substitute for the "
+             "single-conformer production label")
 
 MOLS = [("C01", "DMC", "COC(=O)OC"), ("C02", "EMC", "CCOC(=O)OC"),
         ("C13", "GBL", "O=C1CCCO1"), ("C14", "SL", "O=S1(=O)CCCC1")]
@@ -62,6 +80,14 @@ RESULT_FIELDS = ("mol_id", "name", "state", "charge", "multiplicity", "level",
                  "within_escalation_tolerance", "verdict", "note")
 
 ACC_FIELDS = ("check_id", "description", "ok", "detail")
+
+CONFORMER_SET_FIELDS = ("mol_id", "name", "state", "charge", "multiplicity", "pool", "rank",
+                        "n_atoms", "xtb_energy_eh", "rel_kcal", "source_kind", "source_index",
+                        "geometry_relpath", "geometry_sha256", "selected_round1", "note")
+
+ESCALATION_FIELDS = ("mol_id", "name", "state", "n_distinct_minima", "n_structures_kept",
+                     "structures_round1", "round2_max", "pool_limited", "escalation_status",
+                     "rule", "note")
 
 NOTES = ("gas-phase GFN2-xTB screening only: it says whether one representative structure sits "
          "at/near the screened minimum, NOT a production free energy; the production level stays "
@@ -154,18 +180,25 @@ def run_xtb(directory, block, charge, multiplicity, do_opt):
     return energy, converged
 
 
-def compute():
-    rows = []
+def compute(rows=None, kind=KIND_R1, count=NUM_CONFS_REQUEST, seed=SEED, prefix=PREFIX_R1,
+            with_references=True):
+    """跑一轮构象筛选：round 1 从零开始；round 2 读回既有缓存后追加，绝不覆盖 round 1。"""
+    rows = [] if rows is None else list(rows)
+    have = {(row["name"], row["state"], row["kind"], row["index"]) for row in rows}
     for mol_id, name, smiles in MOLS:
-        blocks = embed(smiles, NUM_CONFS_REQUEST, SEED)
+        blocks = embed(smiles, count, seed)
         for state, charge, uhf in ROUND1_STATES:
             for index, block in enumerate(blocks):
-                energy, converged = run_xtb(WORK / name / state / ("c%02d" % index), block,
-                                            charge, uhf, True)
+                if (name, state, kind, str(index)) in have:
+                    continue
+                energy, converged = run_xtb(WORK / name / state / ("%s%02d" % (prefix, index)),
+                                            block, charge, uhf, True)
                 rows.append({"mol_id": mol_id, "name": name, "state": state, "charge": str(charge),
-                             "multiplicity": str(uhf + 1), "kind": "conformer", "index": str(index),
+                             "multiplicity": str(uhf + 1), "kind": kind, "index": str(index),
                              "energy_eh": energy, "converged": converged,
                              "n_atoms": str(int(block.splitlines()[0].split()[0]))})
+            if not with_references:
+                continue
             source, source_note = production_geometry(name, state)
             reference = dft_geometry(name, state)
             geometry = reference if reference is not None else source
@@ -195,13 +228,71 @@ def cluster_reps(energies, tol):
     return reps
 
 
-def derive(raw):
-    files = {}
+def sha256_of(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else ""
+
+
+def conformer_dir(name, state, kind, index):
+    prefix = PREFIX_R2 if kind == KIND_R2 else PREFIX_R1
+    return WORK / name / state / ("%s%02d" % (prefix, int(index)))
+
+
+def select_pool(raw):
+    """把两轮的构象合成一个池，按能量聚成独立极小，取每个极小的最低能代表（最多 MAX_POOL 个）。"""
+    set_rows = []
+    escalation_rows = []
+    for mol_id, name, smiles in MOLS:
+        for state, charge, uhf in ROUND1_STATES:
+            conf = [row for row in raw if row["name"] == name and row["state"] == state
+                    and row["kind"] in (KIND_R1, KIND_R2) and row["energy_eh"]]
+            if not conf:
+                escalation_rows.append({
+                    "mol_id": mol_id, "name": name, "state": state,
+                    "n_distinct_minima": "0", "n_structures_kept": "0", "structures_round1": "0",
+                    "round2_max": str(MAX_POOL), "pool_limited": "",
+                    "escalation_status": "not_computed", "rule": ESCALATION_RULE,
+                    "note": "no cached pool rows"})
+                continue
+            ordered = sorted(conf, key=lambda item: float(item["energy_eh"]))
+            reps = []
+            for item in ordered:
+                value = float(item["energy_eh"])
+                if not reps or value - reps[-1][0] > DUP_TOL_KCAL / HA_TO_KCAL:
+                    reps.append((value, item))
+            reps = reps[:MAX_POOL]
+            minimum = reps[0][0]
+            for rank, (value, item) in enumerate(reps, start=1):
+                geometry = conformer_dir(name, state, item["kind"], item["index"]) / "xtbopt.xyz"
+                set_rows.append({
+                    "mol_id": mol_id, "name": name, "state": state, "charge": str(charge),
+                    "multiplicity": str(uhf + 1), "pool": "union_round1_round2", "rank": str(rank),
+                    "n_atoms": item["n_atoms"], "xtb_energy_eh": "%.9f" % value,
+                    "rel_kcal": "%.3f" % ((value - minimum) * HA_TO_KCAL),
+                    "source_kind": item["kind"], "source_index": item["index"],
+                    "geometry_relpath": geometry.relative_to(REPO).as_posix(),
+                    "geometry_sha256": sha256_of(geometry),
+                    "selected_round1": str(rank <= KEEP).lower(), "note": POOL_NOTE})
+            escalation_rows.append({
+                "mol_id": mol_id, "name": name, "state": state,
+                "n_distinct_minima": str(len(reps)), "n_structures_kept": str(len(reps)),
+                "structures_round1": str(min(KEEP, len(reps))), "round2_max": str(MAX_POOL),
+                "pool_limited": str(len(reps) < KEEP).lower(),
+                "escalation_status": "registered_pending_round1_free_energy_check",
+                "rule": ESCALATION_RULE,
+                "note": ("the union pool (%d + %d ETKDG starts) produced %d independent GFN2 minima; "
+                         "one structure per minimum is kept, and the registered rule extends 3 -> 6 "
+                         "only if the 3 -> 6 free-energy change crosses the independent tolerance"
+                         % (NUM_CONFS_REQUEST, NUM_CONFS_REQUEST_R2, len(reps)))})
+    return set_rows, escalation_rows
+
+
+def evaluate_round(raw, kind):
+    """按给定轮次算出每态的判定行；两轮复用同一口径，便于逐字对照。"""
     results = []
     for mol_id, name, smiles in MOLS:
         for state, charge, uhf in ROUND1_STATES:
             conf = [row for row in raw if row["name"] == name and row["state"] == state
-                    and row["kind"] == "conformer" and row["energy_eh"]]
+                    and row["kind"] == kind and row["energy_eh"]]
             ref = next((row for row in raw if row["name"] == name and row["state"] == state
                         and row["kind"] == "production_geometry_sp" and row["energy_eh"]), None)
             source, source_note = production_geometry(name, state)
@@ -248,6 +339,15 @@ def derive(raw):
                 row["note"] = "cached conformers exist but the production-geometry reference is missing"
             results.append(row)
 
+    return results
+
+
+def derive(raw):
+    files = {}
+    results = evaluate_round(raw, KIND_R1)
+    results2 = evaluate_round(raw, KIND_R2)
+    pool_rows, escalation_rows = select_pool(raw)
+
     li_rows = []
     for mol_id, name, smiles in MOLS:
         for state in ("LiM_plus", "LiM_2plus"):
@@ -262,6 +362,8 @@ def derive(raw):
     n_done = sum(1 for row in results if row["verdict"] != "not_computed")
     n_ok = sum(1 for row in results if row["verdict"] == "single_conformer_representative")
     n_sensitive = sum(1 for row in results if row["verdict"] == "sampling_sensitive")
+    n_done2 = sum(1 for row in results2 if row["verdict"] != "not_computed")
+    n_limited = sum(1 for row in escalation_rows if row["pool_limited"] == "true")
 
     checks = [
         {"check_id": "round1_covers_the_states_that_govern_the_two_flips",
@@ -281,6 +383,29 @@ def derive(raw):
          "description": "Li 配位 motif 采样单列登记（本轮未做），不并进自由态结论",
          "ok": str(all(row["status"] == "not_computed" for row in li_rows)).lower(),
          "detail": "%d Li entries registered" % len(li_rows)},
+        {"check_id": "conformer_set_structures_come_from_the_registered_pool",
+         "description": "结构集合的每个结构都来自登记的两轮采样池，不引入池外几何",
+         "ok": str(all(row["source_kind"] in (KIND_R1, KIND_R2) for row in pool_rows)).lower(),
+         "detail": "%d structures kept" % len(pool_rows)},
+        {"check_id": "conformer_set_geometries_are_hash_recorded",
+         "description": "每个入选结构的几何文件存在且逐条记录 sha256（可原样复核与重跑）",
+         "ok": str(all(row["geometry_sha256"] and (REPO / row["geometry_relpath"]).is_file()
+                       for row in pool_rows)).lower(),
+         "detail": "%d/%d hashed" % (sum(1 for row in pool_rows if row["geometry_sha256"]),
+                                     len(pool_rows))},
+        {"check_id": "round2_uses_one_uniform_pool_across_states",
+         "description": "第 2 轮对所有分子-态用同一 seed 与同一起点数（统一池、不逐态调参）",
+         "ok": str(len(results2) > 0
+                   and all(row["n_conformers_optimised"] for row in results2)
+                   and len({row["n_conformers_optimised"] for row in results2}) == 1).lower(),
+         "detail": "round-2 optimised counts: %s" % " ".join(
+             sorted({row["n_conformers_optimised"] or "-" for row in results2}))},
+        {"check_id": "escalation_is_registered_not_decided_by_outcome",
+         "description": "3 -> 6 升级只登记待判（等第 1 轮自由能），不按结果事后决定",
+         "ok": str(all(row["escalation_status"] in ("registered_pending_round1_free_energy_check",
+                                                    "not_computed")
+                       for row in escalation_rows)).lower(),
+         "detail": "%d states registered / %d pool-limited" % (len(escalation_rows), n_limited)},
     ]
 
     index = {
@@ -296,6 +421,22 @@ def derive(raw):
                                    "unresolved instead of searching for a preferred outcome")},
         "totals": {"states_screened": n_done, "states_total": len(results),
                    "single_conformer_representative": n_ok, "sampling_sensitive": n_sensitive},
+        "round2": {
+            "level": LEVEL,
+            "protocol": {"n_conformers_requested": NUM_CONFS_REQUEST_R2, "seed": SEED_R2,
+                         "note": ("one uniform larger pool for all 8 states; the round-1 rows are "
+                                  "untouched so the two rounds stay separately auditable")},
+            "totals": {"states_screened": n_done2, "states_total": len(results2)},
+        },
+        "conformer_pool": {
+            "pool": ("union of round 1 (%d starts) and round 2 (%d starts)"
+                     % (NUM_CONFS_REQUEST, NUM_CONFS_REQUEST_R2)),
+            "duplicate_tolerance_kcal": DUP_TOL_KCAL, "keep_round1": KEEP, "max_pool": MAX_POOL,
+            "structures_kept": len(pool_rows), "states_registered": len(escalation_rows),
+            "pool_limited_states": sorted("%s|%s" % (row["name"], row["state"])
+                                          for row in escalation_rows
+                                          if row["pool_limited"] == "true"),
+        },
         "li_motif_sampling": li_rows,
         "raw_cache": "outside-repo: work/sampling/xtb_results.csv (hash-recorded by the provenance manifest)",
         "checks": checks,
@@ -328,7 +469,56 @@ def derive(raw):
         "",
     ]
 
+    md += [
+        "",
+        "## 第 2 轮：统一扩大的池",
+        "",
+        "> 同样是**气相 GFN2 筛选**。第 2 轮对所有 8 个分子-态用同一个更大的池",
+        "> （%d 起点、seed %d），不逐态调参，也不覆盖第 1 轮的行，两轮分开审计。"
+        % (NUM_CONFS_REQUEST_R2, SEED_R2),
+        "",
+        "| 分子 | 态 | 撒点数 | 独立极小 | 生产几何相对最低 | 冻结起点相对最低 | 判定 |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in results2:
+        md.append("| %s | %s | %s | %s | %s | %s | %s |" % (
+            row["name"], row["state"], row["n_conformers_optimised"] or "-",
+            row["n_distinct_minima"] or "-", row["production_geom_rel_kcal"] or "-",
+            row["frozen_start_rel_kcal"] or "-", row["verdict"]))
+    md += [
+        "",
+        "## 独立低能结构（可执行结构集合）",
+        "",
+        "| 分子 | 态 | 序 | 相对最低 (kcal/mol) | 来源 | 几何（仓库相对路径） | sha256 前 12 位 |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in pool_rows:
+        md.append("| %s | %s | %s | %s | %s#%s | `%s` | `%s` |" % (
+            row["name"], row["state"], row["rank"], row["rel_kcal"], row["source_kind"],
+            row["source_index"], row["geometry_relpath"], row["geometry_sha256"][:12]))
+    md += [
+        "",
+        "| 分子 | 态 | 池内独立极小 | 保留结构 | 第 1 轮用 | 池受限 | 升级状态 |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in escalation_rows:
+        md.append("| %s | %s | %s | %s | %s | %s | %s |" % (
+            row["name"], row["state"], row["n_distinct_minima"], row["n_structures_kept"],
+            row["structures_round1"], row["pool_limited"] or "-", row["escalation_status"]))
+    md += [
+        "",
+        "* 每个独立 GFN2 极小保留一个最低能结构（最多 %d 个）；`池受限 = true` 表示这个池" % MAX_POOL,
+        "  在这一水平上只给出少于 3 个独立极小，结构集合无法凑满 3 个——这是登记的事实，不是结论。",
+        "  是否把第 3 个结构升到生产级，由登记规则在算出第 1 轮自由能之后决定。",
+        "",
+    ]
+
     files["outputs/physics_completion/sampling/sampling_round1.csv"] = csv_text(RESULT_FIELDS, results)
+    files["outputs/physics_completion/sampling/sampling_round2.csv"] = csv_text(RESULT_FIELDS, results2)
+    files["outputs/physics_completion/sampling/sampling_conformer_set.csv"] = csv_text(
+        CONFORMER_SET_FIELDS, pool_rows)
+    files["outputs/physics_completion/sampling/sampling_escalation.csv"] = csv_text(
+        ESCALATION_FIELDS, escalation_rows)
     files["outputs/physics_completion/sampling/sampling_index.json"] = dump(index)
     files["outputs/physics_completion/sampling/sampling_acceptance.csv"] = csv_text(ACC_FIELDS, checks)
     files["outputs/physics_completion/sampling/sampling_summary.md"] = "\n".join(md)
@@ -337,12 +527,18 @@ def derive(raw):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Round-1 conformer screening (plan 6.1).")
-    parser.add_argument("--run", action="store_true", help="run the xTB conformer screen and cache it")
+    parser.add_argument("--run", action="store_true", help="run the round-1 xTB screen and cache it")
+    parser.add_argument("--run2", action="store_true",
+                        help="run the larger uniform round-2 pool and append it to the cache")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args(argv)
 
     if args.run:
         compute()
+        return 0
+    if args.run2:
+        compute(rows=read_raw(), kind=KIND_R2, count=NUM_CONFS_REQUEST_R2, seed=SEED_R2,
+                prefix=PREFIX_R2, with_references=False)
         return 0
 
     raw = read_raw()
