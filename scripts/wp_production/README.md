@@ -12,7 +12,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finali
 ```
 
 顺序：`anchors` → `emit-wp2` → `generator` → `closure` → `provenance` → `sampling` → `cost` →
-`recheck-plan` → `figures` → `mirror` → `site` → `freeze` → `clean-room` → 九个 `--check` → `pytest`。
+`recheck-plan` → `figures` → `mirror` → `site` → `freeze` → `clean-room` → 十个 `--check` → `pytest`。
 任一非零即 `ABORT`，不提交。
 
 ## 生产队列：查状态与断点续跑
@@ -50,11 +50,12 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息（写 `work/_wp2_commit_msg.txt`） |
 | `finalize_wp2.ps1` | 上面那条一键收口链 |
 | `supervise_pending.ps1` | 无人值守监守：等其它驱动退出后调 `run_wp2_queue.py --run` |
-| `scripts/build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |
-| `scripts/build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
-| `scripts/build_compute_provenance.py` | 逐作业复现证据清单（派生层） |
-| `scripts/build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） |
-| `scripts/build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的结果前预注册计划（派生层，零新增计算） |
+| `scripts/wp_production/build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |
+| `scripts/wp_production/build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
+| `scripts/wp_production/build_compute_provenance.py` | 逐作业复现证据清单（派生层） |
+| `scripts/wp_production/build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） |
+| `scripts/wp_production/build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的结果前预注册计划（派生层，零新增计算） |
+| `scripts/wp_production/build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） |
 
 ## 边界
 

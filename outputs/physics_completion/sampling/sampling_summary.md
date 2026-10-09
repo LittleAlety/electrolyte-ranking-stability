@@ -1,6 +1,6 @@
 # 方案 6.1 第 1 轮构象采样（气相 GFN2 筛选）
 
-> 由 `scripts/build_wp2_sampling.py` 生成。采样层是**气相 GFN2-xTB 筛选**，
+> 由 `scripts/wp_production/build_wp2_sampling.py` 生成。采样层是**气相 GFN2-xTB 筛选**，
 > 不是生产级 `wB97X-D4 + SMD(acetonitrile)`；它只回答「单一代表结构是否落在同一极小附近」。
 >
 > **集合偏差**：方案 3.3 指定的采样集是 EMC/DEC/DME/TMP，本层实际执行的是 DMC/EMC/GBL/SL

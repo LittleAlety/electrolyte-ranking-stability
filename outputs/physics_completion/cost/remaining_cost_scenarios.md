@@ -1,6 +1,6 @@
 # 方案 11：剩余生产成本情景（低 / 中 / 高）
 
-> 由 `scripts/build_wp2_cost_scenarios.py` 生成；零新增电子结构计算，只汇总已登记台账。
+> 由 `scripts/wp_production/build_wp2_cost_scenarios.py` 生成；零新增电子结构计算，只汇总已登记台账。
 > 口径：`wall hours = core-hours / (workers x 4)`；core-hours 与并发无关。
 
 ## 已测作业（8 条生产腿）

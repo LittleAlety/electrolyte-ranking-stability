@@ -31,7 +31,7 @@ import math
 import statistics
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 COST = REPO / "outputs" / "physics_completion" / "cost"
 CLOSURE = REPO / "outputs" / "physics_completion" / "closure" / "four_molecule_state_closure.csv"
 
@@ -353,7 +353,7 @@ def build():
     md = [
         "# 方案 11：剩余生产成本情景（低 / 中 / 高）",
         "",
-        "> 由 `scripts/build_wp2_cost_scenarios.py` 生成；零新增电子结构计算，只汇总已登记台账。",
+        "> 由 `scripts/wp_production/build_wp2_cost_scenarios.py` 生成；零新增电子结构计算，只汇总已登记台账。",
         "> 口径：`wall hours = core-hours / (workers x %d)`；core-hours 与并发无关。" % WORKER_CORES,
         "",
         "## 已测作业（%d 条生产腿）" % len(measured_keys),

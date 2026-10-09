@@ -10,8 +10,8 @@
 
 用法
 ----
-    .venv\Scripts\python.exe scripts/build_physics_completion_deliverables.py
-    .venv\Scripts\python.exe scripts/build_physics_completion_deliverables.py --check
+    .venv\Scripts\python.exe scripts/wp_production/build_physics_completion_deliverables.py
+    .venv\Scripts\python.exe scripts/wp_production/build_physics_completion_deliverables.py --check
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import shutil
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 PART2 = REPO.parent / "成果输出（part2）"
 
 WEEK_DIRS = ["week%d" % n for n in range(37, 44)]
@@ -38,7 +38,7 @@ WEEK_EXTRA = {
                "docs/physics_completion_protocol.md",
                "docs/claim_migration.md"],
     "week43": ["docs/physics_completion_final_report.md",
-               # 方案 14 的六张主图（F59-F64）与图清单：由 scripts/make_physics_completion_figures.py 生成。
+               # 方案 14 的六张主图（F59-F64）与图清单：由 scripts/wp_production/make_physics_completion_figures.py 生成。
                "outputs/figures/F59_physics_completion_definition.png",
                "outputs/figures/F60_physics_completion_method_audit.png",
                "outputs/figures/F61_physics_completion_ladder.png",
@@ -46,11 +46,11 @@ WEEK_EXTRA = {
                "outputs/figures/F63_physics_completion_mechanism_cases.png",
                "outputs/figures/F64_physics_completion_budget_curve.png",
                "outputs/figures/figure_manifest_week45_physics_completion.md",
-               "scripts/make_physics_completion_figures.py"],
+               "scripts/wp_production/make_physics_completion_figures.py"],
 }
 
 WEEK_COMMON = ["scripts/build_physics_completion_batch.py",
-               "scripts/build_physics_completion_deliverables.py",
+               "scripts/wp_production/build_physics_completion_deliverables.py",
                "src/electrolyte_ranking/pc_batch.py",
                "tests/test_physics_completion_batch.py"]
 
@@ -220,7 +220,7 @@ def render_readme(week, sources, verdict, n_acc):
     lines = [
         "# %s / %s" % (week, WP_LABEL.get(week, "")),
         "",
-        "> 由 `scripts/build_physics_completion_deliverables.py` 从仓库源路径镜像生成；",
+        "> 由 `scripts/wp_production/build_physics_completion_deliverables.py` 从仓库源路径镜像生成；",
         "> `--check` 逐文件复核 byte-identical。所有路径保持仓库相对形状。",
         "",
         "## 交付内容",

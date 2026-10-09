@@ -35,7 +35,7 @@ import re
 import subprocess
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 WORK = REPO / "work" / "sampling"
 WP2PROD = REPO / "work" / "wp2prod"
 RAW = WORK / "xtb_results.csv"
@@ -305,7 +305,7 @@ def evaluate_round(raw, kind):
                         "production_geometry_source": tested_note})
             if not conf:
                 row["verdict"] = "not_computed"
-                row["note"] = "no cached xTB results; run `scripts/build_wp2_sampling.py --run` first"
+                row["note"] = "no cached xTB results; run `scripts/wp_production/build_wp2_sampling.py --run` first"
                 results.append(row)
                 continue
             values = sorted(float(item["energy_eh"]) for item in conf)
@@ -471,7 +471,7 @@ def derive(raw):
     md = [
         "# 方案 6.1 第 1 轮构象采样（气相 GFN2 筛选）",
         "",
-        "> 由 `scripts/build_wp2_sampling.py` 生成。采样层是**气相 GFN2-xTB 筛选**，",
+        "> 由 `scripts/wp_production/build_wp2_sampling.py` 生成。采样层是**气相 GFN2-xTB 筛选**，",
         "> 不是生产级 `wB97X-D4 + SMD(acetonitrile)`；它只回答「单一代表结构是否落在同一极小附近」。",
         ">",
         "> **集合偏差**：方案 3.3 指定的采样集是 EMC/DEC/DME/TMP，本层实际执行的是 DMC/EMC/GBL/SL",

@@ -1,6 +1,6 @@
 # 四分子四态闭环与翻转持续性（derived）
 
-> 由 `scripts/build_wp2_closure.py` 从 `outputs/physics_completion/**` 只读派生；
+> 由 `scripts/wp_production/build_wp2_closure.py` 从 `outputs/physics_completion/**` 只读派生；
 > 零新增电子结构计算。缺值一律留空并标 `not_computed`。
 
 ## 闭环进度

@@ -27,7 +27,7 @@ import io
 import json
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 FREE = REPO / "outputs" / "physics_completion" / "free_states"
 AUDIT = REPO / "outputs" / "physics_completion" / "method_audit"
 OUTDIR = REPO / "outputs" / "physics_completion" / "closure"
@@ -450,7 +450,7 @@ def build():
     md = [
         "# 四分子四态闭环与翻转持续性（derived）",
         "",
-        "> 由 `scripts/build_wp2_closure.py` 从 `outputs/physics_completion/**` 只读派生；",
+        "> 由 `scripts/wp_production/build_wp2_closure.py` 从 `outputs/physics_completion/**` 只读派生；",
         "> 零新增电子结构计算。缺值一律留空并标 `not_computed`。",
         "",
         "## 闭环进度",

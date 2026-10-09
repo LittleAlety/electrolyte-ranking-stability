@@ -29,7 +29,7 @@ import json
 import re
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 WORK = REPO / "work"
 WP2PROD = WORK / "wp2prod"
 AUDIT = WORK / "audit"
@@ -622,7 +622,7 @@ def build():
     md = [
         "# 复现证据清单（per-job provenance）",
         "",
-        "> 由 `scripts/build_compute_provenance.py` 生成；零新增电子结构计算。",
+        "> 由 `scripts/wp_production/build_compute_provenance.py` 生成；零新增电子结构计算。",
         "> 原始 ORCA / xTB 输出不入库，本清单给出**逻辑位置 + sha256 + 解析出的引擎、方法与 QC**，",
         "> 使独立归档可被逐条复核。",
         "",

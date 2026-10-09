@@ -37,7 +37,7 @@ import io
 import json
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 PC = REPO / "outputs" / "physics_completion"
 METHOD_SETTINGS = PC / "method_audit" / "method_settings.csv"
 CERTIFICATION = PC / "method_audit" / "robust_inversion_certification.json"
@@ -271,7 +271,7 @@ def build():
     md = [
         "# 方案 5.3 / 11：关键 pair 第二泛函靶向复核 —— 预注册计划",
         "",
-        "> 由 `scripts/build_pair_recheck_plan.py` 生成；**零新增电子结构计算**。",
+        "> 由 `scripts/wp_production/build_pair_recheck_plan.py` 生成；**零新增电子结构计算**。",
         "> 本文件在任何一个复核单点跑出结果之前登记；规则不随后续结果修改。",
         "",
         "## 选取规则（结果前冻结）",
