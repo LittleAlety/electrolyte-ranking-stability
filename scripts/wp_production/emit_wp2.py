@@ -37,7 +37,7 @@ def baseline_source() -> str:
                               cwd=str(REPO), capture_output=True, text=True, check=True).stdout
         if "WP2_PRODUCTION_LEDGER" not in text:
             BASELINE_CACHE.parent.mkdir(parents=True, exist_ok=True)
-            BASELINE_CACHE.write_text(text, encoding="utf-8")
+            BASELINE_CACHE.write_text(text, encoding="utf-8", newline="")
             print("baseline <- %s" % rev[:8])
             return text
     raise SystemExit("找不到未打补丁的生成器基线")
@@ -77,7 +77,8 @@ WP2_PRODUCTION_LEDGER_CSV_FIELDS = [
     "geometry_start", "e_sp_eh", "e_sp_solution_ev", "zpe_eh", "e_to_g_thermal_eh", "enthalpy_eh",
     "entropy_corr_eh", "g_single_eh", "g_single_ev", "std_state_corr_eh", "std_state_corr_ev",
     "zpe_ev", "thermal_corr_ev", "qrrho", "temp_k", "pressure_atm", "cutoff_cm1",
-    "lowest_freq_cm1", "n_freq", "imaginary_modes", "wall_sec", "cores", "status", "notes",
+    "lowest_freq_cm1", "n_freq", "imaginary_modes", "li_o_ang", "nonli_components",
+    "wall_sec", "cores", "status", "notes",
 ]
 
 
@@ -635,8 +636,10 @@ def main():
     src = sub_once(src, ANCHOR_WP5_AL_CONVENTION, WP5_AL_CONVENTION_BLOCK)
 
     if GEN.exists():
-        GEN.with_suffix(".py.bak-wp2").write_text(GEN.read_text(encoding="utf-8"), encoding="utf-8")
-    GEN.write_text(src, encoding="utf-8")
+        with GEN.open("r", encoding="utf-8", newline="") as f:
+            _baseline_src = f.read()
+        GEN.with_suffix(".py.bak-wp2").write_text(_baseline_src, encoding="utf-8", newline="")
+    GEN.write_text(src, encoding="utf-8", newline="")
     print("已写入 %s（主态 %d 行、额外腿 %d 行；基线来自 git 历史，备份 *.bak-wp2）"
           % (GEN.name, len([r for r in rows if r["state"] in STATES]), len(extras)))
     return 0

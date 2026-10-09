@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | wp1_geometry_prep | 1 | 1 | 1 |
 | wp1_method_audit | 160 | 160 | 160 |
-| wp2_production | 15 | 13 | 9 |
+| wp2_production | 16 | 14 | 10 |
 | wp2_sampling | 640 | 640 | 640 |
 
 ## 未正常结束的作业

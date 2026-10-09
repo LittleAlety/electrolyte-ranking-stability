@@ -3,35 +3,35 @@
 > 由 `scripts/wp_production/build_wp2_cost_scenarios.py` 生成；零新增电子结构计算，只汇总已登记台账。
 > 口径：`wall hours = core-hours / (workers x 4)`；core-hours 与并发无关。
 
-## 已测作业（9 条生产腿）
+## 已测作业（10 条生产腿）
 
 | 类别 | n | min | median | p90 | max | 单位 |
 | --- | --- | --- | --- | --- | --- | --- |
 | free_cation_def2TZVPD | 4 | 11.646 | 14.696 | 18.406 | 18.406 | core-hour |
 | free_neutral_def2TZVP | 4 | 4.373 | 6.051 | 8.233 | 8.233 | core-hour |
 | free_neutral_def2TZVPD | 1 | 6.860 | 6.860 | 6.860 | 6.860 | core-hour |
+| li_complex_def2TZVPD | 1 | 9.775 | 9.775 | 9.775 | 9.775 | core-hour |
 
-## 待补 11 条腿的情景
+## 待补 10 条腿的情景
 
 | 分子 | 态 | 类别 | 实测类别? | low | mid | high | 口径 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | DMC | M_tzvpd | free_neutral_def2TZVPD | true | 6.860 | 6.860 | 6.860 | class median (n=1) |
-| DMC | LiM_plus | li_complex_def2TZVPD | false | 18.406 | 18.406 | 36.812 | declared floor = largest measured leg (no leg measured in this class) |
-| DMC | LiM_2plus | li_complex_def2TZVPD | false | 18.406 | 18.406 | 36.812 | declared floor = largest measured leg (no leg measured in this class) |
+| DMC | LiM_2plus | li_complex_def2TZVPD | true | 9.775 | 9.775 | 9.775 | class median (n=1) |
 | EMC | M_tzvpd | free_neutral_def2TZVPD | true | 6.860 | 6.860 | 6.860 | class median (n=1) |
-| EMC | LiM_plus | li_complex_def2TZVPD | false | 18.406 | 18.406 | 36.812 | declared floor = largest measured leg (no leg measured in this class) |
-| EMC | LiM_2plus | li_complex_def2TZVPD | false | 18.406 | 18.406 | 36.812 | declared floor = largest measured leg (no leg measured in this class) |
-| GBL | LiM_plus | li_complex_def2TZVPD | false | 18.406 | 18.406 | 36.812 | declared floor = largest measured leg (no leg measured in this class) |
-| GBL | LiM_2plus | li_complex_def2TZVPD | false | 18.406 | 18.406 | 36.812 | declared floor = largest measured leg (no leg measured in this class) |
+| EMC | LiM_plus | li_complex_def2TZVPD | true | 9.775 | 9.775 | 9.775 | class median (n=1) |
+| EMC | LiM_2plus | li_complex_def2TZVPD | true | 9.775 | 9.775 | 9.775 | class median (n=1) |
+| GBL | LiM_plus | li_complex_def2TZVPD | true | 9.775 | 9.775 | 9.775 | class median (n=1) |
+| GBL | LiM_2plus | li_complex_def2TZVPD | true | 9.775 | 9.775 | 9.775 | class median (n=1) |
 | SL | M_tzvpd | free_neutral_def2TZVPD | true | 6.860 | 6.860 | 6.860 | class median (n=1) |
-| SL | LiM_plus | li_complex_def2TZVPD | false | 18.406 | 18.406 | 36.812 | declared floor = largest measured leg (no leg measured in this class) |
-| SL | LiM_2plus | li_complex_def2TZVPD | false | 18.406 | 18.406 | 36.812 | declared floor = largest measured leg (no leg measured in this class) |
+| SL | LiM_plus | li_complex_def2TZVPD | true | 9.775 | 9.775 | 9.775 | class median (n=1) |
+| SL | LiM_2plus | li_complex_def2TZVPD | true | 9.775 | 9.775 | 9.775 | class median (n=1) |
 
 | 情景 | core-hours | 墙上时间 @2 worker | @3 worker | @4 worker |
 | --- | --- | --- | --- | --- |
-| low | 167.829 | 20.98 h | 13.99 h | 10.49 h |
-| mid | 167.829 | 20.98 h | 13.99 h | 10.49 h |
-| high | 315.079 | 39.38 h | 26.26 h | 19.69 h |
+| low | 89.007 | 11.13 h | 7.42 h | 5.56 h |
+| mid | 89.007 | 11.13 h | 7.42 h | 5.56 h |
+| high | 89.007 | 11.13 h | 7.42 h | 5.56 h |
 
 * `li_complex_def2TZVPD` 目前没有任何实测腿，因此该类的 low / mid 都用**声明下界**（最大已测腿）而不是类别最小值；high 取该下界的 2 倍。第一条 Li 腿落地后应替换。
 
