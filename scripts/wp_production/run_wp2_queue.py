@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -90,14 +91,23 @@ def ps(command, timeout=60):
 
 
 def orca_activity():
-    query = ("Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'orca' -or "
-             "($_.Name -eq 'python.exe' -and $_.CommandLine -match 'run_wp2_') } | "
-             "ForEach-Object { $_.Name }")
+    """在跑的真实 ORCA 作业数与别的 wp2 驱动数。
+
+    必须排除本进程及其父进程：本队列自己也是 `python.exe` 且命令行含 `run_wp2_`，
+    而 venv 启动器还会再拉一个子解释器，不排除就会把自己数成 1-2 个驱动而永远自锁，
+    让只有队列才负责的 M_tzvpd 腿永远排不上。orca 只数真正的 orca.exe，
+    不把它的 MPI 辅助进程（orca_*_mpi.exe）算成独立作业。
+    """
+    query = ("$self = %d; $parent = %d; Get-CimInstance Win32_Process | Where-Object { "
+             "($_.Name -eq 'orca.exe') -or "
+             "($_.Name -eq 'python.exe' -and $_.CommandLine -match 'run_wp2_' -and "
+             "$_.ProcessId -ne $self -and $_.ProcessId -ne $parent) } | "
+             "ForEach-Object { $_.Name }" % (os.getpid(), os.getppid()))
     text = ps(query)
     if text is None:
         return None
     names = [line.strip() for line in text.splitlines() if line.strip()]
-    return {"orca": len([n for n in names if n.lower().startswith("orca")]),
+    return {"orca": len([n for n in names if n.lower() == "orca.exe"]),
             "drivers": len([n for n in names if n == "python.exe"])}
 
 
