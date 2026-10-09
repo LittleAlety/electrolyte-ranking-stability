@@ -6,10 +6,11 @@
 
 - 新批次协议 `config/physics_completion_v1.yaml`（量名/方向/状态身份/停止规则/落点）
 - 样本 `data/metadata/physics_completion_set.csv`（12 主集 / 8 方法集 / 4 采样集）
+- 排除原因规则 `outputs/physics_completion/definition/cohort_exclusion_rules.csv`（主集 6 条 + 方法集 4 条；18 个 core-set 分子全部有归属）
 - 结论迁移 `docs/claim_migration.md`（5 条：M1/Q3、M2/Q7、M3/Q10、M4/R15、M5/P1a）
 - 原始锚点复核 `data/references/anchor_primary_audit.csv`（WP0 起登记，WP4 细化）
 
-## 验收（7/7 通过）
+## 验收（8/8 通过）
 
 | check | ok | detail |
 | --- | --- | --- |
@@ -20,6 +21,7 @@
 | missing_state_never_coerced_to_zero | PASS | mixed pick=a ; all-missing pick=None |
 | claim_migration_covers_required | PASS | covered=P1a,Q10,Q3,Q7,R15 |
 | cohorts_nested_in_core_set | PASS | main=12 audit=8 sampling=4 |
+| core_set_fully_accounted | PASS | main=12 excluded=6 union=18 core=18 |
 
 ## 限制
 

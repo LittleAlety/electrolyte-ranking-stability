@@ -712,6 +712,24 @@ def anti_misread_block() -> "list[str]":
     ]
 
 
+def new_batch_block() -> "list[str]":
+    """新阶段批次（physics_completion_v1）登记段；由 config 与其 WP0 载荷确定性生成。"""
+    return [
+        "",
+        "## 新阶段批次登记（physics_completion_v1）",
+        "",
+        "除上述 week1-week27 主线外，本仓库另登记了一个**新批次** `physics_completion_v1`"
+        "（`config/physics_completion_v1.yaml`，week37-week44）：",
+        "它把《电解液排序稳定性：物理证据补强与决策预算研究执行方案》登记为可追溯产物 —— 量名/方向/状态身份、"
+        "12/8/4 样本与排除原因、锚点三级分类、方法审计矩阵、自由能账本模板与 Δ-learning/成本账本。",
+        "",
+        "该批次 **零新增电子结构计算、零数据剔除、零阈值改动**，**不改变**本 README 与 `FINAL_CONCLUSIONS.md` 的任何既有结论",
+        "（Gate 1 仍为 NOT CLOSED / NOT CLOSABLE）；逐周交付件见仓库外 `成果输出（part2）/week37..week44`，",
+        "研究问题→结果→证据→限制见 `docs/physics_completion_final_report.md`。",
+        "",
+    ]
+
+
 def build_readme() -> str:
     g1 = rd("outputs/week25/series_rel_ordering_check.json")
     g1_reason = dig(g1, "reason")
@@ -738,6 +756,7 @@ def build_readme() -> str:
     lines.extend(R13_HEAD)
     lines.extend(r13_log())
     lines.extend(TAIL)
+    lines.extend(new_batch_block())
     text = "\n".join(lines)
     if not text.endswith("\n"):
         text += "\n"

@@ -409,3 +409,12 @@ clean-room 入口（在全新 clone 中逐条执行）：
 ```
 
 图表索引 F0–F56：`F47` 属 `week22_hardening`，`F48`–`F51` 属 `week24_corealign`，`F52`–`F54` 属 `week25_gate1`；`F55` 见 `outputs/week25`，`F56` 见仓库内 `outputs/week26`（R14 收口汇总图，不在交付层）；逐图内容与来源见 `成果输出/数据结果汇总.md` 的「图表索引」表。
+
+## 新阶段批次登记（physics_completion_v1）
+
+除上述 week1-week27 主线外，本仓库另登记了一个**新批次** `physics_completion_v1`（`config/physics_completion_v1.yaml`，week37-week44）：
+它把《电解液排序稳定性：物理证据补强与决策预算研究执行方案》登记为可追溯产物 —— 量名/方向/状态身份、12/8/4 样本与排除原因、锚点三级分类、方法审计矩阵、自由能账本模板与 Δ-learning/成本账本。
+
+该批次 **零新增电子结构计算、零数据剔除、零阈值改动**，**不改变**本 README 与 `FINAL_CONCLUSIONS.md` 的任何既有结论
+（Gate 1 仍为 NOT CLOSED / NOT CLOSABLE）；逐周交付件见仓库外 `成果输出（part2）/week37..week44`，
+研究问题→结果→证据→限制见 `docs/physics_completion_final_report.md`。

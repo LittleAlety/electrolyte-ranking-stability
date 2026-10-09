@@ -183,6 +183,11 @@ def build_config():
 # ---------------------------------------------------------------------------
 # data/metadata/physics_completion_set.csv
 # ---------------------------------------------------------------------------
+SAMPLE_SET_FIELDS = ["cohort", "mol_id", "name", "family", "role", "donor_count",
+                     "rotatable_bonds", "in_main", "in_method_audit", "in_sampling_audit",
+                     "exclusion_reason", "batch"]
+
+
 def build_sample_set():
     core = {row["mol_id"]: row for row in PB.load_rows(REPO / "data/metadata/core_set.csv")}
     rows = []
@@ -200,11 +205,35 @@ def build_sample_set():
                 "in_main": "true" if mol_id in PB.COHORTS["main"] else "false",
                 "in_method_audit": "true" if mol_id in PB.COHORTS["method_audit"] else "false",
                 "in_sampling_audit": "true" if mol_id in PB.COHORTS["sampling_audit"] else "false",
+                "exclusion_reason": "",
                 "batch": PB.BATCH_ID,
             })
-    return csv_text(["cohort", "mol_id", "name", "family", "role", "donor_count",
-                     "rotatable_bonds", "in_main", "in_method_audit", "in_sampling_audit",
-                     "batch"], rows)
+    for mol_id in sorted(PB.MAIN_SET_EXCLUSIONS):
+        meta = core[mol_id]
+        rows.append({
+            "cohort": "excluded", "mol_id": mol_id, "name": meta["name"],
+            "family": meta["family"], "role": meta["role"], "donor_count": meta["donor_count"],
+            "rotatable_bonds": meta["rotatable_bonds"], "in_main": "false",
+            "in_method_audit": "false", "in_sampling_audit": "false",
+            "exclusion_reason": PB.MAIN_SET_EXCLUSIONS[mol_id], "batch": PB.BATCH_ID,
+        })
+    return csv_text(SAMPLE_SET_FIELDS, rows)
+
+
+def build_exclusion_rules():
+    core = {row["mol_id"]: row for row in PB.load_rows(REPO / "data/metadata/core_set.csv")}
+    rows = []
+    for mol_id, reason in sorted(PB.MAIN_SET_EXCLUSIONS.items()):
+        rows.append({"scope": "main_set", "mol_id": mol_id, "name": core[mol_id]["name"],
+                     "family": core[mol_id]["family"],
+                     "rule": "core-set molecule not in the 12-molecule main paired set",
+                     "reason": reason})
+    for mol_id, reason in sorted(PB.METHOD_AUDIT_HOLDOUTS.items()):
+        rows.append({"scope": "method_audit", "mol_id": mol_id, "name": core[mol_id]["name"],
+                     "family": core[mol_id]["family"],
+                     "rule": "main-set molecule not in the 8-molecule method audit set",
+                     "reason": reason})
+    return csv_text(["scope", "mol_id", "name", "family", "rule", "reason"], rows)
 
 
 # ---------------------------------------------------------------------------
@@ -437,6 +466,8 @@ def wp0():
     sampling = set(PB.COHORTS["sampling_audit"])
     core_ids = {row["mol_id"] for row in PB.load_rows(REPO / "data/metadata/core_set.csv")}
     cohorts_ok = (audit <= main) and (sampling <= main) and (main <= core_ids)
+    excluded_ids = set(PB.MAIN_SET_EXCLUSIONS)
+    accounted_ok = ((main | excluded_ids) == core_ids) and not (main & excluded_ids)
 
     checks = [
         {"id": "quantity_names_unique", "description": "新批次量名互不重复",
@@ -453,6 +484,10 @@ def wp0():
          "ok": required_questions <= migrated, "detail": "covered=" + ",".join(sorted(migrated))},
         {"id": "cohorts_nested_in_core_set", "description": "三个 cohort 均落在既有 core set 内",
          "ok": cohorts_ok, "detail": "main=%d audit=%d sampling=%d" % (len(main), len(audit), len(sampling))},
+        {"id": "core_set_fully_accounted", "description": "18 个 core-set 分子全部有归属（主集或写明排除原因）",
+         "ok": accounted_ok,
+         "detail": "main=%d excluded=%d union=%d core=%d"
+                   % (len(main), len(PB.MAIN_SET_EXCLUSIONS), len(main | excluded_ids), len(core_ids))},
     ]
 
     payload = {
@@ -464,6 +499,7 @@ def wp0():
             "scientific_definitions": "config/scientific_definitions.yaml",
             "prereg": "config/prereg.yaml",
             "core_set": "data/metadata/core_set.csv",
+            "cohort_exclusion_rules": "outputs/physics_completion/definition/cohort_exclusion_rules.csv",
             "final_conclusions": "FINAL_CONCLUSIONS.md",
             "new_electronic_structure_jobs": 0,
         },
@@ -490,6 +526,7 @@ def wp0():
     local["outputs/physics_completion/definition/claim_migration.csv"] = csv_text(
         ["id", "question", "historical", "source", "new_statement", "risk_if_unmigrated"],
         CLAIM_MIGRATION)
+    local["outputs/physics_completion/definition/cohort_exclusion_rules.csv"] = build_exclusion_rules()
 
     summary = [
         "# Week 37 / WP0 — 定义迁移与历史结论同步",
@@ -501,6 +538,9 @@ def wp0():
         "- 新批次协议 `config/physics_completion_v1.yaml`（量名/方向/状态身份/停止规则/落点）",
         "- 样本 `data/metadata/physics_completion_set.csv`（%d 主集 / %d 方法集 / %d 采样集）"
         % (len(main), len(audit), len(sampling)),
+        "- 排除原因规则 `outputs/physics_completion/definition/cohort_exclusion_rules.csv`"
+        "（主集 %d 条 + 方法集 %d 条；%d 个 core-set 分子全部有归属）"
+        % (len(PB.MAIN_SET_EXCLUSIONS), len(PB.METHOD_AUDIT_HOLDOUTS), len(core_ids)),
         "- 结论迁移 `docs/claim_migration.md`（%d 条：%s）"
         % (len(CLAIM_MIGRATION), "、".join(item["id"] + "/" + item["question"] for item in CLAIM_MIGRATION)),
         "- 原始锚点复核 `data/references/anchor_primary_audit.csv`（WP0 起登记，WP4 细化）",
@@ -929,6 +969,7 @@ def wp3():
         })
 
     unresolved_share = counts.get("UNRESOLVED", 0) / len(rows)
+    payload_certified = False
     checks = [
         {"id": "pairwise_recompute_matches_frozen_counts", "description": "逐对复算的三态计数与冻结载荷一致",
          "ok": counts_match,
@@ -944,6 +985,12 @@ def wp3():
          "detail": "sigma 取该 rung 的 relaxation displacement 总体标准差（%.6f eV）" % sigma},
         {"id": "mechanism_cases_at_most_three", "description": "机制案例不超过 3 个",
          "ok": len(cases) <= 3, "detail": "n_cases=%d" % len(cases)},
+        {"id": "robust_inversion_not_yet_certified", "description": "稳健翻转在独立方法审计前不被认证",
+         "ok": (len(inversions) == 0) or (not payload_certified),
+         "detail": "label=ROBUST_INVERSION x%d 只表示「在该敏感性尺度下的翻转」；认证待 WP1 独立方法审计" % len(inversions)},
+        {"id": "rung_cohort_difference_is_documented", "description": "该 rung 与主集的成员差异被显式记录",
+         "ok": ("SN" in members) and ("DEC" not in members),
+         "detail": "rung members 含 SN 不含 DEC；主集含 DEC 不含 SN —— 已在 payload 的 rung_members_note 说明"},
     ]
 
     payload = {
@@ -960,6 +1007,15 @@ def wp3():
             "multi_method_interval": "all pre-accepted methods and sampling bounds must share sign and exceed tolerance -> resolved; both sides resolved with opposite sign -> robust inversion; else unresolved",
             "not_independent_repeats": "a small set of correlated functionals is not an independent random repeat; 1.96x spread is not automatically a calibrated 95% interval",
             "cases_rule": "strongest robust inversion first, then Top-k-relevant unresolved boundary, then identity change; no case if none exists",
+        },
+        "rung_members_note": ("the frozen rung's 12 molecules differ from the batch main cohort by one molecule: "
+                             "SN is present and DEC is absent; the rung is used only as a demonstration, "
+                             "not as the registered main cohort"),
+        "robust_inversion_certification": {
+            "certified": False,
+            "label_meaning": "ROBUST_INVERSION is the frozen three-state criterion's label, not a certified physical flip",
+            "pending_note": "flips here are only robust under the rung's displacement-std sensitivity scale",
+            "required_before_certification": "independent method audit (WP1) and sampling bounds, per plan section 2",
         },
         "n_members": len(members), "members": members, "n_pairs": len(rows),
         "state_counts": counts, "frozen_state_counts": frozen_counts,
@@ -990,6 +1046,21 @@ def wp3():
         "4. 另给方法 pair spread 的 z 曲线作为 sensitivity；小数目相关泛函不是独立随机重复，\n"
         "   1.96×spread 不能自动标成校准 95% 置信度。\n"
         "5. 本仓库首轮只在既有冻结 rung（P1v→P1a，n=12）上演示该判据；多方法版本待 WP1 生产单点完成后填入。\n")
+    local["outputs/physics_completion/pair_evidence/mechanism_cases.md"] = (
+        "# 机制案例页（最多 3 例）\n\n"
+        "选择规则（事先冻结）：优先选证据最强的稳健翻转，再选影响 Top-k 的 unresolved 边界，再选有身份改变的代表；"
+        "**无稳健翻转时不强行补案例**。\n\n"
+        + "".join(
+            "## %s：%s\n\n"
+            "- 轴：%s\n"
+            "- d_lower = %s eV；d_upper = %s eV；sigma = %s eV\n"
+            "- 判定：%s\n"
+            "- 选集影响：%s\n\n"
+            % (case["case_id"], case["pair"], case["axis"], case["d_lower_ev"], case["d_upper_ev"],
+               case["sigma_ev"], case["label"], case["selection_impact"])
+            for case in cases)
+        + "> 说明：本页只登记判定与选集影响；对应的原始结构、电子密度/自旋、配位变化与 E/G 分解，"
+          "需在 WP1/WP2 的新计算完成后补入（本批次无可提供的原始结构）。\n")
 
     summary = [
         "# Week 40 / WP3 — 排序、独立不确定度与机制",
@@ -1021,6 +1092,8 @@ def wp3():
         "## 限制",
         "",
         "- 首轮只用**单一既有 rung**演示；多方法保守区间待 WP1 生产单点完成后才有真正的方法范围。",
+        "- 该 rung 的 12 个成员与主 cohort 差一个分子（SN 进、DEC 出）：它只作判据演示，不代表已登记的主集。",
+        "- 稳健翻转**尚未认证**：本标签只表示「在该 rung 的位移 std 敏感性尺度下的翻转」，认证需 WP1 独立方法审计与采样界限（方案 2）。",
         "- n=%d 时主选集固定 k=3（辅助 k=2/4）；pairwise unresolved 不任意变成标准 tau_b 的相等值。" % len(members),
         "- 未解析关系不一定传递；优先用偏序 / 集合与显式政策带，而不是强行排名。",
     ]
@@ -1066,14 +1139,24 @@ def wp4():
     est_rows = PB.load_rows(REPO / "data/anchors/solution_redox_anchors.csv")
     n_est = sum(1 for row in est_rows if row.get("method") == "est")
 
+    audit_rows = PB.load_rows(REPO / "data/references/anchor_primary_audit.csv")
+    tier_counts = {}
+    for row in audit_rows:
+        tier_counts[row["curatable_tier"]] = tier_counts.get(row["curatable_tier"], 0) + 1
     tiers = [
-        {"tier": "tier_1_thermodynamic_quantitative", "n_entries": 0, "usable": "false",
+        {"tier": "tier_1_thermodynamic_quantitative",
+         "n_entries": tier_counts.get("tier_1_thermodynamic_quantitative", 0),
+         "n_model_covered_species": 0, "usable": "false",
          "reason": "no condition-matched absolute-calibration series exists in the repository"},
-        {"tier": "tier_2_series_trend", "n_entries": len(covered), "usable": "trend_only",
-         "reason": "one homologous series (one paper / apparatus / criterion); covers %d/%d core-set species" % (len(covered), len(series))},
-        {"tier": "tier_3_not_usable", "n_entries": len(skipped) + n_est, "usable": "false",
-         "reason": "not model-covered series members, literature estimates (est), DOE secondary and gas-phase anchors are a different tier"},
+        {"tier": "tier_2_series_trend", "n_entries": tier_counts.get("tier_2_series_trend", 0),
+         "n_model_covered_species": len(covered), "usable": "trend_only",
+         "reason": "one homologous series (one paper / apparatus / criterion); %d/%d series rows are model-covered"
+                   % (len(covered), len(series))},
+        {"tier": "tier_3_not_usable", "n_entries": tier_counts.get("tier_3_not_usable", 0),
+         "n_model_covered_species": 0, "usable": "false",
+         "reason": "not-model-covered series rows, literature estimates (est), DOE secondary and gas-phase anchors are a different tier"},
     ]
+    n_tier_entries = sum(item["n_entries"] for item in tiers)
 
     checks = [
         {"id": "tau_b_recomputed_from_frozen_inputs", "description": "tau_b 由冻结输入独立重算",
@@ -1087,6 +1170,9 @@ def wp4():
          "ok": n_est == 31, "detail": "n_est=%d (0 upgraded)" % n_est},
         {"id": "cross_series_mixing_flagged", "description": "跨系列混合已标记，不强行汇总",
          "ok": True, "detail": "series_id=Ue1994_Okoshi2015 单系列；DOE secondary 与气相锚点单列 tier_3"},
+        {"id": "tier_counts_match_the_audit_table", "description": "三级条目数与逐行审计表一致（同一计数口径）",
+         "ok": n_tier_entries == len(audit_rows),
+         "detail": "tier entries=%d ; audit rows=%d" % (n_tier_entries, len(audit_rows))},
         {"id": "gate1_unchanged", "description": "旧 Gate 1 失败原样保留",
          "ok": frozen["ok"] is False and frozen["reason"] == "ordering_disagrees",
          "detail": "reason=%s tau_b=%.4f n_pairs=%d" % (frozen["reason"], frozen["tau_b"], frozen["n_pairs"])},
@@ -1125,7 +1211,7 @@ def wp4():
     local["outputs/week41/wp4_acceptance.csv"] = csv_text(
         ["check_id", "description", "ok", "detail"], acceptance_rows(checks))
     local["outputs/physics_completion/anchor/anchor_tier_summary.csv"] = csv_text(
-        ["tier", "n_entries", "usable", "reason"], tiers)
+        ["tier", "n_entries", "n_model_covered_species", "usable", "reason"], tiers)
     local["outputs/physics_completion/anchor/series_coverage.csv"] = csv_text(
         ["species", "value_V", "reference_electrode", "covered_by_model", "p1_ox_ev"],
         [{"species": row["species"], "value_V": row["value_V"],
@@ -1151,11 +1237,13 @@ def wp4():
         "",
         "## 三级分类",
         "",
-        "| tier | 条目数 | 可用性 | 依据 |",
-        "| --- | --- | --- | --- |",
+        "| tier | 条目数 | 其中被模型覆盖物种 | 可用性 | 依据 |",
+        "| --- | --- | --- | --- | --- |",
     ]
     for item in tiers:
-        summary.append("| %s | %d | %s | %s |" % (item["tier"], item["n_entries"], item["usable"], item["reason"]))
+        summary.append("| %s | %d | %d | %s | %s |"
+                       % (item["tier"], item["n_entries"], item["n_model_covered_species"],
+                          item["usable"], item["reason"]))
     summary += [
         "",
         "## 验收（%d/%d 通过）" % (len(checks) - payload["n_failed"], len(checks)),

@@ -10,13 +10,13 @@
 
 ## 三级分类
 
-| tier | 条目数 | 可用性 | 依据 |
-| --- | --- | --- | --- |
-| tier_1_thermodynamic_quantitative | 0 | false | no condition-matched absolute-calibration series exists in the repository |
-| tier_2_series_trend | 7 | trend_only | one homologous series (one paper / apparatus / criterion); covers 7/14 core-set species |
-| tier_3_not_usable | 38 | false | not model-covered series members, literature estimates (est), DOE secondary and gas-phase anchors are a different tier |
+| tier | 条目数 | 其中被模型覆盖物种 | 可用性 | 依据 |
+| --- | --- | --- | --- | --- |
+| tier_1_thermodynamic_quantitative | 0 | 0 | false | no condition-matched absolute-calibration series exists in the repository |
+| tier_2_series_trend | 14 | 7 | trend_only | one homologous series (one paper / apparatus / criterion); 7/14 series rows are model-covered |
+| tier_3_not_usable | 73 | 0 | false | not-model-covered series rows, literature estimates (est), DOE secondary and gas-phase anchors are a different tier |
 
-## 验收（5/5 通过）
+## 验收（6/6 通过）
 
 | check | ok | detail |
 | --- | --- | --- |
@@ -24,6 +24,7 @@
 | pair_counts_match_frozen | PASS | recomputed 15/6 n=21 ; frozen 15/6 n=21 |
 | est_rows_not_upgraded | PASS | n_est=31 (0 upgraded) |
 | cross_series_mixing_flagged | PASS | series_id=Ue1994_Okoshi2015 单系列；DOE secondary 与气相锚点单列 tier_3 |
+| tier_counts_match_the_audit_table | PASS | tier entries=87 ; audit rows=87 |
 | gate1_unchanged | PASS | reason=ordering_disagrees tau_b=0.4286 n_pairs=21 |
 
 ## 限制

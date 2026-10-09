@@ -463,6 +463,14 @@ def build() -> str:
         "**工程入口**：`scripts/build_final_conclusions.py --check`、`outputs/figures/F56_r13_summary.png`、"
         "`docs/47_clean_room_reproduction_audit.md`、`scripts/audit_clean_room.py`。",
         "",
+        "## 新阶段批次登记（physics_completion_v1）",
+        "",
+        "本仓库另登记了一个**新批次** `physics_completion_v1`（`config/physics_completion_v1.yaml`，week37-week44）：",
+        "它把《电解液排序稳定性：物理证据补强与决策预算研究执行方案》登记为可追溯产物，**零新增电子结构计算**、",
+        "零数据剔除、零阈值改动，逐周镜像见仓库外 `成果输出（part2）/week37..week44`。",
+        "该批次**不改变本文件 10 个问题的任何答案**（Gate 1 仍为 NOT CLOSED / NOT CLOSABLE）；",
+        "其研究问题→结果→证据→限制另见 `docs/physics_completion_final_report.md`。",
+        "",
     ]
 
     text = "\n".join(lines)

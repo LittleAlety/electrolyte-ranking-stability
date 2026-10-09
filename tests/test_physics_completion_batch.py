@@ -24,7 +24,7 @@ def _read_csv(path: Path):
 
 def test_every_artifact_is_byte_reproducible() -> None:
     files = batch.build_all()
-    assert len(files) == 61
+    assert len(files) == 63
     for rel, text in files.items():
         target = REPO_ROOT / rel
         assert target.is_file(), rel
@@ -140,6 +140,31 @@ def test_all_acceptance_rows_pass() -> None:
         for path in files:
             for row in _read_csv(path):
                 assert row["ok"] == "true", (path.name, row["check_id"])
+
+
+def test_sample_set_accounts_for_every_core_molecule() -> None:
+    rows = _read_csv(REPO_ROOT / "data/metadata/physics_completion_set.csv")
+    core = _read_csv(REPO_ROOT / "data/metadata/core_set.csv")
+    covered = {row["mol_id"] for row in rows if row["cohort"] != "excluded"}
+    excluded = {row["mol_id"] for row in rows if row["cohort"] == "excluded"}
+    assert covered == set(PB.COHORTS["main"])
+    assert covered | excluded == {row["mol_id"] for row in core}
+    assert not (covered & excluded)
+    assert len(excluded) == 6
+
+
+def test_exclusion_rules_are_registered() -> None:
+    rows = _read_csv(REPO_ROOT / "outputs/physics_completion/definition/cohort_exclusion_rules.csv")
+    expected = len(PB.MAIN_SET_EXCLUSIONS) + len(PB.METHOD_AUDIT_HOLDOUTS)
+    assert len(rows) == expected == 10
+    assert all(row["reason"] for row in rows)
+    assert {row["scope"] for row in rows} == {"main_set", "method_audit"}
+
+
+def test_mechanism_case_page_exists() -> None:
+    text = (REPO_ROOT / "outputs/physics_completion/pair_evidence/mechanism_cases.md").read_text(encoding="utf-8")
+    assert "CASE1" in text and "CASE2" in text
+    assert "无稳健翻转时不强行补案例" in text
 
 
 def test_manifests_cover_their_week_files() -> None:

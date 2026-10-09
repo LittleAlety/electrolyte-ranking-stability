@@ -163,6 +163,24 @@ FOUR_STATES = ["M", "M_plus", "LiM_plus", "LiM_2plus"]
 #: 每个分子只对 C1 代表 motif 的 [LiM]+ / [LiM]2+ 做配位态。
 LI_STATES = ["LiM_plus", "LiM_2plus"]
 
+#: 未进入主配对集的 core-set 分子与原因（方案 3.1 / 15.3 的「排除原因规则」）。
+MAIN_SET_EXCLUSIONS = {
+    "C06": "fluorinated additive FEC - reserved for later expansion (plan 3.1)",
+    "C07": "unsaturated additive VC - reserved for later expansion (plan 3.1)",
+    "C10": "long flexible TEGDME - avoided in round 1 to protect the compute budget",
+    "C11": "ester EA - ester family already represented by GBL; reserved for later expansion",
+    "C12": "simplest ester MA - same family-redundancy control as EA",
+    "C18": "dinitrile SN - reserved for later expansion (plan 3.1)",
+}
+
+#: method_audit 只含 8 个；其余主集分子留作冻结方法后的检验对象。
+METHOD_AUDIT_HOLDOUTS = {
+    "C03": "held out as a post-freeze check; must not be used to select the method",
+    "C05": "held out as a post-freeze check; must not be used to select the method",
+    "C09": "held out as a post-freeze check; must not be used to select the method",
+    "C15": "held out as a post-freeze check; must not be used to select the method",
+}
+
 
 def load_json(path):
     with io.open(path, encoding="utf-8") as handle:
