@@ -400,6 +400,9 @@ def build():
     acceptance_rows = acceptance(state_rows, label_rows, ladder_rows, summary, data)
 
     registered = [row for row in state_rows if row["register_status"] == "produced_single_conformer"]
+    # 主态登记数只数 MAIN_STATES；M_tzvpd 是额外基组一致腿，不能混进 16 个主态的分母。
+    main_registered = [row for row in registered if row["state"] in MAIN_STATES]
+    extra_registered = [row for row in registered if row["state"] == EXTRA_STATE]
     complete_molecules = [row["name"] for row in label_rows if row["four_state_complete"] == "true"]
     free_leg_ready = [row["name"] for row in label_rows if row["basis_consistent_free_leg"] == "true"]
 
@@ -410,19 +413,18 @@ def build():
         "main_states": list(MAIN_STATES),
         "extra_state": EXTRA_STATE,
         "progress": {
-            "states_registered": len(registered),
+            "states_registered": len(main_registered),
+            "states_registered_note": "main states only (M/M_plus/LiM_plus/LiM_2plus); the M_tzvpd extra legs are counted separately",
             "states_total": len(FOUR) * len(MAIN_STATES),
-            "extra_legs_registered": sum(1 for row in state_rows
-                                         if row["state"] == EXTRA_STATE
-                                         and row["register_status"] == "produced_single_conformer"),
+            "extra_legs_registered": len(extra_registered),
             "extra_legs_total": len(FOUR),
             "molecules_four_state_complete": complete_molecules,
             "molecules_with_basis_consistent_free_leg": free_leg_ready,
         },
         "gaps": [
             {"item": "four-state closure",
-             "status": "partial" if len(registered) < len(FOUR) * len(MAIN_STATES) else "complete",
-             "detail": "%d/%d main states registered" % (len(registered), len(FOUR) * len(MAIN_STATES))},
+             "status": "partial" if len(main_registered) < len(FOUR) * len(MAIN_STATES) else "complete",
+             "detail": "%d/%d main states registered" % (len(main_registered), len(FOUR) * len(MAIN_STATES))},
             {"item": "basis-consistent free-molecule redox",
              "status": "partial" if len(free_leg_ready) < len(FOUR) else "complete",
              "detail": "M_tzvpd present for: %s" % (", ".join(free_leg_ready) or "none")},
@@ -455,7 +457,7 @@ def build():
         "",
         "| 项 | 值 |",
         "| --- | --- |",
-        "| 主态登记 | %d / %d |" % (len(registered), len(FOUR) * len(MAIN_STATES)),
+        "|主态登记 | %d / %d |" % (len(main_registered), len(FOUR) * len(MAIN_STATES)),
         "| 基组一致中性腿（M_tzvpd） | %d / %d |" % (
             sum(1 for row in state_rows if row["state"] == EXTRA_STATE
                 and row["register_status"] == "produced_single_conformer"), len(FOUR)),

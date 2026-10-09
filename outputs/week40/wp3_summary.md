@@ -29,8 +29,8 @@
 | C1_to_C2 | reduction | 10 | 0.288888889 | 0.355555556 -> 0.355555556 | 0.000000000 | 0.335007649 | 36 |
 
 - 台阶间独立性（冻结 R15）：20 对、max |Pearson| = 0.7909267873261443、median |Pearson| = 0.383067803565867、>0.7 的 2 对。
-- 逐级报告只用冻结聚合值；Top-k 重叠与 selection regret 目前只在 P1v->P1a 一级逐对给出，
-  其余台阶要等 WP2 生产把同一 cohort 的自由能标签补齐。
+- 逐级报告只用冻结聚合值；Top-k 重叠目前只在 P1v->P1a 一级给出（该冻结文件不含 selection regret）
+  selection regret 在本批次还没有任何逐级产物；其余台阶要等 WP2 生产把同一 cohort 的自由能标签补齐。
 
 ## 验收（10/10 通过）
 
@@ -44,7 +44,7 @@
 | robust_inversion_certification_follows_the_method_audit | PASS | WP1 audit certified=True (2/2 frozen pairs)；label=ROBUST_INVERSION x2 |
 | rung_cohort_difference_is_documented | PASS | rung members 含 SN 不含 DEC；主集含 DEC 不含 SN —— 已在 payload 的 rung_members_note 说明 |
 | mechanism_case_geometries_are_frozen_inputs | PASS | 3 个案例分子；EMC max|Δr|=0.090 Å (C4-O5)、GBL max|Δr|=0.086 Å (C2-O6)、SL max|Δr|=0.016 Å (C5-C6) |
-| frozen_ladder_covers_every_registered_rung | PASS | 5 级台阶 x 2 轴 = 10 行；Top-k 重叠与 selection regret 仍只在 P1v->P1a 一级给出 |
+| frozen_ladder_covers_every_registered_rung | PASS | 5 级台阶 x 2 轴 = 10 行；Top-k 重叠仍只在 P1v->P1a 一级给出，selection regret 在本批次无逐级产物 |
 | mechanism_bond_table_covers_every_case_molecule | PASS | n_bond_rows=17 ; n_molecules=3 ; 变化 >0.01 A 的键 15 条 |
 
 ## 限制

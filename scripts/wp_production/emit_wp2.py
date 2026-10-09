@@ -495,6 +495,19 @@ THERMAL_BLOCK = '''        {"id": "thermal_fields_left_empty_not_zero", "descrip
 '''
 
 
+ANCHOR_WP3_REGRET_DOC = '    resolved/unresolved 比例」，Top-k 重叠与 selection regret 仍只在\n    本批次逐对复算的那一级给出。\n'
+WP3_REGRET_DOC_BLOCK = '    resolved/unresolved 比例」，Top-k 重叠仍只在 P1v->P1a 一级给出（该冻结文件不含\n    selection regret），selection regret 在本批次还没有任何逐级产物。\n'
+ANCHOR_WP3_REGRET_CHECK = '"detail": "%d 级台阶 x 2 轴 = %d 行；Top-k 重叠与 selection regret 仍只在 P1v->P1a 一级给出"'
+WP3_REGRET_CHECK_BLOCK = '"detail": "%d 级台阶 x 2 轴 = %d 行；Top-k 重叠仍只在 P1v->P1a 一级给出，selection regret 在本批次无逐级产物"'
+ANCHOR_WP3_REGRET_MD = '        "- 逐级报告只用冻结聚合值；Top-k 重叠与 selection regret 目前只在 P1v->P1a 一级逐对给出，",\n        "  其余台阶要等 WP2 生产把同一 cohort 的自由能标签补齐。",\n'
+WP3_REGRET_MD_BLOCK = '        "- 逐级报告只用冻结聚合值；Top-k 重叠目前只在 P1v->P1a 一级给出（该冻结文件不含 selection regret）",\n        "  selection regret 在本批次还没有任何逐级产物；其余台阶要等 WP2 生产把同一 cohort 的自由能标签补齐。",\n'
+ANCHOR_WP5_AL_SCENARIO = '    n_scenario = len({(row["task"], row["axis"]) for row in sb})\n'
+WP5_AL_SCENARIO_BLOCK = '    n_scenario = len({(row["task"], row["axis"]) for row in sb})\n\n    replay_pool_note = ("declared protocol: 12-label pool replay (initial 4 labels, 1 per round, 20 acquisition seeds; "\n                        "random/diversity/uncertainty/ranking-aware); the replay evidence shipped in outputs/week32-33 "\n                        "is the frozen legacy 18-molecule pool, not a fresh 12-label pool, because the WP2 free-energy "\n                        "targets are still incomplete")\n'
+ANCHOR_WP5_AL_CHECK = '        {"id": "replay_not_pretended_blind", "description": "回放门槛不伪装成对旧数据的盲预注册",\n         "ok": True, "detail": "已声明旧数据大致行为已知；真实前瞻性需另留未计算分子"},\n'
+WP5_AL_CHECK_BLOCK = '        {"id": "replay_not_pretended_blind", "description": "回放门槛不伪装成对旧数据的盲预注册",\n         "ok": True, "detail": "已声明旧数据大致行为已知；真实前瞻性需另留未计算分子"},\n        {"id": "replay_evidence_is_the_frozen_legacy_pool", "description": "回放证据来自冻结旧池（outputs/week32-33），未冒充 12 标签池的新回放",\n         "ok": "frozen legacy 18-molecule pool" in replay_pool_note, "detail": "协议与证据池身份一致；12 标签池回放待 WP2 标签补齐"},\n'
+ANCHOR_WP5_AL_CONVENTION = '            "al_protocol": "12-label pool replay; initial 4 labels, 1 per round, 20 acquisition seeds; random/diversity/uncertainty/ranking-aware",\n'
+WP5_AL_CONVENTION_BLOCK = '            "al_protocol": replay_pool_note,\n'
+
 def load_rows():
     rows = []
     rejected = []
@@ -610,6 +623,12 @@ def main():
     src = sub_once(src, ANCHOR_LASTPARA, LASTPARA_BLOCK)
     src = sub_once(src, ANCHOR_SCOPE, SCOPE_BLOCK)
     src = sub_once(src, ANCHOR_COST_NOTES, COST_NOTES_BLOCK)
+    src = sub_once(src, ANCHOR_WP3_REGRET_DOC, WP3_REGRET_DOC_BLOCK)
+    src = sub_once(src, ANCHOR_WP3_REGRET_CHECK, WP3_REGRET_CHECK_BLOCK)
+    src = sub_once(src, ANCHOR_WP3_REGRET_MD, WP3_REGRET_MD_BLOCK)
+    src = sub_once(src, ANCHOR_WP5_AL_SCENARIO, WP5_AL_SCENARIO_BLOCK)
+    src = sub_once(src, ANCHOR_WP5_AL_CHECK, WP5_AL_CHECK_BLOCK)
+    src = sub_once(src, ANCHOR_WP5_AL_CONVENTION, WP5_AL_CONVENTION_BLOCK)
 
     if GEN.exists():
         GEN.with_suffix(".py.bak-wp2").write_text(GEN.read_text(encoding="utf-8"), encoding="utf-8")

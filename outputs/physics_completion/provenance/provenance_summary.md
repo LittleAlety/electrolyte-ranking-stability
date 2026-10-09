@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | wp1_geometry_prep | 1 | 1 | 1 |
 | wp1_method_audit | 160 | 160 | 160 |
-| wp2_production | 14 | 12 | 7 |
+| wp2_production | 15 | 13 | 8 |
 | wp2_sampling | 640 | 640 | 640 |
 
 ## 读法
