@@ -1229,7 +1229,7 @@ window.HB = {
    "id": "F61",
    "file": "F61_physics_completion_ladder.png",
    "week": 44,
-   "caption": "E -> G -> ensemble 台阶（方案 WP3）：只有垂直->绝热这一级是冻结的（n=12，逐分子位移箭头），三态判定 55/9/2；G_single 已有 4 主集分子的中性 M 态生产标签（4/16 主态），G_ensemble、带电/Li 主态与其余 8 分子的 G_single 仍需 WP2 生产，故 ROBUST_INVERSION 只是标签不是已认证翻转",
+   "caption": "E -> G -> ensemble 台阶（方案 WP3）：只有垂直->绝热这一级是冻结的（n=12，逐分子位移箭头），三态判定 55/9/2；G_single 已有 6/16 个主态的真实 Opt+Freq 生产标签（生产首段为 4 主集分子 x 4 主态），G_ensemble、其余带电/Li 主态与另 8 分子的 G_single 仍需 WP2 生产，故 ROBUST_INVERSION 只是标签不是已认证翻转",
    "sha": "4df2b2b204a557e3e608c8db5348fa134f5d5f901580af8f2e7ec3d007da8305",
    "bytes": 179055,
    "w": 2592,
