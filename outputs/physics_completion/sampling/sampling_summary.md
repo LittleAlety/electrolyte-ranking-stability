@@ -2,6 +2,10 @@
 
 > 由 `scripts/build_wp2_sampling.py` 生成。采样层是**气相 GFN2-xTB 筛选**，
 > 不是生产级 `wB97X-D4 + SMD(acetonitrile)`；它只回答「单一代表结构是否落在同一极小附近」。
+>
+> **集合偏差**：方案 3.3 指定的采样集是 EMC/DEC/DME/TMP，本层实际执行的是 DMC/EMC/GBL/SL
+> （两对翻转的决定性自由态 / 阳离子态）。偏差登记在 `sampling_index.json` 的
+> `cohort_deviation`，**不宣称完成方案 3.3**；DEC / DME / TMP 没有任何采样产物。
 
 | 分子 | 态 | 撒点数 | 独立极小 | 次低极小 | 生产几何相对最低 | 冻结起点相对最低 | 判定 |
 | --- | --- | --- | --- | --- | --- | --- | --- |

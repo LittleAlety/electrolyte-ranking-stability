@@ -406,6 +406,12 @@ def derive(raw):
                                                     "not_computed")
                        for row in escalation_rows)).lower(),
          "detail": "%d states registered / %d pool-limited" % (len(escalation_rows), n_limited)},
+        {"check_id": "designated_sampling_set_deviation_is_registered",
+         "description": ("方案 3.3 指定的采样集（EMC/DEC/DME/TMP）与本层实际执行集"
+                         "（DMC/EMC/GBL/SL）的偏差显式登记，不宣称完成 3.3"),
+         "ok": "true",
+         "detail": "registered=EMC/DEC/DME/TMP executed=DMC/EMC/GBL/SL; "
+                   "DEC/DME/TMP have no sampling product"},
     ]
 
     index = {
@@ -438,7 +444,25 @@ def derive(raw):
                                           if row["pool_limited"] == "true"),
         },
         "li_motif_sampling": li_rows,
-        "raw_cache": "outside-repo: work/sampling/xtb_results.csv (hash-recorded by the provenance manifest)",
+        "cohort_deviation": {
+            "registered_set": {"source": ("implementation plan section 3.3 and "
+                                         "docs/physics_completion_protocol.md"),
+                               "mol_ids": ["C02", "C03", "C08", "C17"],
+                               "names": ["EMC", "DEC", "DME", "TMP"]},
+            "executed_set": {"mol_ids": ["C01", "C02", "C13", "C14"],
+                             "names": ["DMC", "EMC", "GBL", "SL"],
+                             "reason": ("these are the free neutral / cation states that decide "
+                                        "the EMC-GBL and EMC-SL flips, which is what this layer "
+                                        "is for")},
+            "consequence": ("this layer does not claim to have executed section 3.3: DEC / DME / "
+                            "TMP have no sampling product, and the registered per-state "
+                            "structure budget (3 -> 6) is only reachable where the gas-phase "
+                            "screen finds competing minima at all"),
+        },
+        "raw_cache": ("outside-repo: work/sampling/xtb_results.csv; its sha256 is recorded in "
+                      "outputs/physics_completion/provenance/provenance_index.json (raw_cache), "
+                      "and every conformer start directory is hashed line by line in "
+                      "outputs/physics_completion/provenance/job_archive_manifest.csv"),
         "checks": checks,
         "n_checks": len(checks),
         "n_failed": sum(0 if item["ok"] else 1 for item in checks),
@@ -449,6 +473,10 @@ def derive(raw):
         "",
         "> 由 `scripts/build_wp2_sampling.py` 生成。采样层是**气相 GFN2-xTB 筛选**，",
         "> 不是生产级 `wB97X-D4 + SMD(acetonitrile)`；它只回答「单一代表结构是否落在同一极小附近」。",
+        ">",
+        "> **集合偏差**：方案 3.3 指定的采样集是 EMC/DEC/DME/TMP，本层实际执行的是 DMC/EMC/GBL/SL",
+        "> （两对翻转的决定性自由态 / 阳离子态）。偏差登记在 `sampling_index.json` 的",
+        "> `cohort_deviation`，**不宣称完成方案 3.3**；DEC / DME / TMP 没有任何采样产物。",
         "",
         "| 分子 | 态 | 撒点数 | 独立极小 | 次低极小 | 生产几何相对最低 | 冻结起点相对最低 | 判定 |",
         "| --- | --- | --- | --- | --- | --- | --- | --- |",
