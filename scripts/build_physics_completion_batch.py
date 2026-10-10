@@ -2844,29 +2844,127 @@ def build_mechanism_geometry(cases):
 
 FROZEN_LADDER = "outputs/week27/layer_independence.json"
 
+# 方案 7.2：固定 k 的 Top-k overlap 与 selection regret 要从「同一 cohort 的逐分子分值」现算。
+# 这些逐分子分值不是新计算，而是 week4/week5/week8 已经冻结的 5 张台阶表（week9 的逐级并置表
+# 用的就是同一批数）；layer_independence.json 只保留聚合值，所以必须回到这 5 张表。
+FROZEN_TOP_K_MAIN = 3
+FROZEN_TOP_K_AUX = (2, 4)
+FROZEN_LADDER_PAIR_SOURCES = {
+    "P0_to_P1": "outputs/week4/p1_core_set_derived.csv",
+    "P1_to_P2": "outputs/week4/p2_environment_effects.csv",
+    "G1_to_G2": "outputs/week4/t2_opt_freq_summary.json",
+    "C0_to_C1": "outputs/week5/c1_coord_shifts.csv",
+    "C1_to_C2": "outputs/week8/stage9_shell_shifts.csv",
+}
+
+
+def _frozen_number(value):
+    if value in (None, "", "None"):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _frozen_primary_ok(row):
+    return str(row.get("is_primary", "")).strip().lower() in ("1", "true", "yes")
+
+
+def _frozen_rung_pairs():
+    """rung key -> {name: {"ox": (before, after), "red": (before, after)}}。
+
+    还原轴按 p_red = -EA 取负，与 layer_independence.json 的约定一致：两条轴都越大越稳。
+    """
+    pairs = {key: {} for key in FROZEN_LADDER_PAIR_SOURCES}
+    for row in PB.load_rows(REPO / FROZEN_LADDER_PAIR_SOURCES["P0_to_P1"]):
+        pairs["P0_to_P1"][row["name"]] = {
+            "ox": (_frozen_number(row.get("p0_ox_ev")), _frozen_number(row.get("p1_ox_ev"))),
+            "red": (_frozen_number(row.get("p0_red_ev")), _frozen_number(row.get("p1_red_ev")))}
+    for row in PB.load_rows(REPO / FROZEN_LADDER_PAIR_SOURCES["P1_to_P2"]):
+        pairs["P1_to_P2"][row["name"]] = {
+            "ox": (_frozen_number(row.get("p1_ox_ev")), _frozen_number(row.get("p2_ox_ev"))),
+            "red": (_frozen_number(row.get("p1_red_ev")), _frozen_number(row.get("p2_red_ev")))}
+    for row in PB.load_json(REPO / FROZEN_LADDER_PAIR_SOURCES["G1_to_G2"])["per_molecule"]:
+        ea1 = _frozen_number(row.get("ea_g1_ev"))
+        ea2 = _frozen_number(row.get("ea_g2_ev"))
+        pairs["G1_to_G2"][row["name"]] = {
+            "ox": (_frozen_number(row.get("ip_g1_ev")), _frozen_number(row.get("ip_g2_ev"))),
+            "red": (None if ea1 is None else -ea1, None if ea2 is None else -ea2)}
+    for row in PB.load_rows(REPO / FROZEN_LADDER_PAIR_SOURCES["C0_to_C1"]):
+        if not _frozen_primary_ok(row):
+            continue
+        ea0 = _frozen_number(row.get("ea_c0_g2_ev"))
+        ea1 = _frozen_number(row.get("ea_c1_ev"))
+        pairs["C0_to_C1"][row["name"]] = {
+            "ox": (_frozen_number(row.get("ip_c0_g2_ev")), _frozen_number(row.get("ip_c1_ev"))),
+            "red": (None if ea0 is None else -ea0, None if ea1 is None else -ea1)}
+    for row in PB.load_rows(REPO / FROZEN_LADDER_PAIR_SOURCES["C1_to_C2"]):
+        if not _frozen_primary_ok(row):
+            continue
+        ea1 = _frozen_number(row.get("ea_shell1_ev"))
+        ea2 = _frozen_number(row.get("ea_shell2_ev"))
+        pairs["C1_to_C2"][row["name"]] = {
+            "ox": (_frozen_number(row.get("ip_shell1_ev")), _frozen_number(row.get("ip_shell2_ev"))),
+            "red": (None if ea1 is None else -ea1, None if ea2 is None else -ea2)}
+    return pairs
+
+
+
 
 def build_frozen_rung_ladder():
     """把既有 R15 台阶审计（5 级 x 2 轴）登记成方案 7.2 要求的逐级报告表。
 
     这是冻结聚合值，不是新计算；它只覆盖「同一 cohort 的 n、tau_b、
-    resolved/unresolved 比例」，Top-k 重叠仍只在 P1v->P1a 一级给出（该冻结文件不含
-    selection regret），selection regret 在本批次还没有任何逐级产物。
+    resolved/unresolved 比例」，以及方案 7.2 指定的固定 k=3（辅助 2/4）Top-k overlap 与
+    selection regret。聚合部分直接读冻结文件；Top-k / regret 不是冻结文件里的数，而是用同一批
+    逐分子分值（week4/week5/week8 的 5 张台阶表，与 week9 逐级并置表同源）现算：目标 = 高层
+    after、代理 = 低层 before，两轴 higher_is_better=True；这一步只做排序运算，不改动任何冻结值。
     """
+    from electrolyte_ranking import ranking as _ranking
+
     frozen = PB.load_json(REPO / FROZEN_LADDER)
+    pairs = _frozen_rung_pairs()
+    axis_key = {"oxidation": "ox", "reduction": "red"}
     rows = []
     for rung in frozen["rungs"]:
         for axis, payload in rung["axes"].items():
-            rows.append({
+            key = axis_key[axis]
+            listed = list(payload.get("molecules") or [])
+            table = pairs.get(rung["key"], {})
+            scored = [name for name in listed
+                      if name in table and table[name][key][0] is not None
+                      and table[name][key][1] is not None]
+            before = [table[name][key][0] for name in scored]
+            after = [table[name][key][1] for name in scored]
+            n_pairs = len(listed) * (len(listed) - 1) // 2
+            row = {
                 "rung": rung["key"], "label": rung["label"], "axis": axis,
-                "n_molecules": payload["n_molecules"],
+                "n_molecules": payload["n_molecules"], "n_pairs": n_pairs,
+                "n_scored": len(scored), "k_main": min(FROZEN_TOP_K_MAIN, len(scored)),
+                "insufficient_sample": "true" if len(scored) < 2 * FROZEN_TOP_K_MAIN else "false",
+                "molecules_without_pair_values": ";".join(name for name in listed if name not in scored),
                 "kendall_tau_b": "%.9f" % float(payload["kendall_tau_b"]),
                 "f_unresolved_before": "%.9f" % float(payload["f_unresolved_before"]),
                 "f_unresolved_after": "%.9f" % float(payload["f_unresolved_after"]),
                 "f_robust_inversion": "%.9f" % float(payload["f_robust_inv"]),
+                "n_unresolved_before": "%d" % round(float(payload["f_unresolved_before"]) * n_pairs),
+                "n_unresolved_after": "%d" % round(float(payload["f_unresolved_after"]) * n_pairs),
+                "n_robust_inversion": "%d" % round(float(payload["f_robust_inv"]) * n_pairs),
                 "dispersion_ev": "%.9f" % float(payload["dispersion_ev"]),
                 "cost_jobs": rung.get("cost_jobs", ""),
                 "new_physics": rung["new_physics"],
-            })
+            }
+            if len(scored) >= 2:
+                k_main = min(FROZEN_TOP_K_MAIN, len(scored))
+                row["top_k_overlap_main"] = "%.9f" % _ranking.top_k_overlap(before, after, k_main)
+                row["jaccard_main"] = "%.9f" % _ranking.jaccard_at_k(before, after, k_main)
+                row["selection_regret_main_ev"] = "%.9f" % _ranking.selection_regret(after, before, k_main)
+                for k_aux in FROZEN_TOP_K_AUX:
+                    k_eff = min(k_aux, len(scored))
+                    row["top_k_overlap_k%d" % k_aux] = "%.9f" % _ranking.top_k_overlap(before, after, k_eff)
+                    row["selection_regret_k%d_ev" % k_aux] = "%.9f" % _ranking.selection_regret(after, before, k_eff)
+            rows.append(row)
     return rows, frozen
 
 
@@ -2961,8 +3059,16 @@ def wp3():
                                          row["max_bond_pair"]) for row in geometry_rows))},
         {"id": "frozen_ladder_covers_every_registered_rung", "description": "方案 7.2 的逐级报告覆盖全部冻结台阶与两个轴",
          "ok": len(ladder_rows) == 2 * len(ladder_frozen["rungs"]),
-         "detail": "%d 级台阶 x 2 轴 = %d 行；Top-k 重叠仍只在 P1v->P1a 一级给出，selection regret 在本批次无逐级产物"
+         "detail": "%d 级台阶 x 2 轴 = %d 行；每行给固定 k=3（辅助 2/4）的 Top-k overlap 与 selection regret"
                    % (len(ladder_frozen["rungs"]), len(ladder_rows))},
+        {"id": "wp3_ladder_topk_regret_is_computed_not_copied", "description": "逐级报告每行都带固定 k=3（辅助 2/4）的 Top-k overlap 与 selection regret 列",
+         "ok": bool(ladder_rows) and all(
+             row.get("top_k_overlap_main", "") != "" and row.get("selection_regret_main_ev", "") != ""
+             and row.get("top_k_overlap_k2", "") != "" and row.get("top_k_overlap_k4", "") != ""
+             and row.get("selection_regret_k2_ev", "") != "" and row.get("selection_regret_k4_ev", "") != ""
+             for row in ladder_rows),
+         "detail": "n_rows=%d ; k_main=%s ; 逐分子分值取自 week4/week5/week8 的台阶表，不改动冻结数"
+                   % (len(ladder_rows), ladder_rows[0]["k_main"] if ladder_rows else "")},
         {"id": "mechanism_bond_table_covers_every_case_molecule", "description": "案例的键长变化表逐键覆盖每个案例分子",
          "ok": bool(geometry_bonds) and all(
              any(row["name"] == entry["name"] for row in geometry_bonds) for entry in geometry_rows),
@@ -3037,9 +3143,14 @@ def wp3():
         ["name", "bond", "r_neutral_ang", "r_cation_ang", "dr_ang", "is_largest_change",
          "moved_over_0p01_ang"], geometry_bonds)
     local["outputs/physics_completion/pair_evidence/frozen_rung_ladder.csv"] = csv_text(
-        ["rung", "label", "axis", "n_molecules", "kendall_tau_b", "f_unresolved_before",
-         "f_unresolved_after", "f_robust_inversion", "dispersion_ev", "cost_jobs",
-         "new_physics"], ladder_rows)
+        ["rung", "label", "axis", "n_molecules", "n_pairs", "n_scored", "k_main",
+         "top_k_overlap_main", "jaccard_main", "selection_regret_main_ev",
+         "top_k_overlap_k2", "top_k_overlap_k4",
+         "selection_regret_k2_ev", "selection_regret_k4_ev",
+         "insufficient_sample", "molecules_without_pair_values",
+         "kendall_tau_b", "f_unresolved_before", "f_unresolved_after", "f_robust_inversion",
+         "n_unresolved_before", "n_unresolved_after", "n_robust_inversion",
+         "dispersion_ev", "cost_jobs", "new_physics"], ladder_rows)
     local["outputs/physics_completion/pair_evidence/conservative_interval_protocol.md"] = (
         "# 保守区间与三态判据协议\n\n"
         "1. 对固定目标模型 m 与 pair i,j、每个预先接受的合理方法 r，得到 D_ij^(m,r)；自由态与 Li 态分别构造方法范围，\n"
@@ -3132,8 +3243,9 @@ def wp3():
            ladder_frozen["independence"]["max_abs_pearson"],
            ladder_frozen["independence"]["median_abs_pearson"],
            ladder_frozen["independence"]["n_pairs_above_0_7"]),
-        "- 逐级报告只用冻结聚合值；Top-k 重叠目前只在 P1v->P1a 一级给出（该冻结文件不含 selection regret）",
-        "  selection regret 在本批次还没有任何逐级产物；其余台阶要等 WP2 生产把同一 cohort 的自由能标签补齐。",
+        "- 逐级报告 = 冻结聚合值（n / tau_b / unresolved / robust 比例）+ 用同一批逐分子分值现算的",
+        "  固定 k=3（辅助 2/4）Top-k overlap 与 selection regret（目标=高层 after、代理=低层 before，越高越稳）；",
+        "  系综 / 自由能两级台阶仍要等 WP2 生产把同一 cohort 的自由能标签补齐。",
         "",
         "## 验收（%d/%d 通过）" % (len(checks) - payload["n_failed"], len(checks)),
         "",
@@ -3146,7 +3258,7 @@ def wp3():
         "",
         "## 限制",
         "",
-        "- 逐级报告（方案 7.2）复用冻结的 5 级台阶聚合值；WP1 独立方法审计已给出 4 设定的方法范围（只覆盖电子能层与氧化轴），Top-k/regret 只在 P1v->P1a 一级逐对给出。",
+        "- 逐级报告（方案 7.2）= 冻结的 5 级台阶聚合值（n / tau_b / unresolved / robust 比例）加上用同一批逐分子分值现算的固定 k=3（辅助 2/4）Top-k overlap 与 selection regret；WP1 独立方法审计已给出 4 设定的方法范围（只覆盖电子能层与氧化轴）。",
         "- 该 rung 的 12 个成员与主 cohort 差一个分子（SN 进、DEC 出）：它只作判据演示，不代表已登记的主集。",
         "- 稳健翻转认证：WP1 独立方法审计（4 设定 × 竖直/弛豫两腿）给出 certified=%s；"
         "但**采样界限仍未纳入**，故只认证方法轴（方案 2）。" % METHOD_AUDIT_CERTIFICATION["certified"],

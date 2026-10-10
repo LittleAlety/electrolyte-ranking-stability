@@ -426,6 +426,14 @@ def test_frozen_ladder_reports_every_rung_and_axis() -> None:
             assert abs(float(row["f_unresolved_after"])
                        - float(payload["f_unresolved_after"])) < 1e-9
             assert abs(float(row["f_robust_inversion"]) - float(payload["f_robust_inv"])) < 1e-9
+            # 方案 7.2：固定 k=3（辅助 2/4）的 Top-k overlap 与 selection regret 必须在表里，
+            # 且 k_main 是「3 与 n_scored 的较小者」；n < 2k 时必须标 insufficient_sample。
+            assert int(row["k_main"]) == min(3, int(row["n_scored"]))
+            for key in ("top_k_overlap_main", "top_k_overlap_k2", "top_k_overlap_k4"):
+                assert 0.0 <= float(row[key]) <= 1.0, (row["rung"], row["axis"], key)
+            for key in ("selection_regret_main_ev", "selection_regret_k2_ev", "selection_regret_k4_ev"):
+                assert float(row[key]) >= 0.0, (row["rung"], row["axis"], key)
+            assert row["insufficient_sample"] == ("true" if int(row["n_scored"]) < 6 else "false")
 
 
 def _read_xyz(path: Path):

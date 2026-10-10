@@ -18,7 +18,7 @@
 | `wp2_closure_acceptance` | §6 WP2 固定背景配对自由能标签 | 闭环表自检：不造数 / 未完成显式登记 / 几何与频率 QC | satisfied | closure_checks_ok=8/8 | outputs/physics_completion/closure/closure_acceptance.csv |
 | `wp2_flip_persistence` | §6 WP2 固定背景配对自由能标签 | EMC-GBL / EMC-SL 两对翻转能否保留到自由能层 | partial | rungs_computed=4/10 | outputs/physics_completion/closure/flip_persistence.csv |
 | `wp3_pair_evidence` | §7 WP3 排序、独立 uncertainty 与机制 | 固定模型下的保守符号一致性：STABLE / UNRESOLVED / ROBUST_INVERSION | partial | pairs=66; ROBUST_INVERSION=2; STABLE=55; UNRESOLVED=9 | outputs/physics_completion/pair_evidence/pair_evidence.csv |
-| `wp3_rung_ladder_topk_regret` | §7 WP3 排序、独立 uncertainty 与机制 | 逐级报告固定 k=3（辅助 2/4）的 Top-k overlap 与 selection regret | not_satisfied | ladder_rows=10 has_selection_regret=False has_top_k=False | outputs/physics_completion/pair_evidence/frozen_rung_ladder.csv |
+| `wp3_rung_ladder_topk_regret` | §7 WP3 排序、独立 uncertainty 与机制 | 逐级报告固定 k=3（辅助 2/4）的 Top-k overlap 与 selection regret | satisfied | ladder_rows=10 has_selection_regret=True has_top_k=True | outputs/physics_completion/pair_evidence/frozen_rung_ladder.csv |
 | `wp3_targeted_second_method` | §7 WP3 排序、独立 uncertainty 与机制 | 关键 pair 第二泛函靶向复核（只对新优化几何的单点） | partial | plan=24 ready=14 blocked=10 results=14 | outputs/physics_completion/pair_evidence/targeted_recheck/ |
 | `wp3_mechanism_cases` | §7 WP3 排序、独立 uncertainty 与机制 | 机制案例最多 3 个，事先规则选定 | satisfied | cases=2 | outputs/physics_completion/pair_evidence/mechanism_cases.csv |
 | `wp4_anchor_tiers` | §8 WP4 外部锚点复核与可比性审计 | 既有氧化锚点逐条复核并分三级（可定量 / 仅趋势 / 不可用） | partial | anchor_rows=87 tier_1=0 tier_2=14 tier_3=73 | data/references/anchor_primary_audit.csv |
@@ -32,6 +32,6 @@
 | `stop_rules_registered` | §11 停止规则 | 停止规则（unresolved / sampling_limited / identity outcome / validation limitation） | partial | stop_rules_in_config=True; li_motif_screen_computed=0/8 | config/physics_completion_v1.yaml; docs/physics_completion_protocol.md |
 | `plan_overall_complete` | §1 研究问题与最终交付 | 方案第 1-5 步闭环：四分子四态齐备 + 两对翻转在自由能层判定 | blocked_on_production | four_state_complete=1/4 li_pair_complete=1/4 flip_rungs=4/10 | outputs/physics_completion/closure/four_molecule_state_closure.csv; outputs/physics_completion/closure/flip_persistence.csv |
 
-**状态合计**：satisfied=8; partial=8; not_satisfied=6; blocked_on_production=4
+**状态合计**：satisfied=9; partial=8; not_satisfied=5; blocked_on_production=4
 
 **总体判定**：未闭环 -- 见 `plan_overall_complete` 行

@@ -29,10 +29,11 @@
 | C1_to_C2 | reduction | 10 | 0.288888889 | 0.355555556 -> 0.355555556 | 0.000000000 | 0.335007649 | 36 |
 
 - 台阶间独立性（冻结 R15）：20 对、max |Pearson| = 0.7909267873261443、median |Pearson| = 0.383067803565867、>0.7 的 2 对。
-- 逐级报告只用冻结聚合值；Top-k 重叠目前只在 P1v->P1a 一级给出（该冻结文件不含 selection regret）
-  selection regret 在本批次还没有任何逐级产物；其余台阶要等 WP2 生产把同一 cohort 的自由能标签补齐。
+- 逐级报告 = 冻结聚合值（n / tau_b / unresolved / robust 比例）+ 用同一批逐分子分值现算的
+  固定 k=3（辅助 2/4）Top-k overlap 与 selection regret（目标=高层 after、代理=低层 before，越高越稳）；
+  系综 / 自由能两级台阶仍要等 WP2 生产把同一 cohort 的自由能标签补齐。
 
-## 验收（10/10 通过）
+## 验收（11/11 通过）
 
 | check | ok | detail |
 | --- | --- | --- |
@@ -44,12 +45,13 @@
 | robust_inversion_certification_follows_the_method_audit | PASS | WP1 audit certified=True (2/2 frozen pairs)；label=ROBUST_INVERSION x2 |
 | rung_cohort_difference_is_documented | PASS | rung members 含 SN 不含 DEC；主集含 DEC 不含 SN —— 已在 payload 的 rung_members_note 说明 |
 | mechanism_case_geometries_are_frozen_inputs | PASS | 3 个案例分子；EMC max|Δr|=0.090 Å (C4-O5)、GBL max|Δr|=0.086 Å (C2-O6)、SL max|Δr|=0.016 Å (C5-C6) |
-| frozen_ladder_covers_every_registered_rung | PASS | 5 级台阶 x 2 轴 = 10 行；Top-k 重叠仍只在 P1v->P1a 一级给出，selection regret 在本批次无逐级产物 |
+| frozen_ladder_covers_every_registered_rung | PASS | 5 级台阶 x 2 轴 = 10 行；每行给固定 k=3（辅助 2/4）的 Top-k overlap 与 selection regret |
+| wp3_ladder_topk_regret_is_computed_not_copied | PASS | n_rows=10 ; k_main=3 ; 逐分子分值取自 week4/week5/week8 的台阶表，不改动冻结数 |
 | mechanism_bond_table_covers_every_case_molecule | PASS | n_bond_rows=17 ; n_molecules=3 ; 变化 >0.01 A 的键 15 条 |
 
 ## 限制
 
-- 逐级报告（方案 7.2）复用冻结的 5 级台阶聚合值；WP1 独立方法审计已给出 4 设定的方法范围（只覆盖电子能层与氧化轴），Top-k/regret 只在 P1v->P1a 一级逐对给出。
+- 逐级报告（方案 7.2）= 冻结的 5 级台阶聚合值（n / tau_b / unresolved / robust 比例）加上用同一批逐分子分值现算的固定 k=3（辅助 2/4）Top-k overlap 与 selection regret；WP1 独立方法审计已给出 4 设定的方法范围（只覆盖电子能层与氧化轴）。
 - 该 rung 的 12 个成员与主 cohort 差一个分子（SN 进、DEC 出）：它只作判据演示，不代表已登记的主集。
 - 稳健翻转认证：WP1 独立方法审计（4 设定 × 竖直/弛豫两腿）给出 certified=True；但**采样界限仍未纳入**，故只认证方法轴（方案 2）。
 - 机制案例已补原始结构证据（既有冻结几何的重原子键长变化表，逐键列出中性/阳离子键长）与 WP1 方法敏感性范围，但电子密度/自旋、配位变化与 G 层分解仍需 WP2 生产计算。

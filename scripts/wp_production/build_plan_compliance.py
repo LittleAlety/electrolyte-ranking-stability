@@ -240,7 +240,9 @@ def build_rows():
         "satisfied" if (has_regret and has_topk) else "not_satisfied",
         "ladder_rows=%d has_selection_regret=%s has_top_k=%s" % (len(ladder), has_regret, has_topk),
         "outputs/physics_completion/pair_evidence/frozen_rung_ladder.csv",
-        "现表只有 n / tau_b / unresolved 比例 / robust 比例，没有固定 k 的 Top-k 与 regret 列。",
+        ("现表已有固定 k=3（辅助 2/4）的 Top-k overlap 与 selection regret，且带逐级 resolved / robust 计数。"
+         if (has_regret and has_topk)
+         else "现表只有 n / tau_b / unresolved 比例 / robust 比例，没有固定 k 的 Top-k 与 regret 列。"),
     ))
     plan_rows = read_rows("outputs/physics_completion/pair_evidence/targeted_recheck/job_plan.csv")
     res_rows = read_rows("outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv")
