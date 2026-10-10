@@ -52,6 +52,8 @@
 
 **仓库内没有 `outputs/week24/`、`outputs/week36/`、`outputs/week44/`**：week24 用 `outputs/week24_corealign/`，
 week36 与 week44 只存在于 part2 镜像。
+镜像的周覆盖：**`成果输出（part1）` = week1–week25、`成果输出（part2）` = week28–week44**
+（part2 = week28–36 旧阶段 + week37–44 新阶段）；**week26、week27 两段镜像都未覆盖**。
 
 ### 2.1 两套 WP 编号不是一回事（读者最常混的地方）
 
@@ -88,7 +90,42 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（26 个跟踪文件），脚本表与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**29** 个跟踪文件）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+
+### 3.1 `scripts/wp_production/` 逐脚本职责
+
+新阶段（physics_completion_v1）生产链的每个 `*.py` 一行在这里登记，由 `tests/test_repo_layout.py` 强制覆盖：
+该目录下若新增脚本而没写进本表，测试即失败。非 Python 的跟踪文件见本表之后。
+
+| 脚本（`.py`） | 职责 | 主要输入 → 输出 |
+| --- | --- | --- |
+| `run_wp2_queue.py` | 20 条腿（4 分子 × {`M`,`M_tzvpd`,`M_plus`,`LiM_plus`,`LiM_2plus`}）的幂等队列器：统一调度、并发上限（2 worker × 4 核）、断点续跑、逐次开跑与周期复查 `smpd` | 队列登记表 → `work/wp2prod/**` 现场 + `_queue_<NAME>_<STATE>.out` |
+| `run_wp2_production.py` | 生产级 Opt+NumFreq 驱动（`M` / `M_plus` / `LiM_plus` / `LiM_2plus`） | 起始几何 → ORCA 输入/日志/几何（`work/wp2prod/`） |
+| `run_wp2_extra.py` | 与带电腿**基组一致**的中性腿 `M_tzvpd`（def2-TZVPD）驱动 | 中性几何 → ORCA 现场（`work/wp2prod/`） |
+| `run_batch.py` | 12 主集分子 × 4 主态的 xTB/ORCA 批量驱动与公共工具（几何、ORCA/xTB 路径、片段分析）；`ORCA_CORES` 定义处 | 分子/态清单 → `work/pilot12/**` |
+| `run_method_audit.py` | WP1 的 128 单点 / 32 弛豫腿本机方法审计驱动 | 审计清单 → `work/audit/**` |
+| `run_pair_recheck.py` | 靶向复核执行器：在已登记的生产 Opt 几何上跑 S3/S4 单点（不重优化、不算频率），串行、每作业 2 核 | 计划表 `job_plan.csv` → 仓库外 `work/recheck/<record_id>/` 现场 |
+| `run_to_closure.py` | 队列收尾：把已 computed 的腿折进 production_ledger / 四分子闭环表 / 标签 / week37–44 镜像，未齐的腿留空并显式列出；`--check`/`--dry-run`/`--commit`/`--require-complete` | `work/wp2prod/**` + 生成器 → 交付层 CSV |
+| `supervisor_policy.py` | 监守收敛判据（纯函数，有单测）：`--computed-count` 按队列 `inventory()` 口径数已 computed 的腿，`--decide` 判断继续 / 完成 / 停摆或轮数上限而停 | 队列快照 → `done`/`continue`/`stop_stalled`/`stop_round_cap` |
+| `emit_wp2.py` | 把 `work/wp2prod/**` 已跑完的状态**折进生成器**：确定性重打 `WP2_PRODUCTION_LEDGER` 等补丁块 | 生产现场 + 生成器基线 → `scripts/build_physics_completion_batch.py` |
+| `emit_wp1.py` | 把 WP1 方法审计矩阵折进生成器（读带 SECTION 标记的 `wp1_audit_src.txt`） | `wp1_audit_src.txt` + 生成器基线 → 生成器补丁块 |
+| `wp1_newsrc.py` | `wp1_audit_src.txt` 同一内容的原始文本留档（无 import、不被执行） | — |
+| `emit_pair_recheck.py` | 靶向复核**手工折步**：把 `work/recheck/` 的原始单点折成 `recheck_results.csv`（逐行带几何 sha256）；输入在仓库外，故不进收口链 | `work/recheck/**` → `outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv` |
+| `check_wp2_anchors.py` | 复核 `emit_wp2.py` 的补丁锚点在当前生成器基线里唯一存在 | 生成器基线 → 锚点自检结论 |
+| `make_commit_msg.py` | 按当前已落地子集生成提交信息 | 交付层状态 → `work/_wp2_commit_msg.txt` |
+| `build_compute_provenance.py` | 逐作业复现证据清单 + 从各自 `.log` 推导 `failure_reason`（派生层） | `work/wp2prod/**` + 生产 ledger → `outputs/physics_completion/provenance/**` |
+| `build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） | 生产 ledger → `outputs/physics_completion/closure/**` |
+| `build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） | 生产 ledger → `outputs/physics_completion/sampling/**` |
+| `build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） | 生产 ledger → `outputs/physics_completion/cost/**` |
+| `build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的**结果前预注册** + 复核跑完后只读 `recheck_results.csv`、现算逐 (pair, 设定) 的 delta | 规则/对象/设定/几何来源 → `targeted_recheck/` 计划与验收层 |
+| `build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） | 结构登记 → `outputs/physics_completion/li_motif_sampling/**` |
+| `make_physics_completion_figures.py` | 方案 14 的六张主图（F59-F64）与图清单 | 交付层 CSV → `outputs/figures/**` |
+| `build_physics_completion_deliverables.py` | 建交付镜像（仓库外 `成果输出（part2）/week37..week44`）：week44 收结题报告、协议、配置、样本、锚点审计、本骨架图、生成器源码、测试与全部 `outputs/physics_completion/**`；`--check` 逐文件复核 byte-identical | 仓库源路径 → 仓库外 part2 镜像 |
+| `archive_raw_outputs.py` | 把 provenance 登记的原始作业文件打成**确定性、可复核的 zip 归档**（`--build` 默认落仓库外 `_compute_archive/`；`--check <zip>` 逐条复算 sha256） | `job_archive_manifest.csv` + 仓库外原始日志 → `_compute_archive/*.zip` + `.index.csv` |
+| `verify_archive.py` | 归档的**可重新解析性**核验：拿归档原始日志按仓库口径重算登记值，与 manifest 逐字段比对；`--ledger` 再重算交付账本；缺条目/哈希不符/数值不符 → 退出码 1 | `*.zip` + `job_archive_manifest.csv`（+ `production_ledger.csv`） → 核验结论 |
+
+非 Python 的跟踪文件：`finalize_wp2.ps1`（一键收口链）、`supervise_pending.ps1`（无人值守监守）、
+`watch_smpd.ps1`（轻量 smpd 看护）、`wp1_audit_src.txt`（WP1 分段源码）、`README.md`（本目录索引）。
 
 ## 4. 收口链
 
@@ -116,3 +153,39 @@ anchors → emit-wp2 → generator → closure → provenance → sampling → l
 - 工作区里仍有历史遗留的 CRLF 文本文件（多数是早期周次的 `outputs/**` 与 `src/**`）；
   仓库内的索引 blob 已是 LF，git 在下次 touch 时自动归一化，**不要**为统一行尾批量重写，
   否则会改动冻结产物的哈希。
+
+## 7. 复现证据链落点
+
+「派生数字能对回原始作业、且原始作业可被独立重算」这条主张的落点如下。只想要结论就读 CSV/JSON；
+想独立取得并重算，走 §7.2、§7.3 的归档 + 核验两步。
+
+### 7.1 入库的派生证据（在仓库内）
+
+- `outputs/physics_completion/provenance/`
+  - `job_archive_manifest.csv`：逐作业的原始文件清单与 sha256，以及从原始日志登记的关键值（能量 / 频率 / QC）。
+  - `derived_to_job_map.csv`：**派生值 → 作业 ID** 的映射（交付层每个数字该由哪个作业解释）。
+  - `provenance_acceptance.csv`：证据链自检（缺文件 / 哈希不符 / 字段缺失）。
+  - `provenance_index.json`：上述三者的机器可读索引；`provenance_summary.md` 是人读摘要。
+- `outputs/physics_completion/pair_evidence/targeted_recheck/`
+  - `recheck_results.csv`：第二泛函（S3/S4）靶向复核**原始层**结果，逐行带几何 sha256。
+  - `job_plan.csv`、`selection_rule.json`、`selection_rule.md`：跑之前冻结的预注册层（对象、设定、几何来源、预算、选择规则）。
+  - `acceptance.csv`、`recheck_pair_gaps.csv`：复核层验收与缺口登记。
+  - 仓库内只有这些派生表，**没有原始 ORCA 输入/日志**。
+
+### 7.2 仓库外的原始现场（不入库）
+
+- 原始现场留在仓库外 `work/`：生产 `work/wp2prod/<NAME>/<STATE>/`、审计 `work/audit/`、
+  靶向复核 `work/recheck/<record_id>/`（该 `<record_id>` 即 `recheck_results.csv` 的行标识）。
+- `work/` 被 `.gitignore` 忽略，**永不入库**；它在交付里的替身是 §7.3 的确定性归档。
+
+### 7.3 归档与「可重新解析」主张
+
+- `archive_raw_outputs.py --build`：按 `job_archive_manifest.csv` 把登记的原始文件打成**确定性 zip 归档**，
+  默认落在仓库外 `_compute_archive/`（附 `.index.csv` + `.README.md`）；`--check <zip>` 逐条复算 sha256。
+- `verify_archive.py --archive <zip> --ledger`：这是「归档可被重新解析」主张的核验器——拿归档里的原始日志，
+  按**仓库口径**重算登记值，与 `job_archive_manifest.csv` 逐字段比对；`--ledger` 再用同一份归档重算交付账本
+  `production_ledger.csv` 的数值列。缺条目 / sha256 不符 / 数值不符 → 退出码 1；`--limit N` 调试、
+  `--strict` 把「算不出来」也算失败。
+- 语义提示：生产在跑期间归档必然落后于 manifest，`verify_archive.py` 会报「登记晚于归档」的**预期漂移**；
+  队列停掉后重建归档再核验才应回到 0 不符。所以「归档能被重新解析」是**可执行、可复算**的断言，不是一句口号。
+

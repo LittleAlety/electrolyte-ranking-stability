@@ -100,3 +100,38 @@ def test_layout_doc_names_the_pipeline_and_forced_indexes():
     for token in ("finalize_wp2.ps1", "scripts/README.md", "wp_production/README.md",
                   "tests/test_scripts_index.py", "ALL GREEN", "--check"):
         assert token in doc, "骨架图缺少关键入口：%s" % token
+
+
+
+def test_layout_doc_covers_every_wp_production_script():
+    """scripts/wp_production/ 下每个 *.py 都要逐脚本登记，新增脚本不登记即失败。"""
+    doc = _doc()
+    scripts = sorted(p.name for p in (REPO_ROOT / "scripts" / "wp_production").glob("*.py"))
+    assert scripts, "scripts/wp_production/ 下应有 *.py 脚本"
+    missing = [name for name in scripts if name not in doc]
+    assert not missing, "wp_production 脚本未登记到骨架图：%s" % missing
+
+
+def test_layout_doc_names_the_reproduction_evidence_chain():
+    """复现证据链的关键落点（产物名 + 归档/核验脚本）必须在骨架图里。"""
+    doc = _doc()
+    for token in ("outputs/physics_completion/provenance/",
+                  "job_archive_manifest.csv",
+                  "derived_to_job_map.csv",
+                  "provenance_acceptance.csv",
+                  "provenance_index.json",
+                  "outputs/physics_completion/pair_evidence/targeted_recheck/",
+                  "recheck_results.csv",
+                  "work/recheck/",
+                  "archive_raw_outputs.py",
+                  "_compute_archive/",
+                  "verify_archive.py"):
+        assert token in doc, "骨架图缺少复现证据链落点：%s" % token
+
+
+def test_layout_doc_states_part2_week_coverage():
+    """骨架图要写清交付镜像的周覆盖：part2 = week28-week44。"""
+    doc = _doc()
+    lines = [line for line in doc.splitlines()
+             if "part2" in line and "week28" in line and "week44" in line]
+    assert lines, "骨架图应有一行说明 part2 = week28-week44 的镜像周覆盖"

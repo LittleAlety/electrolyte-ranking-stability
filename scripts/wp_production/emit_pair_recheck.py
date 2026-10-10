@@ -63,7 +63,8 @@ def rows():
     blocked = {row["record_id"] for row in plan if row["status"] != "ready"}
     out = []
     for record_id in sorted(ready):
-        payload_path = RAW / (record_id.replace("|", "__") + ".json")
+        job_dir = RAW / record_id.replace("|", "__")
+        payload_path = job_dir / (record_id.replace("|", "__") + ".json")
         if not payload_path.is_file():
             raise SystemExit("缺少结果 %s（先跑 run_pair_recheck.py）" % payload_path)
         payload = json.loads(payload_path.read_text(encoding="utf-8"))

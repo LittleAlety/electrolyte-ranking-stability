@@ -12,6 +12,7 @@
 | wp1_method_audit | 160 | 160 | 160 |
 | wp2_production | 16 | 14 | 10 |
 | wp2_sampling | 640 | 640 | 640 |
+| wp3_recheck | 12 | 12 | 12 |
 
 ## 未正常结束的作业
 
@@ -36,5 +37,6 @@
   解压独立归档后按同一配方重算即可复核。
 * `engine` / `engine_version`：ORCA cohort 为 ORCA 及其版本（与 `orca_version` 同源，都从该作业自己的 .log 读回）；采样 cohort 为 GFN2-xTB 与 xTB 版本。`orca_keyword` / `orca_version` 只对 ORCA cohort 有值。
 * `n_files_hashed`：本行登记的 sha256 个数（ORCA 行最多 4 个：inp / 起始几何 / 最终几何 / 原始输出；采样行 3 个：起始几何 / 优化几何 / xtbopt.log）。
+* `wp3_recheck` 行：方案 11 的靶向第二泛函单点，起始几何是冻结的生产 Opt 几何；单点不产生新几何（`final_geometry_path` 为空），`final_sp_eh` 与 `pair_evidence/targeted_recheck/recheck_results.csv` 的 `energy_eh` 同源。
 * 采样 cohort 每行对应一个 ETKDG 起点目录；聚合缓存 `work/sampling/xtb_results.csv` 的 sha256 记在 `provenance_index.json` 的 `raw_cache`。
 * 派生 CSV 的 `--check` 只证明内部一致；**原始日志的 sha256 才是外部可复核的证据**。

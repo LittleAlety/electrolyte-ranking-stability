@@ -17,7 +17,8 @@
 * `wp2_production`：热化学段的 `Electronic energy`（不是首个 `FINAL SINGLE POINT ENERGY`）、
   `Final Gibbs free energy`、`VIBRATIONAL FREQUENCIES` 块；取不到热化学段时退回最后一个
   `FINAL SINGLE POINT ENERGY`（只发生于未跑完的作业）；
-* `wp1_method_audit` / `wp1_geometry_prep`：`FINAL SINGLE POINT ENERGY`；
+* `wp1_method_audit` / `wp1_geometry_prep` / `wp3_recheck`：`FINAL SINGLE POINT ENERGY`
+  （`wp3_recheck` 是方案 11 的冻结第二泛函单点）；
 * `wp2_sampling`：`xtbopt.log` 里的 `energy: ... gnorm: ... xtb: <版本>` 行；
 * 方法回显取归档的 `*.inp` 里的 `!` 行；引擎版本取 `Program Version`。
 
@@ -75,6 +76,7 @@ FIELD_RULES = {
     "wp1_method_audit": ("orca_keyword", "orca_version", "final_sp_eh", "opt_converged", "terminated"),
     "wp1_geometry_prep": ("orca_keyword", "orca_version", "final_sp_eh", "opt_converged", "terminated"),
     "wp2_sampling": ("engine_version", "final_sp_eh"),
+    "wp3_recheck": ("orca_keyword", "orca_version", "final_sp_eh", "terminated"),
 }
 REGISTERED_FIELDS = ("orca_keyword", "orca_version", "engine_version", "final_sp_eh", "g_single_eh",
                      "n_freq", "imaginary_modes", "lowest_freq_cm1", "opt_converged", "terminated")

@@ -6,8 +6,8 @@ window.HB = {
   "figures": 65,
   "orca_out": 1535,
   "scripts": 166,
-  "test_files": 81,
-  "tests_passed": 1408
+  "test_files": 82,
+  "tests_passed": 1419
  },
  "pipeline": [
   {

@@ -35,6 +35,7 @@ WP2PROD = WORK / "wp2prod"
 AUDIT = WORK / "audit"
 SAMPLING = WORK / "sampling"
 SAMPLING_CACHE = SAMPLING / "xtb_results.csv"
+RECHECK = WORK / "recheck"
 SET_CSV = REPO / "data" / "metadata" / "physics_completion_set.csv"
 PRODUCTION_LEDGER = REPO / "outputs" / "physics_completion" / "free_states" / "production_ledger.csv"
 AUDIT_COST_LEDGER = REPO / "outputs" / "physics_completion" / "cost" / "audit_cost_ledger.csv"
@@ -60,6 +61,7 @@ SAMPLING_NOTE = ("gas-phase GFN2-xTB conformer screen of one ETKDG start; the st
 AUDIT_DERIVED = "outputs/physics_completion/method_audit/job_matrix.csv"
 RELAXED_DERIVED = "outputs/physics_completion/method_audit/relaxed_leg_matrix.csv"
 PRODUCTION_DERIVED = "outputs/physics_completion/free_states/production_ledger.csv"
+RECHECK_DERIVED = "outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv"
 
 #: 每张派生表用哪几列拼出 derived_row_key，用来验证映射行真的存在。
 DERIVED_KEY_COLUMNS = {
@@ -68,6 +70,7 @@ DERIVED_KEY_COLUMNS = {
     PRODUCTION_DERIVED: ("mol_id", "state"),
     PREP_LEDGER_DERIVED: ("job_id",),
     SAMPLING_CACHE_REL: ("name", "state", "kind", "index"),
+    RECHECK_DERIVED: ("record_id",),
 }
 
 JOB_FIELDS = ("job_id", "cohort", "mol_id", "name", "state", "setting_id", "charge",
@@ -352,6 +355,58 @@ def build_sampling_row(name_token, state_token, start_token, directory, cache):
     }
 
 
+def scan_recheck():
+    """work/recheck/<record_id>/ 每个目录 = 一个 WP3 第二泛函靶向复核单点（方案 5.3 / 11）。"""
+    jobs = []
+    if not RECHECK.is_dir():
+        return jobs
+    for job_dir in sorted(path for path in RECHECK.iterdir() if path.is_dir()):
+        jobs.append((job_dir.name, job_dir.name, job_dir))
+    return jobs
+
+
+def build_recheck_row(mol_token, job_token, directory):
+    """第二泛函单点：载荷在作业目录内的 <record_id>.json，方法与 QC 从本目录的 .inp / .log 读回。"""
+    record = {}
+    payload = pick(directory, "*.json")
+    if payload is not None:
+        record = json.loads(payload.read_text(encoding="utf-8"))
+    inp = pick(directory, "*.inp")
+    log = pick(directory, "*.log")
+    keyword, version = method_echo(inp, log)
+    raw_text = log.read_text(encoding="utf-8", errors="replace") if log is not None else ""
+    input_path, input_sha, input_bytes = hash_entry(inp)
+    start_path, start_sha, _ = hash_entry(directory / "geom.xyz")
+    log_path, log_sha, log_bytes = hash_entry(log)
+    record_id = record.get("record_id") or job_token
+    terminated = record.get("terminated", "true" if RE_TERMINATED.search(raw_text) else "false")
+    job_state = record.get("status") or ("in_flight" if log is None else "log_without_payload")
+    # 单点作业没有可收敛的极小点：opt_converged / n_freq / g_single 一律留空，不补数。
+    return {
+        "job_id": "wp3recheck/%s" % record_id,
+        "cohort": "wp3_recheck",
+        "mol_id": (record.get("mol_id", "")
+                   or NAME_TO_MOL_ID.get(record.get("name") or mol_token, "")),
+        "name": record.get("name") or mol_token,
+        "state": record.get("state") or job_token,
+        "setting_id": record.get("setting_id", ""),
+        "charge": record.get("charge", ""), "multiplicity": record.get("multiplicity", ""),
+        "job_state": job_state,
+        "archive_location": "outside-repo: work/recheck/%s/" % job_token,
+        "engine": "ORCA", "engine_version": version,
+        "input_path": input_path, "input_sha256": input_sha, "input_bytes": input_bytes,
+        "start_geometry_path": start_path, "start_geometry_sha256": start_sha,
+        "final_geometry_path": "", "final_geometry_sha256": "",
+        "raw_output_path": log_path, "raw_output_sha256": log_sha, "raw_output_bytes": log_bytes,
+        "orca_keyword": keyword, "orca_version": version,
+        "final_sp_eh": record.get("energy_eh", "") if job_state == "computed" else "",
+        "g_single_eh": "", "n_freq": "", "imaginary_modes": "", "lowest_freq_cm1": "",
+        "opt_converged": "", "terminated": terminated,
+        "failure_reason": classify_failure(job_state, terminated, log is not None, raw_text),
+        "n_files_hashed": str(sum(1 for value in (input_sha, start_sha, log_sha) if value)),
+        "retrieval_note": ARCHIVE_NOTE,
+    }
+
 def sampling_energy_agreement(rows, cache):
     """采样作业 log 末次 energy 与聚合缓存的对应行是否一致；返回 (比较数, 最大偏差)。"""
     n_agree = 0
@@ -507,6 +562,13 @@ def derived_map(rows):
                     "job_id": row["job_id"], "cohort": row["cohort"],
                     "evidence_kind": "opt+numfreq 账本行与 QC 由该作业的 .log 解析得到",
                 })
+        elif row["cohort"] == "wp3_recheck":
+            mapping.append({
+                "derived_artifact": RECHECK_DERIVED,
+                "derived_row_key": row["job_id"].rsplit("/", 1)[-1],
+                "job_id": row["job_id"], "cohort": row["cohort"],
+                "evidence_kind": "第二泛函单点能量由该作业 .log 的 FINAL SINGLE POINT ENERGY 解析得到（冻结几何、不重优化）",
+            })
         else:
             artifact = (RELAXED_DERIVED if row["state"].endswith("_relaxed") else AUDIT_DERIVED)
             mapping.append({
@@ -613,6 +675,7 @@ def build():
     cache, cache_rows = sampling_cache()
     rows = [build_row(*job) for job in scan_production() + scan_audit()]
     rows += [build_prep_row(*job) for job in scan_geometry_prep()]
+    rows += [build_recheck_row(*job) for job in scan_recheck()]
     rows += [build_sampling_row(*job, cache) for job in scan_sampling()]
     rows.sort(key=lambda row: (row["cohort"], row["job_id"]))
     mapping = derived_map(rows)
@@ -640,7 +703,8 @@ def build():
     index = {
         "scope": ("per-job provenance for every local electronic-structure job registered by the "
                   "WP1 method audit (ORCA), the WP1 EMC-Li geometry preparation (ORCA), the WP2 "
-                  "production segment (ORCA) and the section 6.1 "
+                  "production segment (ORCA), the WP3 targeted second-functional re-check single "
+                  "points at frozen production geometries (ORCA) and the section 6.1 "
                   "gas-phase GFN2-xTB conformer screen of DMC / EMC / GBL / SL; raw outputs stay "
                   "outside the repository"),
         "totals": {"jobs": len(rows), "mappings": len(mapping),
@@ -713,6 +777,9 @@ def build():
         "`orca_keyword` / `orca_version` 只对 ORCA cohort 有值。",
         "* `n_files_hashed`：本行登记的 sha256 个数（ORCA 行最多 4 个：inp / 起始几何 / 最终几何 / 原始输出；"
         "采样行 3 个：起始几何 / 优化几何 / xtbopt.log）。",
+        "* `wp3_recheck` 行：方案 11 的靶向第二泛函单点，起始几何是冻结的生产 Opt 几何；"
+        "单点不产生新几何（`final_geometry_path` 为空），`final_sp_eh` 与 "
+        "`pair_evidence/targeted_recheck/recheck_results.csv` 的 `energy_eh` 同源。",
         "* 采样 cohort 每行对应一个 ETKDG 起点目录；聚合缓存 `work/sampling/xtb_results.csv` "
         "的 sha256 记在 `provenance_index.json` 的 `raw_cache`。",
         "* 派生 CSV 的 `--check` 只证明内部一致；**原始日志的 sha256 才是外部可复核的证据**。",

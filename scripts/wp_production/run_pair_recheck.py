@@ -11,8 +11,9 @@
 
 写（全部在仓库外 work/recheck/，不入交付镜像，与既有边界一致）
 --
-* work/recheck/<record_id>/geom.xyz / .inp / .log   单点作业现场
-* work/recheck/<record_id>.json                     结果行（能量 / 几何哈希 / wall / cores / QC）
+* work/recheck/<record_id>/geom.xyz / .inp / .log / <record_id>.json
+      单点作业现场与结果行（能量 / 几何哈希 / wall / cores / QC）；载荷与作业同目录，
+      让 provenance 能按目录结构把每个复核作业统一登记（见 build_compute_provenance.py 的 wp3_recheck）
 
 纪律
 ----
@@ -83,7 +84,13 @@ def run_one(row, charge_mult, force):
         raise SystemExit("闭环表里没有 %s|%s 的电荷/自旋登记" % key)
     charge, mult = charge_mult[key]
     directory = OUT / record_id.replace("|", "__")
-    payload_path = OUT / (record_id.replace("|", "__") + ".json")
+    payload_path = directory / (record_id.replace("|", "__") + ".json")
+    # 早期版本把载荷平铺在 work/recheck/<record>.json。provenance 靠目录结构分类，这里把
+    # 遗留的平铺载荷原地迁移进作业目录，保持「作业目录 = 单一真相源」，不改任何数值。
+    legacy_payload = OUT / (record_id.replace("|", "__") + ".json")
+    if legacy_payload.is_file() and not payload_path.is_file():
+        directory.mkdir(parents=True, exist_ok=True)
+        legacy_payload.replace(payload_path)
     if payload_path.exists() and not force:
         existing = json.loads(payload_path.read_text(encoding="utf-8"))
         if existing.get("status") == "computed":

@@ -55,7 +55,8 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `run_method_audit.py` | WP1 的 128 单点 / 32 弛豫腿本机方法审计驱动 |
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息（写 `work/_wp2_commit_msg.txt`） |
 | `finalize_wp2.ps1` | 上面那条一键收口链 |
-| `supervise_pending.ps1` | 无人值守监守：单实例锁 + 等其它驱动退出后调 `run_wp2_queue.py --run`（最多 3 轮），队列结束后再调 `run_to_closure.py --commit` 把结果折进交付层 |
+| `supervise_pending.ps1` | 无人值守监守：单实例锁 + **每轮开跑前**都等其它驱动退出后调 `run_wp2_queue.py --run`，队列结束后再调 `run_to_closure.py --commit` 把结果折进交付层。轮次不是固定的：只要已 computed 的腿数在涨就继续下一轮，只有**连续 `-MaxStalledRounds`（默认 3）轮毫无进展**才停；结束时若仍有腿未 computed，日志写 `INCOMPLETE` 并返回 3（重新拉起即可继续）。旧版固定跑 3 轮就退出删锁，一轮里撞上 smpd 刚死的窗口就会让闭环静默停在半路 |
+| `supervisor_policy.py` | 上面那条收敛判据（纯函数，有单测）：`--computed-count` 按队列自己的 `inventory()` 口径数已 computed 的腿，`--decide` 判断该继续 / 完成 / 因停摆或轮数上限而停。把判据从 `.ps1` 的分支里拿出来，是为了它可被测试钉住——写错就会让闭环关不上 |
 | `watch_smpd.ps1` | 轻量 smpd 看护（常驻、约 0 CPU）：每 `-IntervalSeconds`（默认 300）检查 Microsoft MPI 的 smpd，缺失就拉起，日志写 `work/_smpd_watch.log`。用途是兜住**已在跑的**旧驱动——它们没有队列的逐次复查，smpd 一死就会级联秒败；停止：`Get-CimInstance Win32_Process | Where-Object CommandLine -like '*watch_smpd*'` 取 PID 后 `Stop-Process` |
 | `archive_raw_outputs.py` | 把 provenance 里登记的原始作业文件打成**确定性、可复核的 zip 归档**（`--build` 生成，默认落在仓库外 `_compute_archive/`；`--check <zip>` 逐条复算 sha256） |
 | `verify_archive.py` | 归档的**可重新解析性**核验：拿归档里的原始日志按仓库口径重算登记值，与该作业在 `job_archive_manifest.csv` 里的值逐字段比对；`--ledger` 再用同一份归档重算交付账本 `production_ledger.csv` 的数值列。缺条目 / sha256 不符 / 数值不符都算失败（退出码 1），`--limit N` 调试、`--strict` 把「算不出来」也算失败。生产在跑期间归档必然落后于 manifest，报的是「登记晚于归档」的预期漂移；队列停掉后重建归档再跑才应回到 0 |
