@@ -120,6 +120,7 @@ def test_layout_doc_names_the_reproduction_evidence_chain():
                   "derived_to_job_map.csv",
                   "provenance_acceptance.csv",
                   "provenance_index.json",
+                  "leg_reconciliation.csv",
                   "outputs/physics_completion/pair_evidence/targeted_recheck/",
                   "recheck_results.csv",
                   "work/recheck/",

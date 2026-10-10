@@ -63,6 +63,17 @@ RELAXED_DERIVED = "outputs/physics_completion/method_audit/relaxed_leg_matrix.cs
 PRODUCTION_DERIVED = "outputs/physics_completion/free_states/production_ledger.csv"
 RECHECK_DERIVED = "outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv"
 
+#: 四分子四态的 20 条腿（4 个主态 + 1 条基组一致中性腿）。与 build_wp2_closure.py 的四态口径同源，
+#: 是「提交前先核对正在运行 / 已完成但未入库的作业，避免重复计算」这条纪律的对象集合。
+FOUR_MOLECULES = (("C01", "DMC"), ("C02", "EMC"), ("C13", "GBL"), ("C14", "SL"))
+MAIN_STATES = ("M", "M_plus", "LiM_plus", "LiM_2plus")
+EXTRA_STATE = "M_tzvpd"
+
+LEG_FIELDS = ("leg_id", "mol_id", "name", "state", "manifest_job_id", "classification",
+              "input_on_disk", "raw_output_on_disk", "log_terminated", "final_geometry_on_disk",
+              "registered_job_state", "duplicate_work_risk", "note")
+
+
 #: 每张派生表用哪几列拼出 derived_row_key，用来验证映射行真的存在。
 DERIVED_KEY_COLUMNS = {
     AUDIT_DERIVED: ("mol_id", "state", "setting_id"),
@@ -407,6 +418,53 @@ def build_recheck_row(mol_token, job_token, directory):
         "retrieval_note": ARCHIVE_NOTE,
     }
 
+def leg_reconciliation(rows, root=None):
+    """四分子 20 条腿：把「清单登记了哪些作业」与「磁盘上到底有什么」对起来。
+
+    只登记事实，不推断物理：某条腿在 ``work/wp2prod/<NAME>/<STATE>/`` 下有没有 .inp / .log /
+    ``*_opt.xyz``，以及清单里有没有它的作业行。``duplicate_work_risk=true`` 是本表唯一的告警，
+    只在「磁盘上已有 ORCA 正常结束的原始输出，而清单里没有对应的 computed 作业行」时出现——
+    那正是重复计算的入口。``not_started`` 不是失败，只是这条腿还没排上。
+    """
+    by_job = {row["job_id"]: row for row in rows if row["cohort"] == "wp2_production"}
+    base = WP2PROD if root is None else root
+    legs = []
+    for mol_id, name in FOUR_MOLECULES:
+        for state in list(MAIN_STATES) + [EXTRA_STATE]:
+            directory = base / name / state
+            job_id = "wp2prod/%s/%s" % (name, state)
+            registered = by_job.get(job_id)
+            inp = pick(directory, "*.inp") if directory.is_dir() else None
+            log = pick(directory, "*.log") if directory.is_dir() else None
+            final = pick(directory, "*_opt.xyz") if directory.is_dir() else None
+            terminated = False
+            if log is not None:
+                terminated = bool(RE_TERMINATED.search(log.read_text(encoding="utf-8", errors="replace")))
+            job_state = registered["job_state"] if registered is not None else ""
+            if registered is not None:
+                classification = job_state
+            elif terminated:
+                classification = "unregistered_run_on_disk"
+            elif inp is not None:
+                classification = "input_without_registration"
+            else:
+                classification = "not_started"
+            risk = terminated and job_state != "computed"
+            legs.append({
+                "leg_id": "%s|%s" % (name, state), "mol_id": mol_id, "name": name, "state": state,
+                "manifest_job_id": job_id if registered is not None else "",
+                "classification": classification,
+                "input_on_disk": "true" if inp is not None else "false",
+                "raw_output_on_disk": "true" if log is not None else "false",
+                "log_terminated": "true" if terminated else "false",
+                "final_geometry_on_disk": "true" if final is not None else "false",
+                "registered_job_state": job_state,
+                "duplicate_work_risk": "true" if risk else "false",
+                "note": ("a finished raw output exists on disk but the manifest has no computed job row "
+                         "for this leg; re-running it would duplicate work") if risk else "",
+            })
+    return legs
+
 def sampling_energy_agreement(rows, cache):
     """采样作业 log 末次 energy 与聚合缓存的对应行是否一致；返回 (比较数, 最大偏差)。"""
     n_agree = 0
@@ -580,7 +638,7 @@ def derived_map(rows):
     return mapping
 
 
-def acceptance(rows, mapping, cache, pools):
+def acceptance(rows, mapping, cache, pools, legs):
     orca = [row for row in rows if row["cohort"] != "wp2_sampling"]
     sampling = [row for row in rows if row["cohort"] == "wp2_sampling"]
     checks = []
@@ -662,6 +720,24 @@ def acceptance(rows, mapping, cache, pools):
         "ok": str(no_absolute).lower(),
         "detail": "checked %d non-empty raw_output_path values" % len(have_log),
     })
+    classified = [row["classification"] for row in legs]
+    risky = [row for row in legs if row["duplicate_work_risk"] == "true"]
+    on_disk = [row for row in legs if row["classification"] != "not_started"]
+    checks.append({
+        "check_id": "every_four_molecule_leg_is_classified_exactly_once",
+        "description": "DMC / EMC / GBL / SL 的 20 条腿（4 主态 + 基组一致中性腿）逐条登记，不重不漏",
+        "ok": str(len(legs) == 20 and len({row["leg_id"] for row in legs}) == 20).lower(),
+        "detail": "%d legs; %s" % (len(legs), ", ".join(sorted(set(classified)))),
+    })
+    checks.append({
+        "check_id": "no_finished_orca_run_is_missing_from_the_manifest",
+        "description": "凡磁盘上已有 ORCA 正常结束的原始输出，清单里就必须有该腿的 computed 作业行；"
+                       "否则重新排这条腿就是重复计算",
+        "ok": str(not risky).lower(),
+        "detail": "%d legs on disk, %d duplicate-work risks%s" % (
+            len(on_disk), len(risky),
+            "" if not risky else "; first: " + risky[0]["leg_id"]),
+    })
     return checks
 
 
@@ -679,7 +755,8 @@ def build():
     rows += [build_sampling_row(*job, cache) for job in scan_sampling()]
     rows.sort(key=lambda row: (row["cohort"], row["job_id"]))
     mapping = derived_map(rows)
-    checks = acceptance(rows, mapping, cache, pools)
+    legs = leg_reconciliation(rows)
+    checks = acceptance(rows, mapping, cache, pools, legs)
 
     evidence = []
     for row in rows:
@@ -722,6 +799,16 @@ def build():
                                    "input / start geometry / final geometry / raw output; "
                                    "recompute this after extracting an independent archive"),
         "by_cohort": by_cohort,
+        "leg_reconciliation": {
+            "legs": len(legs),
+            "on_disk": sum(1 for row in legs if row["classification"] != "not_started"),
+            "by_classification": {label: sum(1 for row in legs if row["classification"] == label)
+                                  for label in sorted({row["classification"] for row in legs})},
+            "duplicate_work_risk": [row["leg_id"] for row in legs
+                                    if row["duplicate_work_risk"] == "true"],
+            "note": ("a leg whose raw ORCA output already terminated on disk must not be re-queued; "
+                     "the table is rebuilt from the work tree, so it moves with production"),
+        },
         "archive_policy": ("raw ORCA logs are not mirrored; the manifest records repository-relative "
                            "logical locations plus sha256 so an independent archive can be verified"),
         "checks": checks,
@@ -745,6 +832,22 @@ def build():
         entry = by_cohort[cohort]
         md.append("| %s | %d | %d | %d |" % (cohort, entry["jobs"], entry["with_log"],
                                              entry["terminated"]))
+    md += [
+        "",
+        "## 四分子 20 条腿现场核对",
+        "",
+        "> 把「清单登记了哪些作业」与 `work/wp2prod/<NAME>/<STATE>/` 的磁盘事实对起来；"
+        "`not_started` 不是失败，只是这条腿还没排上。",
+        "`duplicate_work_risk=true` 是本表唯一的告警：磁盘上已有正常结束的原始输出、",
+        "清单里却没有对应的 computed 作业行，重新排队就等于重复计算。",
+        "",
+        "| 腿 | 分类 | 磁盘原始输出 | 正常结束 | 重复风险 |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for row in legs:
+        md.append("| %s | %s | %s | %s | %s |" % (row["leg_id"], row["classification"],
+                                                 row["raw_output_on_disk"], row["log_terminated"],
+                                                 row["duplicate_work_risk"]))
     failed_jobs = [row for row in rows if row["job_state"] == "failed"]
     if failed_jobs:
         md += [
@@ -794,6 +897,8 @@ def build():
         "outputs/physics_completion/provenance/provenance_acceptance.csv":
             csv_text(ACC_FIELDS, checks),
         "outputs/physics_completion/provenance/provenance_summary.md": "\n".join(md),
+        "outputs/physics_completion/provenance/leg_reconciliation.csv":
+            csv_text(LEG_FIELDS, legs),
     }
 
 

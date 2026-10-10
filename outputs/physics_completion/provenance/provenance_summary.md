@@ -14,6 +14,35 @@
 | wp2_sampling | 640 | 640 | 640 |
 | wp3_recheck | 12 | 12 | 12 |
 
+## 四分子 20 条腿现场核对
+
+> 把「清单登记了哪些作业」与 `work/wp2prod/<NAME>/<STATE>/` 的磁盘事实对起来；`not_started` 不是失败，只是这条腿还没排上。
+`duplicate_work_risk=true` 是本表唯一的告警：磁盘上已有正常结束的原始输出、
+清单里却没有对应的 computed 作业行，重新排队就等于重复计算。
+
+| 腿 | 分类 | 磁盘原始输出 | 正常结束 | 重复风险 |
+| --- | --- | --- | --- | --- |
+| DMC|M | computed | true | true | false |
+| DMC|M_plus | computed | true | true | false |
+| DMC|LiM_plus | computed | true | true | false |
+| DMC|LiM_2plus | in_flight | false | false | false |
+| DMC|M_tzvpd | not_started | false | false | false |
+| EMC|M | computed | true | true | false |
+| EMC|M_plus | computed | true | true | false |
+| EMC|LiM_plus | failed | true | false | false |
+| EMC|LiM_2plus | failed | true | false | false |
+| EMC|M_tzvpd | not_started | false | false | false |
+| GBL|M | computed | true | true | false |
+| GBL|M_plus | computed | true | true | false |
+| GBL|LiM_plus | in_flight | false | false | false |
+| GBL|LiM_2plus | not_started | false | false | false |
+| GBL|M_tzvpd | computed | true | true | false |
+| SL|M | computed | true | true | false |
+| SL|M_plus | computed | true | true | false |
+| SL|LiM_plus | failed | true | false | false |
+| SL|LiM_2plus | failed | true | false | false |
+| SL|M_tzvpd | not_started | false | false | false |
+
 ## 未正常结束的作业
 
 | job_id | state | failure_reason |

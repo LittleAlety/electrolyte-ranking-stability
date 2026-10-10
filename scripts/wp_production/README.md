@@ -62,7 +62,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `verify_archive.py` | 归档的**可重新解析性**核验：拿归档里的原始日志按仓库口径重算登记值，与该作业在 `job_archive_manifest.csv` 里的值逐字段比对；`--ledger` 再用同一份归档重算交付账本 `production_ledger.csv` 的数值列。缺条目 / sha256 不符 / 数值不符都算失败（退出码 1），`--limit N` 调试、`--strict` 把「算不出来」也算失败。生产在跑期间归档必然落后于 manifest，报的是「登记晚于归档」的预期漂移；队列停掉后重建归档再跑才应回到 0 |
 | `build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |
 | `build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
-| `build_compute_provenance.py` | 逐作业复现证据清单 + 从各自 `.log` 推导的 `failure_reason`（派生层） |
+| `build_compute_provenance.py` | 逐作业复现证据清单 + 从各自 `.log` 推导的 `failure_reason`，外加**四分子 20 条腿现场核对** `leg_reconciliation.csv`（登记 vs 磁盘事实；`duplicate_work_risk` 是唯一告警）（派生层） |
 | `build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） |
 | `build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的结果前预注册计划。预注册层（规则 / 对象 / 设定 / 几何来源 / 预算）零新增计算；复核跑完后只**读** `recheck_results.csv`、现算逐 (pair, 设定) 的 delta，并登记结果层与实测成本行 |
 | `run_pair_recheck.py` | 靶向复核**执行器**：在已登记的生产 Opt 几何上跑 S3/S4 单点（不重优化、不算频率），串行、每作业 2 核；原始现场落仓库外 `work/recheck/` |
@@ -76,7 +76,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 * **原始 ORCA/xTB 输出不入库**：留在仓库外 `work/`（生产为 `work/wp2prod/`，审计为 `work/audit/`，
   队列的原始 stdout 为 `work/wp2prod/_queue_<NAME>_<STATE>.out`）。交付镜像里只有派生的
   CSV/JSON；派生数值与原始日志的对应关系见
-  `outputs/physics_completion/provenance/job_archive_manifest.csv`。需要独立取得原始日志时，用 `archive_raw_outputs.py --build` 生成确定性 zip 归档（默认落在仓库外 `_compute_archive/`），`--check` 逐条复算 sha256，`verify_archive.py [--ledger]` 再拿归档里的原始日志按仓库口径**重算**登记值（`job_archive_manifest.csv` 与交付账本 `production_ledger.csv`）。当前归档 **817 作业 / 2464 文件 / 29.1 MB → 8.8 MB**，`--check` 与 `verify_archive.py --ledger` 均 0 不符；规模随队列推进增长——生产在跑期间归档必然落后于 manifest，队列停掉后要重建归档再核验。
+  `outputs/physics_completion/provenance/job_archive_manifest.csv`。需要独立取得原始日志时，用 `archive_raw_outputs.py --build` 生成确定性 zip 归档（默认落在仓库外 `_compute_archive/`），`--check` 逐条复算 sha256，`verify_archive.py [--ledger]` 再拿归档里的原始日志按仓库口径**重算**登记值（`job_archive_manifest.csv` 与交付账本 `production_ledger.csv`）。当前归档 **829 作业 / 2500 文件 / 30.0 MB → 9.1 MB**，`--check` 与 `verify_archive.py --ledger` 均 0 不符；规模随队列推进增长——生产在跑期间归档必然落后于 manifest，队列停掉后要重建归档再核验。
 * **生成器是派生物**：`scripts/build_physics_completion_batch.py` 由 `emit_wp2.py` 从
   「最近的未打补丁基线 + 补丁块」确定性重打；手工改它会失效。基线缓存在 `work/pilot12/gen_baseline.py`。
 * **`work/pilot12/` 只是暂存区**：`run_batch.py` 的原始输出与生成器基线缓存仍落在那里；

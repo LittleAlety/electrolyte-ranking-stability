@@ -166,6 +166,9 @@ anchors → emit-wp2 → generator → closure → provenance → sampling → l
   - `derived_to_job_map.csv`：**派生值 → 作业 ID** 的映射（交付层每个数字该由哪个作业解释）。
   - `provenance_acceptance.csv`：证据链自检（缺文件 / 哈希不符 / 字段缺失）。
   - `provenance_index.json`：上述三者的机器可读索引；`provenance_summary.md` 是人读摘要。
+  - `leg_reconciliation.csv`：**四分子 20 条腿的现场核对**——把「清单登记了哪些作业」与 `work/wp2prod/` 的磁盘事实对上；
+    `duplicate_work_risk=true` 是唯一告警（磁盘上已有正常结束的原始输出、清单却没有 computed 作业行 = 重复计算的入口）。
+    这条把方案第 1 步「提交前先核对正在运行 / 已完成未入库的作业」钉成可复核的检查。
 - `outputs/physics_completion/pair_evidence/targeted_recheck/`
   - `recheck_results.csv`：第二泛函（S3/S4）靶向复核**原始层**结果，逐行带几何 sha256。
   - `job_plan.csv`、`selection_rule.json`、`selection_rule.md`：跑之前冻结的预注册层（对象、设定、几何来源、预算、选择规则）。

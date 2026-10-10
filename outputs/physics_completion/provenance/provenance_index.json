@@ -44,6 +44,18 @@
       "terminated": 12
     }
   },
+  "leg_reconciliation": {
+    "legs": 20,
+    "on_disk": 16,
+    "by_classification": {
+      "computed": 10,
+      "failed": 4,
+      "in_flight": 2,
+      "not_started": 4
+    },
+    "duplicate_work_risk": [],
+    "note": "a leg whose raw ORCA output already terminated on disk must not be re-queued; the table is rebuilt from the work tree, so it moves with production"
+  },
   "archive_policy": "raw ORCA logs are not mirrored; the manifest records repository-relative logical locations plus sha256 so an independent archive can be verified",
   "checks": [
     {
@@ -105,8 +117,20 @@
       "description": "清单里的路径是仓库相对形状，可移植",
       "ok": "true",
       "detail": "checked 827 non-empty raw_output_path values"
+    },
+    {
+      "check_id": "every_four_molecule_leg_is_classified_exactly_once",
+      "description": "DMC / EMC / GBL / SL 的 20 条腿（4 主态 + 基组一致中性腿）逐条登记，不重不漏",
+      "ok": "true",
+      "detail": "20 legs; computed, failed, in_flight, not_started"
+    },
+    {
+      "check_id": "no_finished_orca_run_is_missing_from_the_manifest",
+      "description": "凡磁盘上已有 ORCA 正常结束的原始输出，清单里就必须有该腿的 computed 作业行；否则重新排这条腿就是重复计算",
+      "ok": "true",
+      "detail": "16 legs on disk, 0 duplicate-work risks"
     }
   ],
-  "n_checks": 10,
+  "n_checks": 12,
   "n_failed": 0
 }
