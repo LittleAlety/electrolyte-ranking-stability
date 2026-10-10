@@ -1,6 +1,18 @@
 {
   "scope": "plan 5.3 / 11 targeted second-functional re-check of the certified pair inversions (zero new geometry, zero new frequency, zero new electronic structure so far)",
   "registered_before_any_recheck_sp": true,
+  "cost_items": {
+    "registered_budget_item": "targeted_pair_second_method_single_points",
+    "measured_item": "targeted_pair_second_method_single_points_computed"
+  },
+  "results": {
+    "registered_single_points": 12,
+    "computed_single_points": 12,
+    "measured_core_hours": 0.692245,
+    "raw_layer": "outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv",
+    "derived_layer": "outputs/physics_completion/pair_evidence/targeted_recheck/recheck_pair_gaps.csv",
+    "raw_orca_outputs": "work/recheck/ (outside the repository and outside the delivery mirror, as for every other job)"
+  },
   "frozen_inputs": {
     "method_settings": "outputs/physics_completion/method_audit/method_settings.csv",
     "certification": "outputs/physics_completion/method_audit/robust_inversion_certification.json",
@@ -77,13 +89,13 @@
     "adding or dropping rows by outcome",
     "re-running the whole 128 single-point method-audit matrix"
   ],
-  "status": "registered_not_started",
+  "status": "results_registered",
   "checks": [
     {
       "check_id": "registered_before_any_recheck_sp",
-      "description": "规则与作业计划在任何一个复核单点跑出结果之前登记，计划里没有任何已完成状态",
+      "description": "规则与作业计划在结果产生前登记：计划表只登记几何来源，不含任何结果列",
       "ok": true,
-      "detail": "status only takes ready / blocked_on_production_leg; 24 planned, 0 run"
+      "detail": "plan rows 24 (ready 12 / blocked 12); result columns in the job plan: none; registered single points live in recheck_results.csv: 12"
     },
     {
       "check_id": "scope_is_exactly_the_certified_pairs",
@@ -134,12 +146,36 @@
       "detail": "result-bearing columns: none"
     },
     {
-      "check_id": "budget_row_in_cost_ledger_still_planned",
-      "description": "方案 11 的该预算行仍是 planned，说明复核尚未开始",
+      "check_id": "results_cover_exactly_the_ready_rows",
+      "description": "结果表恰好覆盖计划里 ready 的那些行，blocked 的行一条结果都没有",
       "ok": true,
-      "detail": "targeted_pair_second_method_single_points status=planned"
+      "detail": "ready 12, registered 12, blocked rows carrying a result 0"
+    },
+    {
+      "check_id": "results_are_the_frozen_second_functional_on_the_registered_geometry",
+      "description": "每条结果都是 S3/S4 的冻结第二泛函，且几何哈希对应当前已登记的生产 Opt 几何",
+      "ok": true,
+      "detail": "12 rows; settings S3, S4; functional/basis match method_settings.csv row by row"
+    },
+    {
+      "check_id": "derived_pair_gaps_are_basis_consistent_and_recomputed",
+      "description": "逐 (pair, 设定) 的 delta 由已登记能量现算，且每一侧两条腿基组一致",
+      "ok": true,
+      "detail": "EMC | GBL|S3 delta=0.481920 eV (positive); EMC | GBL|S4 delta=0.474608 eV (positive); EMC | SL|S3 delta=0.389983 eV (positive); EMC | SL|S4 delta=0.376190 eV (positive)"
+    },
+    {
+      "check_id": "budget_row_in_cost_ledger_still_planned",
+      "description": "方案 11 的预算行保持预注册的 planned（不为结果改写预注册），实测另立一行",
+      "ok": true,
+      "detail": "targeted_pair_second_method_single_points status=planned value=16-32"
+    },
+    {
+      "check_id": "measured_cost_row_matches_the_registered_results",
+      "description": "实测成本行与已登记结果一致：数额等于已登记单点数，core-hours 由结果表加总而来",
+      "ok": true,
+      "detail": "targeted_pair_second_method_single_points_computed value=12 status=measured; registered computed=12, measured core-hours=0.692245"
     }
   ],
-  "n_checks": 10,
+  "n_checks": 14,
   "n_failed": 0
 }

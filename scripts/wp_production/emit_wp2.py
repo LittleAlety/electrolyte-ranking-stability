@@ -510,7 +510,7 @@ ANCHOR_WP5_AL_CONVENTION = '            "al_protocol": "12-label pool replay; in
 WP5_AL_CONVENTION_BLOCK = '            "al_protocol": replay_pool_note,\n'
 
 ANCHOR_TARGETED_COST_NOTE = '    {"item": "targeted_pair_second_method_single_points", "unit": "SP", "value": "16-32", "kind": "planned",\n     "status": "planned", "note": "explicit selection rule; targeted re-check"},\n'
-TARGETED_COST_NOTE_BLOCK = '    {"item": "targeted_pair_second_method_single_points", "unit": "SP", "value": "16-32", "kind": "planned",\n     "status": "planned", "note": "explicit selection rule registered before any result; 24 single points (3 molecules x 4 main states x the two second-functional settings) planned in outputs/physics_completion/pair_evidence/targeted_recheck/"},\n'
+TARGETED_COST_NOTE_BLOCK = '    {"item": "targeted_pair_second_method_single_points", "unit": "SP", "value": "16-32", "kind": "planned",\n     "status": "planned", "note": "explicit selection rule registered before any result; 24 single points (3 molecules x 4 main states x the two second-functional settings) planned in outputs/physics_completion/pair_evidence/targeted_recheck/"},\n    {"item": "targeted_pair_second_method_single_points_computed", "unit": "SP", "value": "12", "kind": "measured",\n     "status": "measured", "note": "the 12 ready single points (3 molecules x the two free states M / M_plus x the two second-functional settings) ran at 2 cores each, serial, 0.692 core-hours in total; the other 12 stay blocked on their Li production legs; the registered table is outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv and the raw ORCA outputs stay in work/recheck/"},\n'
 
 def load_rows():
     rows = []

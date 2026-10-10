@@ -14,7 +14,7 @@
 
 - `delta_vs_direct.csv`：24 格，其中 shift 在 tau_b 上更好 **15** 格。
 - `success_budget.csv`：24 行 / 6 个 (task,axis) 场景；`budget_to_threshold.csv` 24 行。
-- 成本账本：9 项相对预算；**3 项绝对成本缺字段（MISSING）**，故只给相对预算、不给金额。
+- 成本账本：10 项相对预算；**3 项绝对成本缺字段（MISSING）**，故只给相对预算、不给金额。
 - 冻结族口径（方案 9.1）：把既有 stage7 复算表（288 行）限制到 ridge/krr/gpr，逐格对比选型；全模型最优落在族外（gbdt/rf/constant）的格子：tau 21/48、MAE 26/48 —— 这些格子只作旁证。
 
 ## 验收（8/8 通过）

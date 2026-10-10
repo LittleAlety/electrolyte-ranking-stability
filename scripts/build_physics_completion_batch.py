@@ -3325,6 +3325,8 @@ COST_LEDGER = [
      "status": "planned", "note": "4 molecules x 4 states x 3 extra structures, deduplicated where possible"},
     {"item": "targeted_pair_second_method_single_points", "unit": "SP", "value": "16-32", "kind": "planned",
      "status": "planned", "note": "explicit selection rule registered before any result; 24 single points (3 molecules x 4 main states x the two second-functional settings) planned in outputs/physics_completion/pair_evidence/targeted_recheck/"},
+    {"item": "targeted_pair_second_method_single_points_computed", "unit": "SP", "value": "12", "kind": "measured",
+     "status": "measured", "note": "the 12 ready single points (3 molecules x the two free states M / M_plus x the two second-functional settings) ran at 2 cores each, serial, 0.692 core-hours in total; the other 12 stay blocked on their Li production legs; the registered table is outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv and the raw ORCA outputs stay in work/recheck/"},
     {"item": "cpu_core_hours", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
      "note": "allocated core-hours are recorded per job in the production / audit / pilot cost ledgers; "
              "this project-level scalar stays empty until the four-molecule loop closes"},
