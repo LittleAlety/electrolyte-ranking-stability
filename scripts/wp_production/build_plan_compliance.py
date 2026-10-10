@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import csv
 import io
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -41,6 +42,7 @@ PLAN_SECTIONS = {
     "11": "§11 停止规则",
     "12": "§12 时间安排与阶段验收",
     "13": "§13 推荐仓库落点",
+    "14": "§14 最终图与论文主线",
 }
 
 MAIN_STATES = ("M", "M_plus", "LiM_plus", "LiM_2plus")
@@ -63,6 +65,24 @@ def n_true(rows):
 
 def count(rows, pred):
     return sum(1 for r in rows if pred(r))
+
+
+def find_token(root, token, suffixes=(".csv", ".md", ".json")):
+    """在 root 下按文件名与文本找 token，找不到返回 None（用于「这个产物到底有没有」的现算）。"""
+    if not root.is_dir():
+        return None
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in suffixes:
+            continue
+        if token in path.name.lower():
+            return path
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if token in text.lower():
+            return path
+    return None
 
 
 def item(item_id, section, requirement, status, measured, evidence, note=""):
@@ -159,6 +179,27 @@ def build_rows():
         "按「宁欠不过」记 partial，不把「事实上一直这么用」当成「已冻结并登记」。",
     ))
 
+    echo = read_rows("outputs/physics_completion/method_audit/local_method_echo.csv")
+    smoke = read_rows("outputs/physics_completion/method_audit/local_smoke_runs.csv")
+    toolchain = read_rows("outputs/physics_completion/method_audit/local_toolchain.csv")
+    echo_ok = count(echo, lambda r: str(r.get("recognized", "")).lower() == "true")
+    smoke_ok = count(smoke, lambda r: str(r.get("terminated_normally", "")).lower() == "true")
+    kw_rejected = count(echo, lambda r: r.get("plan_keyword_status") == "rejected_as_written")
+    probe_ok = bool(toolchain) and bool(echo) and echo_ok == len(echo) and smoke_ok == len(smoke)
+    out.append(item(
+        "wp1_toolchain_supportability_probe", "5",
+        "§5.1/§15.4 先用本机帮助、方法回显与中性/带电 smoke run 确认支持性",
+        "satisfied" if probe_ok else ("partial" if (echo or smoke) else "not_satisfied"),
+        "toolchain=%d echo_recognized=%d/%d smoke_terminated=%d/%d plan_keyword_rejected=%d"
+        % (len(toolchain), echo_ok, len(echo), smoke_ok, len(smoke), kw_rejected),
+        "outputs/physics_completion/method_audit/local_toolchain.csv; "
+        "outputs/physics_completion/method_audit/local_method_echo.csv; "
+        "outputs/physics_completion/method_audit/local_smoke_runs.csv",
+        "本机 ORCA 6.1.1 对四个设定全部 recognized，四条 smoke run 全部 terminated_normally；"
+        "但规划里的关键词 omegaB97X-D4 被 ORCA 拒收（plan_keyword_status=rejected_as_written），"
+        "实跑用的是容器回显名 wB97X-D4 / PBE0 D4 —— 这条偏差显式登记，不是静默替换。",
+    ))
+
     # ---------------- §6 WP2 ----------------
     states = read_rows("outputs/physics_completion/closure/four_molecule_state_closure.csv")
     produced = [r for r in states if r.get("register_status") == PRODUCED]
@@ -172,6 +213,10 @@ def build_rows():
     li_pair_ok = sum(1 for d in bymol.values() if all(d.get(s) for s in LI_STATES))
     li_legs_done = count(produced, lambda r: r.get("state") in LI_STATES)
     conformers = sorted({r.get("n_conformers", "") for r in produced if r.get("n_conformers")})
+    recon = read_rows("outputs/physics_completion/provenance/leg_reconciliation.csv")
+    failed_legs = [r.get("leg_id", "") for r in recon if r.get("classification") == "failed"]
+    flight_legs = [r.get("leg_id", "") for r in recon if r.get("classification") == "in_flight"]
+    nostart_legs = [r.get("leg_id", "") for r in recon if r.get("classification") == "not_started"]
     out.append(item(
         "wp2_production_state_ledger", "6",
         "四分子 x 四主态（另加基组一致中性腿）的真实 Opt+NumFreq 登记",
@@ -179,7 +224,11 @@ def build_rows():
             "satisfied" if produced else "not_satisfied"),
         "produced=%d total=%d molecules=%d" % (len(produced), len(states), n_mol),
         "outputs/physics_completion/closure/four_molecule_state_closure.csv",
-        "未产出的腿以 planned 显式登记；缺值留空，绝不补成 0。",
+        "未产出的腿以 planned 显式登记；缺值留空，绝不补成 0。"
+        "但闭环表不区分「还没排上」与「跑过但失败」：逐腿磁盘核对在 provenance/leg_reconciliation.csv 里"
+        "另记 failed=%d (%s)、in_flight=%d (%s)、not_started=%d，不把失败静默折成未开始。"
+        % (len(failed_legs), ",".join(failed_legs) or "none",
+           len(flight_legs), ",".join(flight_legs) or "none", len(nostart_legs)),
     ))
     out.append(item(
         "wp2_four_state_complete", "6",
@@ -267,6 +316,28 @@ def build_rows():
         "R1a/R1b 已实测；R2/R3 等生产腿；R4（系综层）设计上要等采样层。",
     ))
 
+    si = read_rows("outputs/physics_completion/state_identity/state_identity_acceptance.csv")
+    si_counts = read_rows("outputs/physics_completion/state_identity/identity_class_counts.csv")
+    si_thr = REPO / "outputs" / "physics_completion" / "state_identity" / "thresholds.json"
+    si_thr_text = si_thr.read_text(encoding="utf-8") if si_thr.is_file() else ""
+    frontier_skipped = "frontier_localization" in si_thr_text and "not_computed" in si_thr_text
+    si_ok = bool(si) and n_true(si) == len(si)
+    out.append(item(
+        "wp2_state_identity_qc", "6",
+        "§6.3 每态 QC（SCF/几何收敛、虚频、spin、连接关系、Li-donor motif、fragment 电荷/自旋、"
+        "frontier localization）与身份分层（intact / Li-centered / mixed / ambiguous / fragmented 分开表）",
+        "partial" if si_ok and frontier_skipped else ("satisfied" if si_ok else "not_satisfied"),
+        "qc_checks_ok=%d/%d; classes=%s; frontier_localization=%s"
+        % (n_true(si), len(si),
+           ",".join("%s:%s" % (r.get("identity_class", ""), r.get("n_states", "")) for r in si_counts)
+           if si_counts else "none",
+           "not_computed" if frontier_skipped else "registered"),
+        "outputs/physics_completion/state_identity/",
+        "13 项自检全过、身份标签按冻结词表分层并逐行带原始日志 sha256；唯 frontier localization "
+        "在 thresholds.json 里显式登记为 not_computed（生产 Opt 日志未要求逐轨道原子组成），"
+        "少一项就不写 satisfied。",
+    ))
+
     # ---------------- §7 WP3 ----------------
     pe = read_rows("outputs/physics_completion/pair_evidence/pair_evidence.csv")
     verdict = Counter(r.get("state", "") for r in pe)
@@ -305,13 +376,32 @@ def build_rows():
         "规则先于结果登记；复核结果未重现冻结 R1b 的符号（换几何与换泛函两因素不可分）。",
     ))
     mech = read_rows("outputs/physics_completion/pair_evidence/mechanism_cases.csv")
+    mech_md = REPO / "outputs" / "physics_completion" / "pair_evidence" / "mechanism_cases.md"
+    mech_text = mech_md.read_text(encoding="utf-8") if mech_md.is_file() else ""
+    mech_pending = mech_text.count("待补")
+    mech_partial = mech_text.count("部分")
     out.append(item(
         "wp3_mechanism_cases", "7",
-        "机制案例最多 3 个，事先规则选定",
-        "satisfied" if 0 < len(mech) <= 3 else "not_satisfied",
-        "cases=%d" % len(mech),
-        "outputs/physics_completion/pair_evidence/mechanism_cases.csv",
-        "两例（EMC|GBL、EMC|SL）；电子密度/自旋与 G 层在案例里如实标待补。",
+        "§7.3 机制案例最多 3 个（事先规则选定），且逐例给出六项证据",
+        "partial" if (mech and mech_pending) else ("satisfied" if mech else "not_satisfied"),
+        "cases=%d; six_item_pending=%d; six_item_partial=%d"
+        % (len(mech), mech_pending, mech_partial),
+        "outputs/physics_completion/pair_evidence/mechanism_cases.csv; "
+        "outputs/physics_completion/pair_evidence/mechanism_cases.md",
+        "两例（EMC|GBL、EMC|SL）已按事先规则选定；但逐例六项里「电子密度/自旋」与「配位变化」"
+        "仍标待补、「E/G 分解」只有电子能层，所以记 partial，不写 satisfied。",
+    ))
+    desc_hits = sorted(str(q.relative_to(REPO)) for q in
+                       (REPO / "outputs" / "physics_completion").rglob("*descriptor*"))
+    out.append(item(
+        "wp3_descriptor_analysis", "7",
+        "§7.3 描述符分析（donor type / chelation / flexibility / functionalization / 廉价 ESP）"
+        "报告全部检验并做族内多重比较处理",
+        "satisfied" if desc_hits else "not_satisfied",
+        "descriptor_artifacts=%d" % len(desc_hits),
+        "outputs/physics_completion/（未找到 descriptor 产物）",
+        "本批次没有做描述符层（n=12 时不拟合多参数机制模型）；方案允许探索性报告，"
+        "但既然盘上没有产物就记 not_satisfied，不靠「允许」把缺口说成完成。",
     ))
 
     # ---------------- §8 WP4 ----------------
@@ -392,6 +482,42 @@ def build_rows():
         "逐作业 core-hours 已实测；三项项目级标量等四分子闭环后才填，缺值留空。",
     ))
 
+    pb_src = REPO / "src" / "electrolyte_ranking" / "pc_batch.py"
+    pb_text = pb_src.read_text(encoding="utf-8") if pb_src.is_file() else ""
+    fam_match = re.search(r"^FROZEN_MODEL_FAMILY\s*=\s*\[([^\]]*)\]", pb_text, re.M)
+    frozen_family = ([t.strip().strip("'\"") for t in fam_match.group(1).split(",") if t.strip()]
+                     if fam_match else [])
+    out.append(item(
+        "wp5_model_family_restriction", "9",
+        "§9.1 主模型只用岭回归/核岭与 GPR 两类（direct/shift 同特征、同外层 split、同调参预算）",
+        "satisfied" if sorted(frozen_family) == ["gpr", "krr", "ridge"] else "not_satisfied",
+        "frozen_model_family=%s; ml_rows=%d" % (",".join(frozen_family) or "none", len(ml)),
+        "src/electrolyte_ranking/pc_batch.py; outputs/physics_completion/ml/frozen_family_view.csv",
+        "冻结族 = ridge/krr/gpr，由源码常量现读；生成器另有 frozen_family_winner_consistent_with_published "
+        "断言，越族胜出会被抓出来。constant/rf/gbdt 只在探索对照里出现，不进决策表。",
+    ))
+    unq = find_token(REPO / "outputs" / "physics_completion", "unqueried")
+    out.append(item(
+        "wp5_remaining_unqueried_error", "9",
+        "§9.2 每轮报告 n_T->tau_b、O_3、R_3、remaining_unqueried_error 与累计 core-hours",
+        "partial" if unq else "not_satisfied",
+        "remaining_unqueried_error_artifact=%s"
+        % (str(unq.relative_to(REPO)) if unq else "none"),
+        "outputs/physics_completion/active_learning/",
+        "O_3 / tau_b / R_3 与累计 core-hours 已在 success_budget.csv 现算；但「未查询候选上的预测误差」"
+        "（remaining_unqueried_error）在本批次没有产物，显式记为缺口。",
+    ))
+    ext_rows = [r for r in cfg_set if r.get("cohort") == "extension" and r.get("mol_id")]
+    out.append(item(
+        "wp5_pool_extension", "9",
+        "§9.3 扩样触发：目标池扩到约 20-24（先加 8-12 个，含一个方法审计未覆盖的家族），先冻结再计算",
+        "partial" if len(ext_rows) >= 8 else "not_satisfied",
+        "extension_rows=%d; replay_pool=%s" % (len(ext_rows), "legacy_pool_not_blind"),
+        "data/metadata/physics_completion_set.csv; outputs/physics_completion/ml/frozen_family_view.csv",
+        "首轮没有扩样：ML/AL 回放仍跑在旧池上，池内端点不能当普适最低标签数。"
+        "扩样要等目标标签与独立 uncertainty 流程可用后才触发（先登记再计算）。",
+    ))
+
     # ---------------- §10 WP6 ----------------
     lig = read_rows("outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv")
     lig_dir = REPO / "outputs" / "physics_completion" / "explicit_ligand"
@@ -401,11 +527,12 @@ def build_rows():
     out.append(item(
         "wp6_explicit_ligand", "10",
         "可选 WP6：固定 R=DME 的共同背景显式配体检查",
-        "satisfied" if lig and lig_executed else ("partial" if lig else "not_satisfied"),
+        "satisfied" if (lig and lig_executed) else ("blocked_on_production" if lig else "not_satisfied"),
         "plan_rows=%d executed_jobs=%d" % (len(lig), lig_executed),
         "outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv",
-        "WP6 本身可选；本轮只做结果前预注册、没有落任何显式配体作业产物"
-        "（它的 gate 写明要等关键 free->Li 结论可解析）。登记完整但检查未做，算部分完成。",
+        "WP6 本身可选；本轮只做结果前预注册、没有落任何显式配体作业产物，零执行。"
+        "它的 gate 写明「要等关键 free->Li 结论可解析」，而 free->Li 正卡在生产腿上，"
+        "所以记 blocked_on_production（被闸门挡住），不把「登记完整」折成部分完成。",
     ))
 
     # ---------------- §11 停止规则 ----------------
@@ -424,6 +551,40 @@ def build_rows():
         "config/physics_completion_v1.yaml; docs/physics_completion_protocol.md",
         "unresolved 与 validation_limitation 已实质触发并登记；sampling_limited 仍只在预注册里，"
         "要等第 1 轮生产自由能才判定。",
+    ))
+
+    pilotcost = read_rows("outputs/physics_completion/cost/pilot_cost_ledger.csv")
+    pilot_cols = set(pilotcost[0].keys()) if pilotcost else set()
+    pilot_need = ("memory", "retry", "conformer", "raw_output")
+    pilot_have = [c for c in pilot_need if c in pilot_cols]
+    pilot_missing = [c for c in pilot_need if c not in pilot_cols]
+    scen = read_rows("outputs/physics_completion/cost/remaining_cost_scenarios.csv")
+    idx_path = REPO / "outputs" / "physics_completion" / "cost" / "cost_scenario_index.json"
+    idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
+    concurrency_ok = '"concurrency"' in idx_text
+    out.append(item(
+        "wp2_pilot_cost_fields", "11",
+        "§11 前 2 个分子的 pilot 逐作业记录 wall time / allocated cores / core-hours / memory / "
+        "failed-retry / phase / method / state / conformer / raw output",
+        "satisfied" if (pilotcost and len(pilot_have) == len(pilot_need))
+        else ("partial" if pilotcost else "not_satisfied"),
+        "pilot_rows=%d; columns=%s; missing_fields=%s"
+        % (len(pilotcost), ",".join(sorted(pilot_cols)) or "none",
+           ",".join(pilot_missing) or "none"),
+        "outputs/physics_completion/cost/pilot_cost_ledger.csv",
+        "已有 job_id / phase / method / cores / wall_sec / core_hours / status（按 allocated core-hours 命名，"
+        "不冒充 process CPU time）；但 memory / failed-retry / conformer / raw_output 四类字段未登记，"
+        "故记 partial，不把「记了 6 列」说成「记了 10 项」。",
+    ))
+    out.append(item(
+        "plan_cost_scenarios_and_concurrency", "11",
+        "§11 用 pilot 的中位与 p90 按作业类别估算剩余成本，给出低/中/高资源情景及可用并发",
+        "satisfied" if scen and concurrency_ok else ("partial" if scen else "not_satisfied"),
+        "scenario_rows=%d; concurrency_registered=%s" % (len(scen), concurrency_ok),
+        "outputs/physics_completion/cost/remaining_cost_scenarios.csv; "
+        "outputs/physics_completion/cost/cost_scenario_index.json",
+        "逐腿 low <= mid <= high 且总量等于逐腿之和（cost_scenario_acceptance.csv 全 true）；"
+        "并发按「同时最多 2 个 ORCA x 4 核」的上限报价，且说明 core-hours 与并发无关。",
     ))
 
     # ---------------- §1 / §12 总体 ----------------
@@ -489,6 +650,28 @@ def build_rows():
         "config/physics_completion_v1.yaml; data/metadata/physics_completion_set.csv; "
         "data/references/anchor_primary_audit.csv; docs/physics_completion_final_report.md",
         "按方案 13 节逐条核对推荐落点是否存在；历史产物不被覆写。",
+    ))
+    figures = [
+        "docs/assets/figures/F59_physics_completion_definition.png",
+        "docs/assets/figures/F60_physics_completion_method_audit.png",
+        "docs/assets/figures/F61_physics_completion_ladder.png",
+        "docs/assets/figures/F62_physics_completion_pair_identity.png",
+        "docs/assets/figures/F63_physics_completion_mechanism_cases.png",
+        "docs/assets/figures/F64_physics_completion_budget_curve.png",
+    ]
+    figures_missing = [q for q in figures if not (REPO / q).is_file()]
+    out.append(item(
+        "plan_main_figures_six", "14",
+        "§14 主图控制为 6 张：模型与条件态定义 / 独立方法审计 / E->G->ensemble 决策变化 / "
+        "pair 证据与身份 outcome / 机制案例 / 累计成本-选集恢复曲线",
+        "satisfied" if not figures_missing else "partial",
+        "figures=%d present=%d missing=%s"
+        % (len(figures), len(figures) - len(figures_missing),
+           ",".join(figures_missing) if figures_missing else "none"),
+        "docs/assets/figures/F59_physics_completion_definition.png ... "
+        "docs/assets/figures/F64_physics_completion_budget_curve.png",
+        "六张主图与方案 14 节一一对应；F63 机制案例页要连 §7.3 的六项覆盖缺口一起读（那一行是 partial），"
+        "图存在不等于内容都已补齐。",
     ))
     return out
 

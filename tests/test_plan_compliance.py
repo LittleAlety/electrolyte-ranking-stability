@@ -84,3 +84,44 @@ def test_items_with_open_gaps_are_never_marked_satisfied() -> None:
     ligand = rows["wp6_explicit_ligand"]
     if "executed_jobs=0" in ligand["measured"]:
         assert ligand["status"] != "satisfied", ligand
+
+
+def test_new_coverage_rows_are_derived_from_evidence() -> None:
+    """§5.1 / §6.3 / §7.3 / §9 / §11 / §14 的补漏条目必须指向盘上的证据产物。"""
+    rows = {r["item_id"]: r for r in _rows()}
+    for item_id in ("wp1_toolchain_supportability_probe", "wp2_state_identity_qc",
+                    "wp3_descriptor_analysis", "wp5_model_family_restriction",
+                    "wp5_remaining_unqueried_error", "wp5_pool_extension",
+                    "wp2_pilot_cost_fields", "plan_cost_scenarios_and_concurrency",
+                    "plan_main_figures_six"):
+        assert item_id in rows, "compliance table is missing %s" % item_id
+        assert rows[item_id]["evidence"], item_id
+        assert rows[item_id]["measured"], item_id
+
+
+def test_state_identity_row_reads_its_own_thresholds() -> None:
+    """§6.3：frontier localization 没算，就不许写成 satisfied。"""
+    row = {r["item_id"]: r for r in _rows()}["wp2_state_identity_qc"]
+    if "frontier_localization=not_computed" in row["measured"]:
+        assert row["status"] == "partial", row
+
+
+def test_mechanism_case_row_reflects_the_six_item_coverage() -> None:
+    """§7.3：案例页六项还有「待补」时不许写 satisfied。"""
+    row = {r["item_id"]: r for r in _rows()}["wp3_mechanism_cases"]
+    pending = int(row["measured"].split("six_item_pending=")[1].split(";")[0])
+    if pending > 0:
+        assert row["status"] == "partial", row
+
+
+def test_explicit_ligand_zero_execution_is_blocked_not_partial() -> None:
+    """§10：零执行要记成被闸门挡住，不能因为「登记完整」就给 partial。"""
+    row = {r["item_id"]: r for r in _rows()}["wp6_explicit_ligand"]
+    if "executed_jobs=0" in row["measured"]:
+        assert row["status"] == "blocked_on_production", row
+
+
+def test_ledger_distinguishes_failed_legs_from_not_started() -> None:
+    """§6：闭环表把失败腿折成 planned，台账的 note 必须把 failed / in_flight 讲清楚。"""
+    row = {r["item_id"]: r for r in _rows()}["wp2_production_state_ledger"]
+    assert "failed=" in row["note"] and "not_started=" in row["note"], row["note"]
