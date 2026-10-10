@@ -60,3 +60,27 @@ def test_overall_row_derives_from_the_live_ledgers() -> None:
     assert "M/M+/LiM+/LiM2+=" in main4["measured"]
     assert "rungs_computed=" in flip["measured"]
     assert overall["status"] in STATUSES
+
+
+def test_table_covers_the_sample_and_landing_sections() -> None:
+    """§3（12 主集/8 方法集/4 采样集）与 §13（推荐落点）也必须有条目，不能只覆盖 WP0-WP6。"""
+    sections = " ".join(r["plan_section"] for r in _rows())
+    assert "\u00a73" in sections, "\u00a73 designated-set row missing"
+    assert "\u00a713" in sections, "\u00a713 landing-path row missing"
+
+
+def test_items_with_open_gaps_are_never_marked_satisfied() -> None:
+    """登记完整 != 工作完成：下面三条只要有未闭合的缺口，就不许写成 satisfied。"""
+    rows = {r["item_id"]: r for r in _rows()}
+
+    method = rows["wp1_unique_production_method"]
+    if "freeze_artifact=False" in method["measured"] or "production_settings=2" in method["measured"]:
+        assert method["status"] == "partial", method
+
+    sampling = rows["wp2_sampling_extension"]
+    if sampling["status"] == "satisfied":
+        assert "escalation_pending=0/" in sampling["measured"], sampling
+
+    ligand = rows["wp6_explicit_ligand"]
+    if "executed_jobs=0" in ligand["measured"]:
+        assert ligand["status"] != "satisfied", ligand

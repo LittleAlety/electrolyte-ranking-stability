@@ -6,15 +6,16 @@
 | item_id | 方案节 | 要求 | 状态 | 实测 | 证据 |
 | --- | --- | --- | --- | --- | --- |
 | `wp0_definition_migration` | §4 WP0 定义迁移与历史结论同步 | 量名/方向/状态身份迁移表与历史结论同步（Q3/Q7/Q10/R15/P1a）落盘 | satisfied | quantities=7 claims=5 config=True protocol=True | config/physics_completion_v1.yaml; docs/physics_completion_protocol.md; docs/claim_migration.md; outputs/physics_completion/definition/ |
+| `plan_designated_sets_registered` | §3 具体样本：12 主集 / 8 方法集 / 4 采样集 | §3.1/3.2/3.3 主集 12 / 方法集 8 / 采样集 4 与排除原因登记 | satisfied | main=12 method_audit=8 sampling_audit=4 excluded=6; sampling_set=C02,C03,C08,C17 | data/metadata/physics_completion_set.csv; config/physics_completion_v1.yaml |
 | `wp1_method_audit_matrix` | §5 WP1 独立方法审计 | 最小作业矩阵：方法集 8 分子 x 4 状态 x 4 设定 = 128 单点实测 | satisfied | computed=128 total=128 | outputs/physics_completion/method_audit/job_matrix.csv |
 | `wp1_reduction_state_checks` | §5 WP1 独立方法审计 | 还原态三项检查：电子空间扩展 / 脱附稳定性 / 波函数身份 | not_satisfied | audited_states=LiM_2plus,LiM_plus,M,M_plus has_reduced_leg=False | outputs/physics_completion/method_audit/job_matrix.csv; docs/59_week38_wp1_method_audit.md |
-| `wp1_unique_production_method` | §5 WP1 独立方法审计 | 冻结唯一生产方法（不按哪个方法翻出更多翻转来选） | satisfied | production_candidates=omegaB97X-D4 | outputs/physics_completion/method_audit/method_settings.csv; docs/59_week38_wp1_method_audit.md |
+| `wp1_unique_production_method` | §5 WP1 独立方法审计 | 冻结唯一生产方法（不按哪个方法翻出更多翻转来选） | partial | production_functionals=omegaB97X-D4; production_settings=2; freeze_artifact=False | outputs/physics_completion/method_audit/method_settings.csv; docs/59_week38_wp1_method_audit.md |
 | `wp2_production_state_ledger` | §6 WP2 固定背景配对自由能标签 | 四分子 x 四主态（另加基组一致中性腿）的真实 Opt+NumFreq 登记 | blocked_on_production | produced=12 total=20 molecules=4 | outputs/physics_completion/closure/four_molecule_state_closure.csv |
 | `wp2_four_state_complete` | §6 WP2 固定背景配对自由能标签 | 四态齐备分子：M / M+ / [LiM]+ / [LiM]2+ 全部产出 | blocked_on_production | M/M+/LiM+/LiM2+=1/4; 再加基组一致中性腿=0/4; Li 成对齐备=1/4 | outputs/physics_completion/closure/four_molecule_state_closure.csv |
 | `wp2_free_redox_labels` | §6 WP2 固定背景配对自由能标签 | 绝热电子能差 + 单构象自由能差（两腿同为 def2-TZVPD 才相减） | partial | free_status_computed=1/4; li_status_computed=0/4 | outputs/physics_completion/free_states/production_redox.csv |
 | `wp2_li_legs` | §6 WP2 固定背景配对自由能标签 | Li 条件态（[LiM]+ / [LiM]2+）：E 与 G 两种配位位移 | blocked_on_production | li_legs_produced=3/8; li_status_computed=0/4 | outputs/physics_completion/closure/four_molecule_state_closure.csv; outputs/physics_completion/free_states/production_redox.csv |
 | `wp2_conformer_ensemble` | §6 WP2 固定背景配对自由能标签 | 同态构象系综自由能 G_ens（最多 3 个再 6 个独立结构） | not_satisfied | distinct_n_conformers=1 | outputs/physics_completion/closure/four_molecule_state_closure.csv |
-| `wp2_sampling_extension` | §6 WP2 固定背景配对自由能标签 | 采样审计集 3 -> 6 结构比较与 sampling_limited 判定 | satisfied | acceptance_ok=9/9 | outputs/physics_completion/sampling/sampling_acceptance.csv |
+| `wp2_sampling_extension` | §6 WP2 固定背景配对自由能标签 | 采样审计集 3 -> 6 结构比较与 sampling_limited 判定 | partial | acceptance_ok=9/9; escalation_pending=8/8; executed=C01,C02,C13,C14; designated=C02,C03,C08,C17 | outputs/physics_completion/sampling/sampling_acceptance.csv; outputs/physics_completion/sampling/sampling_escalation.csv; data/metadata/physics_completion_set.csv |
 | `wp2_closure_acceptance` | §6 WP2 固定背景配对自由能标签 | 闭环表自检：不造数 / 未完成显式登记 / 几何与频率 QC | satisfied | closure_checks_ok=8/8 | outputs/physics_completion/closure/closure_acceptance.csv |
 | `wp2_flip_persistence` | §6 WP2 固定背景配对自由能标签 | EMC-GBL / EMC-SL 两对翻转能否保留到自由能层 | partial | rungs_computed=4/10 | outputs/physics_completion/closure/flip_persistence.csv |
 | `wp3_pair_evidence` | §7 WP3 排序、独立 uncertainty 与机制 | 固定模型下的保守符号一致性：STABLE / UNRESOLVED / ROBUST_INVERSION | partial | pairs=66; ROBUST_INVERSION=2; STABLE=55; UNRESOLVED=9 | outputs/physics_completion/pair_evidence/pair_evidence.csv |
@@ -28,10 +29,12 @@
 | `wp5_new_endpoint_in_budget` | §9 WP5 delta-learning 与成本感知主动查询 | 新端点 O_3>=2/3 且 R_3<=0.10 eV 真的用于算预算 | not_satisfied | budget_columns=axis,baseline,median_overstates_majority,n_t_majority_combined,n_t_majority_tau080,n_t_median_tau080,regret_tolerance_ev,task; regret_tolerance_ev=0.041270500000000016,0.08099575000000002,0.11163849999999997,0.1619,0.16414650000000003,0.22725399999999998 | outputs/physics_completion/active_learning/success_budget.csv |
 | `wp5_two_consecutive_points` | §9 WP5 delta-learning 与成本感知主动查询 | 至少 16/20 回放在两个连续预算点达标才报经验停止预算；12 标签池回放 | not_satisfied | budget_table_has_consecutive_rule=False; replay_pool=legacy_18_not_blind | src/electrolyte_ranking/wp6.py; outputs/week7/stage8_al_summary.md |
 | `wp5_absolute_cost_ledger` | §11 停止规则 | 绝对成本三项：cpu_core_hours / p90_job_cost / frequency_only_cost | partial | cost_rows=10 MISSING=3 | outputs/physics_completion/cost/cost_ledger.csv |
-| `wp6_explicit_ligand` | §10 WP6 显式配体检查（可选） | 可选 WP6：固定 R=DME 的共同背景显式配体检查 | satisfied | plan_rows=4 executed_jobs=0 | outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv |
+| `wp6_explicit_ligand` | §10 WP6 显式配体检查（可选） | 可选 WP6：固定 R=DME 的共同背景显式配体检查 | partial | plan_rows=4 executed_jobs=0 | outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv |
 | `stop_rules_registered` | §11 停止规则 | 停止规则（unresolved / sampling_limited / identity outcome / validation limitation） | partial | stop_rules_in_config=True; li_motif_screen_computed=0/8 | config/physics_completion_v1.yaml; docs/physics_completion_protocol.md |
 | `plan_overall_complete` | §1 研究问题与最终交付 | 方案第 1-5 步闭环：四分子四态齐备 + 两对翻转在自由能层判定 | blocked_on_production | four_state_complete=1/4 li_pair_complete=1/4 flip_rungs=4/10 | outputs/physics_completion/closure/four_molecule_state_closure.csv; outputs/physics_completion/closure/flip_persistence.csv |
+| `plan_stage_reports_present` | §12 时间安排与阶段验收 | §12 阶段验收：WP0-WP6 各阶段报告落盘（只写完成的科学问题与尚未解决的限制） | satisfied | stage_reports=7 present=7 missing=none | docs/58_week37_wp0_definition_migration.md ... docs/64_week43_wp6_explicit_ligand_and_paper.md |
+| `plan_landing_paths` | §13 推荐仓库落点 | §13 推荐落点：协议 / 样本集 / 锚点 / 新批次产物 / docs 逐条落地 | satisfied | checked=14 present=14 missing=none | config/physics_completion_v1.yaml; data/metadata/physics_completion_set.csv; data/references/anchor_primary_audit.csv; docs/physics_completion_final_report.md |
 
-**状态合计**：satisfied=9; partial=8; not_satisfied=5; blocked_on_production=4
+**状态合计**：satisfied=9; partial=11; not_satisfied=5; blocked_on_production=4
 
 **总体判定**：未闭环 -- 见 `plan_overall_complete` 行

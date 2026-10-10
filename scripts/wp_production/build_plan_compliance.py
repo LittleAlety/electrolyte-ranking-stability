@@ -30,6 +30,7 @@ STATUSES = ("satisfied", "partial", "not_satisfied", "blocked_on_production")
 
 PLAN_SECTIONS = {
     "1": "§1 研究问题与最终交付",
+    "3": "§3 具体样本：12 主集 / 8 方法集 / 4 采样集",
     "4": "§4 WP0 定义迁移与历史结论同步",
     "5": "§5 WP1 独立方法审计",
     "6": "§6 WP2 固定背景配对自由能标签",
@@ -39,6 +40,7 @@ PLAN_SECTIONS = {
     "10": "§10 WP6 显式配体检查（可选）",
     "11": "§11 停止规则",
     "12": "§12 时间安排与阶段验收",
+    "13": "§13 推荐仓库落点",
 }
 
 MAIN_STATES = ("M", "M_plus", "LiM_plus", "LiM_2plus")
@@ -96,6 +98,27 @@ def build_rows():
         "五条历史结论逐条登记在 claim_migration.csv，旧别名不静默替换。",
     ))
 
+    # ---------------- §3 样本集定义 ----------------
+    cfg_set = read_rows("data/metadata/physics_completion_set.csv")
+    set_main = sorted({r.get("mol_id", "") for r in cfg_set
+                       if r.get("cohort") == "main" and r.get("mol_id")})
+    set_method = sorted({r.get("mol_id", "") for r in cfg_set
+                         if r.get("cohort") == "method_audit" and r.get("mol_id")})
+    set_sampling = sorted({r.get("mol_id", "") for r in cfg_set
+                           if r.get("cohort") == "sampling_audit" and r.get("mol_id")})
+    set_excluded = count(cfg_set, lambda r: r.get("cohort") == "excluded" and r.get("exclusion_reason"))
+    sets_ok = ((len(set_main), len(set_method), len(set_sampling)) == (12, 8, 4) and set_excluded > 0)
+    out.append(item(
+        "plan_designated_sets_registered", "3",
+        "§3.1/3.2/3.3 主集 12 / 方法集 8 / 采样集 4 与排除原因登记",
+        "satisfied" if sets_ok else "not_satisfied",
+        "main=%d method_audit=%d sampling_audit=%d excluded=%d; sampling_set=%s"
+        % (len(set_main), len(set_method), len(set_sampling), set_excluded, ",".join(set_sampling)),
+        "data/metadata/physics_completion_set.csv; config/physics_completion_v1.yaml",
+        "指定采样集为 EMC/DEC/DME/TMP；实际执行的采样腿是 DMC/EMC/GBL/SL，"
+        "该偏差在 sampling_acceptance.csv 里显式登记，不当作已完成 3.3 的采样审计。",
+    ))
+
     # ---------------- §5 WP1 ----------------
     jm = read_rows("outputs/physics_completion/method_audit/job_matrix.csv")
     jm_done = count(jm, lambda r: r.get("status") == "computed")
@@ -121,14 +144,19 @@ def build_rows():
     ms = read_rows("outputs/physics_completion/method_audit/method_settings.csv")
     fns = sorted({r.get("functional", "") for r in ms if r.get("role") == "production_candidate"})
     prod_fns = [f for f in fns if f]
+    prod_settings = [r for r in ms if r.get("role") == "production_candidate"]
+    freeze_artifact = (REPO / "docs" / "66_wp1_production_method_freeze.md").is_file()
+    method_frozen = len(prod_fns) == 1 and len(prod_settings) == 1 and freeze_artifact
     out.append(item(
         "wp1_unique_production_method", "5",
         "冻结唯一生产方法（不按哪个方法翻出更多翻转来选）",
-        "satisfied" if len(prod_fns) == 1 else "partial",
-        "production_candidates=%s" % (",".join(prod_fns) if prod_fns else "none"),
+        "satisfied" if method_frozen else "partial",
+        "production_functionals=%s; production_settings=%d; freeze_artifact=%s"
+        % (",".join(prod_fns) if prod_fns else "none", len(prod_settings), freeze_artifact),
         "outputs/physics_completion/method_audit/method_settings.csv; docs/59_week38_wp1_method_audit.md",
-        "生产腿实际全部用 wB97X-D4；登记表仍并列 2 个生产候选 + 2 个审计对照，"
-        "缺一份单独的「方法已冻结」决策产物。",
+        "生产腿实际全部用 wB97X-D4（设定表并列的 S1/S2 只差弥散基组，按电荷态二选一），"
+        "但登记层既没有把生产候选收敛成单一设定、也没有一份单独的「方法已冻结」决策产物；"
+        "按「宁欠不过」记 partial，不把「事实上一直这么用」当成「已冻结并登记」。",
     ))
 
     # ---------------- §6 WP2 ----------------
@@ -191,13 +219,33 @@ def build_rows():
         "每个已产出态仍是单构象；系综层尚未启动，所以 R4 台阶无输入。",
     ))
     samp = read_rows("outputs/physics_completion/sampling/sampling_acceptance.csv")
+    samp_escalation = read_rows("outputs/physics_completion/sampling/sampling_escalation.csv")
+    samp_pending = count(samp_escalation,
+                         lambda r: str(r.get("escalation_status", "")).startswith("registered_pending"))
+    samp_executed = sorted({r.get("mol_id", "") for r
+                            in read_rows("outputs/physics_completion/sampling/sampling_round1.csv")
+                            if r.get("mol_id")})
+    samp_designated = sorted({r.get("mol_id", "")
+                              for r in read_rows("data/metadata/physics_completion_set.csv")
+                              if r.get("cohort") == "sampling_audit" and r.get("mol_id")})
+    samp_extension_decided = bool(samp_escalation) and samp_pending == 0
+    samp_on_designated_set = bool(samp_executed) and samp_executed == samp_designated
+    samp_extension_ok = (bool(samp) and n_true(samp) == len(samp)
+                         and samp_extension_decided and samp_on_designated_set)
     out.append(item(
         "wp2_sampling_extension", "6",
         "采样审计集 3 -> 6 结构比较与 sampling_limited 判定",
-        "satisfied" if samp and n_true(samp) == len(samp) else ("partial" if samp else "not_satisfied"),
-        "acceptance_ok=%d/%d" % (n_true(samp), len(samp)),
-        "outputs/physics_completion/sampling/sampling_acceptance.csv",
-        "采样层只做气相 GFN2 筛选，且 3->6 升级只登记待判（等第 1 轮生产自由能）。",
+        "satisfied" if samp_extension_ok else ("partial" if samp else "not_satisfied"),
+        "acceptance_ok=%d/%d; escalation_pending=%d/%d; executed=%s; designated=%s"
+        % (n_true(samp), len(samp), samp_pending, len(samp_escalation),
+           ",".join(samp_executed) if samp_executed else "none",
+           ",".join(samp_designated) if samp_designated else "none"),
+        "outputs/physics_completion/sampling/sampling_acceptance.csv; "
+        "outputs/physics_completion/sampling/sampling_escalation.csv; "
+        "data/metadata/physics_completion_set.csv",
+        "两件事都还没发生：3->6 升级对全部态仍是 registered_pending（要等第 1 轮生产自由能才能判定 "
+        "sampling_limited），且实际采样集 DMC/EMC/GBL/SL 不等于方案 3.3 指定的 EMC/DEC/DME/TMP；"
+        "所以只算部分完成，不宣称做完 3.3。",
     ))
     cal = read_rows("outputs/physics_completion/closure/closure_acceptance.csv")
     out.append(item(
@@ -346,13 +394,18 @@ def build_rows():
 
     # ---------------- §10 WP6 ----------------
     lig = read_rows("outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv")
+    lig_dir = REPO / "outputs" / "physics_completion" / "explicit_ligand"
+    lig_executed = (len([p for p in lig_dir.iterdir()
+                         if p.is_file() and p.name != "explicit_ligand_plan.csv"])
+                    if lig_dir.is_dir() else 0)
     out.append(item(
         "wp6_explicit_ligand", "10",
         "可选 WP6：固定 R=DME 的共同背景显式配体检查",
-        "satisfied" if lig else "not_satisfied",
-        "plan_rows=%d executed_jobs=0" % len(lig),
+        "satisfied" if lig and lig_executed else ("partial" if lig else "not_satisfied"),
+        "plan_rows=%d executed_jobs=%d" % (len(lig), lig_executed),
         "outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv",
-        "只做结果前预注册，首轮不执行（要等关键 free->Li 结论可解析）。",
+        "WP6 本身可选；本轮只做结果前预注册、没有落任何显式配体作业产物"
+        "（它的 gate 写明要等关键 free->Li 结论可解析）。登记完整但检查未做，算部分完成。",
     ))
 
     # ---------------- §11 停止规则 ----------------
@@ -384,6 +437,58 @@ def build_rows():
         "outputs/physics_completion/closure/four_molecule_state_closure.csv; "
         "outputs/physics_completion/closure/flip_persistence.csv",
         "本行是可结题的硬闸门；未满足时只报告进展与限制，不宣称完成。",
+    ))
+
+    # ---------------- §12 阶段验收 ----------------
+    stage_reports = [
+        "docs/58_week37_wp0_definition_migration.md",
+        "docs/59_week38_wp1_method_audit.md",
+        "docs/60_week39_wp2_free_energy_labels.md",
+        "docs/61_week40_wp3_pair_evidence_mechanism.md",
+        "docs/62_week41_wp4_anchor_comparability.md",
+        "docs/63_week42_wp5_delta_learning_active_query.md",
+        "docs/64_week43_wp6_explicit_ligand_and_paper.md",
+    ]
+    stage_missing = [p for p in stage_reports if not (REPO / p).is_file()]
+    out.append(item(
+        "plan_stage_reports_present", "12",
+        "§12 阶段验收：WP0-WP6 各阶段报告落盘（只写完成的科学问题与尚未解决的限制）",
+        "satisfied" if not stage_missing else "partial",
+        "stage_reports=%d present=%d missing=%s"
+        % (len(stage_reports), len(stage_reports) - len(stage_missing),
+           ",".join(stage_missing) if stage_missing else "none"),
+        "docs/58_week37_wp0_definition_migration.md ... docs/64_week43_wp6_explicit_ligand_and_paper.md",
+        "阶段完成度按科学问题计，不按累计周数或图数；这 7 份报告各自登记了尚未解决的限制。",
+    ))
+
+    # ---------------- §13 推荐落点 ----------------
+    landing = [
+        "config/physics_completion_v1.yaml",
+        "data/metadata/physics_completion_set.csv",
+        "data/references/anchor_primary_audit.csv",
+        "docs/physics_completion_protocol.md",
+        "docs/claim_migration.md",
+        "docs/physics_completion_final_report.md",
+        "outputs/physics_completion/method_audit",
+        "outputs/physics_completion/free_states",
+        "outputs/physics_completion/li_states",
+        "outputs/physics_completion/ensembles",
+        "outputs/physics_completion/pair_evidence",
+        "outputs/physics_completion/ml",
+        "outputs/physics_completion/active_learning",
+        "outputs/physics_completion/cost",
+    ]
+    landing_missing = [p for p in landing if not (REPO / p).exists()]
+    out.append(item(
+        "plan_landing_paths", "13",
+        "§13 推荐落点：协议 / 样本集 / 锚点 / 新批次产物 / docs 逐条落地",
+        "satisfied" if not landing_missing else "partial",
+        "checked=%d present=%d missing=%s"
+        % (len(landing), len(landing) - len(landing_missing),
+           ",".join(landing_missing) if landing_missing else "none"),
+        "config/physics_completion_v1.yaml; data/metadata/physics_completion_set.csv; "
+        "data/references/anchor_primary_audit.csv; docs/physics_completion_final_report.md",
+        "按方案 13 节逐条核对推荐落点是否存在；历史产物不被覆写。",
     ))
     return out
 
