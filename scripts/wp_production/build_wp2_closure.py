@@ -203,6 +203,19 @@ def four_molecule_labels(data):
     return rows
 
 
+def method_signature(row):
+    """同泛函 / 同基组 / 同 SMD / 同热化学处理的签名。
+
+    方案第 1、2 步要求「目标差值使用相同泛函、相同基组、相同 SMD 背景与热化学处理」。
+    基组一致本身不等于方法一致：这里把四件事一起比，缺项一律留空而不是默认相等。
+    """
+    level = (row or {}).get("level", "")
+    smd = "|".join(token for token in level.split() if token.startswith("SMD("))
+    return (level.split()[0] if level else "", (row or {}).get("basis", ""), smd,
+            (row or {}).get("qrrho", ""), (row or {}).get("temp_k", ""),
+            (row or {}).get("pressure_atm", ""))
+
+
 def _sign(values):
     signs = {1 if value > 0 else (-1 if value < 0 else 0) for value in values}
     if signs == {1}:
@@ -348,6 +361,14 @@ def ladder_summary(rows, data):
                                                         if ("R1b" in signs and screen_sign) else None),
             "screen_ensemble_li_conditioned_changes_the_sign": ((li_sign != screen_sign)
                                                                 if (li_sign and screen_sign) else None),
+            "fixed_geometry_to_solution_changes_the_sign": ((signs.get("R1b") != signs.get("R2"))
+                                                             if ("R1b" in signs and "R2" in signs) else None),
+            "thermal_correction_changes_the_sign": ((signs.get("R2") != signs.get("R3"))
+                                                    if ("R2" in signs and "R3" in signs) else None),
+            "sampling_changes_the_sign": ((signs.get("R3") != signs.get("R4"))
+                                          if ("R3" in signs and "R4" in signs) else None),
+            "sampling_changes_the_sign_screen_level": ((signs.get("R3") != screen_sign)
+                                                       if ("R3" in signs and screen_sign) else None),
             "screen_verdict": ("screen ensemble absent" if not screen_sign else
                                ("Li coordination flips the pair sign at the screen level"
                                 if (li_sign and li_sign != screen_sign) else
@@ -471,6 +492,28 @@ def acceptance(state_rows, label_rows, ladder_rows, summary, data):
         "ok": str(values_match).lower(),
         "detail": "strings compared verbatim against production_ledger.csv",
     })
+    signature_gaps = []
+    compared = 0
+    for mol_id, name in FOUR:
+        cation = next((row for row in data["production"]
+                       if row["mol_id"] == mol_id and row["state"] == "M_plus"), None)
+        neutral = next((row for row in data["production"]
+                        if row["mol_id"] == mol_id and row["state"] == EXTRA_STATE), None)
+        if not cation or not neutral:
+            continue
+        if cation.get("status") != "computed" or neutral.get("status") != "computed":
+            continue
+        compared += 1
+        if method_signature(cation) != method_signature(neutral):
+            signature_gaps.append("%s: %s vs %s" % (name, method_signature(cation),
+                                                   method_signature(neutral)))
+    rows.append({
+        "check_id": "r2_r3_legs_share_functional_basis_solvent_and_thermochemistry",
+        "description": ("R2/R3 的两支腿必须同泛函 / 同基组 / 同 SMD / 同热化学处理才允许相减；"
+                        "已算完的对才纳入比较，缺项不默认相等"),
+        "ok": str(not signature_gaps).lower(),
+        "detail": "compared=%d; offenders=%s" % (compared, "; ".join(signature_gaps) or "none"),
+    })
     label_ok = all(row["state_status"] in ("computed", "free_only", "not_computed")
                    for row in label_rows)
     rows.append({
@@ -578,7 +621,36 @@ def build():
             signs.get("R4", "not_computed"),
             (item["screen_ensemble_sign"] + " (screen)") if item["screen_ensemble_sign"]
             else "not_computed"))
+    def _answer(flag, available, missing_note):
+        if not available:
+            return missing_note
+        return "**符号改变**" if flag else "符号不变"
+
     md += [
+        "",
+        "## 方案第 2 步的三个问题（逐对）",
+        "",
+        "| pair | 固定几何 → 溶液各态优化 | 电子能 → 单构象自由能（热校正） | 单构象 → 系综 |",
+        "| --- | --- | --- | --- |",
+    ]
+    for item in summary:
+        signs = item["sign_by_rung"]
+        q1 = _answer(item["fixed_geometry_to_solution_changes_the_sign"],
+                     "R1b" in signs and "R2" in signs, "not_computed（R2 缺基组一致腿）")
+        q2 = _answer(item["thermal_correction_changes_the_sign"],
+                     "R2" in signs and "R3" in signs, "not_computed（R2 或 R3 缺）")
+        if "R3" in signs and signs.get("R4"):
+            q3 = _answer(item["sampling_changes_the_sign"], True, "")
+        elif "R3" in signs and item["screen_ensemble_sign"]:
+            q3 = ("筛选层：符号" + ("改变" if item["sampling_changes_the_sign_screen_level"] else "不变")
+                  + "（R4_screen；生产 R4 未做）")
+        else:
+            q3 = "not_computed（R3 与系综都缺）"
+        md.append("| %s | %s | %s | %s |" % (item["pair"], q1, q2, q3))
+    md += [
+        "",
+        "口径：Δ = IP(i) − IP(j)（氧化轴）。「符号改变」= 这一步之后两分子的先后被翻转；"
+        "未计算的一律写 not_computed，不做任何外推。R4_screen 是筛选层，单独标注，不冒充生产 R4。",
         "",
         "## 口径",
         "",

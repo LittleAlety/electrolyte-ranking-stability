@@ -19,6 +19,15 @@
 | EMC | GBL | positive | negative | not_computed | not_computed | not_computed | negative (screen) |
 | EMC | SL | positive | negative | not_computed | not_computed | not_computed | positive (screen) |
 
+## 方案第 2 步的三个问题（逐对）
+
+| pair | 固定几何 → 溶液各态优化 | 电子能 → 单构象自由能（热校正） | 单构象 → 系综 |
+| --- | --- | --- | --- |
+| EMC | GBL | not_computed（R2 缺基组一致腿） | not_computed（R2 或 R3 缺） | not_computed（R3 与系综都缺） |
+| EMC | SL | not_computed（R2 缺基组一致腿） | not_computed（R2 或 R3 缺） | not_computed（R3 与系综都缺） |
+
+口径：Δ = IP(i) − IP(j)（氧化轴）。「符号改变」= 这一步之后两分子的先后被翻转；未计算的一律写 not_computed，不做任何外推。R4_screen 是筛选层，单独标注，不冒充生产 R4。
+
 ## 口径
 
 方法轴认证只覆盖**固定几何上的电子能层**：EMC–GBL 与 EMC–SL 在四种预设设定下
