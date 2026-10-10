@@ -11,8 +11,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finali
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finalize_wp2.ps1 -Commit
 ```
 
-顺序：`anchors` → `emit-wp2` → `generator` → `closure` → `provenance` → `sampling` → `li-motif-plan` → `cost` →
-`recheck-plan` → `figures` → `mirror` → `site` → `freeze` → `clean-room` → 十个 `--check` → `pytest`。
+顺序：`anchors` → `emit-wp2` → `generator` → `closure` → `compliance` → `provenance` → `sampling` → `li-motif-plan` → `cost` →
+`recheck-plan` → `figures` → `mirror` → `site` → `freeze` → `clean-room` → 十一个 `--check` → `pytest`。
 任一非零即 `ABORT`，不提交。
 
 ## 生产队列：查状态与断点续跑
@@ -63,6 +63,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `archive_raw_outputs.py` | 把 provenance 里登记的原始作业文件打成**确定性、可复核的 zip 归档**（`--build` 生成，默认落在仓库外 `_compute_archive/`；`--check <zip>` 逐条复算 sha256） |
 | `verify_archive.py` | 归档的**可重新解析性**核验：拿归档里的原始日志按仓库口径重算登记值，与该作业在 `job_archive_manifest.csv` 里的值逐字段比对；`--ledger` 再用同一份归档重算交付账本 `production_ledger.csv` 的数值列。缺条目 / sha256 不符 / 数值不符都算失败（退出码 1），`--limit N` 调试、`--strict` 把「算不出来」也算失败。生产在跑期间归档必然落后于 manifest，报的是「登记晚于归档」的预期漂移；队列停掉后重建归档再跑才应回到 0 |
 | `build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |
+| `build_plan_compliance.py` | 方案 4-14 节逐条合规台账：状态与数字全部从产物现算（四分子闭环 / 方法审计 / 翻转持续性 / 锚点审计 / AL 预算），源码里不写死；把「都做完没有」变成一条可复算的链上检查（派生层） |
 | `build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
 | `build_compute_provenance.py` | 逐作业复现证据清单 + 从各自 `.log` 推导的 `failure_reason`，外加**四分子 20 条腿现场核对** `leg_reconciliation.csv`（登记 vs 磁盘事实；`duplicate_work_risk` 是唯一告警）（派生层） |
 | `build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） |

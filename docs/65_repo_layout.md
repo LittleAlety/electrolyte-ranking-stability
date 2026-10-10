@@ -33,8 +33,8 @@
 - 特殊命名的周：`week22_hardening/`（W22-H 复核）、`week24_corealign/`（Week 24 主协变对齐）。
 - 跨阶段公共产物：`figures/`（含 F59-F64 六张主图）、`gate1/`、`state_identity/`、
   `decision_state/`、`phase2_p1a/`、`smoke/`。
-- 新阶段批次：`physics_completion/`，其下 15 个子包：
-  `active_learning/`、`anchor/`、`closure/`、`cost/`、`definition/`、`ensembles/`、
+- 新阶段批次：`physics_completion/`，其下 16 个子包：
+  `active_learning/`、`anchor/`、`closure/`、`compliance/`、`cost/`、`definition/`、`ensembles/`、
   `explicit_ligand/`、`free_states/`、`li_motif_sampling/`、`li_states/`、`method_audit/`、
   `ml/`、`pair_evidence/`、`provenance/`、`sampling/`。
 - 历史试算暂存：`_tools/`、`_weekNN_scratch/`（被 `.gitignore` 的 `outputs/_*/` 忽略）。
@@ -90,7 +90,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**29** 个跟踪文件）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**30** 个跟踪文件）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -115,6 +115,7 @@ week36 与 week44 只存在于 part2 镜像。
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息 | 交付层状态 → `work/_wp2_commit_msg.txt` |
 | `build_compute_provenance.py` | 逐作业复现证据清单 + 从各自 `.log` 推导 `failure_reason`（派生层） | `work/wp2prod/**` + 生产 ledger → `outputs/physics_completion/provenance/**` |
 | `build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） | 生产 ledger → `outputs/physics_completion/closure/**` |
+| `build_plan_compliance.py` | 方案 4-14 节逐条合规台账：状态与数字全部从产物现算（四分子闭环 / 方法审计 / 翻转持续性 / 锚点审计 / AL 预算），源码里不写死；作为「都做完没有」的机器可查答案 | 交付层 CSV → `outputs/physics_completion/compliance/**` |
 | `build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） | 生产 ledger → `outputs/physics_completion/sampling/**` |
 | `build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） | 生产 ledger → `outputs/physics_completion/cost/**` |
 | `build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的**结果前预注册** + 复核跑完后只读 `recheck_results.csv`、现算逐 (pair, 设定) 的 delta | 规则/对象/设定/几何来源 → `targeted_recheck/` 计划与验收层 |
@@ -134,7 +135,7 @@ week36 与 week44 只存在于 part2 镜像。
 
 `scripts/wp_production/finalize_wp2.ps1` 一条命令跑完：
 
-anchors → emit-wp2 → generator → closure → provenance → sampling → li-motif-plan → cost
+anchors → emit-wp2 → generator → closure → compliance → provenance → sampling → li-motif-plan → cost
 → recheck-plan → figures → mirror → site → freeze → clean-room → 各 `--check` → pytest。
 
 任一步非零即打印 `ABORT`，全绿才打印 `ALL GREEN`。日志重定向到 `work/_chainN.log`
