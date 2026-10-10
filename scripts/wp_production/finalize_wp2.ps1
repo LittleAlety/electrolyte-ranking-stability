@@ -19,6 +19,7 @@ Step "emit-wp2"     { & $py -X utf8 scripts\wp_production\emit_wp2.py }
 Step "generator"    { & $py -X utf8 scripts\build_physics_completion_batch.py }
 Step "closure"      { & $py -X utf8 scripts\wp_production\build_wp2_closure.py }
 Step "compliance"   { & $py -X utf8 scripts\wp_production\build_plan_compliance.py }
+Step "state-identity" { & $py -X utf8 scripts\wp_production\build_state_identity_qc.py }
 Step "provenance"   { & $py -X utf8 scripts\wp_production\build_compute_provenance.py }
 Step "sampling"     { & $py -X utf8 scripts\wp_production\build_wp2_sampling.py }
 Step "li-motif-plan" { & $py -X utf8 scripts\wp_production\build_li_motif_sampling_plan.py }
@@ -32,6 +33,7 @@ Step "clean-room"   { & $py -X utf8 scripts\audit_clean_room.py }
 Step "check-gen"    { & $py -X utf8 scripts\build_physics_completion_batch.py --check }
 Step "check-closure" { & $py -X utf8 scripts\wp_production\build_wp2_closure.py --check }
 Step "check-compliance" { & $py -X utf8 scripts\wp_production\build_plan_compliance.py --check }
+Step "check-state-identity" { & $py -X utf8 scripts\wp_production\build_state_identity_qc.py --check }
 Step "check-provenance" { & $py -X utf8 scripts\wp_production\build_compute_provenance.py --check }
 Step "check-sampling" { & $py -X utf8 scripts\wp_production\build_wp2_sampling.py --check }
 Step "check-li-motif-plan" { & $py -X utf8 scripts\wp_production\build_li_motif_sampling_plan.py --check }
