@@ -125,7 +125,10 @@ week36 与 week44 只存在于 part2 镜像。
 | `verify_archive.py` | 归档的**可重新解析性**核验：拿归档原始日志按仓库口径重算登记值，与 manifest 逐字段比对；`--ledger` 再重算交付账本；缺条目/哈希不符/数值不符 → 退出码 1 | `*.zip` + `job_archive_manifest.csv`（+ `production_ledger.csv`） → 核验结论 |
 
 非 Python 的跟踪文件：`finalize_wp2.ps1`（一键收口链）、`supervise_pending.ps1`（无人值守监守）、
-`watch_smpd.ps1`（轻量 smpd 看护）、`wp1_audit_src.txt`（WP1 分段源码）、`README.md`（本目录索引）。
+`watch_smpd.ps1`（轻量 smpd 看护）、`watch_supervisor.ps1`（监守看护：接住监守 `exit 3` 的信号）、
+`wp1_audit_src.txt`（WP1 分段源码）、`README.md`（本目录索引）。
+无人值守链的形状是**两个看护 + 一个监守**：`watch_smpd` 兜住 smpd 级联秒败，`watch_supervisor`
+在「还有腿没算完、又没有活跃监守」时重新拉起监守，监守跑完队列后调 `run_to_closure.py --commit` 折入交付层。
 
 ## 4. 收口链
 

@@ -39,6 +39,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 0.2 秒内瞬败。
 
 `supervise_pending.ps1` 持单实例锁 `work/_supervisor.lock`（锁里 PID 仍存活则自己退出，陈旧则接管）：机器重启后只要再拉起一个监守即可继续，不会出现两个监守同时接管、把并发从 2 个 ORCA 叠成 4 个。
+无人值守的完整形状是**两个常驻看护 + 一个监守**：`watch_smpd.ps1` 兜住已在跑的旧驱动（smpd 死掉会级联秒败），`watch_supervisor.ps1` 接住监守 `exit 3` 的信号（否则闭环停在半路没人再拉起），监守自己负责跑队列并在结束后折入交付层。
 
 ## 各脚本职责
 
@@ -58,6 +59,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `supervise_pending.ps1` | 无人值守监守：单实例锁 + **每轮开跑前**都等其它驱动退出后调 `run_wp2_queue.py --run`，队列结束后再调 `run_to_closure.py --commit` 把结果折进交付层。轮次不是固定的：只要已 computed 的腿数在涨就继续下一轮，只有**连续 `-MaxStalledRounds`（默认 3）轮毫无进展**才停；结束时若仍有腿未 computed，日志写 `INCOMPLETE` 并返回 3（重新拉起即可继续）。旧版固定跑 3 轮就退出删锁，一轮里撞上 smpd 刚死的窗口就会让闭环静默停在半路 |
 | `supervisor_policy.py` | 上面那条收敛判据（纯函数，有单测）：`--computed-count` 按队列自己的 `inventory()` 口径数已 computed 的腿，`--decide` 判断该继续 / 完成 / 因停摆或轮数上限而停。把判据从 `.ps1` 的分支里拿出来，是为了它可被测试钉住——写错就会让闭环关不上 |
 | `watch_smpd.ps1` | 轻量 smpd 看护（常驻、约 0 CPU）：每 `-IntervalSeconds`（默认 300）检查 Microsoft MPI 的 smpd，缺失就拉起，日志写 `work/_smpd_watch.log`。用途是兜住**已在跑的**旧驱动——它们没有队列的逐次复查，smpd 一死就会级联秒败；停止：`Get-CimInstance Win32_Process | Where-Object CommandLine -like '*watch_smpd*'` 取 PID 后 `Stop-Process` |
+| `watch_supervisor.ps1` | 监守的看护（常驻、约 0 CPU）：每 `-IntervalSeconds`（默认 600）检查一次——还有腿没 computed、又没有活跃监守时，把 `supervise_pending.ps1` 重新拉起来（`-MaxHours` 默认 120）。监守是**有意**会退出的（连续无进展时写 `INCOMPLETE` 并 `exit 3`，把「要不要再来一轮」交给外部），没有这个看护，那个信号就没人接，闭环会静默停在半路。它只调 `supervise_pending.ps1`，不加 `--max-jobs` / `--force`，并发上限仍由监守守；判据走 `supervisor_policy.py --watch-decide`（纯函数，有单测）；日志写 `work/_supervisor_watch.log` |
 | `archive_raw_outputs.py` | 把 provenance 里登记的原始作业文件打成**确定性、可复核的 zip 归档**（`--build` 生成，默认落在仓库外 `_compute_archive/`；`--check <zip>` 逐条复算 sha256） |
 | `verify_archive.py` | 归档的**可重新解析性**核验：拿归档里的原始日志按仓库口径重算登记值，与该作业在 `job_archive_manifest.csv` 里的值逐字段比对；`--ledger` 再用同一份归档重算交付账本 `production_ledger.csv` 的数值列。缺条目 / sha256 不符 / 数值不符都算失败（退出码 1），`--limit N` 调试、`--strict` 把「算不出来」也算失败。生产在跑期间归档必然落后于 manifest，报的是「登记晚于归档」的预期漂移；队列停掉后重建归档再跑才应回到 0 |
 | `build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |

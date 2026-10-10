@@ -13,6 +13,7 @@ PowerShell 的 supervise_pending.ps1 只负责取数、调用、落盘；「要�
     python scripts/wp_production/supervisor_policy.py --computed-count
     python scripts/wp_production/supervisor_policy.py --decide --before 10 --after 12 --round 1 \
         --stalled 0 --max-rounds 6 --max-stalled 3
+    python scripts/wp_production/supervisor_policy.py --watch-decide --computed 10 --target 20 --active false
 """
 
 from __future__ import annotations
@@ -31,6 +32,11 @@ STOP_ROUND_CAP = "stop_round_cap"
 
 #: 仍未算完时的退出码；与收口链自身的失败码区分开。
 INCOMPLETE_EXIT = 3
+
+#: watch_supervisor.ps1 的三种结论。
+WAIT = "wait"
+RELAUNCH = "relaunch"
+WATCH_EXIT = "exit"
 
 
 def computed_count(rows):
@@ -58,6 +64,24 @@ def decide(before, after, target, round_index, stalled, max_rounds, max_stalled_
     return CONTINUE, stalled
 
 
+def watch_decide(computed, target, supervisor_active):
+    """看护的判据：要不要把监守重新拉起来。
+
+    监守在「腿没算完但连续无进展」时会写 INCOMPLETE 并 exit 3——这是**有意的**信号：
+    把「要不要再来一轮」交给外部决定。但信号要有人接，否则四分子闭环就停在半路、
+    再也没有人拉起它（这正是旧版监守的失败模式，只是换了个地方发生）。
+
+    * 已有活跃监守 -> WAIT（不叠第二个；单实例锁之外再加一层，锁只是监守自己的保险）；
+    * 没有监守但还有腿没算完 -> RELAUNCH；
+    * 没有监守且腿已全齐 -> WATCH_EXIT（折入已由监守自己做完，看护不必再动）。
+    """
+    if supervisor_active:
+        return WAIT
+    if computed >= target:
+        return WATCH_EXIT
+    return RELAUNCH
+
+
 def inventory_rows():
     import run_wp2_queue as queue  # noqa: E402  (延迟导入：模块导入时会解析 ORCA 路径)
 
@@ -68,6 +92,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Supervisor convergence policy.")
     parser.add_argument("--computed-count", action="store_true")
     parser.add_argument("--decide", action="store_true")
+    parser.add_argument("--watch-decide", action="store_true")
+    parser.add_argument("--computed", type=int, default=0)
+    parser.add_argument("--active", type=lambda value: str(value).strip().lower() in ("1", "true", "yes"),
+                        default=False)
     parser.add_argument("--before", type=int, default=0)
     parser.add_argument("--after", type=int, default=0)
     parser.add_argument("--target", type=int, default=20)
@@ -85,7 +113,10 @@ def main(argv=None):
                                    args.stalled, args.max_rounds, args.max_stalled)
         print("%s %d" % (decision, stalled))
         return 0
-    parser.error("需要 --computed-count 或 --decide 之一")
+    if args.watch_decide:
+        print(watch_decide(args.computed, args.target, args.active))
+        return 0
+    parser.error("需要 --computed-count / --decide / --watch-decide 之一")
 
 
 if __name__ == "__main__":
