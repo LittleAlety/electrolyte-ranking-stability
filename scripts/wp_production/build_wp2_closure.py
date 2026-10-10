@@ -31,6 +31,11 @@ REPO = Path(__file__).resolve().parents[2]
 FREE = REPO / "outputs" / "physics_completion" / "free_states"
 AUDIT = REPO / "outputs" / "physics_completion" / "method_audit"
 OUTDIR = REPO / "outputs" / "physics_completion" / "closure"
+ENSEMBLES = REPO / "outputs" / "physics_completion" / "ensembles"
+#: The screen-level ensemble rung is gas-phase GFN2.  It is reported under its own
+#: status so that it can never be mistaken for the production R4 rung.
+SCREEN_STATUS = "computed_screen_only"
+KJ_PER_EV = 96.48533212331002
 
 FOUR = [("C01", "DMC"), ("C02", "EMC"), ("C13", "GBL"), ("C14", "SL")]
 MAIN_STATES = ("M", "M_plus", "LiM_plus", "LiM_2plus")
@@ -43,7 +48,8 @@ SCOPE = ("four-molecule closure (DMC / EMC / GBL / SL) at the production level "
          "def2-TZVPD neutral leg M_tzvpd")
 LADDER_SCOPE = ("EMC | GBL and EMC | SL only; rung 1 is the frozen-geometry method "
                 "axis (4 pre-accepted settings), rung 2/3 are the solution-optimised "
-                "production legs, rung 4 is conformational sampling")
+                "production legs, rung 4 is conformational sampling; R4_screen is a "
+                "separately labelled screen-level (gas-phase GFN2) ensemble and is NOT rung 4")
 
 
 def read_csv(path):
@@ -70,8 +76,19 @@ def dump(obj):
     return json.dumps(obj, ensure_ascii=False, indent=2) + "\n"
 
 
+def load_screen_pairs():
+    """The registered screen-level pair table, if that layer is on disk."""
+    path = ENSEMBLES / "ensemble_index.json"
+    if not path.is_file():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return {(item["left_molecule"], item["right_molecule"]): item
+            for item in payload.get("pair_state_agreement", [])}
+
+
 def load():
     return {
+        "screen": load_screen_pairs(),
         "production": read_csv(FREE / "production_ledger.csv"),
         "qc": read_csv(FREE / "production_qc.csv"),
         "redox": read_csv(FREE / "production_redox.csv"),
@@ -264,8 +281,38 @@ def flip_ladder(data):
             "rung_detail": "conformational sampling (plan 6.1: up to 3 then 6 structures)",
             "i": i_name, "j": j_name, "delta_ev": "", "n_values": "0", "sign": "",
             "sign_stable_across_settings": "", "status": "not_computed",
-            "note": ("no sampled ensemble exists yet; every produced state still carries "
-                     "n_conformers=1, so the ensemble rung cannot be evaluated"),
+            "note": ("no PRODUCTION ensemble exists yet: every produced state still carries "
+                     "n_conformers=1; the screen-level ensemble is reported separately as R4_screen"),
+        })
+        screen = data.get("screen", {}).get((i_name, j_name)) or {}
+        free_gap = screen.get("free_ionisation_gap_kj") or {}
+        li_gap = screen.get("Li_conditioned_gap_kj") or {}
+        headline = free_gap.get("G_state")
+        average = free_gap.get("G_avg")
+        screen_ok = headline is not None
+        conventions = {_sign([value]) for value in (headline, average) if value is not None}
+        li_sign = _sign([li_gap["G_state"]]) if li_gap.get("G_state") is not None else ""
+        note_parts = []
+        if screen_ok:
+            note_parts.append("screen-level only (gas-phase GFN2), NOT the production R4 rung")
+            note_parts.append("headline L(M_plus) - L(M) at L = G_state; L = G_avg gives %.3f eV"
+                              % (average / KJ_PER_EV))
+            note_parts.append("Li-conditioned L(LiM_2plus) - L(LiM_plus) gives %.3f eV (sign=%s)"
+                              % (li_gap["G_state"] / KJ_PER_EV, li_sign))
+            note_parts.append("four-level ladder in outputs/physics_completion/ensembles/ensemble_pair_rungs.csv")
+        else:
+            note_parts.append("the screen-level ensemble layer is not on disk; nothing is inferred")
+        rows.append({
+            "pair": pair, "rung": "R4_screen", "rung_kind": "screen_gfn2_ensemble",
+            "rung_detail": ("screen-level Boltzmann ensemble of the registered screening pools "
+                            "(free-state conformers + Li motifs, GFN2 --ohess): L(M_plus) - L(M)"),
+            "i": i_name, "j": j_name,
+            "delta_ev": "%.6f" % (headline / KJ_PER_EV) if screen_ok else "",
+            "n_values": ("2" if (screen_ok and average is not None) else ("1" if screen_ok else "0")),
+            "sign": _sign([headline]) if screen_ok else "",
+            "sign_stable_across_settings": str(len(conventions) == 1).lower() if screen_ok else "",
+            "status": SCREEN_STATUS if screen_ok else "not_computed",
+            "note": "; ".join(note_parts),
         })
     return rows
 
@@ -277,6 +324,10 @@ def ladder_summary(rows, data):
         pair = "%s | %s" % (i_name, j_name)
         by_rung = {row["rung"]: row for row in rows if row["pair"] == pair}
         certified = next((item for item in cert["pairs"] if item["pair"] == pair), None)
+        screen_row = by_rung.get("R4_screen", {})
+        screen_sign = screen_row.get("sign", "")
+        screen_li_gap = (data.get("screen", {}).get((i_name, j_name)) or {}).get("Li_conditioned_gap_kj") or {}
+        li_sign = _sign([screen_li_gap["G_state"]]) if screen_li_gap.get("G_state") is not None else ""
         evaluated = [rung for rung in ("R1a", "R1b", "R2", "R3", "R4")
                      if by_rung.get(rung, {}).get("status") == "computed"]
         signs = {rung: by_rung[rung]["sign"] for rung in evaluated}
@@ -288,6 +339,19 @@ def ladder_summary(rows, data):
             "rungs_evaluated": evaluated,
             "rungs_not_computed": [rung for rung in ("R1a", "R1b", "R2", "R3", "R4")
                                    if rung not in evaluated],
+            "screen_rungs_evaluated": [rung for rung in ("R4_screen",)
+                                       if by_rung.get(rung, {}).get("status") == SCREEN_STATUS],
+            "screen_ensemble_delta_ev": screen_row.get("delta_ev", ""),
+            "screen_ensemble_sign": screen_sign,
+            "screen_ensemble_li_conditioned_sign": li_sign,
+            "screen_ensemble_agrees_with_method_axis": ((signs.get("R1b") == screen_sign)
+                                                        if ("R1b" in signs and screen_sign) else None),
+            "screen_ensemble_li_conditioned_changes_the_sign": ((li_sign != screen_sign)
+                                                                if (li_sign and screen_sign) else None),
+            "screen_verdict": ("screen ensemble absent" if not screen_sign else
+                               ("Li coordination flips the pair sign at the screen level"
+                                if (li_sign and li_sign != screen_sign) else
+                                "Li coordination keeps the pair sign at the screen level")),
             "sign_by_rung": signs,
             "sign_flip_vertical_to_adiabatic": (signs.get("R1a") is not None
                                                 and signs.get("R1b") is not None
@@ -352,14 +416,41 @@ def acceptance(state_rows, label_rows, ladder_rows, summary, data):
         "ok": str(li_ok).lower(),
         "detail": "li_states_produced=%d" % n_li,
     })
-    ladder_explicit = all((row["delta_ev"] != "") == (row["status"] == "computed")
-                          for row in ladder_rows)
+    filled = ("computed", SCREEN_STATUS)
+    ladder_explicit = all((row["delta_ev"] != "") == (row["status"] in filled) for row in ladder_rows)
     rows.append({
         "check_id": "flip_ladder_marks_uncomputed_rungs",
-        "description": "翻转阶梯：未计算的一级显式标 not_computed，不推断符号",
+        "description": "翻转阶梯：未计算的一级显式标 not_computed、不推断符号；筛选层的值只准带 computed_screen_only",
         "ok": str(ladder_explicit).lower(),
-        "detail": "rungs=%d computed=%d" % (
-            len(ladder_rows), sum(1 for row in ladder_rows if row["status"] == "computed")),
+        "detail": "rungs=%d computed=%d screen_only=%d" % (
+            len(ladder_rows),
+            sum(1 for row in ladder_rows if row["status"] == "computed"),
+            sum(1 for row in ladder_rows if row["status"] == SCREEN_STATUS)),
+    })
+    screen_rows = [row for row in ladder_rows if row["rung_kind"] == "screen_gfn2_ensemble"]
+    screen_labelled = all(
+        row["status"] in ("not_computed", SCREEN_STATUS)
+        and (row["status"] != SCREEN_STATUS or "NOT the production" in row["note"])
+        for row in screen_rows)
+    rows.append({
+        "check_id": "screen_ensemble_rung_is_never_labelled_production",
+        "description": "筛选层系综（气相 GFN2）只能以 computed_screen_only 出现，且必须写明它不是生产 R4",
+        "ok": str(screen_labelled and len(screen_rows) == len(PAIRS)).lower(),
+        "detail": "screen_rows=%d" % len(screen_rows),
+    })
+    readback = []
+    for row in screen_rows:
+        if row["status"] != SCREEN_STATUS:
+            continue
+        gap = ((data.get("screen", {}).get((row["i"], row["j"])) or {}).get("free_ionisation_gap_kj")
+               or {}).get("G_state")
+        if gap is None or abs(float(row["delta_ev"]) - gap / KJ_PER_EV) > 5e-7:
+            readback.append(row["pair"])
+    rows.append({
+        "check_id": "screen_ensemble_delta_is_read_back_from_the_ensemble_layer",
+        "description": "筛选层那一级的 delta 逐字读回 ensembles/ensemble_index.json，不另行重算或换口径",
+        "ok": str(not readback).lower(),
+        "detail": "mismatched: %s" % (", ".join(readback) or "none"),
     })
     cert_ok = all(item["method_axis_certified"] for item in summary)
     rows.append({
@@ -439,8 +530,18 @@ def build():
              "detail": "; ".join("%s->%s" % (item["pair"], item["sign_flip_survives_to_production"])
                                  for item in summary)},
             {"item": "conformer ensemble rung (plan 6.1/6.2)",
-             "status": "not_computed",
-             "detail": "every produced state still carries n_conformers=1; G_ensemble is empty"},
+             "status": ("computed_screen_only" if any(item["screen_rungs_evaluated"] for item in summary)
+                        else "not_computed"),
+             "detail": ("a screen-level gas-phase GFN2 ensemble of the registered pools exists "
+                        "(outputs/physics_completion/ensembles/); the PRODUCTION rung still needs extra "
+                        "produced legs because every produced state carries n_conformers=1")},
+            {"item": "does Li coordination change the pair sign",
+             "status": ("computed_screen_only" if any(item["screen_ensemble_li_conditioned_sign"]
+                                                      for item in summary) else "not_computed"),
+             "detail": "; ".join("%s: free=%s Li=%s (%s)" % (
+                 item["pair"], item["screen_ensemble_sign"] or "n/a",
+                 item["screen_ensemble_li_conditioned_sign"] or "n/a", item["screen_verdict"])
+                 for item in summary)},
         ],
         "ladder": summary,
         "notes": ("derived analysis over the frozen physics_completion free-state ledger; "
@@ -466,22 +567,30 @@ def build():
         "",
         "## 翻转阶梯（Δ = IP(i) − IP(j)，氧化轴）",
         "",
-        "| pair | R1a 垂直 | R1b 绝热 | R2 溶液优化电子能 | R3 单构象自由能 | R4 系综 |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| pair | R1a 垂直 | R1b 绝热 | R2 溶液优化电子能 | R3 单构象自由能 | R4 系综 | R4_screen 筛选层系综 |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for item in summary:
         signs = item["sign_by_rung"]
-        md.append("| %s | %s | %s | %s | %s | %s |" % (
+        md.append("| %s | %s | %s | %s | %s | %s | %s |" % (
             item["pair"], signs.get("R1a", "n/a"), signs.get("R1b", "n/a"),
             signs.get("R2", "not_computed"), signs.get("R3", "not_computed"),
-            signs.get("R4", "not_computed")))
+            signs.get("R4", "not_computed"),
+            (item["screen_ensemble_sign"] + " (screen)") if item["screen_ensemble_sign"]
+            else "not_computed"))
     md += [
         "",
         "## 口径",
         "",
         "方法轴认证只覆盖**固定几何上的电子能层**：EMC–GBL 与 EMC–SL 在四种预设设定下",
         "垂直腿与绝热腿符号相反且各自稳定。该结论**不**自动外推到溶液优化几何或自由能层；",
-        "R2/R3 需要基组一致的 `M_tzvpd` 腿，R4 需要构象采样，未完成即标 `not_computed`。",
+        "R2/R3 需要基组一致的 `M_tzvpd` 腿，R4（生产系综）需要额外产出的结构腿，未完成即标 `not_computed`。",
+        "",
+        "`R4_screen` 是**另一档、单独标注**的：它是已登记筛选池上的气相 GFN2 Boltzmann 系综",
+        "（`outputs/physics_completion/ensembles/`），口径是 `L(M_plus) - L(M)`、`L = G_state`；",
+        "它的状态一律是 `computed_screen_only`，**不是**生产 R4，也不与 R1/R2/R3 的平均口径混用。",
+        "同一份筛选层还给出 Li 条件态 `L(LiM_2plus) - L(LiM_plus)` 的四层阶梯，用来回答",
+        "「Li 配位是否改变这一对的符号」；两者是否同号写在 `closure_index.json` 的 `screen_verdict` 里。",
         "",
     ]
     return {

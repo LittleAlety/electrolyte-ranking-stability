@@ -11,8 +11,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finali
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finalize_wp2.ps1 -Commit
 ```
 
-顺序：`anchors` → `emit-wp2` → `generator` → `closure` → `compliance` → `provenance` → `sampling` → `li-motif-plan` → `cost` →
-`recheck-plan` → `figures` → `mirror` → `site` → `freeze` → `clean-room` → 十一个 `--check` → `pytest`。
+顺序：`anchors` → `emit-wp2` → `generator` → `provenance` → `state-identity` → `anchor-condition` → `sampling` → `li-motif-plan` → `ensemble` → `closure` → `compliance` → `cost` →
+`recheck-plan` → `figures` → `mirror` → `site` → `freeze` → `clean-room` → 十四个 `--check` → `pytest`。
 任一非零即 `ABORT`，不提交。
 
 ## 生产队列：查状态与断点续跑
@@ -75,6 +75,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） |
 | `screen_li_motifs.py` | 方案 6.1 / 执行第 3 步的**执行器**（唯一一个会自己跑 xTB 的派生层脚本）：复用 `build_li_motifs.py` 里冻结的枚举规则，按每条腿自己的电荷/多重度在**该腿自己的几何**上跑气相 GFN2-xTB 配位 motif 筛选，去重后每腿保留最多 3 个独立 motif；`--check` 核对落盘 CSV 与运行记录同版（8 腿全跑约 30 秒，4 并发；不占 ORCA 槽位） |
 | `make_physics_completion_figures.py` | 方案 14 的六张主图（F59-F64）与图清单 |
+| `build_wp2_ensemble_free_energies.py` | 方案 6.1 第 3 步 / 6.2 的**系综层**：读两个已登记筛选池（自由态构象池 + Li motif 池），用 xTB GFN2 `--ohess` 重算自由能并求 Boltzmann 系综；`G_state = -RT ln Q` 与 `G_avg = Σ wᵢGᵢ` 两种口径**并列且不互换**，并给出 EMC-GBL / EMC-SL 的「同分子氧化轴」四层配对台与 Li 条件态对照；带虚频的结构留行、排除出系综；`--check` 要求 6 个产物 byte-identical。**筛选层，不是生产 R4**（状态 `computed_screen_only`） | 两登记池 + `work/enso/**` → `outputs/physics_completion/ensembles/**` |
 | `build_physics_completion_deliverables.py` | 建交付镜像（仓库外 `成果输出（part2）/week37..week44`）；week44 结题提交包收录结题报告、协议、配置、样本、锚点审计、`docs/65_repo_layout.md` 骨架图、生成器源码、测试与全部 `outputs/physics_completion/**`；`--check` 逐文件复核 byte-identical |
 
 ## 边界

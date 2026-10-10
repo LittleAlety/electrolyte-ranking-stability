@@ -90,7 +90,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**33** 个跟踪文件）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**34** 个跟踪文件）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -125,6 +125,7 @@ week36 与 week44 只存在于 part2 镜像。
 | `make_physics_completion_figures.py` | 方案 14 的六张主图（F59-F64）与图清单 | 交付层 CSV → `outputs/figures/**` |
 | `build_physics_completion_deliverables.py` | 建交付镜像（仓库外 `成果输出（part2）/week37..week44`）：week44 收结题报告、协议、配置、样本、锚点审计、本骨架图、生成器源码、测试与全部 `outputs/physics_completion/**`；`--check` 逐文件复核 byte-identical | 仓库源路径 → 仓库外 part2 镜像 |
 | `archive_raw_outputs.py` | 把 provenance 登记的原始作业文件打成**确定性、可复核的 zip 归档**（`--build` 默认落仓库外 `_compute_archive/`；`--check <zip>` 逐条复算 sha256）；并把当次 manifest 内嵌成 `_manifest/job_archive_manifest.csv`，让「这份 zip 对应哪一版登记表」自证、过期可判 | `job_archive_manifest.csv` + 仓库外原始日志 → `_compute_archive/*.zip` + `.index.csv` + `.README.md` |
+| `build_wp2_ensemble_free_energies.py` | 方案 6.1 第 3 步 / 6.2：把两个**已登记**的筛选池（自由态构象池 + Li motif 池）在 xTB GFN2 `--ohess` 自由能层面折成 Boltzmann 系综（`G_state = -RT ln Q` 与布居平均 `G_avg` 两种口径并列、不互换），并给 EMC-GBL / EMC-SL 两对输出「同分子氧化轴」的四层配对台（`free_ionisation` 与 `Li_conditioned`）；虚频结构留行并排除出系综。**是筛选层不是生产 R4**，状态一律 `computed_screen_only` | 两登记池 + gitignore 的 `work/enso/**` → `outputs/physics_completion/ensembles/**` |
 | `verify_archive.py` | 归档的**可重新解析性**核验：拿归档原始日志按仓库口径重算登记值，与 manifest 逐字段比对；`--ledger` 再重算交付账本；`--latest` 自动取最新归档并先打一行 `[freshness]`（内嵌登记表是否与仓库当前那份同版）；`--gate-when-complete` 是收口链里的**结题门禁**（只在 20/20 时先重建归档再要求同版 + 0 不符，没跑完时只提示）；缺条目/哈希不符/数值不符 → 退出码 1 | `*.zip` + `job_archive_manifest.csv`（+ `production_ledger.csv`） → 核验结论 |
 
 非 Python 的跟踪文件：`finalize_wp2.ps1`（一键收口链）、`supervise_pending.ps1`（无人值守监守）、
@@ -137,7 +138,7 @@ week36 与 week44 只存在于 part2 镜像。
 
 `scripts/wp_production/finalize_wp2.ps1` 一条命令跑完：
 
-anchors → emit-wp2 → generator → closure → compliance → state-identity → provenance → sampling → li-motif-plan → cost
+anchors → emit-wp2 → generator → provenance → state-identity → anchor-condition → sampling → li-motif-plan → ensemble → closure → compliance → cost
 → recheck-plan → figures → mirror → site → freeze → clean-room → archive-verify → 各 `--check` → pytest。
 
 任一步非零即打印 `ABORT`，全绿才打印 `ALL GREEN`。日志重定向到 `work/_chainN.log`
