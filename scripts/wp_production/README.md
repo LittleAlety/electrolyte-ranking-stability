@@ -73,6 +73,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `run_pair_recheck.py` | 靶向复核**执行器**：在已登记的生产 Opt 几何上跑 S3/S4 单点（不重优化、不算频率），串行、每作业 2 核；原始现场落仓库外 `work/recheck/` |
 | `emit_pair_recheck.py` | 靶向复核**手工折步**：把 `work/recheck/` 的原始单点折成 `recheck_results.csv`（逐行带几何 sha256）。与 `archive_raw_outputs.py` 同性质，输入在仓库外，因此不进收口链 |
 | `build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） |
+| `screen_li_motifs.py` | 方案 6.1 / 执行第 3 步的**执行器**（唯一一个会自己跑 xTB 的派生层脚本）：复用 `build_li_motifs.py` 里冻结的枚举规则，按每条腿自己的电荷/多重度在**该腿自己的几何**上跑气相 GFN2-xTB 配位 motif 筛选，去重后每腿保留最多 3 个独立 motif；`--check` 核对落盘 CSV 与运行记录同版（8 腿全跑约 30 秒，4 并发；不占 ORCA 槽位） |
 | `make_physics_completion_figures.py` | 方案 14 的六张主图（F59-F64）与图清单 |
 | `build_physics_completion_deliverables.py` | 建交付镜像（仓库外 `成果输出（part2）/week37..week44`）；week44 结题提交包收录结题报告、协议、配置、样本、锚点审计、`docs/65_repo_layout.md` 骨架图、生成器源码、测试与全部 `outputs/physics_completion/**`；`--check` 逐文件复核 byte-identical |
 

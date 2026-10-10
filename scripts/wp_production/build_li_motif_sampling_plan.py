@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -53,11 +54,19 @@ KEEP_LOWEST = 3
 MAX_KEEP = 6
 STARTS_ROUND1 = 16
 PRODUCTION = "produced_single_conformer"
+SCREEN_JSON = OUT / "li_motif_screen.json"
+SCREEN_CSV = OUT / "li_motif_screen.csv"
+SCREEN_OUTPUTS = (
+    "outputs/physics_completion/li_motif_sampling/li_motif_screen.csv",
+    "outputs/physics_completion/li_motif_sampling/li_motif_screen.json",
+    "outputs/physics_completion/li_motif_sampling/li_motif_screen.md",
+)
 
 PLAN_FIELDS = ("record_id", "mol_id", "name", "state", "charge", "multiplicity",
                "screen_level", "round0_identity", "round0_donor_contacts", "round0_li_o_ang",
                "round0_core_hours", "motif_classes_to_enumerate", "starts_round1", "keep_lowest",
                "max_keep", "production_start_kind", "production_leg_status", "motif_screen_status",
+               "screen_kept_motifs", "screen_verdict", "screen_parent_current",
                "note")
 ACC_FIELDS = ("check_id", "description", "ok", "detail")
 
@@ -69,6 +78,22 @@ def read_csv(path):
 
 def read_json(path):
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def screen_parent_current(entry):
+    """Is the geometry the screen was run on still the geometry on disk?"""
+    parent = REPO / entry["parent_path"]
+    if not parent.is_file():
+        return "parent_missing"
+    return "true" if sha256_file(parent) == entry["parent_sha256"] else "stale_parent_changed"
 
 
 def csv_text(fields, rows):
@@ -95,6 +120,8 @@ def build():
     pilot = {row["record_id"]: row for row in read_csv(PILOT_LI)}
     sampling = read_json(SAMPLING_INDEX)
     registered = {(row["mol_id"], row["state"]): row for row in read_csv(PRODUCTION_LEDGER)}
+    screen = read_json(SCREEN_JSON) if SCREEN_JSON.is_file() else None
+    screen_legs = {entry["record_id"]: entry for entry in (screen or {}).get("legs", [])}
 
     sampling_status = {(entry["mol_id"], entry["state"]): entry for entry in sampling["li_motif_sampling"]}
 
@@ -110,6 +137,13 @@ def build():
             if evidence:
                 core_hours = float(evidence["cores"]) * float(evidence["wall_sec"]) / 3600.0
             leg = registered.get((mol_id, state))
+            screen_leg = screen_legs.get(key)
+            if screen_leg is None:
+                screen_status = "not_computed"
+            elif screen_leg["kept"]:
+                screen_status = "computed"
+            else:
+                screen_status = "unresolved"
             plan_rows.append({
                 "record_id": key,
                 "mol_id": mol_id, "name": name, "state": state,
@@ -129,7 +163,10 @@ def build():
                 "max_keep": str(MAX_KEEP),
                 "production_start_kind": "single_frozen_motif",
                 "production_leg_status": "computed" if leg else "not_computed",
-                "motif_screen_status": "not_computed",
+                "motif_screen_status": screen_status,
+                "screen_kept_motifs": "" if screen_leg is None else str(len(screen_leg["kept"])),
+                "screen_verdict": "" if screen_leg is None else screen_leg["verdict"],
+                "screen_parent_current": "" if screen_leg is None else screen_parent_current(screen_leg),
                 "note": ("round-0 evidence is the registered Li pilot single point for this exact leg; the "
                          "production leg still starts from one frozen geometry, so the motif ensemble is "
                          "registered here rather than claimed"),
@@ -144,6 +181,10 @@ def build():
     round0_registered = sum(1 for row in plan_rows if row["round0_identity"])
     screening_untouched = all(entry["status"] == "not_computed"
                               for entry in sampling["li_motif_sampling"])
+    screen_legs_out = sum(1 for row in plan_rows if row["motif_screen_status"] != "not_computed")
+    screen_legs_computed = sum(1 for row in plan_rows if row["motif_screen_status"] == "computed")
+    screen_stale = [row["record_id"] for row in plan_rows
+                    if row["screen_parent_current"] not in ("", "true")]
 
     checks = [
         {"check_id": "covers_every_li_leg_of_the_four_molecule_subcohort",
@@ -190,10 +231,21 @@ def build():
          "ok": pilot_core_hours > 0 and all(row["starts_round1"] == str(STARTS_ROUND1) for row in plan_rows),
          "detail": "8 legs measured round-0 core-hours = %.6f (sum of cores x wall over the 8 Li pilot "
                    "single points); round-1 starts per leg = %d" % (pilot_core_hours, STARTS_ROUND1)},
-        {"check_id": "nothing_is_claimed_computed_yet",
-         "description": "本层只登记规则与证据：motif 筛选一条都没跑，采样层占位仍为 not_computed",
-         "ok": all(row["motif_screen_status"] == "not_computed" for row in plan_rows) and screening_untouched,
-         "detail": "8/8 motif screens not_computed; sampling_index li_motif_sampling untouched"},
+        {"check_id": "screen_claims_match_the_run_record",
+         "description": "每条腿的 motif_screen_status 与 li_motif_screen.json 的运行记录一致：没有记录文件时必须全是 not_computed，有记录文件时不允许再留 not_computed",
+         "ok": ((screen is None and all(row["motif_screen_status"] == "not_computed" for row in plan_rows)
+                 and screening_untouched)
+                or (screen is not None
+                    and all(row["motif_screen_status"] != "not_computed" for row in plan_rows))),
+         "detail": ("no run record: 8/8 not_computed" if screen is None
+                    else "run record present: %d/%d legs carry an outcome (%d computed, %d unresolved)"
+                         % (screen_legs_out, len(plan_rows), screen_legs_computed, screen_legs_out - screen_legs_computed))},
+        {"check_id": "screen_parent_geometries_are_current",
+         "description": "筛选所用父几何与登记一致；生产腿重跑后必须重跑筛选（重跑约 30 秒）",
+         "ok": not screen_stale,
+         "detail": ("no run record yet" if screen is None else (
+             "all %d parents unchanged" % len(plan_rows) if not screen_stale
+             else "stale parent geometry for: " + ", ".join(screen_stale)))},
     ]
     n_failed = sum(0 if item["ok"] else 1 for item in checks)
 
@@ -234,7 +286,11 @@ def build():
                    "keep_lowest": KEEP_LOWEST, "max_keep": MAX_KEEP,
                    "level": SCREEN_LEVEL},
         "production_start_kind": "single_frozen_motif",
-        "motif_screen_status": "not_computed",
+        "motif_screen_status": "computed" if screen_legs_computed == len(plan_rows) else "not_computed",
+        "screen_executor": "scripts/wp_production/screen_li_motifs.py",
+        "screen_run_record": ("outputs/physics_completion/li_motif_sampling/li_motif_screen.json"
+                              if screen is not None else ""),
+        "screen_legs_computed": screen_legs_computed,
         "plan": plan_rows,
         "checks": checks,
         "n_checks": len(checks),
@@ -275,15 +331,34 @@ def build():
         "## 作业计划（%d 条腿，逐条登记）" % len(plan_rows),
         "",
         "| 记录 | 分子 | 态 | q/m | round-0 身份 | 给体接触 | Li–O (Å) | round-0 实测 core-hour | "
-        "round-1 起点 | 保留 | 状态 |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "round-1 起点 | 保留 | 筛选状态 | 筛选保留 motif |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in plan_rows:
-        md.append("| %s | %s | %s | %s/%s | %s | %s | %s | %s | %s | %s | %s |"
+        md.append("| %s | %s | %s | %s/%s | %s | %s | %s | %s | %s | %s | %s | %s |"
                   % (row["record_id"], row["name"], row["state"], row["charge"], row["multiplicity"],
                      row["round0_identity"] or "-", row["round0_donor_contacts"] or "-",
                      row["round0_li_o_ang"] or "-", row["round0_core_hours"] or "-",
-                     row["starts_round1"], row["keep_lowest"], row["motif_screen_status"]))
+                     row["starts_round1"], row["keep_lowest"], row["motif_screen_status"],
+                     row["screen_kept_motifs"] or "-"))
+    screen_summary = []
+    if screen is not None:
+        screen_summary = [
+            "",
+            "## 已执行的筛选结果（运行记录 li_motif_screen.json）",
+            "",
+            "| 记录 | 起点数 | 成功 | 保留 motif | 判定 | 最低 motif |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
+        for row in plan_rows:
+            entry = screen_legs.get(row["record_id"])
+            if entry is None:
+                continue
+            lowest = entry["kept"][0]["_motif_class"] if entry["kept"] else "-"
+            screen_summary.append("| %s | %d | %d | %d | %s | %s |" % (
+                row["record_id"], entry["n_sites"], entry["n_ok"], len(entry["kept"]), entry["verdict"], lowest))
+        screen_summary += ["", "> 筛选层是气相 GFN2-xTB，不是生产自由能；保留结构的几何路径见 li_motif_screen.md。", ""]
+    md += screen_summary
     md += [
         "",
         "## 验收（%d/%d 通过）" % (len(checks) - n_failed, len(checks)),
@@ -297,8 +372,9 @@ def build():
         "",
         "## 边界",
         "",
-        "* 本层**没有跑任何 motif 筛选**：8 条腿全部 `motif_screen_status = not_computed`，"
-        "`outputs/physics_completion/sampling/sampling_index.json` 的 `li_motif_sampling` 占位也保持不变。",
+        "* 本层只登记规则；筛选由 `scripts/wp_production/screen_li_motifs.py` 执行，运行记录写在"
+        "`outputs/physics_completion/li_motif_sampling/li_motif_screen.json`。没有运行记录时 8 条腿仍是"
+        "`motif_screen_status = not_computed`；有记录时逐腿写 computed / unresolved，并核对父几何是否已被重跑。",
         "* round-0 身份/给体接触数逐条取自已登记的 Li pilot 单点，不是推断；其成本为重测值（cores x wall）。",
         "* 生产级 Li 腿仍是单代表 motif：本层只登记「系综该怎么做、怎么做才算不违规」。",
         "",
@@ -311,7 +387,8 @@ def build():
         "outputs/physics_completion/li_motif_sampling/acceptance.csv": csv_text(ACC_FIELDS, checks),
     }
     meta = {"files": len(files), "legs": len(plan_rows), "checks": len(checks), "failed": n_failed,
-            "pilot_core_hours": pilot_core_hours, "switching": mother_vs_oxidised}
+            "pilot_core_hours": pilot_core_hours, "switching": mother_vs_oxidised,
+            "screen_expected": screen is not None, "screen_legs_out": screen_legs_out}
     return files, meta
 
 
@@ -330,11 +407,14 @@ def main(argv=None):
                 failures.append("missing %s" % rel)
             elif target.read_text(encoding="utf-8") != text:
                 failures.append("differs %s" % rel)
+        for rel in sorted(SCREEN_OUTPUTS):
+            if not (REPO / rel).is_file() and meta["screen_expected"]:
+                failures.append("missing %s" % rel)
         if OUT.is_dir():
             for path in sorted(OUT.rglob("*")):
                 if path.is_file():
                     rel = path.relative_to(REPO).as_posix()
-                    if rel not in files:
+                    if rel not in files and rel not in SCREEN_OUTPUTS:
                         failures.append("stray %s" % rel)
         if failures:
             print("CHECK FAILED (%d)" % len(failures))

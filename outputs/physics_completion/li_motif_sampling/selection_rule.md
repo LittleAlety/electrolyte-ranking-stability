@@ -29,18 +29,34 @@
 
 ## 作业计划（8 条腿，逐条登记）
 
-| 记录 | 分子 | 态 | q/m | round-0 身份 | 给体接触 | Li–O (Å) | round-0 实测 core-hour | round-1 起点 | 保留 | 状态 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| C01|LiM_plus | DMC | LiM_plus | 1/1 | intact_monodentate_carbonyl | 1 | 1.654 | 0.077889 | 16 | 3 | not_computed |
-| C01|LiM_2plus | DMC | LiM_2plus | 2/2 | intact_monodentate_carbonyl | 1 | 1.805 | 0.095667 | 16 | 3 | not_computed |
-| C02|LiM_plus | EMC | LiM_plus | 1/1 | intact_monodentate_carbonyl | 1 | 1.659 | 0.132333 | 16 | 3 | not_computed |
-| C02|LiM_2plus | EMC | LiM_2plus | 2/2 | intact_monodentate_carbonyl | 1 | 1.782 | 0.215778 | 16 | 3 | not_computed |
-| C13|LiM_plus | GBL | LiM_plus | 1/1 | intact_monodentate_carbonyl | 1 | 1.667 | 0.087000 | 16 | 3 | not_computed |
-| C13|LiM_2plus | GBL | LiM_2plus | 2/2 | intact_monodentate_carbonyl | 1 | 1.815 | 0.116778 | 16 | 3 | not_computed |
-| C14|LiM_plus | SL | LiM_plus | 1/1 | intact_bidentate_sulfone | 2 | 1.885 | 0.099111 | 16 | 3 | not_computed |
-| C14|LiM_2plus | SL | LiM_2plus | 2/2 | intact_monodentate_sulfone | 1 | 1.721 | 0.097889 | 16 | 3 | not_computed |
+| 记录 | 分子 | 态 | q/m | round-0 身份 | 给体接触 | Li–O (Å) | round-0 实测 core-hour | round-1 起点 | 保留 | 筛选状态 | 筛选保留 motif |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| C01|LiM_plus | DMC | LiM_plus | 1/1 | intact_monodentate_carbonyl | 1 | 1.654 | 0.077889 | 16 | 3 | computed | 2 |
+| C01|LiM_2plus | DMC | LiM_2plus | 2/2 | intact_monodentate_carbonyl | 1 | 1.805 | 0.095667 | 16 | 3 | computed | 1 |
+| C02|LiM_plus | EMC | LiM_plus | 1/1 | intact_monodentate_carbonyl | 1 | 1.659 | 0.132333 | 16 | 3 | computed | 2 |
+| C02|LiM_2plus | EMC | LiM_2plus | 2/2 | intact_monodentate_carbonyl | 1 | 1.782 | 0.215778 | 16 | 3 | computed | 2 |
+| C13|LiM_plus | GBL | LiM_plus | 1/1 | intact_monodentate_carbonyl | 1 | 1.667 | 0.087000 | 16 | 3 | computed | 1 |
+| C13|LiM_2plus | GBL | LiM_2plus | 2/2 | intact_monodentate_carbonyl | 1 | 1.815 | 0.116778 | 16 | 3 | computed | 1 |
+| C14|LiM_plus | SL | LiM_plus | 1/1 | intact_bidentate_sulfone | 2 | 1.885 | 0.099111 | 16 | 3 | computed | 1 |
+| C14|LiM_2plus | SL | LiM_2plus | 2/2 | intact_monodentate_sulfone | 1 | 1.721 | 0.097889 | 16 | 3 | computed | 3 |
 
-## 验收（10/10 通过）
+## 已执行的筛选结果（运行记录 li_motif_screen.json）
+
+| 记录 | 起点数 | 成功 | 保留 motif | 判定 | 最低 motif |
+| --- | --- | --- | --- | --- | --- |
+| C01|LiM_plus | 10 | 10 | 2 | production_motif_is_lowest | monodentate_donor3 |
+| C01|LiM_2plus | 10 | 10 | 1 | production_motif_within_1kj | monodentate_donor3 |
+| C02|LiM_plus | 10 | 10 | 2 | production_motif_is_lowest | monodentate_donor4 |
+| C02|LiM_2plus | 10 | 10 | 2 | production_motif_within_1kj | monodentate_donor4 |
+| C13|LiM_plus | 4 | 4 | 1 | production_motif_within_1kj | monodentate_donor0 |
+| C13|LiM_2plus | 7 | 7 | 1 | production_motif_within_1kj | monodentate_donor0 |
+| C14|LiM_plus | 7 | 7 | 1 | production_motif_within_1kj | bidentate_donors0_2 |
+| C14|LiM_2plus | 7 | 7 | 3 | production_motif_within_1kj | monodentate_donor0 |
+
+> 筛选层是气相 GFN2-xTB，不是生产自由能；保留结构的几何路径见 li_motif_screen.md。
+
+
+## 验收（11/11 通过）
 
 | check | ok | detail |
 | --- | --- | --- |
@@ -53,10 +69,11 @@
 | keep_three_independent_motifs_with_registered_escalation | PASS | keep_lowest=3, max_keep=6 on every leg |
 | stop_rule_is_registered | PASS | stop rule registered in selection_rule.json / selection_rule.md |
 | budget_uses_the_measured_li_pilot_cost | PASS | 8 legs measured round-0 core-hours = 0.922445 (sum of cores x wall over the 8 Li pilot single points); round-1 starts per leg = 16 |
-| nothing_is_claimed_computed_yet | PASS | 8/8 motif screens not_computed; sampling_index li_motif_sampling untouched |
+| screen_claims_match_the_run_record | PASS | run record present: 8/8 legs carry an outcome (8 computed, 0 unresolved) |
+| screen_parent_geometries_are_current | PASS | all 8 parents unchanged |
 
 ## 边界
 
-* 本层**没有跑任何 motif 筛选**：8 条腿全部 `motif_screen_status = not_computed`，`outputs/physics_completion/sampling/sampling_index.json` 的 `li_motif_sampling` 占位也保持不变。
+* 本层只登记规则；筛选由 `scripts/wp_production/screen_li_motifs.py` 执行，运行记录写在`outputs/physics_completion/li_motif_sampling/li_motif_screen.json`。没有运行记录时 8 条腿仍是`motif_screen_status = not_computed`；有记录时逐腿写 computed / unresolved，并核对父几何是否已被重跑。
 * round-0 身份/给体接触数逐条取自已登记的 Li pilot 单点，不是推断；其成本为重测值（cores x wall）。
 * 生产级 Li 腿仍是单代表 motif：本层只登记「系综该怎么做、怎么做才算不违规」。

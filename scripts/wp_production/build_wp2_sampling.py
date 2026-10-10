@@ -14,7 +14,8 @@
     它只回答「单一代表结构是否落在同一极小附近」，不用于给出生产自由能；
   * 每个态保留最多 3 个独立低能极小（池里不足 3 个就保留实际数量，并登记 pool_limited）；
     3 -> 6 的升级只有在算出第 1 轮自由能、且变化跨过独立容差时才触发；
-  * Li 配位态的 motif 采样不在本轮：它需要单独的配位起点构造，显式登记为 not_computed。
+  * Li 配位态的 motif 采样单列一层（它需要自己的配位起点构造）：规则登记在这里，执行由
+    scripts/wp_production/screen_li_motifs.py 完成，结果由 li_motif_screen.json 读回；没有结果时仍是 not_computed。
 
 用法
 ----
@@ -348,15 +349,30 @@ def derive(raw):
     results2 = evaluate_round(raw, KIND_R2)
     pool_rows, escalation_rows = select_pool(raw)
 
+    li_screen = REPO / "outputs" / "physics_completion" / "li_motif_sampling" / "li_motif_screen.json"
+    li_screen_run = json.loads(li_screen.read_text(encoding="utf-8")) if li_screen.is_file() else None
+    li_screen_legs = {entry["record_id"]: entry for entry in (li_screen_run or {}).get("legs", [])}
     li_rows = []
     for mol_id, name, smiles in MOLS:
         for state in ("LiM_plus", "LiM_2plus"):
+            entry = li_screen_legs.get("%s|%s" % (mol_id, state))
+            if entry is None:
+                li_rows.append({
+                    "mol_id": mol_id, "name": name, "state": state, "level": LEVEL,
+                    "n_motifs_screened": "0", "status": "not_computed",
+                    "note": ("Li coordination-motif sampling needs its own complex construction "
+                             "(the Li mother state and the oxidised state must each be sampled "
+                             "separately) and is not part of round 1"),
+                })
+                continue
             li_rows.append({
                 "mol_id": mol_id, "name": name, "state": state, "level": LEVEL,
-                "n_motifs_screened": "0", "status": "not_computed",
-                "note": ("Li coordination-motif sampling needs its own complex construction "
-                         "(the Li mother state and the oxidised state must each be sampled "
-                         "separately) and is not part of round 1"),
+                "n_motifs_screened": str(len(entry["kept"])),
+                "status": "computed" if entry["kept"] else "unresolved",
+                "note": ("executed by scripts/wp_production/screen_li_motifs.py on this leg's own geometry "
+                         "(parent sha256 %s); %d starts screened, verdict=%s; the free-state rounds stay "
+                         "untouched, because a Li complex is not a free-state conformer"
+                         % (entry["parent_sha256"][:12], entry["n_sites"], entry["verdict"])),
             })
 
     n_done = sum(1 for row in results if row["verdict"] != "not_computed")
@@ -380,9 +396,11 @@ def derive(raw):
                        for row in results)).lower(),
          "detail": "%d/%d computed" % (n_done, len(results))},
         {"check_id": "li_motif_sampling_is_registered_separately",
-         "description": "Li 配位 motif 采样单列登记（本轮未做），不并进自由态结论",
-         "ok": str(all(row["status"] == "not_computed" for row in li_rows)).lower(),
-         "detail": "%d Li entries registered" % len(li_rows)},
+         "description": "Li 配位 motif 采样单列登记，且绝不并进自由态结论（不共用自由态结构集合与判定）",
+         "ok": str(all(row["status"] in ("not_computed", "computed", "unresolved") for row in li_rows)
+                   and not any(row.get("source_kind") in (KIND_R1, KIND_R2) for row in li_rows)).lower(),
+         "detail": "%d Li entries; %d computed"
+                   % (len(li_rows), sum(1 for row in li_rows if row["status"] == "computed"))},
         {"check_id": "conformer_set_structures_come_from_the_registered_pool",
          "description": "结构集合的每个结构都来自登记的两轮采样池，不引入池外几何",
          "ok": str(all(row["source_kind"] in (KIND_R1, KIND_R2) for row in pool_rows)).lower(),
