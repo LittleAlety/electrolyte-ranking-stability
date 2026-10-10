@@ -14,9 +14,9 @@
 | --- | --- | --- | --- | --- |
 | tier_1_thermodynamic_quantitative | 0 | 0 | false | no condition-matched absolute-calibration series exists in the repository |
 | tier_2_series_trend | 14 | 7 | trend_only | one homologous series (one paper / apparatus / criterion); 7/14 series rows are model-covered |
-| tier_3_not_usable | 73 | 0 | false | not-model-covered series rows, literature estimates (est), DOE secondary and gas-phase anchors are a different tier |
+| tier_3_not_usable | 73 | 54 | false | literature estimates (est), DOE secondary and gas-phase anchors: species coverage is recorded per row, but a covered species is still not condition-comparable -> stays unusable |
 
-## 验收（6/6 通过）
+## 验收（7/7 通过）
 
 | check | ok | detail |
 | --- | --- | --- |
@@ -26,6 +26,7 @@
 | cross_series_mixing_flagged | PASS | series_id=Ue1994_Okoshi2015 单系列；DOE secondary 与气相锚点单列 tier_3 |
 | tier_counts_match_the_audit_table | PASS | tier entries=87 ; audit rows=87 |
 | gate1_unchanged | PASS | reason=ordering_disagrees tau_b=0.4286 n_pairs=21 |
+| tier_coverage_counts_match_the_audit_table | PASS | tier_2=7 tier_3=54（由 audit 表 covered_by_model 逐行计数） |
 
 ## 限制
 

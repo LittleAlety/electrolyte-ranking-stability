@@ -100,6 +100,10 @@ WP2_PRODUCTION_STATES_DONE = len([row for row in WP2_PRODUCTION_LEDGER
 WP2_PRODUCTION_STATES_TOTAL = len(WP2_PRODUCTION_MOLECULES) * len(WP2_PRODUCTION_STATES)
 WP2_PRODUCTION_EXTRA_DONE = len([row for row in WP2_PRODUCTION_LEDGER
                                  if row["state"] in WP2_PRODUCTION_EXTRA_STATES])
+WP2_PRODUCTION_LI_STATES = ("LiM_plus", "LiM_2plus")
+WP2_PRODUCTION_LI_DONE = len([row for row in WP2_PRODUCTION_LEDGER
+                              if row["state"] in WP2_PRODUCTION_LI_STATES])
+WP2_PRODUCTION_LI_TOTAL = len(WP2_PRODUCTION_MOLECULES) * len(WP2_PRODUCTION_LI_STATES)
 
 
 '''
@@ -474,10 +478,14 @@ WP2_STATUS_BLOCK = '''        "**状态**：账本与系综规则已冻结；48 
         % (production_progress["states_done"], production_progress["states_total"]),
 '''
 
-LIMITS_SECTION_BLOCK = '''        "- WP2 生产：主态只登记 %d/%d；Li 配位态（LiM_plus / LiM_2plus）生产侧全部未开始（0/8，只有 12 分子的 xTB/SP 级 pilot）；"
+LIMITS_SECTION_BLOCK = '''        "- WP2 生产：主态只登记 %d/%d（其中 Li 配位腿 %d/%d）；"
         "每态仍是**单一代表结构**（n_conformers = 1），方案 6.1 的多构象 / 多 motif 系综（12x4 起步、上限 144、6 kcal/mol 窗口、最多 3 结构）尚未执行；"
-        "基组一致 redox 只完成自由腿 1/4（GBL，def2-TZVPD 中性腿 + TZVPD 阳离子腿）与 Li 腿 0/4，未齐的腿留空。"
-        % (WP2_PRODUCTION_STATES_DONE, WP2_PRODUCTION_STATES_TOTAL),
+        "基组一致 redox 只完成自由腿 1/4（GBL，def2-TZVPD 中性腿 + TZVPD 阳离子腿），Li 腿 0/4，未齐的腿留空。"
+        % (WP2_PRODUCTION_STATES_DONE, WP2_PRODUCTION_STATES_TOTAL,
+           WP2_PRODUCTION_LI_DONE, WP2_PRODUCTION_LI_TOTAL),
+        "- WP2 起点方法 QC 警告：12 分子 Li pilot 里 DME（C08）与 AN（C16）的 [LiM]2+ 在 GFN2 松弛中解离"
+        "（Li-O/N 距离约 11 埃，起点是冻结 C1 层几何），其 coordination_shift 已标 d_ip_interpretable=false；"
+        "这只说明该起点与该廉价方法下不可比，不等于已证实的溶液分解路径，也不进入主排序。",
         "- WP4：7 个氧化锚点只做到 transcription 级，回原文页码 / 表号复核因本机网络不可达 + 主要候选源付费墙而处于**硬阻塞**。",
         "- WP3：pair rung 的 12 个成员与主集差一个分子（含 SN、不含 DEC）。",
 '''
@@ -509,8 +517,105 @@ WP5_AL_CHECK_BLOCK = '        {"id": "replay_not_pretended_blind", "description"
 ANCHOR_WP5_AL_CONVENTION = '            "al_protocol": "12-label pool replay; initial 4 labels, 1 per round, 20 acquisition seeds; random/diversity/uncertainty/ranking-aware",\n'
 WP5_AL_CONVENTION_BLOCK = '            "al_protocol": replay_pool_note,\n'
 
+
+ANCHOR_COVERAGE_HELPER = '''def build_anchor_audit():
+'''
+COVERAGE_HELPER_BLOCK = '''def _coverage(species, core_names):
+    """covered_by_model 一律按「物种是否在建模集合里」算，不再逐源写死。
+
+    「被模型覆盖」与「条件可比」是两个正交的轴：gas-phase / est / DOE 行的物种可能确实被建模覆盖，
+    但它们仍留在 tier_3（不可用于当前目标验证）。物种缺失记 unknown，不冒充 false。
+    """
+    if not species:
+        return "unknown"
+    return "true" if species in core_names else "false"
+
+
+def build_anchor_audit():
+'''
+ANCHOR_COVERAGE_EST = '''            "original_scale": row.get("original_scale", ""), "criterion": "literature_informed_estimate",
+            "series_id": "", "cross_series_mixed": "true", "covered_by_model": "true",
+'''
+COVERAGE_EST_BLOCK = '''            "original_scale": row.get("original_scale", ""), "criterion": "literature_informed_estimate",
+            "series_id": "", "cross_series_mixed": "true",
+            "covered_by_model": _coverage(row.get("species", ""), core_names),
+'''
+ANCHOR_COVERAGE_GAS = '''            "original_scale": row.get("method", ""), "criterion": "gas_phase_ion_energetics",
+            "series_id": "", "cross_series_mixed": "true", "covered_by_model": "true",
+'''
+COVERAGE_GAS_BLOCK = '''            "original_scale": row.get("method", ""), "criterion": "gas_phase_ion_energetics",
+            "series_id": "", "cross_series_mixed": "true",
+            "covered_by_model": _coverage(row.get("species", ""), core_names),
+'''
+ANCHOR_TIER_SUMMARY = '''    tiers = [
+        {"tier": "tier_1_thermodynamic_quantitative",
+         "n_entries": tier_counts.get("tier_1_thermodynamic_quantitative", 0),
+         "n_model_covered_species": 0, "usable": "false",
+         "reason": "no condition-matched absolute-calibration series exists in the repository"},
+        {"tier": "tier_2_series_trend", "n_entries": tier_counts.get("tier_2_series_trend", 0),
+         "n_model_covered_species": len(covered), "usable": "trend_only",
+         "reason": "one homologous series (one paper / apparatus / criterion); %d/%d series rows are model-covered"
+                   % (len(covered), len(series))},
+        {"tier": "tier_3_not_usable", "n_entries": tier_counts.get("tier_3_not_usable", 0),
+         "n_model_covered_species": 0, "usable": "false",
+         "reason": "not-model-covered series rows, literature estimates (est), DOE secondary and gas-phase anchors are a different tier"},
+    ]
+'''
+TIER_SUMMARY_BLOCK = '''    tier_covered = {}
+    for row in audit_rows:
+        if row["covered_by_model"] == "true":
+            tier_covered[row["curatable_tier"]] = tier_covered.get(row["curatable_tier"], 0) + 1
+    tiers = [
+        {"tier": "tier_1_thermodynamic_quantitative",
+         "n_entries": tier_counts.get("tier_1_thermodynamic_quantitative", 0),
+         "n_model_covered_species": tier_covered.get("tier_1_thermodynamic_quantitative", 0),
+         "usable": "false",
+         "reason": "no condition-matched absolute-calibration series exists in the repository"},
+        {"tier": "tier_2_series_trend", "n_entries": tier_counts.get("tier_2_series_trend", 0),
+         "n_model_covered_species": tier_covered.get("tier_2_series_trend", 0), "usable": "trend_only",
+         "reason": "one homologous series (one paper / apparatus / criterion); %d/%d series rows are model-covered"
+                   % (len(covered), len(series))},
+        {"tier": "tier_3_not_usable", "n_entries": tier_counts.get("tier_3_not_usable", 0),
+         "n_model_covered_species": tier_covered.get("tier_3_not_usable", 0), "usable": "false",
+         "reason": "literature estimates (est), DOE secondary and gas-phase anchors: species coverage is recorded "
+                   "per row, but a covered species is still not condition-comparable -> stays unusable"},
+    ]
+'''
+ANCHOR_WP4_COVERAGE_CHECK = '''        {"id": "gate1_unchanged", "description": "旧 Gate 1 失败原样保留",
+         "ok": frozen["ok"] is False and frozen["reason"] == "ordering_disagrees",
+         "detail": "reason=%s tau_b=%.4f n_pairs=%d" % (frozen["reason"], frozen["tau_b"], frozen["n_pairs"])},
+    ]
+'''
+WP4_COVERAGE_CHECK_BLOCK = '''        {"id": "gate1_unchanged", "description": "旧 Gate 1 失败原样保留",
+         "ok": frozen["ok"] is False and frozen["reason"] == "ordering_disagrees",
+         "detail": "reason=%s tau_b=%.4f n_pairs=%d" % (frozen["reason"], frozen["tau_b"], frozen["n_pairs"])},
+        {"id": "tier_coverage_counts_match_the_audit_table",
+         "description": "三级表的 model-covered 计数由逐行审计表算出，不再写死",
+         "ok": all(item["n_model_covered_species"] == tier_covered.get(item["tier"], 0) for item in tiers),
+         "detail": "tier_2=%d tier_3=%d（由 audit 表 covered_by_model 逐行计数）"
+                   % (tier_covered.get("tier_2_series_trend", 0),
+                      tier_covered.get("tier_3_not_usable", 0))},
+    ]
+'''
+
 ANCHOR_TARGETED_COST_NOTE = '    {"item": "targeted_pair_second_method_single_points", "unit": "SP", "value": "16-32", "kind": "planned",\n     "status": "planned", "note": "explicit selection rule; targeted re-check"},\n'
-TARGETED_COST_NOTE_BLOCK = '    {"item": "targeted_pair_second_method_single_points", "unit": "SP", "value": "16-32", "kind": "planned",\n     "status": "planned", "note": "explicit selection rule registered before any result; 24 single points (3 molecules x 4 main states x the two second-functional settings) planned in outputs/physics_completion/pair_evidence/targeted_recheck/"},\n    {"item": "targeted_pair_second_method_single_points_computed", "unit": "SP", "value": "12", "kind": "measured",\n     "status": "measured", "note": "the 12 ready single points (3 molecules x the two free states M / M_plus x the two second-functional settings) ran at 2 cores each, serial, 0.692 core-hours in total; the other 12 stay blocked on their Li production legs; the registered table is outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv and the raw ORCA outputs stay in work/recheck/"},\n'
+ANCHOR_COST_LEDGER_DEF = 'COST_LEDGER = [\n'
+COST_LEDGER_DEF_BLOCK = '''RECHECK_RESULTS_PATH = (REPO / "outputs" / "physics_completion" / "pair_evidence"
+                        / "targeted_recheck" / "recheck_results.csv")
+RECHECK_RESULTS_ROWS = (PB.load_rows(RECHECK_RESULTS_PATH) if RECHECK_RESULTS_PATH.exists() else [])
+RECHECK_DONE_ROWS = [row for row in RECHECK_RESULTS_ROWS if row.get("status") == "computed"]
+RECHECK_CORE_HOURS = sum(float(row["core_hours"]) for row in RECHECK_DONE_ROWS)
+
+
+COST_LEDGER = [
+'''
+TARGETED_COST_NOTE_BLOCK = '''    {"item": "targeted_pair_second_method_single_points", "unit": "SP", "value": "16-32", "kind": "planned",
+     "status": "planned", "note": "explicit selection rule registered before any result; 24 single points (3 molecules x 4 main states x the two second-functional settings) planned in outputs/physics_completion/pair_evidence/targeted_recheck/"},
+    {"item": "targeted_pair_second_method_single_points_computed", "unit": "SP",
+     "value": "%d" % len(RECHECK_DONE_ROWS), "kind": "measured", "status": "measured",
+     "note": "the %d registered single points (the frozen second functional on the production Opt geometries, 2 cores each, serial) cost %.3f core-hours in total; the remaining rows of the 24-row plan wait on their production legs; the table is outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv and the raw ORCA outputs stay in work/recheck/"
+             % (len(RECHECK_DONE_ROWS), RECHECK_CORE_HOURS)},
+'''
 
 def load_rows():
     rows = []
@@ -634,6 +739,12 @@ def main():
     src = sub_once(src, ANCHOR_WP5_AL_SCENARIO, WP5_AL_SCENARIO_BLOCK)
     src = sub_once(src, ANCHOR_WP5_AL_CHECK, WP5_AL_CHECK_BLOCK)
     src = sub_once(src, ANCHOR_WP5_AL_CONVENTION, WP5_AL_CONVENTION_BLOCK)
+    src = sub_once(src, ANCHOR_COVERAGE_HELPER, COVERAGE_HELPER_BLOCK)
+    src = sub_once(src, ANCHOR_COVERAGE_EST, COVERAGE_EST_BLOCK)
+    src = sub_once(src, ANCHOR_COVERAGE_GAS, COVERAGE_GAS_BLOCK)
+    src = sub_once(src, ANCHOR_TIER_SUMMARY, TIER_SUMMARY_BLOCK)
+    src = sub_once(src, ANCHOR_WP4_COVERAGE_CHECK, WP4_COVERAGE_CHECK_BLOCK)
+    src = sub_once(src, ANCHOR_COST_LEDGER_DEF, COST_LEDGER_DEF_BLOCK)
 
     if GEN.exists():
         with GEN.open("r", encoding="utf-8", newline="") as f:

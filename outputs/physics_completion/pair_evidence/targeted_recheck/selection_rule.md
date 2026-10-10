@@ -23,8 +23,8 @@
 | 第二泛函设定 | S3 (PBE0-D4/def2-TZVP) / S4 (PBE0-D4/def2-TZVPD) |
 | 计划单点总数 | 24 |
 | 方案 11 预算 | 16-32 |
-| 可用（生产腿已登记） | 12 |
-| 阻塞（生产腿未登记） | 12 |
+| 可用（生产腿已登记） | 14 |
+| 阻塞（生产腿未登记） | 10 |
 
 ## 作业计划（24 行，逐行登记）
 
@@ -50,12 +50,12 @@
 | C14|M|S4 | SL | M | S4 | PBE0-D4/def2-TZVPD | `work/wp2prod/SL/M/SL_M_opt.xyz` | true | false | false | ready | - |
 | C14|M_plus|S3 | SL | M_plus | S3 | PBE0-D4/def2-TZVP | `work/wp2prod/SL/M_plus/SL_M_plus_opt.xyz` | true | false | false | ready | - |
 | C14|M_plus|S4 | SL | M_plus | S4 | PBE0-D4/def2-TZVPD | `work/wp2prod/SL/M_plus/SL_M_plus_opt.xyz` | true | false | false | ready | - |
-| C14|LiM_plus|S3 | SL | LiM_plus | S3 | PBE0-D4/def2-TZVP | `work/wp2prod/SL/LiM_plus/SL_LiM_plus_opt.xyz` | false | false | false | blocked_on_production_leg | C14|LiM_plus |
-| C14|LiM_plus|S4 | SL | LiM_plus | S4 | PBE0-D4/def2-TZVPD | `work/wp2prod/SL/LiM_plus/SL_LiM_plus_opt.xyz` | false | false | false | blocked_on_production_leg | C14|LiM_plus |
+| C14|LiM_plus|S3 | SL | LiM_plus | S3 | PBE0-D4/def2-TZVP | `work/wp2prod/SL/LiM_plus/SL_LiM_plus_opt.xyz` | true | false | false | ready | - |
+| C14|LiM_plus|S4 | SL | LiM_plus | S4 | PBE0-D4/def2-TZVPD | `work/wp2prod/SL/LiM_plus/SL_LiM_plus_opt.xyz` | true | false | false | ready | - |
 | C14|LiM_2plus|S3 | SL | LiM_2plus | S3 | PBE0-D4/def2-TZVP | `work/wp2prod/SL/LiM_2plus/SL_LiM_2plus_opt.xyz` | false | false | false | blocked_on_production_leg | C14|LiM_2plus |
 | C14|LiM_2plus|S4 | SL | LiM_2plus | S4 | PBE0-D4/def2-TZVPD | `work/wp2prod/SL/LiM_2plus/SL_LiM_2plus_opt.xyz` | false | false | false | blocked_on_production_leg | C14|LiM_2plus |
 
-## 复核结果（已登记 12 条，实测 0.692245 core-hours）
+## 复核结果（已登记 14 条，实测 0.841672 core-hours）
 
 | pair | 设定 | Eox(i) | Eox(j) | delta | 符号 | 基组一致 | 与冻结 R1b 同号 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -77,20 +77,20 @@
 
 | check | ok | detail |
 | --- | --- | --- |
-| registered_before_any_recheck_sp | PASS | plan rows 24 (ready 12 / blocked 12); result columns in the job plan: none; registered single points live in recheck_results.csv: 12 |
+| registered_before_any_recheck_sp | PASS | plan rows 24 (ready 14 / blocked 10); result columns in the job plan: none; registered single points live in recheck_results.csv: 14 |
 | scope_is_exactly_the_certified_pairs | PASS | pairs=EMC|GBL; EMC|SL; n_pairs_certified=2 |
 | molecules_are_the_certified_members_in_the_subcohort | PASS | pair members=EMC, GBL, SL; in scope=EMC, GBL, SL; outside the four-molecule subcohort=none |
-| planned_sp_matches_the_rule | PASS | 3 molecules x 4 states x 2 settings = 24 single points (ready 12 / blocked 12) |
+| planned_sp_matches_the_rule | PASS | 3 molecules x 4 states x 2 settings = 24 single points (ready 14 / blocked 10) |
 | planned_sp_inside_the_plan_11_budget | PASS | plan 11 row targeted_pair_second_method_single_points = 16-32; planned = 24 |
 | settings_are_the_frozen_second_functional | PASS | S3 = PBE0-D4/def2-TZVP (role=audit_control); S4 = PBE0-D4/def2-TZVPD (role=audit_control) |
-| production_registered_legs_are_ready | PASS | ready legs 6/12: C02|M, C02|M_plus, C13|M, C13|M_plus, C14|M, C14|M_plus |
-| unregistered_legs_are_blocked_and_named | PASS | blocked rows 12, each naming its missing leg: C02|LiM_2plus, C02|LiM_plus, C13|LiM_2plus, C13|LiM_plus, C14|LiM_2plus, C14|LiM_plus |
+| production_registered_legs_are_ready | PASS | ready legs 7/12: C02|M, C02|M_plus, C13|M, C13|M_plus, C14|LiM_plus, C14|M, C14|M_plus |
+| unregistered_legs_are_blocked_and_named | PASS | blocked rows 10, each naming its missing leg: C02|LiM_2plus, C02|LiM_plus, C13|LiM_2plus, C13|LiM_plus, C14|LiM_2plus |
 | no_new_geometry_no_new_frequency_no_result_columns | PASS | result-bearing columns: none |
-| results_cover_exactly_the_ready_rows | PASS | ready 12, registered 12, blocked rows carrying a result 0 |
-| results_are_the_frozen_second_functional_on_the_registered_geometry | PASS | 12 rows; settings S3, S4; functional/basis match method_settings.csv row by row |
+| results_cover_exactly_the_ready_rows | PASS | ready 14, registered 14, blocked rows carrying a result 0 |
+| results_are_the_frozen_second_functional_on_the_registered_geometry | PASS | 14 rows; settings S3, S4; functional/basis match method_settings.csv row by row |
 | derived_pair_gaps_are_basis_consistent_and_recomputed | PASS | EMC | GBL|S3 delta=0.481920 eV (positive); EMC | GBL|S4 delta=0.474608 eV (positive); EMC | SL|S3 delta=0.389983 eV (positive); EMC | SL|S4 delta=0.376190 eV (positive) |
 | budget_row_in_cost_ledger_still_planned | PASS | targeted_pair_second_method_single_points status=planned value=16-32 |
-| measured_cost_row_matches_the_registered_results | PASS | targeted_pair_second_method_single_points_computed value=12 status=measured; registered computed=12, measured core-hours=0.692245 |
+| measured_cost_row_matches_the_registered_results | PASS | targeted_pair_second_method_single_points_computed value=14 status=measured; registered computed=14, measured core-hours=0.841672 |
 
 ## 边界
 

@@ -39,7 +39,13 @@ def test_results_cover_exactly_the_ready_rows_and_the_plan_stays_result_free():
     results = _results()
     ready = {row["record_id"] for row in plan if row["status"] == "ready"}
     blocked = {row["record_id"] for row in plan if row["status"] != "ready"}
-    assert len(plan) == 24 and len(ready) == 12 and len(blocked) == 12
+    # 24 行 = 3 分子 x 4 主态 x 2 设定（冻结）。ready / blocked 的切分随生产腿落地而移动
+    # （例如 SL|LiM_plus 登记后会多出 2 条 ready），所以这里守的是不变量：每个计划行恰好归入
+    # ready 或 blocked，且只有 ready 行标了可用几何——而不是某个会随生产进度过期的具体数字。
+    assert len(plan) == 24
+    assert len(ready) + len(blocked) == len(plan)
+    assert all(row["geometry_available"] == "true" for row in plan if row["status"] == "ready")
+    assert all(row["geometry_available"] == "false" for row in plan if row["status"] != "ready")
     assert {row["record_id"] for row in results} == ready
     assert not (blocked & {row["record_id"] for row in results})
     result_columns = [field for field in plan[0]
@@ -106,5 +112,5 @@ def test_cost_ledger_keeps_the_preregistered_budget_and_adds_a_measured_row():
     assert preregistered["value"] == "16-32"
     measured = rows["targeted_pair_second_method_single_points_computed"]
     assert measured["kind"] == "measured" and measured["status"] == "measured"
-    assert int(measured["value"]) == len(computed) == 12
+    assert int(measured["value"]) == len(computed)
     assert ("%.3f" % core_hours) in measured["note"]

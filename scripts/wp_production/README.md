@@ -83,5 +83,5 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
   「最近的未打补丁基线 + 补丁块」确定性重打；手工改它会失效。基线缓存在 `work/pilot12/gen_baseline.py`。
 * **`work/pilot12/` 只是暂存区**：`run_batch.py` 的原始输出与生成器基线缓存仍落在那里；
   它被 `.gitignore`/提交时排除，不是交付物来源。
-* **零新增电子结构**：除 WP1/WP2 与靶向复核三段**显式登记**的本机作业外，收口链不引入任何新的电子结构计算。靶向复核的 12 个单点（2 核 × 串行，合计 0.692 core-hours）落在已登记的生产 Opt 几何上，结果与成本记在 `outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv` 与 `cost_ledger.csv` 的 `..._computed` 行。
+* **零新增电子结构**：除 WP1/WP2 与靶向复核三段**显式登记**的本机作业外，收口链不引入任何新的电子结构计算。靶向复核的单点（2 核 × 串行；条数与实测 core-hours 逐条记在 `cost_ledger.csv` 的 `..._computed` 行，不写死）落在已登记的生产 Opt 几何上，结果与成本记在 `outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv` 与 `cost_ledger.csv` 的 `..._computed` 行。
 * **仓库骨架**：目录职责、阶段编号与 WP 的对应、收口链与不可改清单见 `docs/65_repo_layout.md`；新增顶层目录/子包不登记会被 `tests/test_repo_layout.py` 拦下。

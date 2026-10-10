@@ -267,6 +267,27 @@ def test_anchor_audit_keeps_every_source_row() -> None:
     assert all(row["verdict"] == "kept_as_est_never_deleted" for row in est)
 
 
+def test_anchor_coverage_is_computed_not_hardcoded() -> None:
+    """covered_by_model 必须按物种是否在建模集合里算，且与三级表逐行一致。
+
+    这条测试针对一个真实缺陷：gas-phase 锚点曾整列写死 covered_by_model=true，
+    于是 water / oxygen / benzene 这类明显不在建模集合里的物种也被标成"被模型覆盖"，
+    而同一批次的三级表又写着 tier_3 覆盖数 = 0，两个文件自相矛盾。
+    """
+    rows = _read_csv(REPO_ROOT / "data/references/anchor_primary_audit.csv")
+    summary = _read_csv(REPO_ROOT / "outputs/physics_completion/anchor/anchor_tier_summary.csv")
+    covered = {}
+    for row in rows:
+        if row["covered_by_model"] == "true":
+            covered[row["curatable_tier"]] = covered.get(row["curatable_tier"], 0) + 1
+    for item in summary:
+        assert int(item["n_model_covered_species"]) == covered.get(item["tier"], 0), item["tier"]
+    gas = {row["species"]: row["covered_by_model"] for row in rows
+           if row["source_file"] == "data/anchors/gas_phase_anchors.csv"}
+    for species in ("water", "oxygen", "benzene", "carbon dioxide", "sulfur dioxide"):
+        assert gas[species] == "false", species
+
+
 def test_wp5_cost_ledger_flags_missing_absolute_costs() -> None:
     rows = _read_csv(REPO_ROOT / "outputs/physics_completion/cost/cost_ledger.csv")
     assert sum(1 for row in rows if row["status"] == "MISSING") == 3

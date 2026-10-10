@@ -10,9 +10,9 @@
 | --- | --- | --- | --- |
 | wp1_geometry_prep | 1 | 1 | 1 |
 | wp1_method_audit | 160 | 160 | 160 |
-| wp2_production | 16 | 14 | 10 |
+| wp2_production | 16 | 15 | 12 |
 | wp2_sampling | 640 | 640 | 640 |
-| wp3_recheck | 12 | 12 | 12 |
+| wp3_recheck | 14 | 14 | 14 |
 
 ## 四分子 20 条腿现场核对
 
@@ -25,7 +25,7 @@
 | DMC|M | computed | true | true | false |
 | DMC|M_plus | computed | true | true | false |
 | DMC|LiM_plus | computed | true | true | false |
-| DMC|LiM_2plus | in_flight | false | false | false |
+| DMC|LiM_2plus | computed | true | true | false |
 | DMC|M_tzvpd | not_started | false | false | false |
 | EMC|M | computed | true | true | false |
 | EMC|M_plus | computed | true | true | false |
@@ -39,7 +39,7 @@
 | GBL|M_tzvpd | computed | true | true | false |
 | SL|M | computed | true | true | false |
 | SL|M_plus | computed | true | true | false |
-| SL|LiM_plus | failed | true | false | false |
+| SL|LiM_plus | computed | true | true | false |
 | SL|LiM_2plus | failed | true | false | false |
 | SL|M_tzvpd | not_started | false | false | false |
 
@@ -50,7 +50,6 @@
 | wp2prod/EMC/LiM_2plus | LiM_2plus | mpi_smpd_unavailable |
 | wp2prod/EMC/LiM_plus | LiM_plus | mpi_smpd_communication_lost |
 | wp2prod/SL/LiM_2plus | LiM_2plus | mpi_smpd_unavailable |
-| wp2prod/SL/LiM_plus | LiM_plus | mpi_smpd_communication_lost |
 
 * 分类只依据该作业自己 `.log` 里的字符串，不做外部推断。
 * `mpi_smpd_*`：Microsoft MPI 的 smpd 在作业期间不可用或失联（主机重启后需要重新拉起，队列器 `ensure_smpd()` 已处理）。
