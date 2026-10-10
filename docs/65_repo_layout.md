@@ -12,13 +12,14 @@
 | --- | --- | --- |
 | `config/` | 版本化配置：`scientific_definitions.yaml`（旧定义，冻结）、`physics_completion_v1.yaml`（新阶段 WP0-WP6 的量名 / 样本 / 预算 / 停止规则）、`prereg.yaml` | 是（week37 收录 v1） |
 | `data/` | 输入与参考：`anchors/`（氧化锚点及其原始复核）、`metadata/`（样本集）、`references/`、`structures/` | 是 |
-| `docs/` | 文档：`NN_*.md` 按编号区间分段（见 §2.2），协议、结论迁移表、结题报告、本骨架图；`docs/assets/` 是终端站点的静态资源 | 是 |
+| `docs/` | 文档：`NN_*.md` 按编号区间分段（见 §2.2），协议、结论迁移表、结题报告、本骨架图；`docs/assets/` 是终端站点的静态资源；站点入口三件在 `docs/` 顶层：`index.html`、`404.html`、`.nojekyll` | 是 |
 | `outputs/` | 全部产物：`weekNN/` 逐阶段载荷 + `manifest.json`、`physics_completion/` 新阶段、`figures/`、`gate1/`、`state_identity/`、`decision_state/`、`phase2_p1a/`、`smoke/`、`_tools/`、`_weekNN_scratch/` | 是（镜像到仓库外 `成果输出（part2）`） |
 | `scripts/` | 入口脚本：顶层扁平入口 + `wp_production/` 生产子包 | 源码；生成器与关键测试随 week44 收录 |
 | `src/electrolyte_ranking/` | 可复用库（17 个模块）：`orca`、`xtb`、`qc`、`provenance`、`uncertainty`、`ranking`、`robustness`、`decision_state`、`paper`、`toolchain`、`pc_batch`、`wp2`、`wp3`、`wp4`、`wp5`、`wp6`、`wp7`（`wp2`–`wp7` 属**旧** WP 编号，见 §2.1） | 部分（`pc_batch.py` 随 week44 收录） |
-| `structures/` | 起始几何 | 是 |
+| `structures/` | 起始几何：`conformers/`（构象池）、`li_motifs/`（Li 配位 motif）、`microsolvation/`（微溶剂化） | 是 |
 | `tests/` | pytest 契约：生成器 `--check`、镜像一致性、冻结哈希、脚本索引、骨架覆盖等 | 部分（`test_physics_completion_batch.py` 随 week44 收录） |
 | `work/` | 运行期暂存：队列 stdout、生成器基线缓存、监守单实例锁、ORCA scratch | **否**（`.gitignore` 忽略 `work/*`，仅 3 个文件白名单） |
+| `.toolchain/`、`.venv/`、`.mamba/` | 本机工具链与运行环境（**不入库**）：`.toolchain/xtb/xtb-6.7.1/bin/xtb.exe`、`.venv/`（收口链用的解释器）、`.mamba/`；ORCA 在仓库外 `E:\orca_6_1_1\orca.exe`（定位见 `src/electrolyte_ranking/toolchain.py`）。骨架测试按 `startswith(".")` 跳过点目录，因此本行是人读登记 | 否 |
 
 顶层文件：`README.md`（由 `scripts/build_github_readme.py` 确定性生成的逐周日志，**不要手改**）、
 `计划.md`（研究计划 v1）、`FINAL_CONCLUSIONS.md`、`pyproject.toml`、
@@ -134,6 +135,8 @@ week36 与 week44 只存在于 part2 镜像。
 无人值守链的形状是**两个看护 + 一个监守**：`watch_smpd` 兜住 smpd 级联秒败，`watch_supervisor`
 在「还有腿没算完、又没有活跃监守」时重新拉起监守，监守跑完队列后调 `run_to_closure.py --commit` 折入交付层。
 
+**收口链只覆盖上表的一部分**：`finalize_wp2.ps1` 的步骤是 `emit_wp2.py` / `build_compute_provenance.py` / `build_state_identity_qc.py` / `build_anchor_condition_audit.py` / `build_wp2_sampling.py` / `build_li_motif_sampling_plan.py` / `build_wp2_ensemble_free_energies.py` / `build_wp2_closure.py` / `build_plan_compliance.py` / `build_wp2_cost_scenarios.py` / `build_pair_recheck_plan.py` / `make_physics_completion_figures.py` / `build_physics_completion_deliverables.py` / `verify_archive.py`。其余（`run_wp2_queue.py`、`run_wp2_production.py`、`run_wp2_extra.py`、`run_batch.py`、`run_method_audit.py`、`run_pair_recheck.py`、`emit_pair_recheck.py`、`archive_raw_outputs.py`、`screen_li_motifs.py`）**不是** `finalize_wp2.ps1` 的步骤，由无人值守链（`supervise_pending.ps1` → `run_to_closure.py`）或人工触发。
+
 ## 4. 收口链
 
 `scripts/wp_production/finalize_wp2.ps1` 一条命令跑完：
@@ -143,6 +146,8 @@ anchors → emit-wp2 → generator → provenance → state-identity → anchor-
 
 任一步非零即打印 `ABORT`，全绿才打印 `ALL GREEN`。日志重定向到 `work/_chainN.log`
 （**不要**用 `Select-Object -First N` 接管道，会掐断链）。加 `-Commit` 才会提交。
+
+> **折入前置（并发纪律）**：无人值守链收尾的 `run_to_closure.py` 在跑 `finalize_wp2.ps1` **之前**，先执行关键 pair 第二泛函靶向复核（`build_pair_recheck_plan.py` → `run_pair_recheck.py` → `emit_pair_recheck.py`），其中 `run_pair_recheck.py` **会起 ORCA**。因此折入只能在**没有任何 `orca.exe` 在跑**时执行，否则会与生产腿叠加、顶破「全机 2 个 ORCA 作业（各 4 核）」的上限；`finalize_wp2.ps1` 本身不含 ORCA 步骤。
 
 ## 5. 冻结与不可改
 
@@ -175,7 +180,7 @@ anchors → emit-wp2 → generator → provenance → state-identity → anchor-
   - `provenance_index.json`：上述三者的机器可读索引；`provenance_summary.md` 是人读摘要。
   - `leg_reconciliation.csv`：**四分子 20 条腿的现场核对**——把「清单登记了哪些作业」与 `work/wp2prod/` 的磁盘事实对上；
     `duplicate_work_risk=true` 是唯一告警（磁盘上已有正常结束的原始输出、清单却没有 computed 作业行 = 重复计算的入口）。
-    这条把方案第 1 步「提交前先核对正在运行 / 已完成未入库的作业」钉成可复核的检查。
+    这条把方案第 1 步「提交前先核对正在运行 / 已完成未入库的作业」钉成可复核的检查。 **扫描范围提醒**：该表只扫 `work/wp2prod/<名>/<态>/`，对 `work/pilot/`、`work/pilot12/`、`work/audit/`、`work/recheck/` 里的同名单点**完全盲区**；`duplicate_work_risk=false` 只表示「wp2prod 现场内没有重复」，不等于「全机没有可复用的既有输出」。
 - `outputs/physics_completion/pair_evidence/targeted_recheck/`
   - `recheck_results.csv`：第二泛函（S3/S4）靶向复核**原始层**结果，逐行带几何 sha256。
   - `job_plan.csv`、`selection_rule.json`、`selection_rule.md`：跑之前冻结的预注册层（对象、设定、几何来源、预算、选择规则）。
