@@ -81,6 +81,72 @@ def test_partial_legs_still_fold_and_are_flagged(monkeypatch, capsys):
     assert called == [], "--dry-run 不应执行收口链"
 
 
+def _label(command):
+    joined = " ".join(command)
+    for token in ("build_pair_recheck_plan.py", "run_pair_recheck.py",
+                  "emit_pair_recheck.py", "finalize_wp2.ps1"):
+        if token in joined:
+            return token
+    return joined
+
+
+def _recorder(monkeypatch, code_of=None):
+    """记录每一步标签，并按 code_of(label) 返回退出码（默认 0）。"""
+    module = _load()
+    monkeypatch.setattr(module.queue, "inventory", lambda: _rows(set()))
+    seen = []
+
+    class _Done:
+        def __init__(self, rc):
+            self.returncode = rc
+
+    def fake_run(command, **kwargs):
+        label = _label(command)
+        seen.append(label)
+        return _Done(code_of(label) if code_of else 0)
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    return module, seen
+
+
+def test_recheck_chain_runs_before_the_finalize_chain(monkeypatch):
+    """腿一落地 ready 行就变多：必须先补跑第二泛函复核，再把交付层折进去。"""
+    module, seen = _recorder(monkeypatch)
+    assert module.main([]) == 0
+    assert seen == ["build_pair_recheck_plan.py", "run_pair_recheck.py",
+                    "emit_pair_recheck.py", "finalize_wp2.ps1"], seen
+
+
+def test_plan_generator_exit_one_alone_does_not_block_the_fold(monkeypatch):
+    """计划生成器在「还有 ready 行没结果」时按设计返回 1，它只是把缺口说清楚，不是失败。"""
+    module, seen = _recorder(monkeypatch,
+                             code_of=lambda label: 1 if label == "build_pair_recheck_plan.py" else 0)
+    assert module.main([]) == 0
+    assert seen[-1] == "finalize_wp2.ps1"
+
+
+def test_failed_recheck_refuses_to_fold(monkeypatch, capsys):
+    """复核没跑完就不折入：否则收口链的「结果表恰好覆盖 ready 行」验收必失败。"""
+    module, seen = _recorder(monkeypatch,
+                             code_of=lambda label: 7 if label == "run_pair_recheck.py" else 0)
+    assert module.main([]) == 7
+    assert "finalize_wp2.ps1" not in seen, "复核没完成时不应触碰收口链"
+    assert "靶向复核未完成" in capsys.readouterr().out
+
+
+def test_skip_recheck_rebuilds_only(monkeypatch):
+    module, seen = _recorder(monkeypatch)
+    assert module.main(["--skip-recheck"]) == 0
+    assert seen == ["finalize_wp2.ps1"], seen
+
+
+def test_dry_run_does_not_run_the_recheck(monkeypatch):
+    module, called = _no_chain(monkeypatch)
+    monkeypatch.setattr(module.queue, "inventory", lambda: _rows(set()))
+    assert module.main(["--dry-run"]) == 0
+    assert called == [], "--dry-run 不应触碰复核或收口链"
+
+
 def test_commit_flag_is_the_only_thing_that_reaches_the_chain(monkeypatch):
     module = _load()
     monkeypatch.setattr(module.queue, "inventory", lambda: _rows(set()))

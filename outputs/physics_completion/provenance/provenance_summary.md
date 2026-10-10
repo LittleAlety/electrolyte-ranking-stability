@@ -10,9 +10,9 @@
 | --- | --- | --- | --- |
 | wp1_geometry_prep | 1 | 1 | 1 |
 | wp1_method_audit | 160 | 160 | 160 |
-| wp2_production | 16 | 15 | 12 |
+| wp2_production | 17 | 16 | 13 |
 | wp2_sampling | 640 | 640 | 640 |
-| wp3_recheck | 14 | 14 | 14 |
+| wp3_recheck | 16 | 16 | 16 |
 
 ## 四分子 20 条腿现场核对
 
@@ -34,8 +34,8 @@
 | EMC|M_tzvpd | not_started | false | false | false |
 | GBL|M | computed | true | true | false |
 | GBL|M_plus | computed | true | true | false |
-| GBL|LiM_plus | in_flight | false | false | false |
-| GBL|LiM_2plus | not_started | false | false | false |
+| GBL|LiM_plus | computed | true | true | false |
+| GBL|LiM_2plus | in_flight | false | false | false |
 | GBL|M_tzvpd | computed | true | true | false |
 | SL|M | computed | true | true | false |
 | SL|M_plus | computed | true | true | false |

@@ -104,10 +104,19 @@ while ($round -lt $MaxRounds) {
   Start-Sleep -Seconds $RetrySleepSeconds
 }
 
-Log "supervise_pending: folding completed legs into the deliverables"
-& $py -X utf8 scripts\wp_production\run_to_closure.py --commit *>> $logPath
-$fold = $LASTEXITCODE
-Log ("supervise_pending: fold exit=" + $fold)
+# 折入本身也会失败（例如关键 pair 的某支第二泛函单点瞬败，折入会先补跑复核、复核没完就拒绝折入）。
+# 20/20 之后看护不会再重启监守（它的判据是「还有腿没 computed」），所以这里必须有界重试，
+# 否则交付层会永久停在「腿算完了、还是旧数」。
+$fold = 1
+$foldAttempts = 0
+while ($fold -ne 0 -and $foldAttempts -lt 3) {
+  $foldAttempts++
+  Log ("supervise_pending: folding completed legs into the deliverables (attempt " + $foldAttempts + "/3)")
+  & $py -X utf8 scripts\wp_production\run_to_closure.py --commit *>> $logPath
+  $fold = $LASTEXITCODE
+  if ($fold -ne 0 -and $foldAttempts -lt 3) { Start-Sleep -Seconds $RetrySleepSeconds }
+}
+Log ("supervise_pending: fold exit=" + $fold + " after " + $foldAttempts + " attempt(s)")
 if ($fold -eq 0) {
   $head = (& git -C $root rev-parse --short HEAD) 2>$null
   Log ("supervise_pending: head=" + $head + " (待人工 git push origin main)")

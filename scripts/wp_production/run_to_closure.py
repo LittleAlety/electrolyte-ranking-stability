@@ -12,6 +12,12 @@ week37-week44 镜像都要靠 `finalize_wp2.ps1` 折进去。缺了这一步，�
   未齐的腿在交付层留空并标 `not_computed`，同时在日志里显式列出。
 * 不把「20/20 全齐」当硬门禁：若某条腿反复失败，硬门禁会让交付层**永远**停在旧数，
   那才是真正的失败模式。需要严格门禁时用 `--require-complete`。
+* **折入前先补跑关键 pair 的第二泛函靶向复核**（见下）。腿一落地，
+  `build_pair_recheck_plan.py` 的 ready 行就变多，而它有一条验收
+  `results_cover_exactly_the_ready_rows` 要求结果表恰好覆盖 ready 行；缺结果时该生成器返回 1，
+  收口链随即 ABORT、`-Commit` 不再执行，交付层就停在「腿算完了、还是旧数」。
+  所以「重建计划 → 在新登记的生产 Opt 几何上补跑 S3/S4 单点 → 折进 recheck_results.csv」
+  是折入的必要前置，不是可选装饰。
 
 用法
 ----
@@ -19,6 +25,7 @@ week37-week44 镜像都要靠 `finalize_wp2.ps1` 折进去。缺了这一步，�
     .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\run_to_closure.py --dry-run
     .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\run_to_closure.py --commit
     .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\run_to_closure.py --require-complete --commit
+    .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\run_to_closure.py --skip-recheck --dry-run
 
 退出码
 ------
@@ -42,6 +49,28 @@ import run_wp2_queue as queue  # noqa: E402
 
 #: 仍有腿没算完时的退出码；与收口链自身的失败码区分开。
 PENDING_EXIT = 3
+
+#: 关键 pair 第二泛函靶向复核的三段：重建计划 -> 在已登记的生产 Opt 几何上补跑 S3/S4 单点 ->
+#: 把原始结果折进 recheck_results.csv。三段都只碰仓库外的 `work/recheck/` 现场，不改任何已有数值。
+RECHECK_CHAIN = ("build_pair_recheck_plan.py", "run_pair_recheck.py", "emit_pair_recheck.py")
+#: 三段里只有这两段的非零退出码代表「复核没做完」；计划生成器在还有 ready 行没结果时
+#: 按设计返回 1（它只是把那个缺口说清楚），不算失败。
+RECHECK_BLOCKING = ("run_pair_recheck.py", "emit_pair_recheck.py")
+
+
+def run_recheck_chain():
+    """先补跑靶向复核，再折入。返回 (ok, codes)。
+
+    顺序不能反：`emit_pair_recheck.py` 读的是 `job_plan.csv` 的 ready 行，所以必须先由
+    `build_pair_recheck_plan.py` 按最新落地的腿重建计划，运行器才知道要补哪些单点。
+    """
+    codes = {}
+    for name in RECHECK_CHAIN:
+        command = [sys.executable, "-X", "utf8", str(HERE / name)]
+        print("靶向复核: %s" % " ".join(command))
+        codes[name] = subprocess.run(command, cwd=str(REPO)).returncode
+    ok = not any(codes.get(name) for name in RECHECK_BLOCKING)
+    return ok, codes
 
 
 def pending_legs():
@@ -67,6 +96,9 @@ def main(argv=None):
     parser.add_argument("--commit", action="store_true", help="收口链 ALL GREEN 后提交")
     parser.add_argument("--require-complete", action="store_true",
                         help="只有 20/20 全 computed 才折入（默认：队列已停就折入，并列出未齐的腿）")
+    parser.add_argument("--skip-recheck", action="store_true",
+                        help="跳过关键 pair 第二泛函靶向复核，只重建交付层；腿落地后 ready 行会变多，"
+                             "跳过后收口链的「结果表恰好覆盖 ready 行」验收会失败，一般不要用")
     args = parser.parse_args(argv)
 
     pending = pending_legs()
@@ -101,6 +133,16 @@ def main(argv=None):
     print("收口链: %s" % " ".join(command))
     if args.dry_run:
         return 0
+
+    if not args.skip_recheck:
+        ok, codes = run_recheck_chain()
+        if not ok:
+            failed = [name for name in RECHECK_BLOCKING if codes.get(name)]
+            print("关键 pair 第二泛函靶向复核未完成（%s），拒绝折入："
+                  % ", ".join("%s=%s" % (name, codes[name]) for name in RECHECK_CHAIN))
+            print("  收口链的「结果表恰好覆盖 ready 行」验收会因此失败；先修好复核再跑本脚本。")
+            return codes.get(failed[0]) or 1
+
     finished = subprocess.run(command, cwd=str(REPO))
     print("收口链 exit=%d" % finished.returncode)
     return finished.returncode

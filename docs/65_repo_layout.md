@@ -105,7 +105,7 @@ week36 与 week44 只存在于 part2 镜像。
 | `run_batch.py` | 12 主集分子 × 4 主态的 xTB/ORCA 批量驱动与公共工具（几何、ORCA/xTB 路径、片段分析）；`ORCA_CORES` 定义处 | 分子/态清单 → `work/pilot12/**` |
 | `run_method_audit.py` | WP1 的 128 单点 / 32 弛豫腿本机方法审计驱动 | 审计清单 → `work/audit/**` |
 | `run_pair_recheck.py` | 靶向复核执行器：在已登记的生产 Opt 几何上跑 S3/S4 单点（不重优化、不算频率），串行、每作业 2 核 | 计划表 `job_plan.csv` → 仓库外 `work/recheck/<record_id>/` 现场 |
-| `run_to_closure.py` | 队列收尾：把已 computed 的腿折进 production_ledger / 四分子闭环表 / 标签 / week37–44 镜像，未齐的腿留空并显式列出；`--check`/`--dry-run`/`--commit`/`--require-complete` | `work/wp2prod/**` + 生成器 → 交付层 CSV |
+| `run_to_closure.py` | 队列收尾：把已 computed 的腿折进 production_ledger / 四分子闭环表 / 标签 / week37–44 镜像，未齐的腿留空并显式列出；**折入前先跑关键 pair 第二泛函靶向复核**（重建计划 → 在已登记的生产 Opt 几何上补跑 S3/S4 单点 → 折进 `recheck_results.csv`），腿一落地 ready 行就变多、不补跑则收口链 ABORT；`--check`/`--dry-run`/`--commit`/`--require-complete`/`--skip-recheck` | `work/wp2prod/**` + `work/recheck/**` + 生成器 → 交付层 CSV |
 | `supervisor_policy.py` | 监守收敛判据（纯函数，有单测）：`--computed-count` 按队列 `inventory()` 口径数已 computed 的腿，`--decide` 判断继续 / 完成 / 停摆或轮数上限而停 | 队列快照 → `done`/`continue`/`stop_stalled`/`stop_round_cap` |
 | `emit_wp2.py` | 把 `work/wp2prod/**` 已跑完的状态**折进生成器**：确定性重打 `WP2_PRODUCTION_LEDGER` 等补丁块 | 生产现场 + 生成器基线 → `scripts/build_physics_completion_batch.py` |
 | `emit_wp1.py` | 把 WP1 方法审计矩阵折进生成器（读带 SECTION 标记的 `wp1_audit_src.txt`） | `wp1_audit_src.txt` + 生成器基线 → 生成器补丁块 |
