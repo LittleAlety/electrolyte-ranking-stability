@@ -90,7 +90,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**31** 个跟踪文件）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**32** 个跟踪文件）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -117,6 +117,7 @@ week36 与 week44 只存在于 part2 镜像。
 | `build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） | 生产 ledger → `outputs/physics_completion/closure/**` |
 | `build_plan_compliance.py` | 方案 4-14 节逐条合规台账：状态与数字全部从产物现算（四分子闭环 / 方法审计 / 翻转持续性 / 锚点审计 / AL 预算），源码里不写死；作为「都做完没有」的机器可查答案 | 交付层 CSV → `outputs/physics_completion/compliance/**` |
 | `build_state_identity_qc.py` | 方案 6.3 态身份 QC：读被 gitignore 的 `work/wp2prod/**` 里原始 ORCA 日志的**最后一段**布居块，现算 fragment charge/spin（Mulliken + Loewdin 双分区，两个分区不一致就记 ambiguous）与 Li 的 Mayer bonded valence；Li-给体**键级**与 Li-给体**接触距离（Angstrom）**分列登记（弱接触低于 ORCA 打印阈值时留空、不补零），按结果前冻结阈值分成 intact / Li_centered / mixed / ambiguous / fragmented / no_li 六张分表；frontier 定位显式登记为 not_computed（派生层） | 原始日志 + production_ledger → `outputs/physics_completion/state_identity/**` |
+| `build_anchor_condition_audit.py` | 方案 8(a)/8(c) 锚点条件元数据并表 + 检索协议登记状态：把四组既有锚点源里本就有的条件列（溶剂 / 盐与浓度 / 温度 / 扫描速率 / 误差来源 / 原始标度与数值 / 页码表号 / primary 源状态）并到一张 87 行表，缺的字段留空并写明原因、绝不补 0；同时断言检索协议已登记且没有假装已执行（executed=false，新命中 0），tier_1 保持 0、external-validity limitation 继续生效（派生层） | data/anchors/** + data/references/anchor_retrieval_protocol.md → `outputs/physics_completion/anchor/**` |
 | `build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） | 生产 ledger → `outputs/physics_completion/sampling/**` |
 | `build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） | 生产 ledger → `outputs/physics_completion/cost/**` |
 | `build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的**结果前预注册** + 复核跑完后只读 `recheck_results.csv`、现算逐 (pair, 设定) 的 delta | 规则/对象/设定/几何来源 → `targeted_recheck/` 计划与验收层 |

@@ -298,7 +298,8 @@ def build_rows():
         "not_satisfied",
         "tier_1_condition_matched=%d" % tier1,
         "outputs/physics_completion/anchor/anchor_tier_summary.csv",
-        "未执行新检索；tier_1 仍为 0，保持 external-validity limitation。",
+        "检索协议已登记（data/references/anchor_retrieval_protocol.md，含检索源 / 检索式 / 纳入 / 排除 / 停止规则），"
+        "但**尚未执行**；tier_1 仍为 0，保持 external-validity limitation。",
     ))
 
     # ---------------- §9 WP5 ----------------
