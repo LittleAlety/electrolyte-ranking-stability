@@ -204,3 +204,54 @@ def test_zip_source_works_like_a_directory(tmp_path):
     report = module.verify(module.ZipSource(archive), rows=[row])
     assert report["mismatched"] == 0 and report["missing"] == 0
     assert module.render(report) == 0
+
+def test_freshness_is_proven_by_the_embedded_manifest(tmp_path):
+    """归档是否「同版」不能靠猜：内嵌登记表必须与仓库当前那份逐字节一致才算新鲜。"""
+    module = _load()
+    current = tmp_path / "job_archive_manifest.csv"
+    current.write_bytes(b"job_id\nwp2prod/DMC/M\n")
+    fresh = tmp_path / "fresh.zip"
+    with zipfile.ZipFile(fresh, "w") as handle:
+        handle.writestr(module.EMBEDDED_MANIFEST, current.read_bytes())
+    report = module.check_freshness(module.ZipSource(fresh), manifest_path=current)
+    assert report["embedded_present"] and report["verifiable"] and report["fresh"] is True
+
+    stale = tmp_path / "stale.zip"
+    with zipfile.ZipFile(stale, "w") as handle:
+        handle.writestr(module.EMBEDDED_MANIFEST, b"job_id\nwp2prod/DMC/LiM_plus\n")
+    bad = module.check_freshness(module.ZipSource(stale), manifest_path=current)
+    assert bad["verifiable"] and bad["fresh"] is False
+
+
+def test_an_archive_without_the_embedded_manifest_is_not_declared_fresh(tmp_path):
+    """旧版归档没有内嵌登记表：必须报「无法判定」，绝不能默认当成新鲜。"""
+    module = _load()
+    legacy = tmp_path / "legacy.zip"
+    with zipfile.ZipFile(legacy, "w") as handle:
+        handle.writestr("wp2prod/DMC/M/DMC_M.log", "Program Version 6.1.1\n")
+    report = module.check_freshness(module.ZipSource(legacy))
+    assert report["embedded_present"] is False
+    assert report["verifiable"] is False
+    assert report["fresh"] is False
+
+
+def test_latest_archive_picks_the_newest_zip(tmp_path):
+    module = _load()
+    import os
+    older = tmp_path / "raw_jobs_1_aaaa_20260101.zip"
+    newer = tmp_path / "raw_jobs_2_bbbb_20260102.zip"
+    for path in (older, newer):
+        with zipfile.ZipFile(path, "w") as handle:
+            handle.writestr("x", b"1")
+    os.utime(older, (1000, 1000))
+    os.utime(newer, (2000, 2000))
+    assert module.latest_archive(tmp_path) == newer
+    assert module.latest_archive(tmp_path / "empty") is None
+
+
+def test_the_gate_is_advisory_until_the_queue_is_complete(capsys):
+    """生产在跑期间归档必然落后于 manifest：门禁必须只提示、不算失败，否则收口链会被永远卡住。"""
+    module = _load()
+    module.queue_is_complete = lambda: (False, 20)
+    assert module.main(["--gate-when-complete"]) == 0
+    assert "非门禁" in capsys.readouterr().out

@@ -31,6 +31,7 @@ Step "mirror"       { & $py -X utf8 scripts\wp_production\build_physics_completi
 Step "site"         { & $py -X utf8 scripts\build_terminal_site.py }
 Step "freeze"       { & $py -X utf8 scripts\freeze_gates.py --stage 2 }
 Step "clean-room"   { & $py -X utf8 scripts\audit_clean_room.py }
+Step "archive-verify" { & $py -X utf8 scripts\wp_production\verify_archive.py --latest --ledger --gate-when-complete }
 Step "check-gen"    { & $py -X utf8 scripts\build_physics_completion_batch.py --check }
 Step "check-closure" { & $py -X utf8 scripts\wp_production\build_wp2_closure.py --check }
 Step "check-compliance" { & $py -X utf8 scripts\wp_production\build_plan_compliance.py --check }

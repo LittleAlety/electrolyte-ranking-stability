@@ -123,8 +123,8 @@ week36 与 week44 只存在于 part2 镜像。
 | `build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） | 结构登记 → `outputs/physics_completion/li_motif_sampling/**` |
 | `make_physics_completion_figures.py` | 方案 14 的六张主图（F59-F64）与图清单 | 交付层 CSV → `outputs/figures/**` |
 | `build_physics_completion_deliverables.py` | 建交付镜像（仓库外 `成果输出（part2）/week37..week44`）：week44 收结题报告、协议、配置、样本、锚点审计、本骨架图、生成器源码、测试与全部 `outputs/physics_completion/**`；`--check` 逐文件复核 byte-identical | 仓库源路径 → 仓库外 part2 镜像 |
-| `archive_raw_outputs.py` | 把 provenance 登记的原始作业文件打成**确定性、可复核的 zip 归档**（`--build` 默认落仓库外 `_compute_archive/`；`--check <zip>` 逐条复算 sha256） | `job_archive_manifest.csv` + 仓库外原始日志 → `_compute_archive/*.zip` + `.index.csv` |
-| `verify_archive.py` | 归档的**可重新解析性**核验：拿归档原始日志按仓库口径重算登记值，与 manifest 逐字段比对；`--ledger` 再重算交付账本；缺条目/哈希不符/数值不符 → 退出码 1 | `*.zip` + `job_archive_manifest.csv`（+ `production_ledger.csv`） → 核验结论 |
+| `archive_raw_outputs.py` | 把 provenance 登记的原始作业文件打成**确定性、可复核的 zip 归档**（`--build` 默认落仓库外 `_compute_archive/`；`--check <zip>` 逐条复算 sha256）；并把当次 manifest 内嵌成 `_manifest/job_archive_manifest.csv`，让「这份 zip 对应哪一版登记表」自证、过期可判 | `job_archive_manifest.csv` + 仓库外原始日志 → `_compute_archive/*.zip` + `.index.csv` + `.README.md` |
+| `verify_archive.py` | 归档的**可重新解析性**核验：拿归档原始日志按仓库口径重算登记值，与 manifest 逐字段比对；`--ledger` 再重算交付账本；`--latest` 自动取最新归档并先打一行 `[freshness]`（内嵌登记表是否与仓库当前那份同版）；`--gate-when-complete` 是收口链里的**结题门禁**（只在 20/20 时先重建归档再要求同版 + 0 不符，没跑完时只提示）；缺条目/哈希不符/数值不符 → 退出码 1 | `*.zip` + `job_archive_manifest.csv`（+ `production_ledger.csv`） → 核验结论 |
 
 非 Python 的跟踪文件：`finalize_wp2.ps1`（一键收口链）、`supervise_pending.ps1`（无人值守监守）、
 `watch_smpd.ps1`（轻量 smpd 看护）、`watch_supervisor.ps1`（监守看护：接住监守 `exit 3` 的信号）、
@@ -137,7 +137,7 @@ week36 与 week44 只存在于 part2 镜像。
 `scripts/wp_production/finalize_wp2.ps1` 一条命令跑完：
 
 anchors → emit-wp2 → generator → closure → compliance → state-identity → provenance → sampling → li-motif-plan → cost
-→ recheck-plan → figures → mirror → site → freeze → clean-room → 各 `--check` → pytest。
+→ recheck-plan → figures → mirror → site → freeze → clean-room → archive-verify → 各 `--check` → pytest。
 
 任一步非零即打印 `ABORT`，全绿才打印 `ALL GREEN`。日志重定向到 `work/_chainN.log`
 （**不要**用 `Select-Object -First N` 接管道，会掐断链）。加 `-Commit` 才会提交。
@@ -190,10 +190,16 @@ anchors → emit-wp2 → generator → closure → compliance → state-identity
 
 - `archive_raw_outputs.py --build`：按 `job_archive_manifest.csv` 把登记的原始文件打成**确定性 zip 归档**，
   默认落在仓库外 `_compute_archive/`（附 `.index.csv` + `.README.md`）；`--check <zip>` 逐条复算 sha256。
-- `verify_archive.py --archive <zip> --ledger`：这是「归档可被重新解析」主张的核验器——拿归档里的原始日志，
+  归档里**内嵌了建它时的那份 `_manifest/job_archive_manifest.csv`**：这份 zip 对应哪一版登记表由它自证，
+  不靠猜（README 同时印出该登记表的 sha256 与行数）。
+- `verify_archive.py --latest --ledger`：这是「归档可被重新解析」主张的核验器——拿归档里的原始日志，
   按**仓库口径**重算登记值，与 `job_archive_manifest.csv` 逐字段比对；`--ledger` 再用同一份归档重算交付账本
   `production_ledger.csv` 的数值列。缺条目 / sha256 不符 / 数值不符 → 退出码 1；`--limit N` 调试、
-  `--strict` 把「算不出来」也算失败。
+  `--strict` 把「算不出来」也算失败。开头先打一行 `[freshness]`：内嵌登记表与仓库当前那份同版即「新鲜」，
+  不同版即「过期」。
+- `--gate-when-complete` 是**结题门禁**（已进收口链）：只在队列 20/20 全 computed 时才动手——先重建归档，
+  再要求它与当前登记表同版且逐字段核验 0 不符；队列没跑完时只打印一行提示、不算失败。
 - 语义提示：生产在跑期间归档必然落后于 manifest，`verify_archive.py` 会报「登记晚于归档」的**预期漂移**；
-  队列停掉后重建归档再核验才应回到 0 不符。所以「归档能被重新解析」是**可执行、可复算**的断言，不是一句口号。
+  队列停掉后重建归档再核验才应回到 0 不符。所以门禁只在 20/20 时生效，针对的正是
+  「拿着过期归档声称可复核」这种唯一不能容忍的情形；「归档能被重新解析」因此是**可执行、可复算**的断言，不是一句口号。
 

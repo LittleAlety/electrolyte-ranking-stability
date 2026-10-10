@@ -30,12 +30,20 @@
     .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\verify_archive.py --archive <zip-or-dir>
     .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\verify_archive.py --archive <zip> --ledger
     .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\verify_archive.py --archive <zip> --strict
+    .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\verify_archive.py --latest --ledger
+    .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\verify_archive.py --gate-when-complete
 
 退出码：0 = 无「不符」也无「归档缺条目」；1 = 有（`--strict` 下「不可复算」也算失败）。
 
 注意：生产在跑期间**归档一定落后于 manifest**——新作业是在归档建好之后才登记的，
 这时报的是「归档缺条目（登记晚于归档）」，是预期漂移；队列停掉后重建归档
 （`archive_raw_outputs.py --build`）再跑本脚本，才应该回到 0。
+
+归档是否「同版」不靠猜：zip 里内嵌了建它时的 `_manifest/job_archive_manifest.csv`，
+与仓库当前那份逐字节比较即可判定（`--latest` 自动取最新一份归档并报出结论）。
+`--gate-when-complete` 是**结题门禁**：只在队列 20/20 全 computed 时才动手——
+先重建归档，再要求它与当前登记表同版且逐字段核验为 0 不符；队列没跑完时只提示、不算失败，
+因为生产在跑期间归档必然落后于 manifest。这条门禁针对的正是「拿着过期归档声称可复核」。
 """
 
 from __future__ import annotations
@@ -44,6 +52,7 @@ import argparse
 import csv
 import hashlib
 import re
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
@@ -56,6 +65,9 @@ import run_wp2_production as prod  # noqa: E402
 
 MANIFEST = REPO / "outputs" / "physics_completion" / "provenance" / "job_archive_manifest.csv"
 LEDGER = REPO / "outputs" / "physics_completion" / "free_states" / "production_ledger.csv"
+ARCHIVE_DIR = REPO.parent / "_compute_archive"
+#: 归档里内嵌的登记表副本（由 archive_raw_outputs.py 写入）。
+EMBEDDED_MANIFEST = "_manifest/job_archive_manifest.csv"
 
 RE_VERSION = re.compile(r"Program Version\s+(\S+)")
 RE_TERMINATED = re.compile(r"ORCA TERMINATED NORMALLY")
@@ -137,6 +149,53 @@ def arcname_of(job_id, rel):
 
 def sha256_of(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def manifest_sha256(path=None):
+    """仓库当前那份登记表的 sha256（不存在就给空串）。"""
+    path = MANIFEST if path is None else Path(path)
+    return sha256_of(path.read_bytes()) if path.is_file() else ""
+
+
+def latest_archive(directory=None):
+    """取归档目录里最新的一份 raw_jobs_*.zip；没有就返回 None。"""
+    directory = ARCHIVE_DIR if directory is None else Path(directory)
+    candidates = sorted(directory.glob("raw_jobs_*.zip"),
+                        key=lambda path: (path.stat().st_mtime, path.name))
+    return candidates[-1] if candidates else None
+
+
+def check_freshness(source, manifest_path=None):
+    """这份归档是否与仓库当前的登记表同版：靠 zip 内嵌的登记表副本自证。
+
+    返回 dict：embedded_present（归档里有没有内嵌登记表，旧版归档没有）、
+    verifiable（能不能判定）、fresh（判定结果）。
+    """
+    current = manifest_sha256(manifest_path)
+    embedded = source.read(EMBEDDED_MANIFEST)
+    report = {"current": current,
+              "embedded": sha256_of(embedded) if embedded is not None else "",
+              "embedded_present": embedded is not None}
+    report["verifiable"] = embedded is not None
+    report["fresh"] = bool(embedded is not None and current and report["embedded"] == current)
+    return report
+
+
+def render_freshness(report):
+    if not report["verifiable"]:
+        print("[freshness] 归档内没有内嵌登记表：无法判定它与哪一版 manifest 同版（旧版归档）")
+        return
+    print("[freshness] 内嵌登记表 %s... | 仓库当前 %s... | %s"
+          % (report["embedded"][:12] or "(none)", report["current"][:12] or "(none)",
+             "同版（新鲜）" if report["fresh"] else "过期"))
+
+
+def queue_is_complete():
+    """按队列自己的口径判断 20 条腿是否全部 computed；返回 (是否全齐, 总条数)。"""
+    sys.path.insert(0, str(HERE))
+    import run_wp2_queue as queue
+    rows = queue.inventory()
+    return (bool(rows) and all(row["status"] == "computed" for row in rows)), len(rows)
 
 
 def first_keyword(inp_text):
@@ -318,22 +377,57 @@ def render(report, strict=False):
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Re-parse an archived job set and compare with the shipped provenance/ledger.")
-    parser.add_argument("--archive", required=True, help="zip 归档或已解压的目录")
+    parser.add_argument("--archive", default=None, help="zip 归档或已解压的目录")
+    parser.add_argument("--latest", action="store_true", help="自动取归档目录里最新的一份")
+    parser.add_argument("--archive-dir", default=str(ARCHIVE_DIR), help="配合 --latest 的归档目录")
     parser.add_argument("--limit", type=int, default=None, help="只核验前 N 个作业（调试用）")
     parser.add_argument("--ledger", action="store_true", help="额外用同一份归档核验交付账本")
     parser.add_argument("--strict", action="store_true",
                         help="把「登记了但归档日志无法复算」也视为失败")
+    parser.add_argument("--gate-when-complete", action="store_true",
+                        help="结题门禁：只在队列 20/20 全 computed 时先重建归档、再要求它与当前登记表同版"
+                             "且逐字段核验为 0 不符；队列没跑完时只提示、不算失败")
     args = parser.parse_args(argv)
 
-    target = Path(args.archive)
+    if args.gate_when_complete:
+        complete, total = queue_is_complete()
+        if not complete:
+            print("[gate] 生产未完成（共 %d 条腿）：归档新鲜度**非门禁**——生产在跑期间归档必然落后于"
+                  " manifest，跳过。" % total)
+            return 0
+        print("[gate] 生产已 %d/%d 全 computed：先重建归档，再核验。" % (total, total))
+        build = subprocess.run([sys.executable, "-X", "utf8",
+                                str(HERE / "archive_raw_outputs.py"), "--build"], cwd=str(REPO))
+        if build.returncode != 0:
+            print("[gate] 归档重建失败（exit %d）：登记的文件与 manifest 的 sha256 不符，"
+                  "交付层不能声称原始日志可复核。" % build.returncode)
+            return 1
+        args.latest = True
+
+    if args.latest:
+        target = latest_archive(args.archive_dir)
+        if target is None:
+            print("未在 %s 找到 raw_jobs_*.zip；先跑 archive_raw_outputs.py --build" % args.archive_dir)
+            return 1
+    elif args.archive:
+        target = Path(args.archive)
+    else:
+        parser.error("需要 --archive / --latest / --gate-when-complete 之一")
+        return 2
     if not target.exists():
         print("archive not found: %s" % target)
         return 1
     source = ZipSource(target) if target.is_file() else DirSource(target)
+    freshness = check_freshness(source)
+    render_freshness(freshness)
     jobs = load_jobs()
     code = render(verify(source, args.limit, jobs), args.strict)
     if args.ledger:
         code = max(code, render(verify_ledger(source, jobs), args.strict))
+    if args.gate_when_complete and not freshness["fresh"]:
+        print("[gate] 归档与当前登记表**不同版**：即便逐字段核验通过，也不能据此说「交付物里的数可由"
+              "归档复现」。重建后再核验。")
+        code = max(code, 1)
     return code
 
 
