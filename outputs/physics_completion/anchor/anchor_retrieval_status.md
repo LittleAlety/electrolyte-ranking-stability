@@ -20,10 +20,12 @@ primary 源状态。参考电极 / 判据 / 系列 / 是否跨系列混合在 an
 ## 2. 检索协议状态（方案 8(c)）
 
 - 协议文件：data/references/anchor_retrieval_protocol.md（结果前登记，含检索源、检索式、纳入、排除、停止规则）。
-- 执行状态：尚未执行（executed = false）。
-- 新命中条件可比条目：0。
+- 执行状态：已执行（executed = true，2026-10-10）；执行记录 data/references/anchor_retrieval_execution.md。
+- 新命中条件可比条目：0（四组检索式返回 19 个去重候选，无一条满足纳入标准）。
 - tier_1_condition_matched：0（保持）。
-- 结论：维持 computational target + external-validity limitation（方案 8(d)）；真正执行检索卡在两篇 Ue 原文未取得。
+- 结论：按协议 §6 停止规则维持 computational target + external-validity limitation（方案 8(d)）；
+  两篇 Ue 正文仍未取得，且执行中发现 Okoshi 2015 的被引登记（Ue 参编专著 + CRC 手册）与此前猜测的两篇 Ue JES 论文冲突，
+  ue_ref_attribution 保持 UNVERIFIED 并登记为 attribution_conflict_open。
 
 ## 3. 验收（7/7 通过）
 
@@ -33,6 +35,6 @@ primary 源状态。参考电极 / 判据 / 系列 / 是否跨系列混合在 an
 | required_condition_fields_are_filled_per_family | PASS | missing=0  |
 | gas_phase_conditions_are_explicitly_not_applicable | PASS | gas_rows=39 |
 | retrieval_protocol_is_registered_with_all_required_sections | PASS | protocol=data/references/anchor_retrieval_protocol.md markers=5/5 |
-| retrieval_is_not_pretended_executed | PASS | executed=false 已在协议正文登记；本轮不新增可比条目 |
+| retrieval_is_executed_and_reports_zero_admissible | PASS | executed=true；执行记录 data/references/anchor_retrieval_execution.md 在盘上；新命中可纳入 0 条，走协议 §6 停止规则 |
 | no_condition_value_is_guessed | PASS | empty stays empty; 0 is never used as a stand-in |
 | tier1_limit_is_carried_forward_not_hidden | PASS | tier_1_row_present=False |

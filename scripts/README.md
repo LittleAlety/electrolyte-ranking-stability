@@ -9,7 +9,7 @@
 | --- | --- |
 | `scripts/*.py` | 历史各周（week1–week36）的分析 / 生成入口，以及仍被测试或门禁直接调用的全局入口。**不要为“好看”把历史脚本搬走**：`outputs/**` 的冻结产物里记录了它们的路径，移动会断掉可追溯性。 |
 | `scripts/wp_production/` | 当前批次 **physics_completion_v1（WP0–WP6）的完整流水线**：生产驱动 + 生成器 emit + 各派生层 + 一键收口。见 `scripts/wp_production/README.md`，一键收口入口是 `scripts/wp_production/finalize_wp2.ps1` |
-| `scripts/wp_production/wp1_audit_src.txt` / `wp1_newsrc.py` | WP1 方法审计的补丁源（由 `emit_wp1.py` 折进生成器） |
+| `scripts/wp_production/wp1_audit_src.txt` | WP1 方法审计的补丁源（由 `emit_wp1.py` 折进生成器；同内容的旧 `wp1_newsrc.py` 留档因从不被执行已删除） |
 | `work/`（不跟踪） | 原始 ORCA / xTB 输出、生成器基线缓存、临时脚本 |
 | `docs/65_repo_layout.md` | **仓库骨架图**（顶层目录职责、阶段编号 ↔ WP 对应、收口链、冻结与不可改清单）；由 `tests/test_repo_layout.py` 强制覆盖，骨架漂了就会测试失败 |
 

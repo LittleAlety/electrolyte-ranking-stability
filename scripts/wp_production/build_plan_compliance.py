@@ -428,16 +428,24 @@ def build_rows():
         "partial" if anchors else "not_satisfied",
         "transcription_only=%d/%d" % (trans, len(anchors)),
         "data/anchors/primary_source_verification.csv; docs/62_week41_wp4_anchor_comparability.md",
-        "两篇 Ue 正文未取得（网络不可达 + 付费墙），14 行保持 transcription-only。",
+        "两篇 Ue 正文未取得（付费墙 + IOPscience 验证码页）；14 行保持 transcription-only。"
+        "二轮检索执行中另发现 Okoshi 2015 的被引登记（OpenAlex 2 条 / Semantic Scholar 4 条）指向 Ue 参编专著 + CRC 手册，"
+        "与仓库猜测的两篇 Ue JES 论文不一致，已登记为 attribution_conflict_open（见 data/references/anchor_retrieval_execution.md §5）。",
     ))
+    protocol_text = (REPO / "data/references/anchor_retrieval_protocol.md")
+    protocol_text = protocol_text.read_text(encoding="utf-8") if protocol_text.is_file() else ""
+    execution_record = (REPO / "data/references/anchor_retrieval_execution.md").is_file()
+    retrieval_executed = "executed = true" in protocol_text and execution_record
     out.append(item(
         "wp4_new_comparable_entries", "8",
         "按明确检索协议再找 6-10 条条件可比条目",
-        "not_satisfied",
-        "tier_1_condition_matched=%d" % tier1,
-        "outputs/physics_completion/anchor/anchor_tier_summary.csv",
-        "检索协议已登记（data/references/anchor_retrieval_protocol.md，含检索源 / 检索式 / 纳入 / 排除 / 停止规则），"
-        "但**尚未执行**；tier_1 仍为 0，保持 external-validity limitation。",
+        "partial" if retrieval_executed else "not_satisfied",
+        "protocol_executed=%s record=%s tier_1_condition_matched=%d" % (
+            str(retrieval_executed).lower(), str(execution_record).lower(), tier1),
+        "data/references/anchor_retrieval_execution.md; data/references/anchor_retrieval_protocol.md",
+        "检索协议已按登记的源与检索式**执行**（Crossref / OpenAlex / Unpaywall / Semantic Scholar），"
+        "新命中可纳入 0 条，按协议 §6 停止规则保留 computational target + external-validity limitation（方案 8(d)）；"
+        "因实际未取得 6-10 条条件可比条目，记 partial 而不是 satisfied。",
     ))
 
     # ---------------- §9 WP5 ----------------

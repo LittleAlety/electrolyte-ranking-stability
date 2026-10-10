@@ -7,10 +7,11 @@ raw 审计表 data/references/anchor_primary_audit.csv 只带了其中 4 项（�
 是否跨系列混合）；本脚本把四组既有锚点源里**本来就存在**的条件列并到一张表，缺的字段显式留空
 并写明为什么，绝不补 0、绝不从别处借值。
 
-方案 8(c) 要求「按明确检索协议」再找 6-10 条条件可比条目。本脚本只**登记协议与执行状态**：
+方案 8(c) 要求「按明确检索协议」再找 6-10 条条件可比条目。本脚本**登记协议 + 执行状态**：
 读 data/references/anchor_retrieval_protocol.md，断言协议里写明检索源 / 检索式 / 纳入 / 排除 /
-停止规则，并断言它没有假装已经执行（executed = false，新命中 0）。tier_1 仍为 0，external-validity
-limitation 继续生效（方案 8(d)），不把「没找到」写成「已完成」。
+停止规则，并断言它**已按协议执行**（executed = true）且执行记录 data/references/anchor_retrieval_execution.md
+在盘上；本次执行新命中可纳入 0 条，按协议 §6 走「找不到足够可比数据」这一条，tier_1 仍为 0，
+external-validity limitation 继续生效（方案 8(d)），不把「没找到」写成「已完成」。
 
     .venv/Scripts/python.exe -X utf8 scripts/wp_production/build_anchor_condition_audit.py
     .venv/Scripts/python.exe -X utf8 scripts/wp_production/build_anchor_condition_audit.py --check
@@ -29,6 +30,7 @@ OUTDIR = REPO / "outputs" / "physics_completion" / "anchor"
 NL = chr(10)
 
 PROTOCOL = "data/references/anchor_retrieval_protocol.md"
+EXECUTION = "data/references/anchor_retrieval_execution.md"
 PRIMARY_AUDIT = "data/references/anchor_primary_audit.csv"
 TIER_SUMMARY = "outputs/physics_completion/anchor/anchor_tier_summary.csv"
 
@@ -66,7 +68,7 @@ PROTOCOL_REQUIRED_MARKERS = (
     "## 4. 纳入标准",
     "## 5. 排除标准",
     "## 6. 目标与停止规则",
-    "executed = false",
+    "executed = true",
 )
 
 FIELDS = [
@@ -228,6 +230,11 @@ def protocol_text():
     return path.read_text(encoding="utf-8") if path.is_file() else ""
 
 
+def execution_text():
+    path = REPO / EXECUTION
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+
+
 def tier_summary():
     for row in read_rows(TIER_SUMMARY):
         if row.get("tier") == "tier_1" or row.get("curatable_tier") == "tier_1":
@@ -273,10 +280,11 @@ def acceptance(rows, family_source_counts):
         "protocol=%s markers=%d/%d" % (PROTOCOL,
                                        sum(1 for m in PROTOCOL_REQUIRED_MARKERS if m in text),
                                        len(PROTOCOL_REQUIRED_MARKERS)))
-    add("retrieval_is_not_pretended_executed",
-        "协议如实登记「尚未执行检索」，不把没找到写成已完成",
-        "executed = false" in text and "**0**" in text,
-        "executed=false 已在协议正文登记；本轮不新增可比条目")
+    execution = execution_text()
+    add("retrieval_is_executed_and_reports_zero_admissible",
+        "协议已按登记的源与检索式执行，且执行记录在盘上、如实登记「新命中可纳入 0 条」",
+        "executed = true" in text and "新命中可纳入条目数：**0**" in text and bool(execution),
+        "executed=true；执行记录 %s 在盘上；新命中可纳入 0 条，走协议 §6 停止规则" % (EXECUTION,))
     add("no_condition_value_is_guessed",
         "取不到的字段一律留空并写明原因，绝不补 0 或从别处借值",
         all(row.get(key, "") != "0" for row in rows
@@ -314,10 +322,12 @@ def status_doc(rows, checks):
         "## 2. 检索协议状态（方案 8(c)）",
         "",
         "- 协议文件：data/references/anchor_retrieval_protocol.md（结果前登记，含检索源、检索式、纳入、排除、停止规则）。",
-        "- 执行状态：尚未执行（executed = false）。",
-        "- 新命中条件可比条目：0。",
+        "- 执行状态：已执行（executed = true，2026-10-10）；执行记录 data/references/anchor_retrieval_execution.md。",
+        "- 新命中条件可比条目：0（四组检索式返回 19 个去重候选，无一条满足纳入标准）。",
         "- tier_1_condition_matched：0（保持）。",
-        "- 结论：维持 computational target + external-validity limitation（方案 8(d)）；真正执行检索卡在两篇 Ue 原文未取得。",
+        "- 结论：按协议 §6 停止规则维持 computational target + external-validity limitation（方案 8(d)）；",
+        "  两篇 Ue 正文仍未取得，且执行中发现 Okoshi 2015 的被引登记（Ue 参编专著 + CRC 手册）与此前猜测的两篇 Ue JES 论文冲突，",
+        "  ue_ref_attribution 保持 UNVERIFIED 并登记为 attribution_conflict_open。",
         "",
         "## 3. 验收（%d/%d 通过）" % (sum(1 for c in checks if c["ok"] == "true"), len(checks)),
         "",

@@ -47,7 +47,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | --- | --- |
 | `check_wp2_anchors.py` | 复核 `emit_wp2.py` 的补丁锚点在当前生成器基线里唯一存在 |
 | `emit_wp2.py` | 把 `work/wp2prod/**` 已跑完的状态折进生成器：重打 `WP2_PRODUCTION_LEDGER` 等补丁块 |
-| `emit_wp1.py` + `wp1_audit_src.txt` + `wp1_newsrc.py` | 把 WP1 方法审计矩阵折进生成器；`wp1_audit_src.txt` 是带 SECTION 标记的分段源码（`emit_wp1.py` 直接读它），`wp1_newsrc.py` 是同一内容的原始文本留档（无代码 import） |
+| `emit_wp1.py` + `wp1_audit_src.txt` | 把 WP1 方法审计矩阵折进生成器；`wp1_audit_src.txt` 是带 SECTION 标记的分段源码（`emit_wp1.py` 直接读它）。同内容的 `wp1_newsrc.py`（无 import、从不执行）已删除，避免在「每个 .py 都是入口」的目录里留一个假入口 |
 | `run_batch.py` | 12 主集分子 × 4 主态的 xTB/ORCA 批量驱动与公共工具（几何、ORCA/xTB 路径、片段分析） |
 | `run_wp2_production.py` | 生产级 Opt+NumFreq 驱动（`M` / `M_plus` / `LiM_plus` / `LiM_2plus`） |
 | `run_wp2_extra.py` | 与带电腿**基组一致**的中性腿 `M_tzvpd`（def2-TZVPD）驱动 |
@@ -65,7 +65,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） |
 | `build_plan_compliance.py` | 方案 4-14 节逐条合规台账：状态与数字全部从产物现算（四分子闭环 / 方法审计 / 翻转持续性 / 锚点审计 / AL 预算），源码里不写死；把「都做完没有」变成一条可复算的链上检查（派生层） |
 | `build_state_identity_qc.py` | 方案 6.3 态身份 QC：读被 gitignore 的 `work/wp2prod/**` 里原始 ORCA 日志的最后一段布居块，现算 fragment charge/spin（Mulliken + Loewdin 双分区，两个分区不一致就记 ambiguous）与 Li 的 Mayer bonded valence；Li-给体**键级**与 **接触距离（Angstrom）**分列登记（弱接触低于 ORCA 打印阈值时留空、不补零，绝不拿 ~2 Angstrom 的键长冒充键级），按结果前冻结的阈值分成 intact / Li_centered / mixed / ambiguous / fragmented / no_li 六张分表；frontier 定位显式登记为 not_computed 并写明补法，不拿来源不清的 HOMO/LUMO 充数（派生层） |
-| `build_anchor_condition_audit.py` | 方案 8(a)/8(c)：把四组既有锚点源里本就有的条件列并成一张 87 行表（溶剂 / 盐与浓度 / 温度 / 扫描速率 / 误差来源 / 原始标度与数值 / 页码表号 / primary 源状态），缺的留空并写明原因、绝不补 0；并断言检索协议已登记且没有假装已执行（executed=false、新命中 0），tier_1 仍为 0、external-validity limitation 继续生效（派生层） |
+| `build_anchor_condition_audit.py` | 方案 8(a)/8(c)：把四组既有锚点源里本就有的条件列并成一张 87 行表（溶剂 / 盐与浓度 / 温度 / 扫描速率 / 误差来源 / 原始标度与数值 / 页码表号 / primary 源状态），缺的留空并写明原因、绝不补 0；并断言检索协议已登记**且已执行**（executed=true + 执行记录 data/references/anchor_retrieval_execution.md 在盘上）、本轮新命中可纳入 0 条，tier_1 仍为 0、按协议 §6 停止规则保留 external-validity limitation（派生层） |
 | `build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） |
 | `build_compute_provenance.py` | 逐作业复现证据清单 + 从各自 `.log` 推导的 `failure_reason`，外加**四分子 20 条腿现场核对** `leg_reconciliation.csv`（登记 vs 磁盘事实；`duplicate_work_risk` 是唯一告警）（派生层） |
 | `build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） |

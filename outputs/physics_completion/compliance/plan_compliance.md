@@ -27,7 +27,7 @@
 | `wp3_descriptor_analysis` | §7 WP3 排序、独立 uncertainty 与机制 | §7.3 描述符分析（donor type / chelation / flexibility / functionalization / 廉价 ESP）报告全部检验并做族内多重比较处理 | not_satisfied | descriptor_artifacts=0 | outputs/physics_completion/（未找到 descriptor 产物） |
 | `wp4_anchor_tiers` | §8 WP4 外部锚点复核与可比性审计 | 既有氧化锚点逐条复核并分三级（可定量 / 仅趋势 / 不可用） | partial | anchor_rows=87 tier_1=0 tier_2=14 tier_3=73 | data/references/anchor_primary_audit.csv |
 | `wp4_primary_text_check` | §8 WP4 外部锚点复核与可比性审计 | 回原始文献页码/表号复核（而非二级转抄） | partial | transcription_only=14/87 | data/anchors/primary_source_verification.csv; docs/62_week41_wp4_anchor_comparability.md |
-| `wp4_new_comparable_entries` | §8 WP4 外部锚点复核与可比性审计 | 按明确检索协议再找 6-10 条条件可比条目 | not_satisfied | tier_1_condition_matched=0 | outputs/physics_completion/anchor/anchor_tier_summary.csv |
+| `wp4_new_comparable_entries` | §8 WP4 外部锚点复核与可比性审计 | 按明确检索协议再找 6-10 条条件可比条目 | partial | protocol_executed=true record=true tier_1_condition_matched=0 | data/references/anchor_retrieval_execution.md; data/references/anchor_retrieval_protocol.md |
 | `wp5_task_separation` | §9 WP5 delta-learning 与成本感知主动查询 | 任务 A（预测 free Gox）与任务 B（预测配位位移）分开，C 特征集不出现 X2 | satisfied | ml_rows=48 budget_rows=24 | outputs/physics_completion/ml/; outputs/physics_completion/active_learning/ |
 | `wp5_new_endpoint_in_budget` | §9 WP5 delta-learning 与成本感知主动查询 | 新端点 O_3>=2/3 且 R_3<=0.10 eV 真的用于算预算 | not_satisfied | budget_columns=axis,baseline,median_overstates_majority,n_t_majority_combined,n_t_majority_tau080,n_t_median_tau080,regret_tolerance_ev,task; regret_tolerance_ev=0.041270500000000016,0.08099575000000002,0.11163849999999997,0.1619,0.16414650000000003,0.22725399999999998 | outputs/physics_completion/active_learning/success_budget.csv |
 | `wp5_two_consecutive_points` | §9 WP5 delta-learning 与成本感知主动查询 | 至少 16/20 回放在两个连续预算点达标才报经验停止预算；12 标签池回放 | not_satisfied | budget_table_has_consecutive_rule=False; replay_pool=legacy_18_not_blind | src/electrolyte_ranking/wp6.py; outputs/week7/stage8_al_summary.md |
@@ -44,6 +44,6 @@
 | `plan_landing_paths` | §13 推荐仓库落点 | §13 推荐落点：协议 / 样本集 / 锚点 / 新批次产物 / docs 逐条落地 | satisfied | checked=14 present=14 missing=none | config/physics_completion_v1.yaml; data/metadata/physics_completion_set.csv; data/references/anchor_primary_audit.csv; docs/physics_completion_final_report.md |
 | `plan_main_figures_six` | §14 最终图与论文主线 | §14 主图控制为 6 张：模型与条件态定义 / 独立方法审计 / E->G->ensemble 决策变化 / pair 证据与身份 outcome / 机制案例 / 累计成本-选集恢复曲线 | satisfied | figures=6 present=6 missing=none | docs/assets/figures/F59_physics_completion_definition.png ... docs/assets/figures/F64_physics_completion_budget_curve.png |
 
-**状态合计**：satisfied=12; partial=14; not_satisfied=7; blocked_on_production=5
+**状态合计**：satisfied=12; partial=15; not_satisfied=6; blocked_on_production=5
 
 **总体判定**：未闭环 -- 见 `plan_overall_complete` 行

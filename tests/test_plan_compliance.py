@@ -125,3 +125,24 @@ def test_ledger_distinguishes_failed_legs_from_not_started() -> None:
     """§6：闭环表把失败腿折成 planned，台账的 note 必须把 failed / in_flight 讲清楚。"""
     row = {r["item_id"]: r for r in _rows()}["wp2_production_state_ledger"]
     assert "failed=" in row["note"] and "not_started=" in row["note"], row["note"]
+
+
+def test_wp4_new_comparable_entries_reflects_an_executed_search() -> None:
+    """方案 §8(c) 的目标条目没找到时必须走 §6 停止规则：检索**已执行** + 可纳入 0 条 = partial。
+
+    既不能写成 satisfied（6-10 条条件可比条目确实没拿到），也不能还原成 not_satisfied（检索确实跑了）。
+    """
+    protocol = (REPO_ROOT / "data" / "references" / "anchor_retrieval_protocol.md").read_text(encoding="utf-8")
+    record = REPO_ROOT / "data" / "references" / "anchor_retrieval_execution.md"
+    assert "executed = true" in protocol, "the retrieval protocol must be marked as executed"
+    assert record.is_file(), "the retrieval execution record must be on disk"
+    row = next(r for r in _rows() if r["item_id"] == "wp4_new_comparable_entries")
+    assert row["status"] == "partial", row
+    assert "protocol_executed=true" in row["measured"] and "record=true" in row["measured"], row["measured"]
+
+
+def test_wp4_primary_text_check_records_the_reference_index_conflict() -> None:
+    """两篇 Ue 正文仍未取得，且新发现的被引登记冲突不能从台账里消失。"""
+    row = next(r for r in _rows() if r["item_id"] == "wp4_primary_text_check")
+    assert "attribution_conflict_open" in row["note"], row["note"]
+    assert "transcription-only" in row["note"]

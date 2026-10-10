@@ -33,18 +33,35 @@ $logPath = Join-Path $root "work\_extra_supervisor.log"
 $target = 20
 function Log($m) { ("[{0}] {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $m) | Out-File -Append -Encoding UTF8 $logPath }
 
-# 与队列器同一个「什么算在跑」的口径：真 orca.exe，或别的 run_wp2_* 驱动。
+# 「什么算在跑」的口径**刻意比队列器更宽**：名字里含 orca 的全部进程（真 orca.exe 连同
+# orca_numfreq / orca_scfgrad / orca_leanscf_mpi 等 MPI 子进程），加上别的 run_wp2_* 驱动。
+# 口径宽是为了守住用户硬要求「全机同时最多 2 个 ORCA 作业」：宁可多等，绝不让两批 ORCA 叠加。
 # 监守自己的命令行是 supervise_pending.ps1，不会被数进来。
 function Get-DriverProcesses() {
   Get-CimInstance Win32_Process |
     Where-Object { $_.Name -match 'orca' -or ($_.Name -eq 'python.exe' -and $_.CommandLine -match 'run_wp2_(production|extra|queue)') }
 }
 
+function Format-DriverSummary($procs) {
+  (@($procs) | ForEach-Object { $_.Name + '#' + $_.ProcessId } | Sort-Object) -join ','
+}
+
+# 等对等驱动退出。**不缩小归属范围**：对等驱动可能正在推进同一队列的其它腿，硬等是刻意的
+# （「只等自己的驱动」会让两批 ORCA 叠加，突破全机 2 ORCA 上限）。但空转必须可观测：每 10 分钟
+# 记一条 blocked_by_peer_drivers 心跳，写清还在等谁、等了多久，免得像旧版那样在日志里静默停在半路。
 function Wait-ForDrivers() {
+  $waited = 0
   while ($true) {
-    $busy = Get-DriverProcesses
-    if (-not $busy) { return }
+    $busy = @(Get-DriverProcesses)
+    if (-not $busy) {
+      if ($waited -gt 0) { Log ('supervise_pending: peer drivers exited after ' + $waited + 's; proceeding') }
+      return
+    }
+    if ($waited % 600 -eq 0) {
+      Log ('supervise_pending: blocked_by_peer_drivers waited=' + $waited + 's n=' + $busy.Count + ' [' + (Format-DriverSummary $busy) + ']')
+    }
     Start-Sleep -Seconds 120
+    $waited += 120
   }
 }
 

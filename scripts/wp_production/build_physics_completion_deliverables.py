@@ -127,7 +127,10 @@ def submission_sources():
               "docs/claim_migration.md", "docs/65_repo_layout.md",
               "config/physics_completion_v1.yaml",
               "data/metadata/physics_completion_set.csv",
-              "data/references/anchor_primary_audit.csv"] + WEEK_COMMON + WEEK44_EXTRA)
+              "data/references/anchor_primary_audit.csv",
+              #: 方案 8(c) 的检索协议与执行记录：结题提交包里必须带上「按协议执行了什么、没找到什么」的证据本身。
+              "data/references/anchor_retrieval_protocol.md",
+              "data/references/anchor_retrieval_execution.md"] + WEEK_COMMON + WEEK44_EXTRA)
     for rel in roots:
         if rel not in seen:
             seen.add(rel)

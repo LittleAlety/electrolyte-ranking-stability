@@ -101,3 +101,23 @@ def test_supervisor_uses_the_tested_policy_and_reports_incomplete():
     assert "--decide" in text and "--computed-count" in text
     assert "run_to_closure.py --commit" in text
     assert "INCOMPLETE" in text and "exit 3" in text, "没算完必须以非零退出并写清楚，好让调用方重新拉起"
+
+
+def test_supervisor_makes_peer_driver_waiting_observable():
+    """旧版 Wait-ForDrivers 是纯静默空转：对等驱动不退时，日志里只剩一条「waiting」，
+    看不出在等谁、等了多久（现场曾连续数小时无新日志）。空转本身是对的——它守的是
+    全机 2 ORCA 上限——但必须可观测，否则卡点只能靠人去猜。"""
+    text = SUPERVISOR.read_text(encoding="utf-8-sig")
+    start = text.index("function Wait-ForDrivers")
+    body = text[start:text.index("\n}\n", start)]
+    assert "blocked_by_peer_drivers" in body, "等待对等驱动时必须有周期性心跳日志"
+    assert "Format-DriverSummary" in body, "心跳必须写清在等哪些进程，否则仍看不出卡点"
+    assert "% 600" in body, "心跳要有固定节流，不能每 120s 都刷一行"
+
+
+def test_supervisor_keeps_the_wide_driver_match_to_hold_the_cap():
+    """监守的「忙」口径**不得**收窄成「只认自己」：对等驱动可能正在推进同一队列的其它腿，
+    收窄归属会让两批 ORCA 叠加，直接突破用户硬要求（全机最多 2 个 ORCA 作业）。"""
+    text = SUPERVISOR.read_text(encoding="utf-8-sig")
+    assert "-match 'orca'" in text, "orca 口径必须保持宽匹配（含 MPI 子进程）"
+    assert "-eq 'orca.exe'" not in text, "监守不得把口径收窄成只认真 orca.exe"

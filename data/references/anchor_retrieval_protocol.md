@@ -2,7 +2,7 @@
 
 本文件是**结果前登记**的检索协议：在查看任何新命中之前写定检索源、检索式、纳入/排除标准与目标条目数。
 它把方案 §8(c)「按明确检索协议寻找 6–10 个条件可比条目」的要求变成一条可核对、可复算的登记，
-而不是每次口头重述。**当前状态：协议已登记，检索尚未执行**（见文末「执行状态」），因此 tier_1 仍为 0，
+而不是每次口头重述。**当前状态：协议已登记且已执行（见文末「执行状态」与 `data/references/anchor_retrieval_execution.md`），新命中可纳入 0 条**，因此 tier_1 仍为 0，
 external-validity limitation 继续生效（方案 §8(d)）。
 
 ## 1. 目的
@@ -45,7 +45,13 @@ external-validity limitation 继续生效（方案 §8(d)）。
 ## 7. 执行状态
 - 协议版本：`anchor_retrieval_protocol_v1`
 - 协议登记日期：2026-10-10
-- 检索是否执行：**否（`executed = false`）**
-- 新命中条目数：**0**
+- 检索是否执行：**是（`executed = true`）**；执行日期 2026-10-10，执行记录见 `data/references/anchor_retrieval_execution.md`
+- 实际执行源：Crossref REST API（DOI 反查 + 检索式 A/C 取回）、OpenAlex（检索式 A–D + 被引登记）、Unpaywall（OA 定位）、Semantic Scholar（被引交叉核对）
+- 执行偏差：Crossref 对检索式 B / D 持续返回 HTTP 429 限流，未取回；该两条改由 OpenAlex 登记，偏差已写进执行记录
+- 新命中条目数：**0**（四组检索式返回 19 个去重候选，无一条同时满足 §4 的五条纳入标准）
+- 新命中可纳入条目数：**0**
 - `tier_1_condition_matched`：**0**（保持）
-- 结论：本批次只做到「协议已登记 + 既有锚点条件字段并表复核」；真正执行检索需要原文获取（两篇 Ue 正文仍未取得，`primary_source_status = full_text_not_obtained`）。
+- 结论：协议已按登记的源与检索式执行，结果按 §6 停止规则走「找不到足够可比数据」这一条——保留 computational target + external-validity limitation（方案 §8(d)），
+  并把「没找到」原样写进执行记录，不写成「已完成」。两篇 Ue 正文仍未取得（IOPscience PDF 返回验证码页而非 PDF），
+  `primary_source_status = full_text_not_obtained` 不变；执行中还发现 Okoshi 2015 的被引登记指向 Ue 参编专著与 CRC 手册，
+  与此前猜测的两篇 Ue JES 论文不一致，故 `ue_ref_attribution` 的猜测保持 UNVERIFIED 并新登记为 `attribution_conflict_open`（详见执行记录 §5）。

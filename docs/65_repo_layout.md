@@ -109,7 +109,6 @@ week36 与 week44 只存在于 part2 镜像。
 | `supervisor_policy.py` | 监守收敛判据（纯函数，有单测）：`--computed-count` 按队列 `inventory()` 口径数已 computed 的腿，`--decide` 判断继续 / 完成 / 停摆或轮数上限而停 | 队列快照 → `done`/`continue`/`stop_stalled`/`stop_round_cap` |
 | `emit_wp2.py` | 把 `work/wp2prod/**` 已跑完的状态**折进生成器**：确定性重打 `WP2_PRODUCTION_LEDGER` 等补丁块 | 生产现场 + 生成器基线 → `scripts/build_physics_completion_batch.py` |
 | `emit_wp1.py` | 把 WP1 方法审计矩阵折进生成器（读带 SECTION 标记的 `wp1_audit_src.txt`） | `wp1_audit_src.txt` + 生成器基线 → 生成器补丁块 |
-| `wp1_newsrc.py` | `wp1_audit_src.txt` 同一内容的原始文本留档（无 import、不被执行） | — |
 | `emit_pair_recheck.py` | 靶向复核**手工折步**：把 `work/recheck/` 的原始单点折成 `recheck_results.csv`（逐行带几何 sha256）；输入在仓库外，故不进收口链 | `work/recheck/**` → `outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv` |
 | `check_wp2_anchors.py` | 复核 `emit_wp2.py` 的补丁锚点在当前生成器基线里唯一存在 | 生成器基线 → 锚点自检结论 |
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息 | 交付层状态 → `work/_wp2_commit_msg.txt` |
@@ -117,7 +116,7 @@ week36 与 week44 只存在于 part2 镜像。
 | `build_wp2_closure.py` | 四分子四态闭环 + 翻转持续性 + 逐作业复现证据（派生层） | 生产 ledger → `outputs/physics_completion/closure/**` |
 | `build_plan_compliance.py` | 方案 4-14 节逐条合规台账：状态与数字全部从产物现算（四分子闭环 / 方法审计 / 翻转持续性 / 锚点审计 / AL 预算），源码里不写死；作为「都做完没有」的机器可查答案 | 交付层 CSV → `outputs/physics_completion/compliance/**` |
 | `build_state_identity_qc.py` | 方案 6.3 态身份 QC：读被 gitignore 的 `work/wp2prod/**` 里原始 ORCA 日志的**最后一段**布居块，现算 fragment charge/spin（Mulliken + Loewdin 双分区，两个分区不一致就记 ambiguous）与 Li 的 Mayer bonded valence；Li-给体**键级**与 Li-给体**接触距离（Angstrom）**分列登记（弱接触低于 ORCA 打印阈值时留空、不补零），按结果前冻结阈值分成 intact / Li_centered / mixed / ambiguous / fragmented / no_li 六张分表；frontier 定位显式登记为 not_computed（派生层） | 原始日志 + production_ledger → `outputs/physics_completion/state_identity/**` |
-| `build_anchor_condition_audit.py` | 方案 8(a)/8(c) 锚点条件元数据并表 + 检索协议登记状态：把四组既有锚点源里本就有的条件列（溶剂 / 盐与浓度 / 温度 / 扫描速率 / 误差来源 / 原始标度与数值 / 页码表号 / primary 源状态）并到一张 87 行表，缺的字段留空并写明原因、绝不补 0；同时断言检索协议已登记且没有假装已执行（executed=false，新命中 0），tier_1 保持 0、external-validity limitation 继续生效（派生层） | data/anchors/** + data/references/anchor_retrieval_protocol.md → `outputs/physics_completion/anchor/**` |
+| `build_anchor_condition_audit.py` | 方案 8(a)/8(c) 锚点条件元数据并表 + 检索协议执行状态：把四组既有锚点源里本就有的条件列（溶剂 / 盐与浓度 / 温度 / 扫描速率 / 误差来源 / 原始标度与数值 / 页码表号 / primary 源状态）并到一张 87 行表，缺的字段留空并写明原因、绝不补 0；同时断言检索协议已登记**且已执行**（executed=true + 执行记录在盘上），本轮新命中可纳入 0 条、按 §6 停止规则保留 external-validity limitation，tier_1 保持 0（派生层） | data/anchors/** + data/references/anchor_retrieval_{protocol,execution}.md → `outputs/physics_completion/anchor/**` |
 | `build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） | 生产 ledger → `outputs/physics_completion/sampling/**` |
 | `build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） | 生产 ledger → `outputs/physics_completion/cost/**` |
 | `build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的**结果前预注册** + 复核跑完后只读 `recheck_results.csv`、现算逐 (pair, 设定) 的 delta | 规则/对象/设定/几何来源 → `targeted_recheck/` 计划与验收层 |
