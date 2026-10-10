@@ -3460,6 +3460,53 @@ RECHECK_RESULTS_ROWS = (PB.load_rows(RECHECK_RESULTS_PATH) if RECHECK_RESULTS_PA
 RECHECK_DONE_ROWS = [row for row in RECHECK_RESULTS_ROWS if row.get("status") == "computed"]
 RECHECK_CORE_HOURS = sum(float(row["core_hours"]) for row in RECHECK_DONE_ROWS)
 
+# ---------------------------------------------------------------------------
+# 方案 11：绝对成本三项（cpu_core_hours / p90_job_cost / frequency_only_cost）。
+# 只在四分子闭环后按实测的逐作业台账现算填入；闭环前留空并标 MISSING，
+# 不拿「已经跑完的那部分作业」冒充项目级 headline 数。
+# ---------------------------------------------------------------------------
+WP2_PRODUCTION_EXPECTED_ROWS = (len(WP2_PRODUCTION_MOLECULES)
+                                * (len(WP2_PRODUCTION_STATES) + len(WP2_PRODUCTION_EXTRA_STATES)))
+WP2_LOOP_CLOSED = WP2_PRODUCTION_LEDGER_ROWS == WP2_PRODUCTION_EXPECTED_ROWS
+
+
+def _pilot_job_core_hours(row):
+    """pilot 台账只记 wall_sec / cores，core-hours 按 allocated cores 现算，不冒充 process CPU time。"""
+    return float(row["wall_sec"]) * float(row["cores"]) / 3600.0
+
+
+def _absolute_cost_jobs():
+    values = [float(row["core_hours"]) for row in METHOD_AUDIT_COST if row.get("core_hours")]
+    values += [_pilot_job_core_hours(row) for row in PILOT_COST_JOBS]
+    values += [float(row["core_hours"]) for row in WP2_PRODUCTION_LEDGER if row.get("core_hours")]
+    values += [float(row["core_hours"]) for row in RECHECK_DONE_ROWS if row.get("core_hours")]
+    return values
+
+
+def _nearest_rank_p90(values):
+    """与 build_wp2_cost_scenarios.py 的 p90 同一口径：最近秩，不插值。"""
+    ordered = sorted(values)
+    index = max(1, int(-(-0.9 * len(ordered) // 1)))
+    return ordered[index - 1]
+
+
+def _median_value(values):
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return 0.5 * (ordered[middle - 1] + ordered[middle])
+
+
+ABSOLUTE_COST_JOBS_CORE_HOURS = _absolute_cost_jobs()
+ABSOLUTE_FREQ_ONLY_JOBS = [row for row in PILOT_COST_JOBS if row.get("phase") == "orca_freq"]
+ABSOLUTE_CPU_CORE_HOURS = "%.6f" % sum(ABSOLUTE_COST_JOBS_CORE_HOURS)
+ABSOLUTE_P90_JOB_COST = ("%.6f" % _nearest_rank_p90(ABSOLUTE_COST_JOBS_CORE_HOURS)
+                         if ABSOLUTE_COST_JOBS_CORE_HOURS else "")
+ABSOLUTE_FREQ_ONLY_COST = ("%.6f" % _median_value([_pilot_job_core_hours(row)
+                                                   for row in ABSOLUTE_FREQ_ONLY_JOBS])
+                           if ABSOLUTE_FREQ_ONLY_JOBS else "")
+
 
 COST_LEDGER = [
     {"item": "method_audit_single_points", "unit": "SP", "value": "128", "kind": "measured", "status": "measured",
@@ -3480,16 +3527,23 @@ COST_LEDGER = [
      "value": "%d" % len(RECHECK_DONE_ROWS), "kind": "measured", "status": "measured",
      "note": "the %d registered single points (the frozen second functional on the production Opt geometries, 2 cores each, serial) cost %.3f core-hours in total; the remaining rows of the 24-row plan wait on their production legs; the table is outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv and the raw ORCA outputs stay in work/recheck/"
              % (len(RECHECK_DONE_ROWS), RECHECK_CORE_HOURS)},
-    {"item": "cpu_core_hours", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
-     "note": "allocated core-hours are recorded per job in the production / audit / pilot cost ledgers; "
-             "this project-level scalar stays empty until the four-molecule loop closes"},
-    {"item": "p90_job_cost", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
-     "note": "per-class median and p90 are reported in outputs/physics_completion/cost/"
-             "remaining_cost_scenarios.csv; the headline p90 stays empty until the loop closes"},
-    {"item": "frequency_only_cost", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
-     "note": "a measured frequency-only job exists in pilot_cost_ledger.csv (C01|M|orca_freq, "
-             "wB97X-D4/def2-TZVP SMD NumFreq, 1.254556 core-hours); the headline figure stays empty "
-             "until the loop closes"},
+    {"item": "cpu_core_hours", "unit": "core-hour",
+     "value": ABSOLUTE_CPU_CORE_HOURS if WP2_LOOP_CLOSED else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "note": "项目级 allocated core-hours（不是 process CPU time）：四分子 %d/%d 条腿闭环后按现算填入，"
+             "口径 = 方法审计 + pilot + 生产 + 靶向复核四个逐作业台账里 %d 条带 core-hours 记录的作业之和；"
+             "闭环前留空，不拿已跑的那部分作业冒充 headline 数。"
+             % (WP2_PRODUCTION_LEDGER_ROWS, WP2_PRODUCTION_EXPECTED_ROWS, len(ABSOLUTE_COST_JOBS_CORE_HOURS))},
+    {"item": "p90_job_cost", "unit": "core-hour",
+     "value": ABSOLUTE_P90_JOB_COST if WP2_LOOP_CLOSED else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "note": "逐作业 core-hours 的最近秩 p90（小样本下等于最大值，不插值假装样本充足）；逐类中位 / p90 "
+             "另见 outputs/physics_completion/cost/remaining_cost_scenarios.csv；闭环前留空。"},
+    {"item": "frequency_only_cost", "unit": "core-hour",
+     "value": ABSOLUTE_FREQ_ONLY_COST if WP2_LOOP_CLOSED else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "note": "只做频率的作业（phase=orca_freq，%d 条，C01|M|orca_freq = wB97X-D4/def2-TZVP SMD NumFreq）"
+             "的中位 core-hours；闭环前留空。" % len(ABSOLUTE_FREQ_ONLY_JOBS)},
 ]
 
 
@@ -3584,9 +3638,13 @@ def wp5():
          "ok": True, "detail": "已声明旧数据大致行为已知；真实前瞻性需另留未计算分子"},
         {"id": "replay_evidence_is_the_frozen_legacy_pool", "description": "回放证据来自冻结旧池（outputs/week32-33），未冒充 12 标签池的新回放",
          "ok": "frozen legacy 18-molecule pool" in replay_pool_note, "detail": "协议与证据池身份一致；12 标签池回放待 WP2 标签补齐"},
-        {"id": "absolute_cost_missing_flagged", "description": "绝对成本字段缺失被显式标 MISSING，不给金额",
-         "ok": sum(1 for item in COST_LEDGER if item["status"] == "MISSING") == 3,
-         "detail": "MISSING=%d" % sum(1 for item in COST_LEDGER if item["status"] == "MISSING")},
+        {"id": "absolute_cost_tracks_the_four_molecule_loop",
+         "description": "绝对成本三项：四分子闭环后按实测台账现算填入，闭环前显式标 MISSING（不用部分作业当 headline 数）",
+         "ok": (sum(1 for item in COST_LEDGER if item["status"] == "MISSING") == 0) == WP2_LOOP_CLOSED,
+         "detail": "loop_closed=%s MISSING=%d total_jobs=%d"
+                   % (WP2_LOOP_CLOSED,
+                      sum(1 for item in COST_LEDGER if item["status"] == "MISSING"),
+                      len(ABSOLUTE_COST_JOBS_CORE_HOURS))},
         {"id": "frozen_family_view_covers_every_cell", "description": "冻结族复算覆盖既有 stage7 复算表的每一格",
          "ok": (n_rows_accounted == len(metrics_rows)) and n_frozen_per_cell == [len(PB.FROZEN_MODEL_FAMILY)],
          "detail": "%d/%d 行；%d 格，每格冻结族候选 %s 个"
@@ -3669,8 +3727,9 @@ def wp5():
         "",
         "- `delta_vs_direct.csv`：%d 格，其中 shift 在 tau_b 上更好 **%d** 格。" % (len(dv), shift_better),
         "- `success_budget.csv`：%d 行 / %d 个 (task,axis) 场景；`budget_to_threshold.csv` %d 行。" % (len(sb), n_scenario, len(btt)),
-        "- 成本账本：%d 项相对预算；**3 项绝对成本缺字段（MISSING）**，故只给相对预算、不给金额。"
-        % len(COST_LEDGER),
+        "- 成本账本：%d 项相对预算；绝对成本三项 %s。"
+        % (len(COST_LEDGER), "已按实测台账现算填入（四分子闭环）" if WP2_LOOP_CLOSED
+           else "在四分子闭环前显式标 MISSING，只给相对预算、不给金额"),
         "- 冻结族口径（方案 9.1）：把既有 stage7 复算表（%d 行）限制到 ridge/krr/gpr，逐格对比选型；"
         "全模型最优落在族外（gbdt/rf/constant）的格子：tau %d/%d、MAE %d/%d —— 这些格子只作旁证。"
         % (len(metrics_rows), n_tau_outside, len(family_view), n_mae_outside, len(family_view)),
@@ -3820,7 +3879,8 @@ def build_final_report():
            WP2_PRODUCTION_EXTRA_DONE),
         "| WP3 | week40 | pair 证据表 + 机制案例 | P1v→P1a（n=12，66 pair）逐对复算 55/9/2；2 个机制案例 | 单 rung 演示；多方法范围已由 WP1 审计给出（方法轴） |",
         "| WP4 | week41 | 外部可比性审计 | 7 氧化锚点逐条重算 tau_b=0.4286；三级分类 | transcription-only；21 pair 非独立样本 |",
-        "| WP5 | week42 | Δ-learning + 成本账本 | 端点/泄漏防线冻结；成本 3 项 MISSING | 回放非盲预注册；绝对成本缺失 |",
+        "| WP5 | week42 | Δ-learning + 成本账本 | 端点/泄漏防线冻结；绝对成本 %s | 回放非盲预注册；绝对成本按闭环闸门填 |"
+        % ("已按实测台账现算（四分子闭环）" if WP2_LOOP_CLOSED else "3 项 MISSING（闭环前）"),
         "| WP6 | week43 | 显式配体检查（可选） | R=DME 协议登记；不纳入首轮闭环 | 依赖关键 free→Li 结论先可解析 |",
         "",
         "## 3. 证据分层",
@@ -3842,7 +3902,8 @@ def build_final_report():
         "（qRRHO，合计 %.6f core-hours），另登记 %d 条 def2-TZVPD 中性腿；未完成的主态保持空串（None），未把缺值写成 0。"
         % (WP2_PRODUCTION_STATES_DONE, WP2_PRODUCTION_STATES_TOTAL,
            WP2_PRODUCTION_CORE_HOURS, WP2_PRODUCTION_EXTRA_DONE),
-        "- WP5：shift 在 tau_b 上更好的格数与冻结表一致；成本账本 3 项 MISSING。",
+        "- WP5：shift 在 tau_b 上更好的格数与冻结表一致；绝对成本三项%s。"
+        % ("已按实测台账填入（四分子闭环）" if WP2_LOOP_CLOSED else "在闭环前保持 MISSING"),
         "",
         "## 5. 限制与停止规则",
         "",

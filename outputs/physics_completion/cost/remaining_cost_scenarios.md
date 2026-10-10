@@ -39,13 +39,15 @@
 * 只做优化（opt-only）：唯一一条是 `A161`（r2SCAN-3c），方法口径与生产腿不同，不能当作 wB97X-D4 的 Opt 成本。
 * 生产腿是 Opt + NumFreq 联合作业，Opt 与 Freq 无法从同一作业的墙上时间里拆分，本条如实登记而不估算。
 
-## 仍然 MISSING 的绝对三项
+## 绝对成本三项（四分子闭环后按实测台账现算；闭环前留空并标 MISSING）
+
+* 闭环状态：尚未闭环；绝对成本三项 留空并标 MISSING。
 
 | item | status | note |
 | --- | --- | --- |
-| cpu_core_hours | MISSING | allocated core-hours are recorded per job in the production / audit / pilot cost ledgers; this project-level scalar stays empty until the four-molecule loop closes |
-| p90_job_cost | MISSING | per-class median and p90 are reported in outputs/physics_completion/cost/remaining_cost_scenarios.csv; the headline p90 stays empty until the loop closes |
-| frequency_only_cost | MISSING | a measured frequency-only job exists in pilot_cost_ledger.csv (C01|M|orca_freq, wB97X-D4/def2-TZVP SMD NumFreq, 1.254556 core-hours); the headline figure stays empty until the loop closes |
+| cpu_core_hours | MISSING | 项目级 allocated core-hours（不是 process CPU time）：四分子 13/20 条腿闭环后按现算填入，口径 = 方法审计 + pilot + 生产 + 靶向复核四个逐作业台账里 299 条带 core-hours 记录的作业之和；闭环前留空，不拿已跑的那部分作业冒充 headline 数。 |
+| p90_job_cost | MISSING | 逐作业 core-hours 的最近秩 p90（小样本下等于最大值，不插值假装样本充足）；逐类中位 / p90 另见 outputs/physics_completion/cost/remaining_cost_scenarios.csv；闭环前留空。 |
+| frequency_only_cost | MISSING | 只做频率的作业（phase=orca_freq，1 条，C01|M|orca_freq = wB97X-D4/def2-TZVP SMD NumFreq）的中位 core-hours；闭环前留空。 |
 
 ## 历史口径
 

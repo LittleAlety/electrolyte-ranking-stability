@@ -293,12 +293,17 @@ def build():
         "detail": "SP pilot keys=%d audit keys=%d; freq_only=%s; %s" % (
             len(pilot_sp), len(audit_sp), freq.get("job_id", "none"), JOINT_NOTE),
     })
+    filled = (len(absolute) == 3
+              and all(row["status"] != "MISSING" and row["value"] != "" for row in absolute))
+    still_missing = (len(absolute) == 3
+                     and all(row["status"] == "MISSING" and row["value"] == "" for row in absolute))
+    loop_closed = len(measured_keys) == len(legs)
     checks.append({
-        "check_id": "absolute_cost_items_stay_missing",
-        "description": "绝对成本三项在四分子闭环前仍标 MISSING 且值为空，不用部分数据填成 headline 数",
-        "ok": str(len(absolute) == 3 and all(row["status"] == "MISSING" and row["value"] == ""
-                                             for row in absolute)).lower(),
-        "detail": "items=%s" % " ".join(row["item"] for row in absolute),
+        "check_id": "absolute_cost_tracks_the_four_molecule_loop",
+        "description": "绝对成本三项：四分子闭环后按实测台账现算填入；闭环前必须留空并标 MISSING（不给部分数据当 headline 数）",
+        "ok": str((filled and loop_closed) or (still_missing and not loop_closed)).lower(),
+        "detail": "items=%s; filled=%s; legs=%d/%d" % (
+            " ".join(row["item"] for row in absolute), filled, len(measured_keys), len(legs)),
     })
 
     index = {
@@ -407,7 +412,11 @@ def build():
            index["phase_split"]["opt_only"]["basis"] or "-"),
         "* 生产腿是 Opt + NumFreq 联合作业，Opt 与 Freq 无法从同一作业的墙上时间里拆分，本条如实登记而不估算。",
         "",
-        "## 仍然 MISSING 的绝对三项",
+        "## 绝对成本三项（四分子闭环后按实测台账现算；闭环前留空并标 MISSING）",
+        "",
+        "* 闭环状态：%s；绝对成本三项 %s。"
+        % ("四分子四态已齐备" if loop_closed else "尚未闭环",
+           "已按实测台账填入" if filled else "留空并标 MISSING"),
         "",
         "| item | status | note |",
         "| --- | --- | --- |",

@@ -445,17 +445,57 @@ ANCHOR_COST_NOTES = '''    {"item": "cpu_core_hours", "unit": "core-hour", "valu
     {"item": "frequency_only_cost", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
      "note": "frequency-only cost not recorded"},
 '''
-COST_NOTES_BLOCK = '''    {"item": "cpu_core_hours", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
-     "note": "allocated core-hours are recorded per job in the production / audit / pilot cost ledgers; "
-             "this project-level scalar stays empty until the four-molecule loop closes"},
-    {"item": "p90_job_cost", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
-     "note": "per-class median and p90 are reported in outputs/physics_completion/cost/"
-             "remaining_cost_scenarios.csv; the headline p90 stays empty until the loop closes"},
-    {"item": "frequency_only_cost", "unit": "core-hour", "value": "", "kind": "absolute", "status": "MISSING",
-     "note": "a measured frequency-only job exists in pilot_cost_ledger.csv (C01|M|orca_freq, "
-             "wB97X-D4/def2-TZVP SMD NumFreq, 1.254556 core-hours); the headline figure stays empty "
-             "until the loop closes"},
+COST_NOTES_BLOCK = '''    {"item": "cpu_core_hours", "unit": "core-hour",
+     "value": ABSOLUTE_CPU_CORE_HOURS if WP2_LOOP_CLOSED else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "note": "项目级 allocated core-hours（不是 process CPU time）：四分子 %d/%d 条腿闭环后按现算填入，"
+             "口径 = 方法审计 + pilot + 生产 + 靶向复核四个逐作业台账里 %d 条带 core-hours 记录的作业之和；"
+             "闭环前留空，不拿已跑的那部分作业冒充 headline 数。"
+             % (WP2_PRODUCTION_LEDGER_ROWS, WP2_PRODUCTION_EXPECTED_ROWS, len(ABSOLUTE_COST_JOBS_CORE_HOURS))},
+    {"item": "p90_job_cost", "unit": "core-hour",
+     "value": ABSOLUTE_P90_JOB_COST if WP2_LOOP_CLOSED else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "note": "逐作业 core-hours 的最近秩 p90（小样本下等于最大值，不插值假装样本充足）；逐类中位 / p90 "
+             "另见 outputs/physics_completion/cost/remaining_cost_scenarios.csv；闭环前留空。"},
+    {"item": "frequency_only_cost", "unit": "core-hour",
+     "value": ABSOLUTE_FREQ_ONLY_COST if WP2_LOOP_CLOSED else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "note": "只做频率的作业（phase=orca_freq，%d 条，C01|M|orca_freq = wB97X-D4/def2-TZVP SMD NumFreq）"
+             "的中位 core-hours；闭环前留空。" % len(ABSOLUTE_FREQ_ONLY_JOBS)},
 '''
+ANCHOR_ABS_COST_CHECK = '''        {"id": "absolute_cost_missing_flagged", "description": "绝对成本字段缺失被显式标 MISSING，不给金额",
+         "ok": sum(1 for item in COST_LEDGER if item["status"] == "MISSING") == 3,
+         "detail": "MISSING=%d" % sum(1 for item in COST_LEDGER if item["status"] == "MISSING")},
+'''
+ABS_COST_CHECK_BLOCK = '''        {"id": "absolute_cost_tracks_the_four_molecule_loop",
+         "description": "绝对成本三项：四分子闭环后按实测台账现算填入，闭环前显式标 MISSING（不用部分作业当 headline 数）",
+         "ok": (sum(1 for item in COST_LEDGER if item["status"] == "MISSING") == 0) == WP2_LOOP_CLOSED,
+         "detail": "loop_closed=%s MISSING=%d total_jobs=%d"
+                   % (WP2_LOOP_CLOSED,
+                      sum(1 for item in COST_LEDGER if item["status"] == "MISSING"),
+                      len(ABSOLUTE_COST_JOBS_CORE_HOURS))},
+'''
+
+ANCHOR_COST_MD_LINE = '''        "- 成本账本：%d 项相对预算；**3 项绝对成本缺字段（MISSING）**，故只给相对预算、不给金额。"
+        % len(COST_LEDGER),
+'''
+COST_MD_LINE_BLOCK = '''        "- 成本账本：%d 项相对预算；绝对成本三项 %s。"
+        % (len(COST_LEDGER), "已按实测台账现算填入（四分子闭环）" if WP2_LOOP_CLOSED
+           else "在四分子闭环前显式标 MISSING，只给相对预算、不给金额"),
+'''
+
+ANCHOR_COST_TABLE_ROW = '''        "| WP5 | week42 | Δ-learning + 成本账本 | 端点/泄漏防线冻结；成本 3 项 MISSING | 回放非盲预注册；绝对成本缺失 |",
+'''
+COST_TABLE_ROW_BLOCK = '''        "| WP5 | week42 | Δ-learning + 成本账本 | 端点/泄漏防线冻结；绝对成本 %s | 回放非盲预注册；绝对成本按闭环闸门填 |"
+        % ("已按实测台账现算（四分子闭环）" if WP2_LOOP_CLOSED else "3 项 MISSING（闭环前）"),
+'''
+
+ANCHOR_COST_KEYNUM_BULLET = '''        "- WP5：shift 在 tau_b 上更好的格数与冻结表一致；成本账本 3 项 MISSING。",
+'''
+COST_KEYNUM_BULLET_BLOCK = '''        "- WP5：shift 在 tau_b 上更好的格数与冻结表一致；绝对成本三项%s。"
+        % ("已按实测台账填入（四分子闭环）" if WP2_LOOP_CLOSED else "在闭环前保持 MISSING"),
+'''
+
 ANCHOR_CONST = "PILOT_RT_EH = 0.000944183\nPILOT_LN_VM = 3.197365\n"
 ANCHOR_LEDGER_LOOP = '                "n_conformers": "", "identity_label": "", "status": "planned",\n            })\n'
 ANCHOR_OUTPUTS = '    local["outputs/physics_completion/free_states/sampling_plan.csv"] = csv_text(\n'
@@ -620,6 +660,53 @@ COST_LEDGER_DEF_BLOCK = '''RECHECK_RESULTS_PATH = (REPO / "outputs" / "physics_c
 RECHECK_RESULTS_ROWS = (PB.load_rows(RECHECK_RESULTS_PATH) if RECHECK_RESULTS_PATH.exists() else [])
 RECHECK_DONE_ROWS = [row for row in RECHECK_RESULTS_ROWS if row.get("status") == "computed"]
 RECHECK_CORE_HOURS = sum(float(row["core_hours"]) for row in RECHECK_DONE_ROWS)
+
+# ---------------------------------------------------------------------------
+# 方案 11：绝对成本三项（cpu_core_hours / p90_job_cost / frequency_only_cost）。
+# 只在四分子闭环后按实测的逐作业台账现算填入；闭环前留空并标 MISSING，
+# 不拿「已经跑完的那部分作业」冒充项目级 headline 数。
+# ---------------------------------------------------------------------------
+WP2_PRODUCTION_EXPECTED_ROWS = (len(WP2_PRODUCTION_MOLECULES)
+                                * (len(WP2_PRODUCTION_STATES) + len(WP2_PRODUCTION_EXTRA_STATES)))
+WP2_LOOP_CLOSED = WP2_PRODUCTION_LEDGER_ROWS == WP2_PRODUCTION_EXPECTED_ROWS
+
+
+def _pilot_job_core_hours(row):
+    """pilot 台账只记 wall_sec / cores，core-hours 按 allocated cores 现算，不冒充 process CPU time。"""
+    return float(row["wall_sec"]) * float(row["cores"]) / 3600.0
+
+
+def _absolute_cost_jobs():
+    values = [float(row["core_hours"]) for row in METHOD_AUDIT_COST if row.get("core_hours")]
+    values += [_pilot_job_core_hours(row) for row in PILOT_COST_JOBS]
+    values += [float(row["core_hours"]) for row in WP2_PRODUCTION_LEDGER if row.get("core_hours")]
+    values += [float(row["core_hours"]) for row in RECHECK_DONE_ROWS if row.get("core_hours")]
+    return values
+
+
+def _nearest_rank_p90(values):
+    """与 build_wp2_cost_scenarios.py 的 p90 同一口径：最近秩，不插值。"""
+    ordered = sorted(values)
+    index = max(1, int(-(-0.9 * len(ordered) // 1)))
+    return ordered[index - 1]
+
+
+def _median_value(values):
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return 0.5 * (ordered[middle - 1] + ordered[middle])
+
+
+ABSOLUTE_COST_JOBS_CORE_HOURS = _absolute_cost_jobs()
+ABSOLUTE_FREQ_ONLY_JOBS = [row for row in PILOT_COST_JOBS if row.get("phase") == "orca_freq"]
+ABSOLUTE_CPU_CORE_HOURS = "%.6f" % sum(ABSOLUTE_COST_JOBS_CORE_HOURS)
+ABSOLUTE_P90_JOB_COST = ("%.6f" % _nearest_rank_p90(ABSOLUTE_COST_JOBS_CORE_HOURS)
+                         if ABSOLUTE_COST_JOBS_CORE_HOURS else "")
+ABSOLUTE_FREQ_ONLY_COST = ("%.6f" % _median_value([_pilot_job_core_hours(row)
+                                                   for row in ABSOLUTE_FREQ_ONLY_JOBS])
+                           if ABSOLUTE_FREQ_ONLY_JOBS else "")
 
 
 COST_LEDGER = [
@@ -914,6 +1001,10 @@ def main():
     src = sub_once(src, ANCHOR_TIER_SUMMARY, TIER_SUMMARY_BLOCK)
     src = sub_once(src, ANCHOR_WP4_COVERAGE_CHECK, WP4_COVERAGE_CHECK_BLOCK)
     src = sub_once(src, ANCHOR_COST_LEDGER_DEF, COST_LEDGER_DEF_BLOCK)
+    src = sub_once(src, ANCHOR_ABS_COST_CHECK, ABS_COST_CHECK_BLOCK)
+    src = sub_once(src, ANCHOR_COST_MD_LINE, COST_MD_LINE_BLOCK)
+    src = sub_once(src, ANCHOR_COST_TABLE_ROW, COST_TABLE_ROW_BLOCK)
+    src = sub_once(src, ANCHOR_COST_KEYNUM_BULLET, COST_KEYNUM_BULLET_BLOCK)
 
     src = sub_once(src, ANCHOR_FROZEN_LADDER_CONST, FROZEN_LADDER_CONST_BLOCK)
     src = sub_once(src, ANCHOR_FROZEN_LADDER_BODY, FROZEN_LADDER_BODY_BLOCK)

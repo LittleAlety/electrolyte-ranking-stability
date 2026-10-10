@@ -288,11 +288,46 @@ def test_anchor_coverage_is_computed_not_hardcoded() -> None:
         assert gas[species] == "false", species
 
 
-def test_wp5_cost_ledger_flags_missing_absolute_costs() -> None:
+def test_wp5_cost_ledger_gates_absolute_costs_on_the_closed_loop() -> None:
+    """绝对成本三项要么在四分子闭环后按实测台账填入，要么闭环前留空标 MISSING；不允许第三种。"""
     rows = _read_csv(REPO_ROOT / "outputs/physics_completion/cost/cost_ledger.csv")
-    assert sum(1 for row in rows if row["status"] == "MISSING") == 3
+    absolute = [row for row in rows if row.get("kind") == "absolute"]
+    assert len(absolute) == 3, absolute
+    missing = [row for row in absolute if row["status"] == "MISSING"]
+    filled = [row for row in absolute if row["status"] != "MISSING" and row["value"] != ""]
+    assert len(missing) == 3 or len(filled) == 3, absolute
+    closure = _read_csv(REPO_ROOT / "outputs/physics_completion/closure/four_molecule_state_closure.csv")
+    produced = [row for row in closure if row.get("register_status") == "produced_single_conformer"]
+    loop_closed = len(produced) == len(closure)
+    assert (len(filled) == 3) == loop_closed, (len(filled), loop_closed)
     payload = json.loads((REPO_ROOT / "outputs/week42/wp5_delta_learning_active_query.json").read_text(encoding="utf-8"))
     assert "R3<=0.10" in payload["conventions"]["success_endpoint"]
+
+
+def test_wp5_absolute_cost_values_are_recomputed_and_gated() -> None:
+    """§11 绝对成本三项：值必须由四个实测台账现算，且只在四分子闭环后才写进 CSV。"""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "wp5_cost_generator", REPO_ROOT / "scripts" / "build_physics_completion_batch.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.WP2_LOOP_CLOSED == (module.WP2_PRODUCTION_LEDGER_ROWS
+                                      == module.WP2_PRODUCTION_EXPECTED_ROWS)
+    values = module.ABSOLUTE_COST_JOBS_CORE_HOURS
+    assert values and all(value > 0 for value in values)
+    assert abs(float(module.ABSOLUTE_CPU_CORE_HOURS) - sum(values)) < 1e-6
+    assert float(module.ABSOLUTE_FREQ_ONLY_COST) > 0
+    rows = _read_csv(REPO_ROOT / "outputs/physics_completion/cost/cost_ledger.csv")
+    gated = {row["item"]: row for row in rows if row.get("kind") == "absolute"}
+    for item, expected in (("cpu_core_hours", module.ABSOLUTE_CPU_CORE_HOURS),
+                           ("p90_job_cost", module.ABSOLUTE_P90_JOB_COST),
+                           ("frequency_only_cost", module.ABSOLUTE_FREQ_ONLY_COST)):
+        row = gated[item]
+        if module.WP2_LOOP_CLOSED:
+            assert row["value"] == expected, (item, row)
+        else:
+            assert row["value"] == "" and row["status"] == "MISSING", (item, row)
 
 
 def test_wp6_uses_a_single_background_ligand() -> None:
