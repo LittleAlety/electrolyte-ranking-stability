@@ -24,7 +24,8 @@ def _read_csv(path: Path):
 
 def test_every_artifact_is_byte_reproducible() -> None:
     files = batch.build_all()
-    assert len(files) == 88
+    assert len(files) == 89
+    assert "outputs/physics_completion/active_learning/round_diagnostics.csv" in files
     for rel, text in files.items():
         target = REPO_ROOT / rel
         assert target.is_file(), rel
@@ -133,6 +134,14 @@ def test_wp2_free_state_pilot_ledger_and_cost() -> None:
     assert len(cost) == 109
     assert all(float(row["core_hours"]) > 0 for row in cost)
     assert any(row["phase"] == "orca_freq" for row in cost)
+    assert all(row["conformer"] == "rdkit-etkdg-mmff-seed-12648430:representative-1"
+               for row in cost)
+    assert all(row["memory"] == "MISSING" and row["retry"] == "UNVERIFIABLE"
+               for row in cost)
+    assert all(row["raw_output"] for row in cost)
+    assert all((row["raw_output_sha256"] and len(row["raw_output_sha256"]) == 64)
+               if row["raw_output_status"] == "verified_on_disk"
+               else not row["raw_output_sha256"] for row in cost)
     energies = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/pilot_free_state_energies.csv")
     assert len(energies) == 36
     assert all(row["terminated"] == "true" for row in energies)
@@ -427,6 +436,32 @@ def test_wp5_frozen_family_view_matches_the_source_table() -> None:
     for row in view:
         if row["tau_winner_all"] in PB.FROZEN_MODEL_FAMILY:
             assert row["tau_winner_all"] == row["tau_winner_frozen_family"]
+
+
+def test_wp5_new_endpoint_and_missing_fields_are_machine_auditable() -> None:
+    rounds = _read_csv(REPO_ROOT / "outputs/physics_completion/active_learning/round_diagnostics.csv")
+    budgets = _read_csv(REPO_ROOT / "outputs/physics_completion/active_learning/success_budget.csv")
+    assert rounds and budgets
+    assert {row["regret_threshold_ev"] for row in rounds} == {"0.10"}
+    for row in rounds:
+        assert row["remaining_unqueried_error_ev"] == ""
+        assert row["remaining_unqueried_error_status"] == "MISSING"
+        assert row["remaining_unqueried_error_reason"]
+        assert row["cumulative_core_hours"] == ""
+        assert row["cumulative_core_hours_status"] == "MISSING"
+        assert row["cumulative_core_hours_reason"]
+        if row["endpoint_status"] == "computed_from_exact_legacy_k3":
+            assert row["O_3"] != "" and row["R_3_ev"] != ""
+        else:
+            assert row["endpoint_status"] == "blocked"
+            assert row["O_3"] == "" and row["R_3_ev"] == "" and row["endpoint_reason"]
+    for row in budgets:
+        assert row["O_3_threshold"] == "0.666666667"
+        assert row["R_3_threshold_ev"] == "0.10"
+        assert row["required_success_repeats"] == "16"
+        assert row["required_total_repeats"] == "20"
+        assert row["required_consecutive_budget_points"] == "2"
+        assert row["new_endpoint_status"] in ("computed", "blocked")
 
 
 def test_plan_section_14_figures_exist_and_are_registered() -> None:

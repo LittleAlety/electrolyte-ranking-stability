@@ -5,7 +5,7 @@
 #
 # 本脚本只做一件事：每 -IntervalSeconds 检查一次——还有腿没 computed、又没有活跃监守时，
 # 把 supervise_pending.ps1 重新拉起来。它不碰并发：只调 supervise_pending.ps1，
-# 不传任何放宽并发的开关；2 个 ORCA 作业的上限仍由监守自己守（外加单实例锁）。
+# 不传任何放宽并发的开关；3 个 ORCA 作业的上限仍由监守自己守（外加单实例锁）。
 #
 # 用法（后台常驻，约 0 CPU）：
 #   Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',
@@ -15,7 +15,7 @@
 param(
   [int]$IntervalSeconds = 600,
   [int]$MaxHours = 120,
-  [int]$Target = 20
+  [int]$Target = 0
 )
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $root = (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent)
@@ -39,6 +39,13 @@ function Get-ComputedCount() {
   $out = (& $py -X utf8 $policy --computed-count 2>$null | Out-String).Trim()
   if ($out -match '^\d+$') { return [int]$out }
   return -1
+}
+
+# target 默认不写死：取队列器自己的口径（supervisor_policy.py --total）。写死 20 会在队列
+# 覆盖范围扩大后与队列错位，让看护在还有腿没算完时就判「腿已全齐」并退出。
+if ($Target -le 0) {
+  $rawTotal = (& $py -X utf8 $policy --total 2>$null | Out-String).Trim()
+  if ($rawTotal -match '^\d+$' -and [int]$rawTotal -gt 0) { $Target = [int]$rawTotal } else { $Target = 60 }
 }
 
 Write-Log ("watch_supervisor start; interval=${IntervalSeconds}s; max=${MaxHours}h; target=$Target; pid=$PID")

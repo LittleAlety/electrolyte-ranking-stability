@@ -34,7 +34,7 @@
 | C01|LiM_plus | DMC | LiM_plus | 1/1 | intact_monodentate_carbonyl | 1 | 1.654 | 0.077889 | 16 | 3 | computed | 2 |
 | C01|LiM_2plus | DMC | LiM_2plus | 2/2 | intact_monodentate_carbonyl | 1 | 1.805 | 0.095667 | 16 | 3 | computed | 1 |
 | C02|LiM_plus | EMC | LiM_plus | 1/1 | intact_monodentate_carbonyl | 1 | 1.659 | 0.132333 | 16 | 3 | computed | 2 |
-| C02|LiM_2plus | EMC | LiM_2plus | 2/2 | intact_monodentate_carbonyl | 1 | 1.782 | 0.215778 | 16 | 3 | computed | 2 |
+| C02|LiM_2plus | EMC | LiM_2plus | 2/2 | intact_monodentate_carbonyl | 1 | 1.782 | 0.215778 | 16 | 3 | computed | 1 |
 | C13|LiM_plus | GBL | LiM_plus | 1/1 | intact_monodentate_carbonyl | 1 | 1.667 | 0.087000 | 16 | 3 | computed | 1 |
 | C13|LiM_2plus | GBL | LiM_2plus | 2/2 | intact_monodentate_carbonyl | 1 | 1.815 | 0.116778 | 16 | 3 | computed | 1 |
 | C14|LiM_plus | SL | LiM_plus | 1/1 | intact_bidentate_sulfone | 2 | 1.885 | 0.099111 | 16 | 3 | computed | 1 |
@@ -46,12 +46,12 @@
 | --- | --- | --- | --- | --- | --- |
 | C01|LiM_plus | 10 | 10 | 2 | production_motif_is_lowest | monodentate_donor3 |
 | C01|LiM_2plus | 10 | 10 | 1 | production_motif_within_1kj | monodentate_donor3 |
-| C02|LiM_plus | 10 | 10 | 2 | production_motif_is_lowest | monodentate_donor4 |
-| C02|LiM_2plus | 10 | 10 | 2 | production_motif_within_1kj | monodentate_donor4 |
+| C02|LiM_plus | 10 | 10 | 2 | production_motif_within_1kj | monodentate_donor4 |
+| C02|LiM_2plus | 10 | 10 | 1 | production_motif_is_lowest | monodentate_donor4 |
 | C13|LiM_plus | 4 | 4 | 1 | production_motif_within_1kj | monodentate_donor0 |
 | C13|LiM_2plus | 7 | 7 | 1 | production_motif_within_1kj | monodentate_donor0 |
 | C14|LiM_plus | 7 | 7 | 1 | production_motif_within_1kj | bidentate_donors0_2 |
-| C14|LiM_2plus | 7 | 7 | 3 | production_motif_within_1kj | monodentate_donor0 |
+| C14|LiM_2plus | 7 | 7 | 3 | production_motif_is_lowest | monodentate_donor0 |
 
 > 筛选层是气相 GFN2-xTB，不是生产自由能；保留结构的几何路径见 li_motif_screen.md。
 

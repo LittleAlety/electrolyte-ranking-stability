@@ -34,6 +34,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 import run_batch as rb  # noqa: E402
+import run_wp2_production as production  # noqa: E402
 
 ORCA = rb.ORCA
 CORES = rb.ORCA_CORES
@@ -64,14 +65,18 @@ RE_FREQ = re.compile(r"^\s*\d+:\s+(-?\d+\.\d+) cm\*\*-1", re.M)
 
 
 def geometry_start(mol_id: str, name: str, state: str) -> Path:
-    if state in ("M", "M_tzvpd"):
-        return REPO / "outputs/week4/t2_opt_freq" / name / (name + "_G2.xyz")
-    if state == "M_plus":
-        return REPO / "outputs/week4/t2_opt_freq" / name / (name + "_G2_cation.xyz")
-    frozen = REPO / "outputs/week5/c1" / name / (name + "_m1_G2Li.xyz")
-    if frozen.exists():
-        return frozen
-    return REPO / "work/audit/EMC_Li" / (name + "_m1_G2Li.xyz")
+    """中性腿的 def2-TZVPD 版本与中性 M 用**同一个**起点几何。
+
+    起点规则只有一处：委托给 run_wp2_production，免得本文件漂移出自己的第二套规则
+    （历史上两处各写一份，加分子时容易只改一处）。M_tzvpd 折算到 M。
+    """
+    return production.geometry_start_with_level(
+        mol_id, name, "M" if state == "M_tzvpd" else state)[0]
+
+
+def geometry_start_with_level(mol_id: str, name: str, state: str):
+    return production.geometry_start_with_level(
+        mol_id, name, "M" if state == "M_tzvpd" else state)
 
 
 def freq_block(text: str) -> list:
@@ -106,9 +111,7 @@ def run_state(mol_id: str, name: str, state: str, method: str, charge: int, mult
         print("%s %s: exists, skip" % (name, state))
         return json.loads(payload_path.read_text(encoding="utf-8"))
     d.mkdir(parents=True, exist_ok=True)
-    source = geometry_start(mol_id, name, state)
-    if not source.exists():
-        raise SystemExit("missing frozen geometry: %s" % source)
+    source, geometry_level = geometry_start_with_level(mol_id, name, state)
     (d / "geom.xyz").write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     inp = d / ("%s_%s.inp" % (name, state))
     inp.write_text("! %s Opt NumFreq SMD(acetonitrile) TightOpt TightSCF SlowConv\n"
@@ -138,6 +141,7 @@ def run_state(mol_id: str, name: str, state: str, method: str, charge: int, mult
         "method": method, "solvent": "SMD_acetonitrile",
         "level": "%s SMD(acetonitrile) Opt NumFreq (qRRHO=%s)" % (method, group(RE_QRRHO)),
         "geometry_start": str(source.relative_to(REPO)).replace("\\", "/"),
+        "geometry_start_level": geometry_level,
         "e_sp_eh": e_sp,
         "electronic_eh": group(RE_ELEC),
         "zpe_eh": group(RE_ZPE),

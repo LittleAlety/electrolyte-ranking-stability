@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """无人值守链的收敛判据（纯函数 + 一个取数入口，都可单测）。
 
-为什么单独成文件：本阶段唯一的目标是「把四分子 20 条腿算完」，所以「腿没算完绝不停」
+为什么单独成文件：本阶段唯一的目标是「把队列里的腿算完」，所以「腿没算完绝不停」
 这件事的判据不能埋在 .ps1 的分支里——那段无法单测，而它一旦写错，整条链会在半路静默停摆
 （旧版就是跑满固定轮数就退出、删锁、不再有人拉起）。
 
@@ -88,9 +88,23 @@ def inventory_rows():
     return queue.inventory()
 
 
+def queue_total():
+    """队列总腿数。**只有这一处定义**。
+
+    监守与看护的 target 曾经各自写死 20，于是队列覆盖范围一改（4 分子 → 主集 12 分子、
+    20 腿 → 60 腿）就会和队列口径错位：监守以为算完了、看护以为腿已全齐，两边一起停摆。
+    现在两边都取这里，范围扩大自动跟随。
+    """
+    import run_wp2_queue as queue  # noqa: E402
+
+    return len(queue.MOL_IDS) * len(queue.LEGS)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Supervisor convergence policy.")
     parser.add_argument("--computed-count", action="store_true")
+    parser.add_argument("--total", action="store_true",
+                        help="打印队列总腿数（= MOL_IDS x LEGS），供监守/看护取 target")
     parser.add_argument("--decide", action="store_true")
     parser.add_argument("--watch-decide", action="store_true")
     parser.add_argument("--computed", type=int, default=0)
@@ -105,6 +119,9 @@ def main(argv=None):
     parser.add_argument("--max-stalled", type=int, default=3)
     args = parser.parse_args(argv)
 
+    if args.total:
+        print(queue_total())
+        return 0
     if args.computed_count:
         print(computed_count(inventory_rows()))
         return 0

@@ -78,7 +78,7 @@ WP2_PRODUCTION_LEDGER_CSV_FIELDS = [
     "entropy_corr_eh", "g_single_eh", "g_single_ev", "std_state_corr_eh", "std_state_corr_ev",
     "zpe_ev", "thermal_corr_ev", "qrrho", "temp_k", "pressure_atm", "cutoff_cm1",
     "lowest_freq_cm1", "n_freq", "imaginary_modes", "li_o_ang", "nonli_components",
-    "wall_sec", "cores", "status", "notes",
+    "wall_sec", "cores", "core_hours", "cost_status", "hpc_wall_sec", "hpc_core_hours", "status", "notes",
 ]
 
 
@@ -94,7 +94,8 @@ def _wp2_production_identity(state, li_o_ang):
 '''
 
 POST_CONST = '''
-WP2_PRODUCTION_CORE_HOURS = sum(float(row["core_hours"]) for row in WP2_PRODUCTION_LEDGER)
+WP2_PRODUCTION_CORE_HOURS = sum(float(row["core_hours"]) for row in WP2_PRODUCTION_LEDGER if row.get("core_hours"))
+WP2_PRODUCTION_COST_UNKNOWN = sum(not row.get("core_hours") or row.get("cost_status") == "incomplete" for row in WP2_PRODUCTION_LEDGER)
 WP2_PRODUCTION_STATES_DONE = len([row for row in WP2_PRODUCTION_LEDGER
                                    if row["state"] in WP2_PRODUCTION_STATES])
 WP2_PRODUCTION_STATES_TOTAL = len(WP2_PRODUCTION_MOLECULES) * len(WP2_PRODUCTION_STATES)
@@ -145,13 +146,17 @@ PRODUCTION_BLOCK = '''    # 方案 6.1/6.2 —— 生产首段：已完成的分
 
     production_cost = []
     production_core_hours = 0.0
+    production_cost_unknown = WP2_PRODUCTION_COST_UNKNOWN
     for prod in all_production:
-        production_core_hours += float(prod["core_hours"])
+        if prod.get("core_hours"):
+            production_core_hours += float(prod["core_hours"])
         production_cost.append({
             "job_id": "%s|%s|opt_numfreq" % (prod["mol_id"], prod["state"]),
             "mol_id": prod["mol_id"], "name": prod["name"], "state": prod["state"],
             "phase": "opt_numfreq", "level": prod["level"], "cores": prod["cores"],
             "wall_sec": prod["wall_sec"], "core_hours": prod["core_hours"],
+            "cost_status": prod["cost_status"], "hpc_wall_sec": prod["hpc_wall_sec"],
+            "hpc_core_hours": prod["hpc_core_hours"],
             "status": prod["status"],
         })
 
@@ -232,7 +237,7 @@ OUTPUTS_BLOCK = '''    local["outputs/physics_completion/free_states/production_
         production_redox)
     local["outputs/physics_completion/cost/production_cost_ledger.csv"] = csv_text(
         ["job_id", "mol_id", "name", "state", "phase", "level", "cores", "wall_sec",
-         "core_hours", "status"], production_cost)
+         "core_hours", "cost_status", "hpc_wall_sec", "hpc_core_hours", "status"], production_cost)
 '''
 
 CHECKS_BLOCK = '''        {"id": "wp2_production_states_terminated_without_imaginary",
@@ -281,8 +286,8 @@ CHECKS_BLOCK = '''        {"id": "wp2_production_states_terminated_without_imagi
                       sum(1 for r in production if r["identity_label"] == "bound"))},
         {"id": "wp2_production_cost_records_allocated_core_hours",
          "description": "生产作业逐条记录 allocated core-hours（cores x wall clock）",
-         "ok": len(production_cost) == len(all_production) and production_core_hours > 0.0,
-         "detail": "jobs=%d; total=%.6f core-hours" % (len(production_cost), production_core_hours)},
+         "ok": len(production_cost) == len(all_production) and production_core_hours > 0.0 and production_cost_unknown == 0,
+         "detail": "jobs=%d; known_subtotal=%.6f core-hours; unknown_jobs=%d" % (len(production_cost), production_core_hours, production_cost_unknown)},
 '''
 
 REDOX_CHECKS = '''        {"id": "wp2_production_redox_uses_basis_consistent_legs",
@@ -337,7 +342,10 @@ PAYLOAD_BLOCK = '''        "free_state_production": {
             "redox": production_redox,
             "cost_jobs": production_cost,
             "totals": {"orca_jobs": len(all_production),
-                       "core_hours": "%.6f" % production_core_hours},
+                       "core_hours": "%.6f" % production_core_hours if not production_cost_unknown else "",
+                       "known_subtotal_core_hours": "%.6f" % production_core_hours,
+                       "unknown_cost_jobs": production_cost_unknown,
+                       "cost_status": "incomplete" if production_cost_unknown else "complete"},
             "raw_outputs": "kept outside the repository (work/wp2prod, not mirrored)",
         },
         "counts": {"ledger_rows": len(ledger), "production_rows": len(production),
@@ -350,20 +358,22 @@ FINISH_BLOCK = '''                 "free_state_pilot_core_hours": "%.6f" % pilot
                  "free_state_production_states": len(production),
                  "free_state_production_states_total": production_progress["states_total"],
                  "free_state_production_molecules_complete": len(molecules_complete),
-                 "free_state_production_core_hours": "%.6f" % production_core_hours,
+                 "free_state_production_core_hours": "%.6f" % production_core_hours if not production_cost_unknown else "",
+                 "free_state_production_known_subtotal_core_hours": "%.6f" % production_core_hours,
+                 "free_state_production_unknown_cost_jobs": production_cost_unknown,
                  "free_state_production_redox_computed": str(
                      any(row["status"] == "computed" for row in production_redox)).lower()})
 '''
 
 WP2_ROW_BLOCK = '''        "| WP2 | week39 | 固定背景配对自由能标签 | 48 行账本；4 主集分子 x 4 主态生产中已登记 %d/%d 个真实 "
-        "Opt+Freq G 标签（%.6f core-hours，另含 %d 条 def2-TZVPD 中性腿）| 生产首段每态单构象；其余状态在产；"
+        "Opt+Freq G 标签（已知成本小计 %.6f core-hours，另含 %d 条 def2-TZVPD 中性腿）| 生产首段每态单构象；其余状态在产；"
         "基组一致 redox 的自由腿与 Li 腿分开登记，未齐不补数 |"
         % (WP2_PRODUCTION_STATES_DONE, WP2_PRODUCTION_STATES_TOTAL, WP2_PRODUCTION_CORE_HOURS,
            WP2_PRODUCTION_EXTRA_DONE),
 '''
 
 KEYNUM_BLOCK = '''        "- WP2：48 行状态账本，其中 4 主集分子 x 4 主态生产已登记 %d/%d 个真实 Opt+Freq 自由能标签"
-        "（qRRHO，合计 %.6f core-hours），另登记 %d 条 def2-TZVPD 中性腿；未完成的主态保持空串（None），未把缺值写成 0。"
+        "（qRRHO，已知成本小计 %.6f core-hours），另登记 %d 条 def2-TZVPD 中性腿；未完成的主态保持空串（None），未把缺值写成 0。"
         % (WP2_PRODUCTION_STATES_DONE, WP2_PRODUCTION_STATES_TOTAL,
            WP2_PRODUCTION_CORE_HOURS, WP2_PRODUCTION_EXTRA_DONE),
 '''
@@ -390,8 +400,8 @@ SUMMARY_TABLE_HEAD = '''    summary += [
                           prod["identity_label"]))
     summary += [
         "",
-        "成本：%d 个 Opt+Freq 作业，合计 %.6f core-hours（allocated cores x wall clock）。"
-        % (len(production_cost), production_core_hours),
+        "成本：%d 个 Opt+Freq 作业，已知小计 %.6f core-hours；%d 个作业总成本未知（非零成本，非完整总计）。"
+        % (len(production_cost), production_core_hours, production_cost_unknown),
         "",
 '''
 
@@ -446,20 +456,20 @@ ANCHOR_COST_NOTES = '''    {"item": "cpu_core_hours", "unit": "core-hour", "valu
      "note": "frequency-only cost not recorded"},
 '''
 COST_NOTES_BLOCK = '''    {"item": "cpu_core_hours", "unit": "core-hour",
-     "value": ABSOLUTE_CPU_CORE_HOURS if WP2_LOOP_CLOSED else "",
-     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "value": ABSOLUTE_CPU_CORE_HOURS if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "MISSING",
      "note": "项目级 allocated core-hours（不是 process CPU time）：四分子 %d/%d 条腿闭环后按现算填入，"
              "口径 = 方法审计 + pilot + 生产 + 靶向复核四个逐作业台账里 %d 条带 core-hours 记录的作业之和；"
              "闭环前留空，不拿已跑的那部分作业冒充 headline 数。"
              % (WP2_PRODUCTION_LEDGER_ROWS, WP2_PRODUCTION_EXPECTED_ROWS, len(ABSOLUTE_COST_JOBS_CORE_HOURS))},
     {"item": "p90_job_cost", "unit": "core-hour",
-     "value": ABSOLUTE_P90_JOB_COST if WP2_LOOP_CLOSED else "",
-     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "value": ABSOLUTE_P90_JOB_COST if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "MISSING",
      "note": "逐作业 core-hours 的最近秩 p90（小样本下等于最大值，不插值假装样本充足）；逐类中位 / p90 "
              "另见 outputs/physics_completion/cost/remaining_cost_scenarios.csv；闭环前留空。"},
     {"item": "frequency_only_cost", "unit": "core-hour",
-     "value": ABSOLUTE_FREQ_ONLY_COST if WP2_LOOP_CLOSED else "",
-     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "value": ABSOLUTE_FREQ_ONLY_COST if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "MISSING",
      "note": "只做频率的作业（phase=orca_freq，%d 条，C01|M|orca_freq = wB97X-D4/def2-TZVP SMD NumFreq）"
              "的中位 core-hours；闭环前留空。" % len(ABSOLUTE_FREQ_ONLY_JOBS)},
 '''
@@ -469,8 +479,8 @@ ANCHOR_ABS_COST_CHECK = '''        {"id": "absolute_cost_missing_flagged", "desc
 '''
 ABS_COST_CHECK_BLOCK = '''        {"id": "absolute_cost_tracks_the_four_molecule_loop",
          "description": "绝对成本三项：四分子闭环后按实测台账现算填入，闭环前显式标 MISSING（不用部分作业当 headline 数）",
-         "ok": (sum(1 for item in COST_LEDGER if item["status"] == "MISSING") == 0) == WP2_LOOP_CLOSED,
-         "detail": "loop_closed=%s MISSING=%d total_jobs=%d"
+         "ok": ABSOLUTE_COST_COMPLETE and ((sum(1 for item in COST_LEDGER if item["status"] == "MISSING") == 0) == WP2_LOOP_CLOSED),
+         "detail": "loop_closed=%s MISSING=%d known_cost_jobs=%d"
                    % (WP2_LOOP_CLOSED,
                       sum(1 for item in COST_LEDGER if item["status"] == "MISSING"),
                       len(ABSOLUTE_COST_JOBS_CORE_HOURS))},
@@ -669,6 +679,10 @@ RECHECK_CORE_HOURS = sum(float(row["core_hours"]) for row in RECHECK_DONE_ROWS)
 WP2_PRODUCTION_EXPECTED_ROWS = (len(WP2_PRODUCTION_MOLECULES)
                                 * (len(WP2_PRODUCTION_STATES) + len(WP2_PRODUCTION_EXTRA_STATES)))
 WP2_LOOP_CLOSED = WP2_PRODUCTION_LEDGER_ROWS == WP2_PRODUCTION_EXPECTED_ROWS
+ABSOLUTE_COST_COMPLETE = (WP2_PRODUCTION_COST_UNKNOWN == 0
+                          and all(row.get("core_hours") for row in METHOD_AUDIT_COST)
+                          and all(row.get("wall_sec") and row.get("cores") for row in PILOT_COST_JOBS)
+                          and all(row.get("core_hours") for row in RECHECK_DONE_ROWS))
 
 
 def _pilot_job_core_hours(row):
@@ -678,7 +692,7 @@ def _pilot_job_core_hours(row):
 
 def _absolute_cost_jobs():
     values = [float(row["core_hours"]) for row in METHOD_AUDIT_COST if row.get("core_hours")]
-    values += [_pilot_job_core_hours(row) for row in PILOT_COST_JOBS]
+    values += [_pilot_job_core_hours(row) for row in PILOT_COST_JOBS if row.get("wall_sec") and row.get("cores")]
     values += [float(row["core_hours"]) for row in WP2_PRODUCTION_LEDGER if row.get("core_hours")]
     values += [float(row["core_hours"]) for row in RECHECK_DONE_ROWS if row.get("core_hours")]
     return values
@@ -700,7 +714,7 @@ def _median_value(values):
 
 
 ABSOLUTE_COST_JOBS_CORE_HOURS = _absolute_cost_jobs()
-ABSOLUTE_FREQ_ONLY_JOBS = [row for row in PILOT_COST_JOBS if row.get("phase") == "orca_freq"]
+ABSOLUTE_FREQ_ONLY_JOBS = [row for row in PILOT_COST_JOBS if row.get("phase") == "orca_freq" and row.get("wall_sec") and row.get("cores")]
 ABSOLUTE_CPU_CORE_HOURS = "%.6f" % sum(ABSOLUTE_COST_JOBS_CORE_HOURS)
 ABSOLUTE_P90_JOB_COST = ("%.6f" % _nearest_rank_p90(ABSOLUTE_COST_JOBS_CORE_HOURS)
                          if ABSOLUTE_COST_JOBS_CORE_HOURS else "")
@@ -931,7 +945,12 @@ def enrich(row):
     out["zpe_ev"] = "%.9f" % (float(row["zpe_eh"]) * H_EV)
     out["thermal_corr_ev"] = "%.9f" % (float(row["e_to_g_thermal_eh"]) * H_EV)
     out["std_state_corr_ev"] = "%.9f" % (float(row["std_state_corr_eh"]) * H_EV)
-    out["core_hours"] = "%.6f" % (float(row["cores"]) * float(row["wall_sec"]) / 3600.0)
+    complete = bool(row.get("cores") and row.get("wall_sec")) and row.get("cost_status") != "incomplete"
+    out["core_hours"] = "%.6f" % (float(row["cores"]) * float(row["wall_sec"]) / 3600.0) if complete else ""
+    out["cost_status"] = "complete" if complete else "incomplete"
+    out["hpc_wall_sec"] = row.get("hpc_wall_sec", "")
+    out["hpc_core_hours"] = ("%.6f" % (float(row["cores"]) * float(row["hpc_wall_sec"]) / 3600.0)
+                             if row.get("cores") and row.get("hpc_wall_sec") else "")
     return out
 
 
@@ -948,6 +967,331 @@ def sub_once(src, anchor, replacement):
         raise SystemExit("锚点不唯一 (%d 次): %r" % (src.count(anchor), anchor[:80]))
     return src.replace(anchor, replacement)
 
+
+# ---------------------------------------------------------------------------
+# §11 pilot 成本账本的证据补强：memory/retry 不猜零，conformer/raw_output 从现存
+# 作业目录回填并登记 SHA256。这一段与 §9.2 的逐轮诊断一起，把「partial 的缺口」
+# 从散落的正文说明变成机器可读字段；两者都不新增任何计算。
+# ---------------------------------------------------------------------------
+PILOT_COST_EVIDENCE = '''def _pilot_cost_evidence(cost_row):
+    """Recover only provenance fields supported by surviving pilot files.
+
+    The pilot runner overwrote a fixed log name and kept no attempt journal, so
+    retry count is not inferable from one final log. Peak memory was never
+    sampled. Both are explicit sentinels rather than guessed zeroes.
+    """
+    mol_id = cost_row["mol_id"]
+    state_token = cost_row["job_id"].split("|")[1]
+    phase = cost_row["phase"]
+    if phase == "xtb_opt":
+        raw = REPO / "work" / "pilot12" / mol_id / ("xtb_" + state_token) / "xtb.log"
+    elif phase == "orca_sp":
+        directory = REPO / "work" / "pilot12" / mol_id / ("sp_%s_%s" % (mol_id, state_token))
+        matches = sorted(directory.glob("*.log")) if directory.is_dir() else []
+        raw = matches[0] if matches else directory / ("%s_%s.log" % (cost_row["molecule"], state_token))
+    elif phase == "orca_freq" and mol_id == "C01" and state_token == "M":
+        raw = REPO / "outputs" / "week4" / "t2_opt_freq" / "DMC" / "DMC_optfreq.out"
+    else:
+        raw = REPO / "work" / "pilot12" / mol_id / ("unresolved_" + phase + "_" + state_token)
+    try:
+        raw_rel = raw.relative_to(REPO).as_posix()
+    except ValueError:
+        raw_rel = "UNVERIFIABLE"
+    if raw.is_file():
+        digest = hashlib.sha256(raw.read_bytes()).hexdigest()
+        raw_status = "verified_on_disk"
+    else:
+        digest = ""
+        raw_status = "unverifiable"
+    return {
+        "memory": "MISSING",
+        "retry": "UNVERIFIABLE",
+        "conformer": "rdkit-etkdg-mmff-seed-12648430:representative-1",
+        "raw_output": raw_rel,
+        "raw_output_sha256": digest,
+        "raw_output_status": raw_status,
+        "evidence_note": ("peak memory was not recorded; the overwrite-in-place runner retained no "
+                          "attempt journal, so retry count is not recoverable from the final log"),
+    }
+
+
+'''
+
+PILOT_COST_ANCHOR_FUNC = "def wp2():"
+PILOT_COST_ANCHOR_LOOP = '''        core_hours = float(cost_row["wall_sec"]) * float(cost_row["cores"]) / 3600.0
+        pilot_cost.append({
+            "job_id": cost_row["job_id"], "mol_id": cost_row["mol_id"], "molecule": cost_row["molecule"],
+            "state": cost_row["state"], "phase": cost_row["phase"], "method": cost_row["method"],
+            "cores": cost_row["cores"], "wall_sec": cost_row["wall_sec"],
+            "core_hours": "%.6f" % core_hours, "status": cost_row["status"],
+        })
+'''
+PILOT_COST_LOOP_REPLACEMENT = '''        core_hours = float(cost_row["wall_sec"]) * float(cost_row["cores"]) / 3600.0
+        evidence = _pilot_cost_evidence(cost_row)
+        item = {
+            "job_id": cost_row["job_id"], "mol_id": cost_row["mol_id"], "molecule": cost_row["molecule"],
+            "state": cost_row["state"], "phase": cost_row["phase"], "method": cost_row["method"],
+            "cores": cost_row["cores"], "wall_sec": cost_row["wall_sec"],
+            "core_hours": "%.6f" % core_hours, "status": cost_row["status"],
+        }
+        item.update(evidence)
+        pilot_cost.append(item)
+'''
+PILOT_COST_ANCHOR_CHECK = ('         "detail": "jobs=%d; total=%.6f core-hours" '
+                           '% (len(pilot_cost), pilot_core_hours)},\n')
+PILOT_COST_CHECK_BLOCK = '''        {"id": "pilot_cost_ledger_records_verifiable_provenance",
+         "description": "pilot 成本账本逐作业登记构象、原始输出证据；缺失 memory/retry 不猜零",
+         "ok": (bool(pilot_cost)
+                and all(r["conformer"] and r["raw_output"] for r in pilot_cost)
+                and all(r["memory"] == "MISSING" for r in pilot_cost)
+                and all(r["retry"] == "UNVERIFIABLE" for r in pilot_cost)),
+         "detail": "raw verified=%d/%d; memory=MISSING; retry=UNVERIFIABLE" % (
+             sum(1 for r in pilot_cost if r["raw_output_status"] == "verified_on_disk"),
+             len(pilot_cost))},
+'''
+PILOT_COST_ANCHOR_CSV = '''    local["outputs/physics_completion/cost/pilot_cost_ledger.csv"] = csv_text(
+        ["job_id", "mol_id", "molecule", "state", "phase", "method", "cores", "wall_sec",
+         "core_hours", "status"], pilot_cost)
+'''
+PILOT_COST_CSV_BLOCK = '''    local["outputs/physics_completion/cost/pilot_cost_ledger.csv"] = csv_text(
+        ["job_id", "mol_id", "molecule", "state", "phase", "method", "cores", "wall_sec",
+         "core_hours", "status", "memory", "retry", "conformer", "raw_output",
+         "raw_output_sha256", "raw_output_status", "evidence_note"], pilot_cost)
+'''
+
+# ---------------------------------------------------------------------------
+# §9.2 逐轮诊断：把固定端点 O_3>=2/3 且 R_3<=0.10 eV 真的逐轮登记。旧池的 k 网格是
+# 池大小的 0.1/0.2/0.3；只有 C 轴（池 10）的 30% 恰好等于 k=3，可以严格给出 O_3/R_3；
+# E/M 轴（池 18）拿不到精确 k=3，机器可读地标 blocked，不用百分比近似冒充。
+# remaining_unqueried_error 与逐查询 core-hours 在旧回放里没有落盘，留空并写 MISSING 原因。
+# ---------------------------------------------------------------------------
+AL_ROUND_ANCHOR = '    n_scenario = len({(row["task"], row["axis"]) for row in sb})\n'
+AL_ROUND_BLOCK = '''    n_scenario = len({(row["task"], row["axis"]) for row in sb})
+
+    # §9.2 固定端点（回放前冻结）：O_3 >= 2/3 且 R_3 <= 0.10 eV。
+    NEW_ENDPOINT_R3_EV = "0.10"
+    NEW_ENDPOINT_O3 = "0.666666667"
+    endpoint_audit = {(r["task"], r["axis"]): r
+                      for r in PB.load_rows(REPO / "outputs/week33/al_protocol_audit.csv")}
+    endpoint_curves = PB.load_rows(REPO / "outputs/week33/budget_curves.csv")
+    legacy_curves = PB.load_rows(REPO / "outputs/week7/stage8_al_curves.csv")
+    legacy_regret_30 = {(r["task"], r["objective"], r["baseline"], r["n_T"]):
+                        r["selection_regret_30%"] for r in legacy_curves}
+
+    def _exact_k3(task, axis):
+        pool = int(endpoint_audit[(task, axis)]["pool_size"])
+        return pool if abs(0.30 * pool - 3.0) < 1e-9 else 0
+
+    round_diagnostics = []
+    for curve in endpoint_curves:
+        pool = int(endpoint_audit[(curve["task"], curve["axis"])]["pool_size"])
+        row = {
+            "task": curve["task"], "axis": curve["axis"], "baseline": curve["baseline"],
+            "n_T": curve["n_T"], "pool_size": str(pool), "requested_k": "3",
+            "legacy_k_fraction": "0.30", "regret_threshold_ev": NEW_ENDPOINT_R3_EV,
+            "tau_b": curve["tau_b"],
+            "remaining_unqueried_error_ev": "",
+            "remaining_unqueried_error_status": "MISSING",
+            "remaining_unqueried_error_reason": ("the frozen legacy replay shipped only aggregate "
+                "curves; it persisted no candidate-level predictions for the still-unqueried "
+                "candidates, so the per-round remaining error is not recoverable"),
+            "cumulative_core_hours": "",
+            "cumulative_core_hours_status": "MISSING",
+            "cumulative_core_hours_reason": ("the frozen legacy replay stored no per-query cost "
+                "mapping, so cumulative core-hours per budget point cannot be reconstructed from "
+                "the shipped tables"),
+        }
+        if _exact_k3(curve["task"], curve["axis"]):
+            row["O_3"] = curve["o30"]
+            row["R_3_ev"] = legacy_regret_30.get(
+                (curve["task"], curve["axis"], curve["baseline"], curve["n_T"]), "")
+            row["endpoint_status"] = "computed_from_exact_legacy_k3"
+            row["endpoint_reason"] = ""
+        else:
+            row["O_3"] = ""
+            row["R_3_ev"] = ""
+            row["endpoint_status"] = "blocked"
+            row["endpoint_reason"] = ("the legacy k grid is 0.1/0.2/0.3 of a %d-molecule pool, so "
+                "neither 30%% nor 10%% equals k=3; an exact top-3 overlap / regret needs "
+                "candidate-level predictions the frozen replay did not persist" % pool)
+        round_diagnostics.append(row)
+
+    for row in endpoint_rows:
+        exact = bool(_exact_k3(row["task"], row["axis"]))
+        row["O_3_threshold"] = NEW_ENDPOINT_O3
+        row["R_3_threshold_ev"] = NEW_ENDPOINT_R3_EV
+        row["required_success_repeats"] = "16"
+        row["required_total_repeats"] = "20"
+        row["required_consecutive_budget_points"] = "2"
+        row["new_endpoint_status"] = "computed" if exact else "blocked"
+'''
+AL_ROUND_FIELDS = [
+    "task", "axis", "baseline", "n_T", "pool_size", "requested_k", "legacy_k_fraction",
+    "regret_threshold_ev", "tau_b", "O_3", "R_3_ev", "endpoint_status", "endpoint_reason",
+    "remaining_unqueried_error_ev", "remaining_unqueried_error_status",
+    "remaining_unqueried_error_reason", "cumulative_core_hours",
+    "cumulative_core_hours_status", "cumulative_core_hours_reason",
+]
+BUDGET_EXTRA_FIELDS = ["O_3_threshold", "R_3_threshold_ev", "required_success_repeats",
+                       "required_total_repeats", "required_consecutive_budget_points",
+                       "new_endpoint_status"]
+AL_BUDGET_ANCHOR = '''    local["outputs/physics_completion/active_learning/success_budget.csv"] = csv_text(
+        ["task", "axis", "baseline", "n_T_median_tau080", "n_T_majority_tau080",
+         "n_T_majority_combined", "median_overstates_majority", "regret_tolerance_ev"], endpoint_rows)
+'''
+
+
+# ---------------------------------------------------------------------------
+# 方案 §7.3 机制案例页：六项证据覆盖（CSV 六列 + 页面章节）。
+# 状态是对既有冻结产物的证据评估（登记件），数值/路径与正文引用的冻结产物逐字一致。
+# ---------------------------------------------------------------------------
+ANCHOR_MECH_CASES_CSV = '    local["outputs/physics_completion/pair_evidence/mechanism_cases.csv"] = csv_text(\n        ["case_id", "rule", "pair", "axis", "d_lower_ev", "d_upper_ev", "sigma_ev", "label",\n         "selection_impact"], cases)\n'
+
+MECH_CASES_CSV_BLOCK = r'''
+    # 方案 §7.3：机制案例页的六项证据逐例状态（登记件；状态取自冻结证据盘点，不按结果反推）。
+    six_item_fields = ['six_item_original_structure', 'six_item_density_spin', 'six_item_coordination', 'six_item_eg_decomposition', 'six_item_method_sensitivity', 'six_item_selection_set_impact']
+    six_item_labels = ['原始结构', '电子密度/自旋', '配位变化', 'E/G 分解', '方法敏感性', '实际选集影响']
+    six_item_status = {
+        "CASE1": ['已具', '部分', '部分', '部分', '已具', '已具'],
+        "CASE2": ['已具', '部分', '部分', '部分', '已具', '已具'],
+    }
+    mech_cases = [dict(case, **dict(zip(six_item_fields, six_item_status[case["case_id"]])))
+                  for case in cases]
+    local["outputs/physics_completion/pair_evidence/mechanism_cases.csv"] = csv_text(
+        ["case_id", "rule", "pair", "axis", "d_lower_ev", "d_upper_ev", "sigma_ev", "label",
+         "selection_impact"] + six_item_fields, mech_cases)
+
+'''
+
+ANCHOR_MECH_CASES_MD = '    case_lines = ["# 机制案例页（最多 3 例）", "",\n                  "选择规则（事先冻结）：优先选证据最强的稳健翻转，再选影响 Top-k 的 unresolved 边界，再选有身份改变的代表；"\n                  "**无稳健翻转时不强行补案例**。", ""]\n    for case in cases:\n        case_lines += [\n            "## %s：%s" % (case["case_id"], case["pair"]), "",\n            "- 轴：%s" % case["axis"],\n            "- d_lower = %s eV；d_upper = %s eV；sigma = %s eV"\n            % (case["d_lower_ev"], case["d_upper_ev"], case["sigma_ev"]),\n            "- 判定：%s" % case["label"],\n            "- 选集影响：%s" % case["selection_impact"], "",\n        ]\n    case_lines += [\n        "## 原始结构证据（既有冻结几何，零新增计算）", "",\n        "| 分子 | 家族 | 原子数 | 元素序列一致 | 重原子成键对 | 平均 abs(dr) (Å) | 最大 abs(dr) (Å) | 最大变化键 | 该键 dr (Å) | dIP (eV) |",\n        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",\n    ]\n    for row in geometry_rows:\n        case_lines.append(\n            "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"\n            % (row["name"], row["family"], row["n_atoms"], row["element_sequence_matches"],\n               row["n_heavy_bonds_shared"], row["mean_abs_bond_change_ang"],\n               row["max_abs_bond_change_ang"], row["max_bond_pair"],\n               row["max_bond_change_ang"], row["d_ip_ev"]))\n    case_lines += [\n        "",\n        "结构来源（既有冻结路径；按交付层纪律不复制原始几何文件，只交付派生的键长变化）："\n        "中性松弛几何 `%s`；阳离子松弛几何 `%s`。" % (PB.MECHANISM_NEUTRAL_GEOMETRY, PB.MECHANISM_CATION_GEOMETRY),\n        "成键对只用 %.1f Å 几何截断枚举，不是力常数判据；键长是平移/旋转不变量，因此不需要结构叠合。"\n        % PB.GEOMETRY_BOND_CUTOFF_ANG,\n        "",\n        "## 逐例六项证据覆盖（方案 7.3）", "",\n        "| 项目 | 状态 | 说明 |",\n        "| --- | --- | --- |",\n        "| 原始结构 | 已提供（派生） | 上表 + `mechanism_bond_changes.csv` 逐键列出中性/阳离子键长（原始几何仍留在冻结路径，未复制进交付层） |",\n        "| 电子密度/自旋 | 待补 | 需专门的自旋布居分析；WP1 方法审计只做能量层 |",\n        "| 配位变化 | 待补 | 本 rung 为自由态；配位态属 WP2 |",\n        "| E/G 分解 | 部分 | 有电子能层分解（dIP 列）；G 层待 WP2 |",\n        "| 方法敏感性 | 已提供 | WP1 独立方法审计：4 设定下竖直腿与弛豫腿的 pair 级差值范围与符号一致性，见 outputs/physics_completion/method_audit/pair_gap_sensitivity.csv |",\n        "| 选集影响 | 已提供 | 每例的 pair 级翻转说明 |",\n        "",\n        "> 说明：本页登记判定、原始结构、方法敏感性与选集影响；电子密度/自旋、配位变化与 G 层分解"\n        "仍需 WP2 生产计算补入（本批次无可提供的对应计算）。",\n    ]\n    local["outputs/physics_completion/pair_evidence/mechanism_cases.md"] = "\\n".join(case_lines) + "\\n"\n'
+
+MECH_CASES_MD_BLOCK = r'''
+    # 方案 §7.3 机制案例页：口径 / 六项覆盖总览 / 逐项证据与来源路径（与 CSV 六列同源）。
+    case_lines = [
+        '# 机制案例页（最多 3 例）',
+        '',
+        '选择规则（事先冻结）：优先选证据最强的稳健翻转，再选影响 Top-k 的 unresolved 边界，再选有身份改变的代表；**无稳健翻转时不强行补案例**。',
+        '',
+    ]
+    case_lines += [
+        '口径：本页只登记既有冻结产物（P1v→P1a 氧化台阶，n=12，66 pair，源自 `outputs/phase2_p1a/p1v_vs_p1a.json`），**零新增电子结构计算**。方案 §7.3 的六项证据逐例逐项标注 **已具 / 部分 / 未具**；凡缺原始产物支撑的一律标 部分 或 未具，不把日志里的定性描述说成计算证据。数字与既有产物逐字一致；不一致处在第 4、5 项显式登记，不做调和。',
+        '',
+        '## 六项覆盖总览（逐例）',
+        '',
+    ]
+    case_lines.append("| 项目（§7.3） | %s |" % " | ".join(
+        "%s %s" % (case["case_id"], case["pair"].replace("|", "\\|")) for case in cases))
+    case_lines.append("| --- |%s" % (" --- |" * len(cases)))
+    for idx, label in enumerate(six_item_labels):
+        case_lines.append("| %s |%s" % (label, "".join(
+            " %s |" % six_item_status[case["case_id"]][idx] for case in cases)))
+    case_lines += [
+        '',
+        '> 六项里「电子密度本体、多 motif/生产系综配位、G_ensemble」三处仍待补，故整体仍记 **partial**，不写 satisfied。',
+        '',
+    ]
+    for case in cases:
+        case_lines += [
+            "## %s：%s" % (case["case_id"], case["pair"]), "",
+            "- 轴：%s" % case["axis"],
+            "- d_lower = %s eV；d_upper = %s eV；sigma = %s eV"
+            % (case["d_lower_ev"], case["d_upper_ev"], case["sigma_ev"]),
+            "- 判定：%s" % case["label"],
+            "- 选集影响（pair 级）：%s" % case["selection_impact"], "",
+        ]
+    case_lines += [
+        '## 原始结构证据（既有冻结几何，零新增计算）',
+        '',
+        '| 分子 | 家族 | 原子数 | 元素序列一致 | 重原子成键对 | 平均 abs(dr) (Å) | 最大 abs(dr) (Å) | 最大变化键 | 该键 dr (Å) | dIP (eV) |',
+        '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+    ]
+    for row in geometry_rows:
+        case_lines.append(
+            "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+            % (row["name"], row["family"], row["n_atoms"], row["element_sequence_matches"],
+               row["n_heavy_bonds_shared"], row["mean_abs_bond_change_ang"],
+               row["max_abs_bond_change_ang"], row["max_bond_pair"],
+               row["max_bond_change_ang"], row["d_ip_ev"]))
+    case_lines += [
+        '',
+        '结构来源（既有冻结路径；按交付层纪律不复制原始几何文件，只交付派生的键长变化）：中性松弛几何 `outputs/week4/t2_opt_freq/{name}/{name}_G2.xyz`（已核验存在）；阳离子松弛几何 `outputs/phase2_p1a/geometry_relaxation/{name}/{name}_cation_opt.xyz`（已核验存在）。逐键表见 `outputs/physics_completion/pair_evidence/mechanism_bond_changes.csv`（17 条键），汇总见 `outputs/physics_completion/pair_evidence/mechanism_geometry.csv`。成键对只用 1.8 Å 几何截断枚举，不是力常数判据；键长是平移/旋转不变量，因此不需要结构叠合。',
+        '',
+        '## 逐项证据与来源路径',
+        '',
+        '### 1. 原始结构 —— 已具',
+        '',
+        '- 中性 + 阳离子两套原始几何都在冻结路径上（见上表 `neutral_geometry` / `cation_geometry` 列，两文件均已核验存在），派生的逐键键长变化（`mechanism_bond_changes.csv`）可由冻结 .xyz 独立重算（`tests/test_physics_completion_batch.py::test_mechanism_bond_changes_recompute_from_frozen_geometry`）。',
+        '- CASE1：EMC 平均 |Δr| = 0.053936 Å、最大 0.089787 Å（C4-O5，伸缩 +0.089787）；GBL 平均 0.037918 Å、最大 0.085612 Å（C2-O6，-0.085612）。',
+        '- CASE2：SL 平均 0.009897 Å、最大 0.015528 Å（C5-C6，-0.015528）；EMC 同 CASE1。',
+        '- 缺口：无。原始几何留在冻结路径、未复制进交付层（这是交付层纪律，不是缺证据）。',
+        '',
+        '### 2. 电子密度/自旋 —— 部分（自旋/电荷布居 已具；电子密度本体与 frontier 局域化 未具、待补）',
+        '',
+        '- 已有（原始产物支撑）：`outputs/physics_completion/state_identity/state_identity_qc.csv` 逐态给出 Mulliken 与 Löwdin 原子电荷/自旋，并带原始日志路径与 sha256（如 `work/wp2prod/EMC/M_plus/EMC_M_plus.log`）。',
+        '  - 氧化态 M_plus 的自旋求和：EMC `spin_sum_mulliken` = 0.999999、GBL = 1.000002、SL = 1.000002（各一个未配对电子）；电荷求和与登记总电荷一致（`state_identity/state_identity_acceptance.csv` 的 `whole_atom_charge_sum...` 与 `whole_atom_spin_sum_matches_two_s` 均 ok=true）。',
+        '  - Li 条件态的自旋/电荷局域化类：EMC/GBL/SL 的 LiM_plus = Li_centered（`state_identity/Li_centered_states.csv`，share 0.950012 / 0.952082 / 0.921887），LiM_2plus = solvent_centered。',
+        '- 缺口（未具、待补）：没有电子密度本体产物——无 .cube/.dens、无密度差、无自旋密度分布图；frontier 轨道局域化在 `outputs/physics_completion/state_identity/thresholds.json` 里显式登记为 `frontier_localization.status = not_computed`（理由：生产 Opt 日志未要求逐轨道原子组成）。',
+        '- 结论：自旋/电荷布居这一半已具且可复算、带哈希；电子密度本体与 frontier 局域化未具 → 整项 部分。',
+        '',
+        '### 3. 配位变化 —— 部分（三例分子的单构象条件态 Li 腿 已具；多 motif / 生产系综 未具、待补；且非本例轴）',
+        '',
+        '- 已有（原始产物支撑，三个案例分子都在四分子生产子集内）：',
+        '  - `outputs/physics_completion/closure/four_molecule_state_closure.csv`：EMC/GBL/SL 的 LiM_plus、LiM_2plus 均 `register_status = produced_single_conformer`；Li–O 距离 `li_o_ang`：EMC 1.816 / 1.901，GBL 1.833 / 1.923，SL 2.053 / 2.439 Å；身份 bound/intact。',
+        '  - `outputs/physics_completion/free_states/production_redox.csv`：Li 条件态 IP 与配位位移 `coordination_shift_e_ev` / `_g_ev`：EMC 0.446461 / 0.373529，GBL 0.880186 / 0.707681，SL 0.582285 / 0.558920 eV。',
+        '  - `outputs/physics_completion/state_identity/state_identity_qc.csv`：Li–给体接触距离与 Mayer 键价（SL 的 LiM_plus 接触为 `O:2.0530;O:2.0545;S:2.5027`，valence 0.1491）。',
+        '  - `outputs/physics_completion/free_states/pilot_coordination_shift.csv`（更多分子的同类量）。',
+        '  - 条件态阶梯（筛选层 GFN2）：`outputs/physics_completion/ensembles/ensemble_pair_rungs.csv` 与 `closure/flip_persistence.csv` 的 R4_screen——EMC|GBL 的 Li 条件态 sign = negative，EMC|SL 的 Li 条件态 sign = negative（均为 screen，非生产）。',
+        '- 缺口（未具、待补）：每态只有 1 个 motif / 1 个构象（`li_motif_sampling/li_motif_screen.csv` 每态只保留 m1）；没有多 motif 或生产系综层的配位变化；且本案例轴是自由态氧化，配位变化属条件副轴（C0→C1），不是该翻转的成因。',
+        '- 结论：单构象条件态配位证据已具，多 motif / 生产系综未具 → 整项 部分。',
+        '',
+        '### 4. E/G 分解 —— 部分（E 与 G_single 已具；G_ensemble 未具、待补）',
+        '',
+        '- 已有（原始产物支撑）：',
+        '  - 逐态 E 与 G：`outputs/physics_completion/closure/four_molecule_state_closure.csv` 给出 `e_sp_solution_ev`、`g_single_ev`、`zpe_ev`、`thermal_corr_ev`、`std_state_corr_ev`（EMC/GBL/SL 各四主态）。',
+        '  - 单构象自由能标签：`outputs/physics_completion/free_states/production_redox.csv` 的 `eox_adiabatic_ev` / `gox_single_ev` / `thermal_step_free_ev`——EMC 8.191111 / 8.128207 / -0.062904，GBL 7.754285 / 7.685265 / -0.069020，SL 7.905012 / 7.776312 / -0.128700 eV。',
+        '  - pair 级 E 与 G：`outputs/physics_completion/closure/flip_persistence.csv` R2（溶液优化电子能）EMC|GBL = +0.436826、EMC|SL = +0.286099；R3（单构象自由能）EMC|GBL = +0.442942、EMC|SL = +0.351895。',
+        '- 缺口（未具、待补）：G_ensemble（生产 R4）未做——`flip_persistence.csv` R4 = `not_computed`；现有系综只有筛选层 GFN2（`outputs/physics_completion/ensembles/ensemble_free_energies.csv`，气相 GFN2），不能冒充生产 G_ensemble。',
+        '- **不一致（如实报告，不调和）**：R2/R3 的符号为正（+），与冻结的 R1b（负）相反。也就是说，垂直→绝热的这一对翻转**没有保留到溶液优化的电子能与单构象自由能层**（见 `outputs/physics_completion/closure/closure_summary.md` 的「固定几何 → 溶液各态优化 = 符号改变」）。',
+        '- 结论：E 与 G_single 分解已具，G_ensemble 未具 → 整项 部分。',
+        '',
+        '### 5. 方法敏感性 —— 已具',
+        '',
+        '- `outputs/physics_completion/method_audit/pair_gap_sensitivity.csv`：S1–S4 四设定下两对的竖直腿与弛豫腿 pair 差值，`vertical_sign_consistent` 与 `adiabatic_sign_consistent` 均 true，`sign_flip_across_legs` true。',
+        '  - EMC|GBL：竖直 0.612–0.697 eV；绝热 -0.328 … -0.345 eV（四条设定符号一致）。',
+        '  - EMC|SL：竖直 0.693–0.713 eV；绝热 -0.436 … -0.518 eV。',
+        '- `outputs/physics_completion/method_audit/robust_inversion_certification.csv`：EMC|GBL、EMC|SL 的 `certified` = true（对方法轴认证）。',
+        '- 设定与弛豫腿：`method_audit/method_settings.csv`（S1 omegaB97X-D4/def2-TZVP、S2 omegaB97X-D4/def2-TZVPD、S3 PBE0-D4/def2-TZVP、S4 PBE0-D4/def2-TZVPD）；`method_audit/relaxed_leg_matrix.csv` 32 格。',
+        '- **不一致（如实报告，不调和）**：本 CSV 与 `pair_evidence/pair_evidence.csv` 用的 `sigma = 0.206521142 eV` 是该台阶的**弛豫位移总体标准差**（`p1v_vs_p1a.json` `displacement.population_std_ev`），**不是方法 spread**；方法 spread 见 `robust_inversion_certification.csv`（EMC|GBL `adiabatic_sigma` = 0.006516 eV，EMC|SL = 0.032367 eV）。两者口径不同，不可混用。',
+        '- 反证：`outputs/physics_completion/pair_evidence/targeted_recheck/recheck_pair_gaps.csv`（S3/S4，生产 Opt 几何）给出 EMC|GBL = +0.4746 … +0.4819、EMC|SL = +0.3762 … +0.3900，均为正，`matches_frozen_r1b_sign` = false——**在生产几何上不复现冻结 R1b 的负号**（换几何与换泛函两因素不可分）。',
+        '- 结论：方法轴认证、范围与上述反证都齐 → 已具。',
+        '',
+        '### 6. 实际选集影响 —— 已具',
+        '',
+        '- `outputs/phase2_p1a/p1v_vs_p1a.json`（该台阶排序现算）：`kendall_tau_b` = 0.787879；`top_k_overlap` k=0.10 → 1.0、k=0.20 → 1.0、k=0.30 → 0.75；`decision_state_counts` = STABLE 55 / UNRESOLVED 9 / ROBUST_INVERSION 2。',
+        '- `outputs/physics_completion/pair_evidence/pair_evidence.csv`：66 pair 中 2 个 `state = ROBUST_INVERSION`，即本两例。',
+        '- 逐级 Top-k overlap 与 selection regret：`outputs/physics_completion/pair_evidence/frozen_rung_ladder.csv`（注意：该表 `G1_to_G2` 行是另一条 r2SCAN-3c 几何弛豫台阶，`f_robust_inversion` = 0、`top_k_overlap_main` = 1.0，**不是**本 P1v→P1a 台阶，口径不同）。',
+        '- 翻转持续性：`outputs/physics_completion/closure/flip_persistence.csv` 与 `closure_summary.md`——R1a（+）→ R1b（-）符号翻转，但 R2/R3 均为正、R4 `not_computed`；即 pair 级翻转**不保留**到生产溶液优化 E/G。',
+        '- 结论：pair 级翻转 + 该台阶的 tau_b/Top-k 均已具，并同时给出「不保留到 R2/R3」的实际边界 → 已具。',
+        '',
+        '## 逐例关键数字对照',
+        '',
+        '| 项目 | CASE1 EMC \\| GBL | CASE2 EMC \\| SL |',
+        '| --- | --- | --- |',
+        '| 原始结构 平均/最大 \\|Δr\\| (Å) | EMC 0.053936 / 0.089787；GBL 0.037918 / 0.085612 | EMC 同左；SL 0.009897 / 0.015528 |',
+        '| 自旋 M_plus `spin_sum_mulliken` | EMC 0.999999；GBL 1.000002 | EMC 同左；SL 1.000002 |',
+        '| 配位 `li_o_ang`（LiM+ / LiM2+） | EMC 1.816 / 1.901；GBL 1.833 / 1.923 | EMC 同左；SL 2.053 / 2.439 |',
+        '| `coordination_shift_g_ev` | EMC 0.373529；GBL 0.707681 | EMC 同左；SL 0.558920 |',
+        '| 台阶 R1a / R1b (eV) | +0.653471 / -0.336247 | +0.703086 / -0.477287 |',
+        '| 台阶 R2 / R3 (eV) | +0.436826 / +0.442942 | +0.286099 / +0.351895 |',
+        '| 方法范围 竖直 / 绝热 (eV) | 0.612–0.697 / -0.328…-0.345 | 0.693–0.713 / -0.436…-0.518 |',
+        '| 认证 | certified=true | certified=true |',
+        '| d_lower / d_upper (eV) | +0.250050009 / -0.455791550 | +0.408539433 / -0.277578589 |',
+        '',
+        '> 说明：本页登记判定、原始结构、电子密度/自旋（自旋布居）、配位变化（单构象条件态）、E/G 分解（单构象）、方法敏感性与实际选集影响；**电子密度本体、多 motif/生产系综配位与 G_ensemble 仍待补**，故六项整体仍为 partial。',
+    ]
+    local["outputs/physics_completion/pair_evidence/mechanism_cases.md"] = "\n".join(case_lines) + "\n"
+
+'''
 
 def main():
     src = baseline_source()
@@ -1010,6 +1354,27 @@ def main():
     src = sub_once(src, ANCHOR_FROZEN_LADDER_BODY, FROZEN_LADDER_BODY_BLOCK)
     src = sub_once(src, ANCHOR_FROZEN_LADDER_CSV, FROZEN_LADDER_CSV_BLOCK)
     src = sub_once(src, ANCHOR_LADDER_LIMIT, LADDER_LIMIT_BLOCK)
+
+    # §11 pilot 成本证据字段 + §9.2 逐轮端点诊断（两者都不新增计算）。
+    src = sub_once(src, PILOT_COST_ANCHOR_FUNC,
+                   PILOT_COST_EVIDENCE.rstrip("\n") + "\n\n\ndef wp2():")
+    src = sub_once(src, PILOT_COST_ANCHOR_LOOP, PILOT_COST_LOOP_REPLACEMENT)
+    src = sub_once(src, PILOT_COST_ANCHOR_CHECK, PILOT_COST_ANCHOR_CHECK + PILOT_COST_CHECK_BLOCK)
+    src = sub_once(src, PILOT_COST_ANCHOR_CSV, PILOT_COST_CSV_BLOCK)
+    src = sub_once(src, AL_ROUND_ANCHOR, AL_ROUND_BLOCK)
+    budget_fields = (["task", "axis", "baseline", "n_T_median_tau080", "n_T_majority_tau080",
+                      "n_T_majority_combined", "median_overstates_majority",
+                      "regret_tolerance_ev"] + BUDGET_EXTRA_FIELDS)
+    budget_block = (
+        '    local["outputs/physics_completion/active_learning/success_budget.csv"] = csv_text(\n'
+        "        %s, endpoint_rows)\n" % json.dumps(budget_fields)
+        + '    local["outputs/physics_completion/active_learning/round_diagnostics.csv"] = csv_text(\n'
+        "        %s, round_diagnostics)\n" % json.dumps(AL_ROUND_FIELDS))
+    src = sub_once(src, AL_BUDGET_ANCHOR, budget_block)
+
+    # §7.3 机制案例页六项覆盖（CSV 六列 + 逐项证据章节）。
+    src = sub_once(src, ANCHOR_MECH_CASES_CSV, MECH_CASES_CSV_BLOCK)
+    src = sub_once(src, ANCHOR_MECH_CASES_MD, MECH_CASES_MD_BLOCK)
     if GEN.exists():
         with GEN.open("r", encoding="utf-8", newline="") as f:
             _baseline_src = f.read()

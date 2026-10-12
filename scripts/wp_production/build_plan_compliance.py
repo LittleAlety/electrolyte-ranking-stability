@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import csv
 import io
+import json
 import re
 import sys
 from collections import Counter
@@ -57,6 +58,14 @@ def read_rows(rel):
         return []
     with path.open(encoding="utf-8-sig", newline="") as handle:
         return list(csv.DictReader(handle))
+
+
+def read_json(rel):
+    path = REPO / rel
+    if not path.is_file():
+        return {}
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 def n_true(rows):
@@ -162,21 +171,39 @@ def build_rows():
         "因此这三项检查在本批次没有可执行对象；显式记为未做，而不是默认通过。",
     ))
     ms = read_rows("outputs/physics_completion/method_audit/method_settings.csv")
-    fns = sorted({r.get("functional", "") for r in ms if r.get("role") == "production_candidate"})
-    prod_fns = [f for f in fns if f]
-    prod_settings = [r for r in ms if r.get("role") == "production_candidate"]
-    freeze_artifact = (REPO / "docs" / "66_wp1_production_method_freeze.md").is_file()
-    method_frozen = len(prod_fns) == 1 and len(prod_settings) == 1 and freeze_artifact
+    freeze_rel = "config/production_method_freeze_v1.json"
+    freeze = read_json(freeze_rel)
+    freeze_doc = (REPO / "docs" / "66_wp1_production_method_freeze.md").is_file()
+    frozen_functional = freeze.get("functional", {}).get("canonical_name", "")
+    frozen_setting = freeze.get("functional", {}).get("audit_setting_id", "")
+    frozen_basis = freeze.get("basis_by_state", {})
+    setting_index = {r.get("setting_id", ""): r for r in ms}
+    setting = setting_index.get(frozen_setting, {})
+    method_frozen = (
+        freeze.get("status") == "frozen"
+        and frozen_functional == "wB97X-D4"
+        and set(frozen_basis) == set(MAIN_STATES)
+        and set(frozen_basis.values()) == {"def2-TZVPD"}
+        and setting.get("functional") == "omegaB97X-D4"
+        and setting.get("basis") == "def2-TZVPD"
+        and freeze.get("selected_by_inversion_outcome") is False
+        and bool(freeze.get("selection_basis"))
+        and freeze_doc
+    )
     out.append(item(
         "wp1_unique_production_method", "5",
-        "冻结唯一生产方法（不按哪个方法翻出更多翻转来选）",
+        "冻结唯一生产方法与逐状态基组规则（不按哪个方法翻出更多翻转来选）",
         "satisfied" if method_frozen else "partial",
-        "production_functionals=%s; production_settings=%d; freeze_artifact=%s"
-        % (",".join(prod_fns) if prod_fns else "none", len(prod_settings), freeze_artifact),
-        "outputs/physics_completion/method_audit/method_settings.csv; docs/59_week38_wp1_method_audit.md",
-        "生产腿实际全部用 wB97X-D4（设定表并列的 S1/S2 只差弥散基组，按电荷态二选一），"
-        "但登记层既没有把生产候选收敛成单一设定、也没有一份单独的「方法已冻结」决策产物；"
-        "按「宁欠不过」记 partial，不把「事实上一直这么用」当成「已冻结并登记」。",
+        "production_setting=%s; functional=%s; state_basis_rules=%d/%d; basis=%s; "
+        "selected_by_inversion=%s; freeze_artifact=%s"
+        % (frozen_setting or "none", frozen_functional or "none", len(frozen_basis), len(MAIN_STATES),
+           ",".join(sorted(set(frozen_basis.values()))) or "none",
+           freeze.get("selected_by_inversion_outcome", "missing"), bool(freeze)),
+        "%s; docs/66_wp1_production_method_freeze.md; "
+        "outputs/physics_completion/method_audit/method_settings.csv" % freeze_rel,
+        "S2 是唯一 target-label setting；S1 只保留为历史 pilot/diagnostic。四个主态全部使用 "
+        "def2-TZVPD，避免把 M/def2-TZVP 与带电 def2-TZVPD 腿相减。冻结理由逐项登记为本机支持性、"
+        "数值/QC 可用性、弥散函数要求与标签一致性；selected_by_inversion_outcome=false。",
     ))
 
     echo = read_rows("outputs/physics_completion/method_audit/local_method_echo.csv")
@@ -207,37 +234,66 @@ def build_rows():
     for r in states:
         bymol.setdefault(r.get("mol_id", ""), {})[r.get("state", "")] = (
             r.get("register_status") == PRODUCED)
-    n_mol = len(bymol)
-    main4_ok = sum(1 for d in bymol.values() if all(d.get(s) for s in MAIN_STATES))
+    pilot_mol_count = len(bymol)
+    pilot_main4_ok = sum(1 for d in bymol.values() if all(d.get(s) for s in MAIN_STATES))
     five_ok = sum(1 for d in bymol.values() if all(d.get(s) for s in MAIN_STATES + (EXTRA_STATE,)))
-    li_pair_ok = sum(1 for d in bymol.values() if all(d.get(s) for s in LI_STATES))
-    li_legs_done = count(produced, lambda r: r.get("state") in LI_STATES)
-    conformers = sorted({r.get("n_conformers", "") for r in produced if r.get("n_conformers")})
+    pilot_li_pair_ok = sum(1 for d in bymol.values() if all(d.get(s) for s in LI_STATES))
+    main_expected_states = len(set_main) * len(MAIN_STATES)
+    main_produced = [r for r in produced
+                     if r.get("mol_id") in set_main and r.get("state") in MAIN_STATES]
+    main_covered = sorted({r.get("mol_id", "") for r in states
+                           if r.get("mol_id") in set_main and r.get("state") in MAIN_STATES})
+    main4_ok = sum(1 for mol_id in set_main
+                   if all(bymol.get(mol_id, {}).get(s) for s in MAIN_STATES))
+    li_pair_ok = sum(1 for mol_id in set_main
+                     if all(bymol.get(mol_id, {}).get(s) for s in LI_STATES))
+    li_legs_done = count(main_produced, lambda r: r.get("state") in LI_STATES)
     recon = read_rows("outputs/physics_completion/provenance/leg_reconciliation.csv")
     failed_legs = [r.get("leg_id", "") for r in recon if r.get("classification") == "failed"]
     flight_legs = [r.get("leg_id", "") for r in recon if r.get("classification") == "in_flight"]
     nostart_legs = [r.get("leg_id", "") for r in recon if r.get("classification") == "not_started"]
     out.append(item(
         "wp2_production_state_ledger", "6",
-        "四分子 x 四主态（另加基组一致中性腿）的真实 Opt+NumFreq 登记",
-        "blocked_on_production" if produced and len(produced) < len(states) else (
-            "satisfied" if produced else "not_satisfied"),
-        "produced=%d total=%d molecules=%d" % (len(produced), len(states), n_mol),
+        "原方案 12 主集 x 4 主态的真实 Opt+NumFreq 生产登记",
+        "satisfied" if len(main_produced) == main_expected_states else (
+            "blocked_on_production" if main_produced else "not_satisfied"),
+        "main_states_produced=%d/%d; main_molecules_covered=%d/%d; pilot_subset_legs=%d/%d"
+        % (len(main_produced), main_expected_states, len(main_covered), len(set_main),
+           len(produced), len(states)),
+        "data/metadata/physics_completion_set.csv; "
         "outputs/physics_completion/closure/four_molecule_state_closure.csv",
-        "未产出的腿以 planned 显式登记；缺值留空，绝不补成 0。"
+        "总分母始终是原方案 12x4=48 个主态。现有 DMC/EMC/GBL/SL 的 20 腿表（16 主态 + 4 个"
+        "同基组中性补腿）只是 pilot subset，不能把 pilot 分母替换成项目分母。未产出的腿保持缺失。"
         "但闭环表不区分「还没排上」与「跑过但失败」：逐腿磁盘核对在 provenance/leg_reconciliation.csv 里"
         "另记 failed=%d (%s)、in_flight=%d (%s)、not_started=%d，不把失败静默折成未开始。"
         % (len(failed_legs), ",".join(failed_legs) or "none",
            len(flight_legs), ",".join(flight_legs) or "none", len(nostart_legs)),
     ))
     out.append(item(
+        "wp2_four_molecule_pilot_subset", "6",
+        "四分子 20 腿仅作为生产 pilot 子集单独跟踪，不参与总体完成判定",
+        "satisfied" if states and len(produced) == len(states) else (
+            "blocked_on_production" if produced else "not_satisfied"),
+        "pilot_subset_legs=%d/%d; pilot_molecules=%d; pilot_four_state_complete=%d/%d; "
+        "pilot_five_leg_complete=%d/%d"
+        % (len(produced), len(states), pilot_mol_count, pilot_main4_ok, pilot_mol_count,
+           five_ok, pilot_mol_count),
+        "outputs/physics_completion/closure/four_molecule_state_closure.csv; "
+        "outputs/physics_completion/provenance/leg_reconciliation.csv",
+        "即使本行达到 20/20，也只表示 DMC/EMC/GBL/SL pilot 完成；原方案主生产仍按 48 主态、"
+        "12 个 free/Li 配对标签及生产级系综分别验收。",
+    ))
+    out.append(item(
         "wp2_four_state_complete", "6",
-        "四态齐备分子：M / M+ / [LiM]+ / [LiM]2+ 全部产出",
-        "satisfied" if n_mol and main4_ok == n_mol else "blocked_on_production",
-        "M/M+/LiM+/LiM2+=%d/%d; 再加基组一致中性腿=%d/%d; Li 成对齐备=%d/%d"
-        % (main4_ok, n_mol, five_ok, n_mol, li_pair_ok, n_mol),
+        "12 主集每个分子的 M / M+ / [LiM]+ / [LiM]2+ 四态全部产出",
+        "satisfied" if set_main and main4_ok == len(set_main) else "blocked_on_production",
+        "main_four_state_complete=%d/%d; main_li_pair_complete=%d/%d; "
+        "pilot_four_state_complete=%d/%d; pilot_five_leg_complete=%d/%d"
+        % (main4_ok, len(set_main), li_pair_ok, len(set_main), pilot_main4_ok, pilot_mol_count,
+           five_ok, pilot_mol_count),
+        "data/metadata/physics_completion_set.csv; "
         "outputs/physics_completion/closure/four_molecule_state_closure.csv",
-        "方案第 1 步的验收线；未齐前不进入排序结论。",
+        "方案主验收线使用 12 分子分母；四分子 pilot 完成数只作进度旁证。",
     ))
     redox = read_rows("outputs/physics_completion/free_states/production_redox.csv")
     free_ok = count(redox, lambda r: r.get("free_status") == "computed")
@@ -245,27 +301,40 @@ def build_rows():
     out.append(item(
         "wp2_free_redox_labels", "6",
         "绝热电子能差 + 单构象自由能差（两腿同为 def2-TZVPD 才相减）",
-        "satisfied" if redox and free_ok == len(redox) else ("partial" if free_ok else "not_satisfied"),
-        "free_status_computed=%d/%d; li_status_computed=%d/%d" % (free_ok, len(redox), li_ok, len(redox)),
+        "satisfied" if free_ok == len(set_main) else ("partial" if free_ok else "not_satisfied"),
+        "main_free_status_computed=%d/%d; main_li_status_computed=%d/%d; pilot_rows=%d"
+        % (free_ok, len(set_main), li_ok, len(set_main), len(redox)),
         "outputs/physics_completion/free_states/production_redox.csv",
         "def2-TZVP 中性腿不与 def2-TZVPD 阳离子相减。",
     ))
     out.append(item(
         "wp2_li_legs", "6",
         "Li 条件态（[LiM]+ / [LiM]2+）：E 与 G 两种配位位移",
-        "satisfied" if n_mol and li_pair_ok == n_mol else "blocked_on_production",
-        "li_legs_produced=%d/8; li_status_computed=%d/%d" % (li_legs_done, li_ok, len(redox)),
+        "satisfied" if set_main and li_pair_ok == len(set_main) and li_ok == len(set_main)
+        else "blocked_on_production",
+        "main_li_legs_produced=%d/%d; main_li_pair_complete=%d/%d; main_li_labels=%d/%d"
+        % (li_legs_done, len(set_main) * len(LI_STATES), li_pair_ok, len(set_main),
+           li_ok, len(set_main)),
         "outputs/physics_completion/closure/four_molecule_state_closure.csv; "
         "outputs/physics_completion/free_states/production_redox.csv",
         "配位位移需要两个 Li 腿齐备，缺一即空。",
     ))
+    prod_ens = read_rows("outputs/physics_completion/ensembles/production_ensemble_labels.csv")
+    prod_ens_keys = {(r.get("mol_id", ""), r.get("state", "")) for r in prod_ens
+                     if r.get("mol_id") in set_main and r.get("state") in MAIN_STATES
+                     and r.get("status") in ("computed", "ok")}
+    screen_ens = read_rows("outputs/physics_completion/ensembles/ensemble_free_energies.csv")
     out.append(item(
         "wp2_conformer_ensemble", "6",
-        "同态构象系综自由能 G_ens（最多 3 个再 6 个独立结构）",
-        "not_satisfied" if conformers == ["1"] else ("partial" if conformers else "not_satisfied"),
-        "distinct_n_conformers=%s" % (",".join(conformers) if conformers else "none"),
-        "outputs/physics_completion/closure/four_molecule_state_closure.csv",
-        "每个已产出态仍是单构象；系综层尚未启动，所以 R4 台阶无输入。",
+        "12 x 4 主态的生产级同态构象/配位 motif 系综自由能 G_ensemble",
+        "satisfied" if len(prod_ens_keys) == main_expected_states else (
+            "partial" if prod_ens_keys else "not_satisfied"),
+        "production_ensemble_labels=%d/%d; screen_gfn2_rows=%d"
+        % (len(prod_ens_keys), main_expected_states, len(screen_ens)),
+        "outputs/physics_completion/ensembles/production_ensemble_labels.csv; "
+        "outputs/physics_completion/ensembles/ensemble_free_energies.csv",
+        "只有 production_ensemble_labels.csv 中完成 QC 的 wB97X-D4/SMD 标签计入 48 态分母。"
+        "现有 ensemble_free_energies.csv 是气相 GFN2 screening，不能冒充生产 G_ensemble。",
     ))
     samp = read_rows("outputs/physics_completion/sampling/sampling_acceptance.csv")
     samp_escalation = read_rows("outputs/physics_completion/sampling/sampling_escalation.csv")
@@ -450,9 +519,11 @@ def build_rows():
 
     # ---------------- §9 WP5 ----------------
     sb = read_rows("outputs/physics_completion/active_learning/success_budget.csv")
+    rounds = read_rows("outputs/physics_completion/active_learning/round_diagnostics.csv")
     sb_cols = {c.lower() for c in (sb[0].keys() if sb else [])}
-    has_o3 = any(c in ("o_3", "o3") or "o3" in c or c.startswith("o_3") for c in sb_cols)
-    tols = sorted({r.get("regret_tolerance_ev", "") for r in sb if r.get("regret_tolerance_ev")})
+    has_o3 = bool(rounds) and all("O_3" in r for r in rounds)
+    fixed_r3 = bool(rounds) and {r.get("regret_threshold_ev") for r in rounds} == {"0.10"}
+    endpoint_statuses = Counter(r.get("new_endpoint_status", "") for r in sb)
     ml = read_rows("outputs/physics_completion/ml/frozen_family_view.csv")
     out.append(item(
         "wp5_task_separation", "9",
@@ -465,19 +536,20 @@ def build_rows():
     out.append(item(
         "wp5_new_endpoint_in_budget", "9",
         "新端点 O_3>=2/3 且 R_3<=0.10 eV 真的用于算预算",
-        "satisfied" if has_o3 else "not_satisfied",
-        "budget_columns=%s; regret_tolerance_ev=%s" % (
-            ",".join(sorted(sb_cols)) or "none", ",".join(tols) or "none"),
-        "outputs/physics_completion/active_learning/success_budget.csv",
-        "端点已在正文登记，但预算表用 tau_b>=0.80 与 5% 池内极差判据，没有 O_3 列。",
+        "partial" if (has_o3 and fixed_r3) else "not_satisfied",
+        "rounds=%d O_3_field=%s fixed_R_3_0.10=%s computed=%d blocked=%d" % (
+            len(rounds), has_o3, fixed_r3, endpoint_statuses["computed"], endpoint_statuses["blocked"]),
+        "outputs/physics_completion/active_learning/round_diagnostics.csv; outputs/physics_completion/active_learning/success_budget.csv",
+        "固定端点已逐轮登记；旧池只有 C 轴的 30% 指标严格等于 k=3，E/M 轴缺候选级预测，机器可读 blocked，不用百分比近似冒充 O_3/R_3。",
     ))
     out.append(item(
         "wp5_two_consecutive_points", "9",
         "至少 16/20 回放在两个连续预算点达标才报经验停止预算；12 标签池回放",
-        "not_satisfied",
-        "budget_table_has_consecutive_rule=False; replay_pool=legacy_18_not_blind",
-        "src/electrolyte_ranking/wp6.py; outputs/week7/stage8_al_summary.md",
-        "现判据取第一个达标点，无「连续两点」；回放仍是旧 18 分子池的非盲复算。",
+        "partial" if sb and all(r.get("required_consecutive_budget_points") == "2" for r in sb) else "not_satisfied",
+        "rule=16/20 for 2 consecutive points; computed=%d blocked=%d; replay_pool=legacy_18_not_blind" % (
+            endpoint_statuses["computed"], endpoint_statuses["blocked"]),
+        "outputs/physics_completion/active_learning/success_budget.csv; outputs/physics_completion/active_learning/round_diagnostics.csv",
+        "连续两点判据已实现；能严格恢复固定 k=3 的场景给结果，其余场景显式 blocked。旧回放仍非盲，不能冒充新 12 标签池。",
     ))
     cost = read_rows("outputs/physics_completion/cost/cost_ledger.csv")
     missing = count(cost, lambda r: r.get("status") == "MISSING")
@@ -504,16 +576,16 @@ def build_rows():
         "冻结族 = ridge/krr/gpr，由源码常量现读；生成器另有 frozen_family_winner_consistent_with_published "
         "断言，越族胜出会被抓出来。constant/rf/gbdt 只在探索对照里出现，不进决策表。",
     ))
-    unq = find_token(REPO / "outputs" / "physics_completion", "unqueried")
+    missing_unq = count(rounds, lambda r: r.get("remaining_unqueried_error_status") == "MISSING")
+    missing_cost = count(rounds, lambda r: r.get("cumulative_core_hours_status") == "MISSING")
     out.append(item(
         "wp5_remaining_unqueried_error", "9",
         "§9.2 每轮报告 n_T->tau_b、O_3、R_3、remaining_unqueried_error 与累计 core-hours",
-        "partial" if unq else "not_satisfied",
-        "remaining_unqueried_error_artifact=%s"
-        % (str(unq.relative_to(REPO)) if unq else "none"),
-        "outputs/physics_completion/active_learning/",
-        "O_3 / tau_b / R_3 与累计 core-hours 已在 success_budget.csv 现算；但「未查询候选上的预测误差」"
-        "（remaining_unqueried_error）在本批次没有产物，显式记为缺口。",
+        "partial" if rounds else "not_satisfied",
+        "rounds=%d remaining_error_MISSING=%d cumulative_core_hours_MISSING=%d" % (
+            len(rounds), missing_unq, missing_cost),
+        "outputs/physics_completion/active_learning/round_diagnostics.csv",
+        "逐轮字段已落盘；旧回放未保存候选级预测与逐查询成本映射，因此两列留空并附机器可读 MISSING 原因，不用其他台账或旧端点冒充。",
     ))
     ext_rows = [r for r in cfg_set if r.get("cohort") == "extension" and r.get("mol_id")]
     out.append(item(
@@ -566,46 +638,82 @@ def build_rows():
     pilot_need = ("memory", "retry", "conformer", "raw_output")
     pilot_have = [c for c in pilot_need if c in pilot_cols]
     pilot_missing = [c for c in pilot_need if c not in pilot_cols]
+    pilot_memory_missing = count(pilotcost, lambda r: r.get("memory") == "MISSING")
+    pilot_retry_unverifiable = count(pilotcost, lambda r: r.get("retry") == "UNVERIFIABLE")
+    pilot_raw_verified = count(pilotcost, lambda r: r.get("raw_output_status") == "verified_on_disk")
+    pilot_fields_complete = bool(pilotcost) and len(pilot_have) == len(pilot_need)
+    pilot_evidence_complete = (pilot_fields_complete and pilot_memory_missing == 0
+                               and pilot_retry_unverifiable == 0
+                               and pilot_raw_verified == len(pilotcost))
     scen = read_rows("outputs/physics_completion/cost/remaining_cost_scenarios.csv")
     idx_path = REPO / "outputs" / "physics_completion" / "cost" / "cost_scenario_index.json"
     idx_text = idx_path.read_text(encoding="utf-8") if idx_path.is_file() else ""
     concurrency_ok = '"concurrency"' in idx_text
+    # 判据用成本层自己的验收（全 true），不是「剩余情景表非空」：四分子 20 腿全部落地后
+    # 待补集合为空，逐腿情景表**按设计**为空，此时把空表读成「没做估算」会把已完成的闭环报成缺口。
+    cost_acc = read_rows("outputs/physics_completion/cost/cost_scenario_acceptance.csv")
+    cost_acceptance_ok = bool(cost_acc) and all(row.get("ok") == "true" for row in cost_acc)
     out.append(item(
         "wp2_pilot_cost_fields", "11",
         "§11 前 2 个分子的 pilot 逐作业记录 wall time / allocated cores / core-hours / memory / "
         "failed-retry / phase / method / state / conformer / raw output",
-        "satisfied" if (pilotcost and len(pilot_have) == len(pilot_need))
+        "satisfied" if pilot_evidence_complete
         else ("partial" if pilotcost else "not_satisfied"),
-        "pilot_rows=%d; columns=%s; missing_fields=%s"
+        "pilot_rows=%d; columns=%s; missing_fields=%s; raw_verified=%d/%d; "
+        "memory_MISSING=%d; retry_UNVERIFIABLE=%d"
         % (len(pilotcost), ",".join(sorted(pilot_cols)) or "none",
-           ",".join(pilot_missing) or "none"),
+           ",".join(pilot_missing) or "none", pilot_raw_verified, len(pilotcost),
+           pilot_memory_missing, pilot_retry_unverifiable),
         "outputs/physics_completion/cost/pilot_cost_ledger.csv",
-        "已有 job_id / phase / method / cores / wall_sec / core_hours / status（按 allocated core-hours 命名，"
-        "不冒充 process CPU time）；但 memory / failed-retry / conformer / raw_output 四类字段未登记，"
-        "故记 partial，不把「记了 6 列」说成「记了 10 项」。",
+        "conformer 与 raw_output 从现存作业目录回填，原始输出存在时同时登记 SHA256。"
+        "历史 runner 没有记录峰值内存，也会覆盖固定日志名而不保留 attempt journal，故 memory 显式 MISSING、"
+        "retry 显式 UNVERIFIABLE；字段存在不等于证据完备，状态仍为 partial。",
     ))
     out.append(item(
         "plan_cost_scenarios_and_concurrency", "11",
         "§11 用 pilot 的中位与 p90 按作业类别估算剩余成本，给出低/中/高资源情景及可用并发",
-        "satisfied" if scen and concurrency_ok else ("partial" if scen else "not_satisfied"),
-        "scenario_rows=%d; concurrency_registered=%s" % (len(scen), concurrency_ok),
+        "satisfied" if cost_acceptance_ok and concurrency_ok
+        else ("partial" if scen else "not_satisfied"),
+        "scenario_rows=%d; concurrency_registered=%s; cost_acceptance_all_true=%s"
+        % (len(scen), concurrency_ok, cost_acceptance_ok),
         "outputs/physics_completion/cost/remaining_cost_scenarios.csv; "
-        "outputs/physics_completion/cost/cost_scenario_index.json",
+        "outputs/physics_completion/cost/cost_scenario_index.json; "
+        "outputs/physics_completion/cost/cost_scenario_acceptance.csv",
         "逐腿 low <= mid <= high 且总量等于逐腿之和（cost_scenario_acceptance.csv 全 true）；"
-        "并发按「同时最多 2 个 ORCA x 4 核」的上限报价，且说明 core-hours 与并发无关。",
+        "并发按「同时最多 3 个 ORCA x 4 核」的上限报价，且说明 core-hours 与并发无关。"
+        "四分子闭环后待补腿为 0，逐腿情景表为空即「剩余成本 0」，48 态完整计划的剩余预算"
+        "另列为 cost_ledger.csv 的 main_production_state_structures（planned）。",
     ))
 
     # ---------------- §1 / §12 总体 ----------------
-    plan_complete = bool(n_mol) and main4_ok == n_mol and li_pair_ok == n_mol and bool(flip) and flip_done == len(flip)
+    # 项目级分母来自方案登记的 12 主集，而不是当前四分子 pilot ledger。四分子
+    # 20 腿即使全部完成，也只能关闭 pilot 子集，不能关闭完整 physics_completion_v1。
+    plan_complete = (
+        method_frozen
+        and len(main_produced) == main_expected_states
+        and main4_ok == len(set_main)
+        and free_ok == len(set_main)
+        and li_ok == len(set_main)
+        and len(prod_ens_keys) == main_expected_states
+        and samp_extension_ok
+        and bool(flip) and flip_done == len(flip)
+    )
     out.append(item(
         "plan_overall_complete", "1",
-        "方案第 1-5 步闭环：四分子四态齐备 + 两对翻转在自由能层判定",
+        "原方案核心闭环：12 主集 x 4 主态、12 个 free/Li 标签、48 态生产系综与目标排序证据",
         "satisfied" if plan_complete else "blocked_on_production",
-        "four_state_complete=%d/%d li_pair_complete=%d/%d flip_rungs=%d/%d"
-        % (main4_ok, n_mol, li_pair_ok, n_mol, flip_done, len(flip)),
+        "main_states=%d/%d; main_four_state_complete=%d/%d; free_labels=%d/%d; "
+        "li_labels=%d/%d; production_ensembles=%d/%d; sampling_complete=%s; "
+        "flip_rungs=%d/%d; pilot_subset=%d/%d"
+        % (len(main_produced), main_expected_states, main4_ok, len(set_main),
+           free_ok, len(set_main), li_ok, len(set_main), len(prod_ens_keys), main_expected_states,
+           samp_extension_ok, flip_done, len(flip), len(produced), len(states)),
+        "data/metadata/physics_completion_set.csv; "
         "outputs/physics_completion/closure/four_molecule_state_closure.csv; "
+        "outputs/physics_completion/ensembles/production_ensemble_labels.csv; "
         "outputs/physics_completion/closure/flip_persistence.csv",
-        "本行是可结题的硬闸门；未满足时只报告进展与限制，不宣称完成。",
+        "本行是可结题的硬闸门，分母固定为主集 12 分子和 48 个主态。四分子 20 腿只作为 pilot_subset "
+        "显示，绝不参与缩小总体分母；任一目标标签、生产系综、指定采样审计或排序证据未齐即不结题。",
     ))
 
     # ---------------- §12 阶段验收 ----------------
@@ -633,11 +741,13 @@ def build_rows():
     # ---------------- §13 推荐落点 ----------------
     landing = [
         "config/physics_completion_v1.yaml",
+        "config/production_method_freeze_v1.json",
         "data/metadata/physics_completion_set.csv",
         "data/references/anchor_primary_audit.csv",
         "docs/physics_completion_protocol.md",
         "docs/claim_migration.md",
         "docs/physics_completion_final_report.md",
+        "docs/66_wp1_production_method_freeze.md",
         "outputs/physics_completion/method_audit",
         "outputs/physics_completion/free_states",
         "outputs/physics_completion/li_states",

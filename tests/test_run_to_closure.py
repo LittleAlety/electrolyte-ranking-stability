@@ -56,7 +56,10 @@ def test_check_reports_pending_and_passes_when_complete(monkeypatch, capsys):
 
     monkeypatch.setattr(module.queue, "inventory", lambda: _rows(set()))
     assert module.main(["--check"]) == 0
-    assert "all 20 legs computed" in capsys.readouterr().out
+    # 总数取自队列自己的口径（MOL_IDS x LEGS），不写死：写死 20 会在覆盖范围从
+    # 四分子扩到主集 12 分子后与队列错位。
+    total = len(module.queue.MOL_IDS) * len(module.queue.LEGS)
+    assert ("all %d legs computed" % total) in capsys.readouterr().out
 
 
 def test_require_complete_refuses_to_fold(monkeypatch, capsys):

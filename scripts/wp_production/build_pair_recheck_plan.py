@@ -498,7 +498,8 @@ def build():
         "outputs/physics_completion/pair_evidence/targeted_recheck/job_plan.csv":
             csv_text(PLAN_FIELDS, plan_rows),
         "outputs/physics_completion/pair_evidence/targeted_recheck/acceptance.csv":
-            csv_text(ACC_FIELDS, checks),
+            # 验收列的 ok 与仓库其余验收表同口径（小写 true/false），测试与人工读表都按小写判读。
+            csv_text(ACC_FIELDS, [dict(item, ok=str(item["ok"]).lower()) for item in checks]),
         "outputs/physics_completion/pair_evidence/targeted_recheck/recheck_pair_gaps.csv":
             csv_text(GAP_FIELDS, gaps),
     }

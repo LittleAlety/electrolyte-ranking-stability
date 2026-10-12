@@ -1,6 +1,6 @@
 ﻿# WP2 生产监守：等其它 wp2 驱动 / ORCA 退出后，用可断点续跑的队列器把剩余腿跑完。
 # 覆盖 DMC/EMC/GBL/SL 的全部 20 条腿。队列器自身幂等——已 computed 的跳过、failed 或被打断的重试，
-# 且并发上限 2 个 ORCA 作业。
+# 且并发上限 3 个 ORCA 作业。
 #
 # 为什么要「按进展继续」而不是「固定 N 轮」：
 #   腿没算完就停摆 = 四分子闭环永远关不上，而这是本阶段唯一的目标。旧版跑满固定轮数就退出、删锁、
@@ -17,7 +17,7 @@
 #
 # 单实例锁：work\_supervisor.lock 记录持有者 PID，同一时刻只允许一个监守进入队列阶段。
 # 若锁里 PID 已死则视为陈旧锁并接管。没有这道锁时，两个监守会在驱动退出后同时接管，
-# 把并发从 2 个 ORCA 叠成 4 个（用户硬要求：不要占满机器）。
+# 把并发从 3 个 ORCA 叠成 6 个（用户硬要求：不要占满机器）。
 param(
   [int]$MaxRounds = 6,
   [int]$MaxStalledRounds = 3,
@@ -30,12 +30,17 @@ $policy = "scripts\wp_production\supervisor_policy.py"
 $root = (Get-Location).Path
 $lock = Join-Path $root "work\_supervisor.lock"
 $logPath = Join-Path $root "work\_extra_supervisor.log"
-$target = 20
+# target **不写死**：取队列器自己的口径（MOL_IDS x LEGS）。写死 20 的老版本在覆盖范围从
+# 四分子（20 腿）扩到主集 12 分子（60 腿）后会与队列错位——监守在 20 就判 done、看护在 20
+# 就判「腿已全齐」，两边一起退出，生产永远停在 16/48。这正是本次核实发现的空转根因之一。
+$rawTotal = (& $py -X utf8 $policy --total 2>$null | Out-String).Trim()
+$target = 0
+if ($rawTotal -match '^\d+$' -and [int]$rawTotal -gt 0) { $target = [int]$rawTotal } else { $target = 60 }
 function Log($m) { ("[{0}] {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $m) | Out-File -Append -Encoding UTF8 $logPath }
 
 # 「什么算在跑」的口径**刻意比队列器更宽**：名字里含 orca 的全部进程（真 orca.exe 连同
 # orca_numfreq / orca_scfgrad / orca_leanscf_mpi 等 MPI 子进程），加上别的 run_wp2_* 驱动。
-# 口径宽是为了守住用户硬要求「全机同时最多 2 个 ORCA 作业」：宁可多等，绝不让两批 ORCA 叠加。
+# 口径宽是为了守住用户硬要求「全机同时最多 3 个 ORCA 作业」：宁可多等，绝不让两批 ORCA 叠加。
 # 监守自己的命令行是 supervise_pending.ps1，不会被数进来。
 function Get-DriverProcesses() {
   Get-CimInstance Win32_Process |

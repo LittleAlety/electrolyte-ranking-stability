@@ -239,7 +239,7 @@ def build():
     checks = []
     checks.append({
         "check_id": "every_registered_leg_is_accounted_for",
-        "description": "20 条登记腿全部归位：已测 7 条 + 待补 13 条，不丢腿",
+        "description": "20 条登记腿全部归位：已测 + 待补 = 20，不丢腿",
         "ok": str(len(legs) == 20 and len(measured_keys) + len(pending) == 20).lower(),
         "detail": "registered=%d measured=%d pending=%d" % (len(legs), len(measured_keys), len(pending)),
     })
@@ -255,8 +255,11 @@ def build():
     checks.append({
         "check_id": "per_leg_scenarios_are_monotone",
         "description": "每条腿 low <= mid <= high，不允许出现低情景高于高情景",
-        "ok": str(bool(estimate_rows) and monotone).lower(),
-        "detail": "checked %d pending legs" % len(estimate_rows),
+        # 待补腿为空 = 注册的 20 腿子集已全部落地，这一层没有可报的情景；此时「每条待补腿都单调」
+        # 是空真命题，可以判 true，但 detail 必须写明「不是检过了 0 条，而是本来就没有待补腿」。
+        "ok": str(monotone and (not pending or bool(estimate_rows))).lower(),
+        "detail": ("pending=0 (registered 20-leg subcohort complete): no remaining leg to estimate"
+                   if not pending else "checked %d pending legs" % len(estimate_rows)),
     })
     checks.append({
         "check_id": "totals_are_the_sum_of_their_rows",
@@ -273,9 +276,11 @@ def build():
     checks.append({
         "check_id": "every_estimate_names_its_basis",
         "description": "每个数字都写明口径（类别实测 / 声明界），没有来源不明的数",
-        "ok": str(bool(estimate_rows) and named).lower(),
-        "detail": "%d/%d rows labelled" % (sum(1 for row in estimate_rows if row["basis_low"]),
-                                           len(estimate_rows)),
+        "ok": str(named and (not pending or bool(estimate_rows))).lower(),
+        "detail": ("pending=0 (registered 20-leg subcohort complete): no remaining estimate to label"
+                   if not pending else
+                   "%d/%d rows labelled" % (sum(1 for row in estimate_rows if row["basis_low"]),
+                                            len(estimate_rows))),
     })
     unmeasured = [row for row in estimate_rows if row["measured_class"] == "false"]
     flagged = all(row["estimate_kind"] == "declared_floor_unmeasured_class" and row["note"]
@@ -308,7 +313,8 @@ def build():
 
     index = {
         "scope": ("plan 11: per-class median / p90 of the measured jobs and low / mid / high scenarios "
-                  "for the 13 legs still missing from the four-molecule loop; zero new electronic structure"),
+                  "for the %d legs still missing from the four-molecule loop; zero new electronic structure"
+                  % len(pending)),
         "measured": {
             "legs": len(measured_keys),
             "core_hours_total": round6(sum(all_measured)),
@@ -382,6 +388,13 @@ def build():
                   % (row["name"], row["state"], row["job_class"], row["measured_class"],
                      float(row["core_hours_low"]), float(row["core_hours_mid"]),
                      float(row["core_hours_high"]), row["basis_mid"]))
+    if not pending:
+        md += [
+            "",
+            "**0 条待补腿**：注册的四分子 20 腿子集已全部落地（见 `closure/four_molecule_state_closure.csv`），"
+            "因此本子集的剩余成本为 **0 core-hour**，逐腿情景表为空是「没有剩余」而不是「没有估算」。"
+            "完整 48 态计划的剩余预算仍单列在 `cost_ledger.csv` 的 `main_production_state_structures`（planned）。",
+        ]
     md += [
         "",
         "| 情景 | core-hours | 墙上时间 @2 worker | @3 worker | @4 worker |",
@@ -392,10 +405,19 @@ def build():
         md.append("| %s | %.3f | %.2f h | %.2f h | %.2f h |"
                   % (key, scenario["core_hours"], scenario["wall_hours"]["2"],
                      scenario["wall_hours"]["3"], scenario["wall_hours"]["4"]))
+    md += [""]
+    if unmeasured:
+        md += [
+            "* 类别 %s 目前没有任何实测腿，因此该类的 low / mid 都用**声明下界**（最大已测腿）"
+            "而不是类别最小值；high 取该下界的 2 倍。第一条该类腿落地后应替换。"
+            % "、".join(sorted({row["job_class"] for row in unmeasured})),
+        ]
+    else:
+        md += [
+            "* 每个作业类别都至少有一条实测腿（待补 %d 条），本轮没有任何数字来自声明下界。"
+            % len(pending),
+        ]
     md += [
-        "",
-        "* `li_complex_def2TZVPD` 目前没有任何实测腿，因此该类的 low / mid 都用**声明下界**"
-        "（最大已测腿）而不是类别最小值；high 取该下界的 2 倍。第一条 Li 腿落地后应替换。",
         "",
         "## 分项成本（方案 11 要求先检查 Opt / Freq / SP）",
         "",

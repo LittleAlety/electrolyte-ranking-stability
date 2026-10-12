@@ -8,12 +8,12 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | C01|LiM_plus | DMC | LiM_plus | 10 | 10 | 2 | production_motif_is_lowest | monodentate_donor3 |
 | C01|LiM_2plus | DMC | LiM_2plus | 10 | 10 | 1 | production_motif_within_1kj | monodentate_donor3 |
-| C02|LiM_plus | EMC | LiM_plus | 10 | 10 | 2 | production_motif_is_lowest | monodentate_donor4 |
-| C02|LiM_2plus | EMC | LiM_2plus | 10 | 10 | 2 | production_motif_within_1kj | monodentate_donor4 |
+| C02|LiM_plus | EMC | LiM_plus | 10 | 10 | 2 | production_motif_within_1kj | monodentate_donor4 |
+| C02|LiM_2plus | EMC | LiM_2plus | 10 | 10 | 1 | production_motif_is_lowest | monodentate_donor4 |
 | C13|LiM_plus | GBL | LiM_plus | 4 | 4 | 1 | production_motif_within_1kj | monodentate_donor0 |
 | C13|LiM_2plus | GBL | LiM_2plus | 7 | 7 | 1 | production_motif_within_1kj | monodentate_donor0 |
 | C14|LiM_plus | SL | LiM_plus | 7 | 7 | 1 | production_motif_within_1kj | bidentate_donors0_2 |
-| C14|LiM_2plus | SL | LiM_2plus | 7 | 7 | 3 | production_motif_within_1kj | monodentate_donor0 |
+| C14|LiM_2plus | SL | LiM_2plus | 7 | 7 | 3 | production_motif_is_lowest | monodentate_donor0 |
 
 ## 保留的独立 motif（可执行结构集合）
 
@@ -22,16 +22,15 @@
 | C01|LiM_plus | 1 | 0.000 | monodentate_donor3 | 3 | 1.6559 | `work/limotif/C01_LiM_plus/C01_LiM_plus_c00/xtbopt.xyz` |
 | C01|LiM_plus | 2 | 24.622 | bidentate_donors1_4 | 1,4 | 1.8702 | `work/limotif/C01_LiM_plus/C01_LiM_plus_c05/xtbopt.xyz` |
 | C01|LiM_2plus | 1 | 0.000 | monodentate_donor3 | 3 | 1.8029 | `work/limotif/C01_LiM_2plus/C01_LiM_2plus_c06/xtbopt.xyz` |
-| C02|LiM_plus | 1 | 0.000 | monodentate_donor4 | 4 | 1.6581 | `work/limotif/C02_LiM_plus/C02_LiM_plus_c00/xtbopt.xyz` |
-| C02|LiM_plus | 2 | 19.927 | bidentate_donors2_5 | 2,5 | 1.8498 | `work/limotif/C02_LiM_plus/C02_LiM_plus_c05/xtbopt.xyz` |
-| C02|LiM_2plus | 1 | 0.000 | monodentate_donor4 | 4 | 1.7630 | `work/limotif/C02_LiM_2plus/C02_LiM_2plus_c02/xtbopt.xyz` |
-| C02|LiM_2plus | 2 | 18.307 | monodentate_donor4 | 4 | 1.7798 | `work/limotif/C02_LiM_2plus/C02_LiM_2plus_c06/xtbopt.xyz` |
+| C02|LiM_plus | 1 | 0.000 | monodentate_donor4 | 4 | 1.6577 | `work/limotif/C02_LiM_plus/C02_LiM_plus_c02/xtbopt.xyz` |
+| C02|LiM_plus | 2 | 19.885 | bidentate_donors2_5 | 2,5 | 1.8509 | `work/limotif/C02_LiM_plus/C02_LiM_plus_c08/xtbopt.xyz` |
+| C02|LiM_2plus | 1 | 0.000 | monodentate_donor4 | 4 | 1.7636 | `work/limotif/C02_LiM_2plus/C02_LiM_2plus_c00/xtbopt.xyz` |
 | C13|LiM_plus | 1 | 0.000 | monodentate_donor0 | 0 | 1.6667 | `work/limotif/C13_LiM_plus/C13_LiM_plus_c03/xtbopt.xyz` |
-| C13|LiM_2plus | 1 | 0.000 | monodentate_donor0 | 0 | 1.8143 | `work/limotif/C13_LiM_2plus/C13_LiM_2plus_c04/xtbopt.xyz` |
+| C13|LiM_2plus | 1 | 0.000 | monodentate_donor0 | 0 | 1.8142 | `work/limotif/C13_LiM_2plus/C13_LiM_2plus_c04/xtbopt.xyz` |
 | C14|LiM_plus | 1 | 0.000 | bidentate_donors0_2 | 0,2 | 1.8872 | `work/limotif/C14_LiM_plus/C14_LiM_plus_c02/xtbopt.xyz` |
-| C14|LiM_2plus | 1 | 0.000 | monodentate_donor0 | 0 | 1.7209 | `work/limotif/C14_LiM_2plus/C14_LiM_2plus_c06/xtbopt.xyz` |
-| C14|LiM_2plus | 2 | 0.003 | monodentate_donor2 | 2 | 1.7208 | `work/limotif/C14_LiM_2plus/C14_LiM_2plus_c05/xtbopt.xyz` |
-| C14|LiM_2plus | 3 | 9.095 | bidentate_donors0_2 | 0,2 | 2.0494 | `work/limotif/C14_LiM_2plus/C14_LiM_2plus_c03/xtbopt.xyz` |
+| C14|LiM_2plus | 1 | 0.000 | monodentate_donor0 | 0 | 1.7213 | `work/limotif/C14_LiM_2plus/C14_LiM_2plus_c00/xtbopt.xyz` |
+| C14|LiM_2plus | 2 | 0.004 | monodentate_donor2 | 2 | 1.7210 | `work/limotif/C14_LiM_2plus/C14_LiM_2plus_c02/xtbopt.xyz` |
+| C14|LiM_2plus | 3 | 9.091 | bidentate_donors0_2 | 0,2 | 2.0478 | `work/limotif/C14_LiM_2plus/C14_LiM_2plus_c03/xtbopt.xyz` |
 
 ## 与登记规则的偏差（逐条显式记录）
 

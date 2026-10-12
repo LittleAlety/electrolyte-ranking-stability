@@ -1,6 +1,6 @@
 # Week 39 / WP2 — 固定背景配对自由能标签
 
-**状态**：账本与系综规则已冻结；48 行生产模板中已登记 12/16 个主态的真实 Opt+Freq 账本行（其余行热校正保持为空，缺值不写 0）。已另跑 12 主集自由态 + Li 配位态 pilot（新增计算，方案 15.5/15.6），见下节。
+**状态**：账本与系综规则已冻结；48 行生产模板中已登记 16/16 个主态的真实 Opt+Freq 账本行（其余行热校正保持为空，缺值不写 0）。已另跑 12 主集自由态 + Li 配位态 pilot（新增计算，方案 15.5/15.6），见下节。
 
 ## 交付
 
@@ -9,12 +9,12 @@
 - `ensemble_rules.csv`：7 条系综/窗口/去重规则。
 - `existing_electronic_layer.csv`：32 条既有电子能层数值（12 个分子），全部标注 `thermal_correction=absent`。
 
-## 验收（22/22 通过）
+## 验收（23/23 通过）
 
 | check | ok | detail |
 | --- | --- | --- |
 | ledger_covers_main_x_four_states | PASS | n_rows=48 |
-| thermal_fields_left_empty_not_zero | PASS | planned=36 行留空；produced=12 行有值（无 0 填充） |
+| thermal_fields_left_empty_not_zero | PASS | planned=32 行留空；produced=16 行有值（无 0 填充） |
 | sampling_plan_has_escalation_rule | PASS | n_rows=16 |
 | existing_electronic_layer_is_labelled | PASS | 32 条既有数值 / 12 个分子 |
 | ensemble_rules_frozen | PASS | n_rules=7 |
@@ -22,19 +22,20 @@
 | pilot_vertical_ip_is_basis_consistent | PASS | DMC=8.957162 eV,EMC=8.537180 eV,DEC=8.592402 eV,EC=8.603601 eV,PC=8.542029 eV,DME=6.831624 eV,DOL=7.184396 eV,GBL=8.034424 eV,SL=7.937598 eV,DMSO=6.475203 eV,AN=9.463296 eV,TMP=8.715843 eV |
 | pilot_ledger_instance_is_complete | PASS | record=C01|M; G=-9354.960153462 eV |
 | pilot_cost_ledger_records_core_hours | PASS | jobs=109; total=6.546039 core-hours |
+| pilot_cost_ledger_records_verifiable_provenance | PASS | raw verified=109/109; memory=MISSING; retry=UNVERIFIABLE |
 | pilot_li_states_converged_and_intact | PASS | rows=24; LiM_plus bound 12/12; dissociated=C08|LiM_2plus,C16|LiM_2plus |
 | pilot_covers_all_four_master_states | PASS | free=36 + li=24 rows over 12 main-set molecules |
 | pilot_donor_placement_recorded | PASS | families=carbonyl,ether,nitrile,phosphoryl,sulfone,sulfoxide |
 | pilot_covers_all_twelve_main_molecules | PASS | molecules=12 |
 | pilot_coordination_shift_computed | PASS | 10 interpretable + 2 dissociated(not interpretable); d_ip 0.357-0.897 eV over interpretable |
 | pilot_flags_dissociated_dication_states | PASS | dissociated=[DME,AN] |
-| wp2_production_states_terminated_without_imaginary | PASS | 13 条已生产账本行（主态 + 额外 def2-TZVPD 中性腿）全部 terminated / Opt 收敛 / 无虚频 |
-| wp2_production_gibbs_decomposes_from_the_solution_sp | PASS | max |G - (E_SP + G-E(el))| = 1.000e-08 Eh over 13 state(s) |
-| wp2_production_is_a_registered_subset | PASS | states 12/16 over 4/4 molecules; extra legs 1 |
-| wp2_production_fills_only_the_produced_template_rows | PASS | produced=12 planned=36; planned rows carry empty G |
-| wp2_production_li_states_record_binding_metrics | PASS | li_states=4 bound=4 |
-| wp2_production_cost_records_allocated_core_hours | PASS | jobs=13; total=136.718333 core-hours |
-| wp2_production_redox_uses_basis_consistent_legs | PASS | extra_legs=1; free_computed=GBL 7.685265; li_computed=none |
+| wp2_production_states_terminated_without_imaginary | PASS | 20 条已生产账本行（主态 + 额外 def2-TZVPD 中性腿）全部 terminated / Opt 收敛 / 无虚频 |
+| wp2_production_gibbs_decomposes_from_the_solution_sp | PASS | max |G - (E_SP + G-E(el))| = 1.000e-08 Eh over 20 state(s) |
+| wp2_production_is_a_registered_subset | PASS | states 16/16 over 4/4 molecules; extra legs 4 |
+| wp2_production_fills_only_the_produced_template_rows | PASS | produced=16 planned=32; planned rows carry empty G |
+| wp2_production_li_states_record_binding_metrics | PASS | li_states=8 bound=8 |
+| wp2_production_cost_records_allocated_core_hours | PASS | jobs=20; known_subtotal=202.194222 core-hours; unknown_jobs=0 |
+| wp2_production_redox_uses_basis_consistent_legs | PASS | extra_legs=4; free_computed=DMC 8.314745,EMC 8.128207,GBL 7.685265,SL 7.776312; li_computed=DMC,EMC,GBL,SL |
 
 ## 12 主集四主态 pilot（方案 15.5 / 15.6，新增计算）
 
@@ -114,7 +115,7 @@ Li 配位两态（SMD，def2-TZVPD，Li 按给体类型沿外侧 1.9 A 起点后
 ## 生产首段：4 主集分子 x 4 主态的真实 Opt+Freq 自由能
 
 级别：wB97X-D4 (= omegaB97X-D4) / def2-TZVP for the neutral leg and def2-TZVPD for the charged/Li legs; SMD acetonitrile; Opt NumFreq TightOpt TightSCF SlowConv；几何起点为既有冻结 r2SCAN-3c 结构，每态一个代表结构。
-进度：已登记 **12/16** 个主态（完成分子 C01）；未完成的状态不出现在表里，也不写成 0。
+进度：已登记 **16/16** 个主态（完成分子 C01,C02,C13,C14）；未完成的状态不出现在表里，也不写成 0。
 账本 G = E_SP + (G - E(el)) + 标准态项（RT ln V_m，1 atm -> 1 mol/L）；标准态项在同一化学计量差值中相消。
 
 | 记录 | E_SP (Eh) | ZPE (Eh) | E->G 热项 (Eh) | G_single (Eh) | G (eV) | 虚频 | 最低频 (cm^-1) | Li-O/N (A) | 非 Li 片段 | 身份 |
@@ -125,27 +126,34 @@ Li 配位两态（SMD，def2-TZVPD，Li 按给体类型沿外侧 1.9 A 起点后
 | C01|LiM_2plus | -350.97956074 | 0.09183248 | 0.05844892 | -350.92111182 | -9549.049915606 | 0 | 96.62 | 1.927 | 1 | bound |
 | C02|M | -383.21194726 | 0.12437320 | 0.09205369 | -383.11989357 | -10425.223402455 | 0 | 77.89 | - | - | intact |
 | C02|M_plus | -382.91291033 | 0.12293835 | 0.08957027 | -382.82334006 | -10417.153770352 | 0 | 62.29 | - | - | intact |
+| C02|LiM_plus | -390.66882506 | 0.12631344 | 0.09213480 | -390.57669025 | -10628.133177072 | 0 | 71.30 | 1.816 | 1 | bound |
+| C02|LiM_2plus | -390.35140013 | 0.12244595 | 0.08714292 | -390.26425721 | -10619.631440945 | 0 | 60.85 | 1.901 | 1 | bound |
 | C13|M | -306.73708477 | 0.09943860 | 0.07086694 | -306.66621783 | -8344.812901968 | 0 | 150.06 | - | - | intact |
 | C13|M_plus | -306.45395804 | 0.09748803 | 0.06823672 | -306.38572132 | -8337.180203094 | 0 | 164.90 | - | - | intact |
 | C13|LiM_plus | -314.19479755 | 0.10103541 | 0.07021655 | -314.12458100 | -8547.765302950 | 0 | 53.58 | 1.833 | 1 | bound |
+| C13|LiM_2plus | -313.87748657 | 0.09341143 | 0.06134063 | -313.81614594 | -8539.372357401 | 0 | 27.85 | 1.923 | 1 | bound |
 | C14|M | -706.15322084 | 0.12428876 | 0.09358347 | -706.05963738 | -19212.861505449 | 0 | 37.15 | - | - | intact |
 | C14|M_plus | -705.86571853 | 0.12059954 | 0.08861666 | -705.77710188 | -19205.173322831 | 0 | 68.25 | - | - | intact |
 | C14|LiM_plus | -713.61011552 | 0.12575882 | 0.09315350 | -713.51696202 | -19415.785646590 | 0 | 24.01 | 2.053 | 1 | bound |
+| C14|LiM_2plus | -713.29821312 | 0.12173522 | 0.08756523 | -713.21064789 | -19407.450414486 | 0 | 59.64 | 2.439 | 1 | bound |
+| C01|M_tzvpd | -343.85676276 | 0.09574938 | 0.06503754 | -343.79172521 | -9355.049422864 | 0 | 112.57 | - | - | intact |
+| C02|M_tzvpd | -383.21392811 | 0.12425294 | 0.09188196 | -383.12204615 | -10425.281977141 | 0 | 75.46 | - | - | intact |
 | C13|M_tzvpd | -306.73892277 | 0.09936051 | 0.07077317 | -306.66814960 | -8344.865468108 | 0 | 146.18 | - | - | intact |
+| C14|M_tzvpd | -706.15622236 | 0.12414130 | 0.09334627 | -706.06287609 | -19212.949635238 | 0 | 29.85 | - | - | intact |
 
-成本：13 个 Opt+Freq 作业，合计 136.718333 core-hours（allocated cores x wall clock）。
+成本：20 个 Opt+Freq 作业，已知小计 202.194222 core-hours；0 个作业总成本未知（非零成本，非完整总计）。
 
 基组一致（同为 def2-TZVPD）的自由腿 Gox_single 与 Li 腿配位位移（两条腿分开登记）：
 
 | 分子 | 自由腿 | Li 腿 | 整行 | Eox_adiabatic (eV) | Gox_single (eV) | E->G 台阶 (eV) | Li IP (E, eV) | Li IP (G, eV) | 配位位移 (E, eV) | 配位位移 (G, eV) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| DMC | not_computed | not_computed | not_computed |  |  |  |  |  |  |  |
-| EMC | not_computed | not_computed | not_computed |  |  |  |  |  |  |  |
-| GBL | computed | not_computed | free_only | 7.754285 | 7.685265 | -0.069020 |  |  |  |  |
-| SL | not_computed | not_computed | not_computed |  |  |  |  |  |  |  |
+| DMC | computed | computed | computed | 8.496281 | 8.314745 | -0.181536 | 9.027826 | 8.839764 | 0.531545 | 0.525019 |
+| EMC | computed | computed | computed | 8.191111 | 8.128207 | -0.062904 | 8.637572 | 8.501736 | 0.446461 | 0.373529 |
+| GBL | computed | computed | computed | 7.754285 | 7.685265 | -0.069020 | 8.634472 | 8.392946 | 0.880186 | 0.707681 |
+| SL | computed | computed | computed | 7.905012 | 7.776312 | -0.128700 | 8.487297 | 8.335232 | 0.582285 | 0.558920 |
 
 ## 限制
-- 生产模板只回填已跑完的主态（本次 12/16）：中性腿 def2-TZVP、带电/Li 腿 def2-TZVPD，两腿相减不是基组一致的自由分子 IP，本报告不据此计算 Eox；其余行热校正保持为空（未把缺值写成 0）。
+- 生产模板只回填已跑完的主态（本次 16/16）：中性腿 def2-TZVP、带电/Li 腿 def2-TZVPD，两腿相减不是基组一致的自由分子 IP，本报告不据此计算 Eox；其余行热校正保持为空（未把缺值写成 0）。
 - Gox_single 与配位位移在 production_redox.csv 单列，只用两腿同为 def2-TZVPD 的差值。
 - 生产首段每态只有**单一代表结构**（n_conformers = 1），不是方案 6.1 的多构象/多 motif 系综；6 kcal/mol 窗口与 3 结构上限仍是资源规则。
 - pilot 覆盖 12 主集全部分子，但每态只有单一构象（GFN2 起点），不是方案 6 的多构象系综生产；几何来自 GFN2 而非 r2SCAN-3c。

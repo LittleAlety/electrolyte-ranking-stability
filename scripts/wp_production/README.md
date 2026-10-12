@@ -11,8 +11,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finali
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finalize_wp2.ps1 -Commit
 ```
 
-顺序：`anchors` → `emit-wp2` → `generator` → `provenance` → `state-identity` → `anchor-condition` → `sampling` → `li-motif-plan` → `ensemble` → `closure` → `compliance` → `cost` →
-`recheck-plan` → `figures` → `mirror` → `site` → `freeze` → `clean-room` → 十四个 `--check` → `pytest`。
+顺序：`anchors` → `emit-wp2` → `generator` → `provenance` → `state-identity` → `anchor-condition` → `sampling` → `li-motif-plan` → `ensemble` → `closure` → `cost` →
+`recheck-plan` → `compliance` → `figures` → `mirror` → `site` → `freeze` → `clean-room` → 十四个 `--check` → `pytest`。
+`cost` / `recheck-plan` 必须排在 `compliance` 之前（`build_plan_compliance.py` 直接读成本层与
+靶向复核的产物）；顺序反了会让 `check-compliance` 读到上一轮状态而报 `differs`。
 任一非零即 `ABORT`，不提交。
 
 ## 生产队列：查状态与断点续跑
@@ -29,8 +31,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finali
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\supervise_pending.ps1
 ```
 
-并发纪律：队列器只做调度，最多同时 2 个 worker 子进程，每个 worker 内 ORCA 用 4 核
-（`run_batch.ORCA_CORES`），即全机最多 8 个 ORCA 核。`--run` 在开跑前会检查是否已有别的
+并发纪律：队列器只做调度，最多同时 3 个 worker 子进程，每个 worker 内 ORCA 用 4 核
+（`run_batch.ORCA_CORES`），即全机最多 12 个 ORCA 核（本机 16 物理核）。`--run` 在开跑前会检查是否已有别的
 wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止叠加。检查时会排除队列自身进程与父进程，否则队列会把自己数成一个「已在跑的驱动」而永远自锁，使只有队列负责的 `M_tzvpd` 腿排不上。
 本地 `smpd`（Microsoft MPI）在开跑前、**每个作业开跑前**、以及长跑期间每
 `SMPD_RECHECK_POLLS`（15 次轮询，约 5 分钟）都复查一次：死掉就拉起；
@@ -38,7 +40,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 2026-10-10 的一次重启就是因为它中途死掉、而队列只在启动时查过一次，导致 5 条腿在
 0.2 秒内瞬败。
 
-`supervise_pending.ps1` 持单实例锁 `work/_supervisor.lock`（锁里 PID 仍存活则自己退出，陈旧则接管）：机器重启后只要再拉起一个监守即可继续，不会出现两个监守同时接管、把并发从 2 个 ORCA 叠成 4 个。
+`supervise_pending.ps1` 持单实例锁 `work/_supervisor.lock`（锁里 PID 仍存活则自己退出，陈旧则接管）：机器重启后只要再拉起一个监守即可继续，不会出现两个监守同时接管、把并发从 3 个 ORCA 叠成 6 个。
 无人值守的完整形状是**两个常驻看护 + 一个监守**：`watch_smpd.ps1` 兜住已在跑的旧驱动（smpd 死掉会级联秒败），`watch_supervisor.ps1` 接住监守 `exit 3` 的信号（否则闭环停在半路没人再拉起），监守自己负责跑队列并在结束后折入交付层。
 
 ## 各脚本职责
@@ -51,10 +53,14 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `run_batch.py` | 12 主集分子 × 4 主态的 xTB/ORCA 批量驱动与公共工具（几何、ORCA/xTB 路径、片段分析） |
 | `run_wp2_production.py` | 生产级 Opt+NumFreq 驱动（`M` / `M_plus` / `LiM_plus` / `LiM_2plus`） |
 | `run_wp2_extra.py` | 与带电腿**基组一致**的中性腿 `M_tzvpd`（def2-TZVPD）驱动 |
-| `run_wp2_queue.py` | 上面两条驱动的幂等队列器：20 条腿的统一调度、并发上限、断点续跑、逐次开跑与周期复查 smpd |
+| `run_wp2_queue.py` | 上面两条驱动的幂等队列器：**12 主集分子 × 5 腿 = 60 条腿**的统一调度（并发上限 3 worker × 4 核）、断点续跑、逐次开跑与周期复查 smpd；覆盖范围与 `data/metadata/physics_completion_set.csv` 的 `in_main=true` 集合由 `tests/test_wp2_queue_scope.py` 钉死，防止再次无声漂移（曾写死四分子，跑完 20/20 后队列永远 empty、生产静默停在 16/48） |
 | `run_to_closure.py` | 队列收尾：队列已停就把**已 computed 的腿**折进 production_ledger / 四分子闭环表 / 四分子标签 / week37-week44 镜像；未齐的腿在交付层留空并显式列出（不补数、不替换结构）——硬门禁会让某条反复失败的腿把交付层永远钉在旧数，那才是失败模式。`--check` 只报告，`--dry-run` 只打印，`--commit` 在 ALL GREEN 时提交（不 push），需要严格门禁时用 `--require-complete`。**折入前先跑关键 pair 第二泛函靶向复核**（`build_pair_recheck_plan.py` → `run_pair_recheck.py` → `emit_pair_recheck.py`）：腿一落地，`build_pair_recheck_plan.py` 的 ready 行就变多，不补跑复核则收口链的「结果表恰好覆盖 ready 行」验收失败、`-Commit` 不执行，交付层停在「腿算完了、还是旧数」；`--skip-recheck` 可跳过（一般不要用） |
 | `run_method_audit.py` | WP1 的 128 单点 / 32 弛豫腿本机方法审计驱动 |
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息（写 `work/_wp2_commit_msg.txt`） |
+| `prepare_hpc_main_remaining.py` | 把队列里 `missing` 的腿打成**超算任务包**（每态 `tasks/<name>/<state>/` + `job.inp` + `geom.xyz` + `inputs.sha256`，按 17+18 分批附 `batch_N.sbatch` / `batch_N.txt` / `manifest.json`）；只准备，不上传、不提交、不跑 ORCA；起点几何与输入逐条解析并记 sha256 | 队列 `inventory()` → `work/hpc_main_remaining_17_18/`（再由人工 `hpc put` 上传） |
+| `import_hpc_numfreq.py` | 超算 NumFreq 结果的**只读校验 + 非覆盖导入**：拒绝混用梯度（`Restart` 复用位移几何且最大位移 > 2e-6 Å 即拒收）、拒绝源 Opt 未收敛 / 源已有频率、核对 HPC 起始几何与本地部分腿逐原子一致、要求热化学完整且 `G = E + 热校正`；**虚频结果照样登记但写 `status=failed` / `qc_flag=imaginary_modes`（退出码仍为 0，判定必须读 status）**；写盘一律不覆盖内容不同的既有文件 | `work/hpc_results/<job>/…` + `work/wp2prod/<name>/<state>/` → `<NAME>_<STATE>.{json,log,_opt.xyz}` + `hpc_import/provenance.json` |
+| `import_hpc_opt_numfreq.py` | **自包含 HPC Opt+NumFreq 腿**（主集任务包 `hpc_main_remaining_17_18`、鞍点重优化 `hpc_dec_reopt_*`）的只读校验 + 非覆盖导入——续算导入器按构造拒收这类结果，因为它们的 Opt 与 NumFreq 都在集群上一次跑完：校验冻结输入语法与 `Opt TightOpt` 联合作业、输入逐行回显、`ORCA TERMINATED NORMALLY` + `THE OPTIMIZATION HAS CONVERGED`、**拒收频率重启**（`Restart: N calculations left` / `%freq Restart true` → 梯度可能复用位移几何）、起点几何与日志坐标块一致且 `job.xyz` 与末块一致（2e-6 Å）、频率恰为 3N 且有限、热化学完整且 `G = E + 热校正`；虚频记 `status=failed`/`qc_flag=imaginary_modes`；`inputs.sha256` 与包 `manifest.json` 的起点档位不符即拒收 | 包内 `tasks/<NAME>/<STATE>/run/{job.log,job.xyz,job.inp,geom.xyz}` → `work/wp2prod/<name>/<state>/<NAME>_<STATE>.{json,log,opt.xyz,inp}` + `hpc_import/provenance.json` |
+| `build_descriptor_analysis.py` | 方案 §7.3 描述符层（派生层，零新增计算）：只读冻结的样本元数据、氧化标签与廉价 ESP，对 donor type / chelation / flexibility / functionalization / 廉价 ESP 报**全部**检验（含不显著），Holm 与 BH 两种多重比较并列，TPSA 仅探索性；n=12 不拟合多参数机制模型 | 冻结产物 → `outputs/physics_completion/pair_evidence/descriptor_analysis.{csv,md}` |
 | `finalize_wp2.ps1` | 上面那条一键收口链 |
 | `supervise_pending.ps1` | 无人值守监守：单实例锁 + **每轮开跑前**都等其它驱动退出后调 `run_wp2_queue.py --run`，队列结束后再调 `run_to_closure.py --commit` 把结果折进交付层（折入会先补跑关键 pair 第二泛函靶向复核；失败时有界重试 3 次——20/20 之后看护按「还有腿没 computed」判据不再重启监守，不重试就会把交付层永久停在旧数）。轮次不是固定的：只要已 computed 的腿数在涨就继续下一轮，只有**连续 `-MaxStalledRounds`（默认 3）轮毫无进展**才停；结束时若仍有腿未 computed，日志写 `INCOMPLETE` 并返回 3（重新拉起即可继续）。旧版固定跑 3 轮就退出删锁，一轮里撞上 smpd 刚死的窗口就会让闭环静默停在半路 |
 | `supervisor_policy.py` | 上面那条收敛判据（纯函数，有单测）：`--computed-count` 按队列自己的 `inventory()` 口径数已 computed 的腿，`--decide` 判断该继续 / 完成 / 因停摆或轮数上限而停。把判据从 `.ps1` 的分支里拿出来，是为了它可被测试钉住——写错就会让闭环关不上 |

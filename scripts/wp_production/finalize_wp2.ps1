@@ -25,9 +25,14 @@ Step "li-motif-plan" { & $py -X utf8 scripts\wp_production\build_li_motif_sampli
 # ensemble 吃 sampling/ 与 li_motif_sampling/ 两个池，必须排在 closure 之前：closure 读它的筛选层配对台
 Step "ensemble"     { & $py -X utf8 scripts\wp_production\build_wp2_ensemble_free_energies.py }
 Step "closure"      { & $py -X utf8 scripts\wp_production\build_wp2_closure.py }
-Step "compliance"   { & $py -X utf8 scripts\wp_production\build_plan_compliance.py }
+# cost / recheck-plan 必须排在 compliance 之前：compliance 的 §11 条目直接读
+# cost_scenario_acceptance.csv + cost_scenario_index.json，§5.1 条目读 targeted_recheck 的
+# job_plan.csv / recheck_results.csv。顺序反了，compliance 读的是上一轮的成本/复核状态，
+# 同一轮里再跑 `--check` 就会因输入已变而报 differs —— 这正是 2026-10-11 四分子 20/20 时
+# 暴露的“收口链自相矛盾”（cost 步改写了 compliance 已经读过的文件）。
 Step "cost"         { & $py -X utf8 scripts\wp_production\build_wp2_cost_scenarios.py }
 Step "recheck-plan" { & $py -X utf8 scripts\wp_production\build_pair_recheck_plan.py }
+Step "compliance"   { & $py -X utf8 scripts\wp_production\build_plan_compliance.py }
 Step "figures"      { & $py -X utf8 scripts\wp_production\make_physics_completion_figures.py }
 Step "mirror"       { & $py -X utf8 scripts\wp_production\build_physics_completion_deliverables.py }
 Step "site"         { & $py -X utf8 scripts\build_terminal_site.py }

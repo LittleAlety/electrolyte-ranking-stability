@@ -918,7 +918,7 @@ WP2_PRODUCTION_LEDGER_CSV_FIELDS = [
     "entropy_corr_eh", "g_single_eh", "g_single_ev", "std_state_corr_eh", "std_state_corr_ev",
     "zpe_ev", "thermal_corr_ev", "qrrho", "temp_k", "pressure_atm", "cutoff_cm1",
     "lowest_freq_cm1", "n_freq", "imaginary_modes", "li_o_ang", "nonli_components",
-    "wall_sec", "cores", "status", "notes",
+    "wall_sec", "cores", "core_hours", "cost_status", "hpc_wall_sec", "hpc_core_hours", "status", "notes",
 ]
 
 
@@ -932,22 +932,30 @@ def _wp2_production_identity(state, li_o_ang):
 
 
 WP2_PRODUCTION_LEDGER = [
-    {"record_id": "C01|M", "mol_id": "C01", "name": "DMC", "state": "M", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVP", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVP SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/DMC/DMC_G2.xyz", "e_sp_eh": "-343.85476184", "electronic_eh": "-343.85476184", "zpe_eh": "0.09586398", "enthalpy_eh": "-343.75105104", "entropy_corr_eh": "-0.03850812", "e_to_g_thermal_eh": "0.06520269", "g_single_eh": "-343.78955915", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "116.03", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "4856.6", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY line.", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVP", "e_sp_solution_ev": "-9356.764736950", "g_single_ev": "-9354.990481369", "zpe_ev": "2.608591787", "thermal_corr_ev": "1.774255582", "std_state_corr_ev": "0.082148454", "core_hours": "5.396222"},
-    {"record_id": "C01|M_plus", "mol_id": "C01", "name": "DMC", "state": "M_plus", "charge": "1", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/DMC/DMC_G2_cation.xyz", "e_sp_eh": "-343.54453019", "electronic_eh": "-343.54453019", "zpe_eh": "0.09014966", "enthalpy_eh": "-343.44601367", "entropy_corr_eh": "-0.04015030", "e_to_g_thermal_eh": "0.05836622", "g_single_eh": "-343.48616397", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "70.26", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "10616.6", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-9348.322903697", "g_single_ev": "-9346.734677940", "zpe_ev": "2.453097218", "thermal_corr_ev": "1.588225756", "std_state_corr_ev": "0.082148454", "core_hours": "11.796222"},
-    {"record_id": "C01|LiM_plus", "mol_id": "C01", "name": "DMC", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "e_sp_eh": "-351.31132724", "electronic_eh": "-351.31132724", "zpe_eh": "0.09794269", "enthalpy_eh": "-351.20396015", "entropy_corr_eh": "-0.04200699", "e_to_g_thermal_eh": "0.06536011", "g_single_eh": "-351.24596714", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "74.82", "n_freq": "39", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "8797.9", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "1.821", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-9559.668218118", "g_single_ev": "-9557.889679192", "zpe_ev": "2.665156368", "thermal_corr_ev": "1.778539198", "std_state_corr_ev": "0.082148454", "core_hours": "9.775444"},
-    {"record_id": "C01|LiM_2plus", "mol_id": "C01", "name": "DMC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "e_sp_eh": "-350.97956074", "electronic_eh": "-350.97956074", "zpe_eh": "0.09183248", "enthalpy_eh": "-350.87802536", "entropy_corr_eh": "-0.04308646", "e_to_g_thermal_eh": "0.05844892", "g_single_eh": "-350.92111182", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "96.62", "n_freq": "39", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "10733.8", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "1.927", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-9550.640391743", "g_single_ev": "-9549.049915606", "zpe_ev": "2.498889083", "thermal_corr_ev": "1.590476138", "std_state_corr_ev": "0.082148454", "core_hours": "11.926444"},
-    {"record_id": "C02|M", "mol_id": "C02", "name": "EMC", "state": "M", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVP", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVP SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/EMC/EMC_G2.xyz", "e_sp_eh": "-383.21194726", "electronic_eh": "-383.21194726", "zpe_eh": "0.12437320", "enthalpy_eh": "-383.07853290", "entropy_corr_eh": "-0.04136067", "e_to_g_thermal_eh": "0.09205369", "g_single_eh": "-383.11989357", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "77.89", "n_freq": "45", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "6035.4", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY line.", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVP", "e_sp_solution_ev": "-10427.728310969", "g_single_ev": "-10425.223402455", "zpe_ev": "3.384367184", "thermal_corr_ev": "2.504908514", "std_state_corr_ev": "0.082148454", "core_hours": "6.706000"},
-    {"record_id": "C02|M_plus", "mol_id": "C02", "name": "EMC", "state": "M_plus", "charge": "1", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/EMC/EMC_G2_cation.xyz", "e_sp_eh": "-382.91291033", "electronic_eh": "-382.91291033", "zpe_eh": "0.12293835", "enthalpy_eh": "-382.78052045", "entropy_corr_eh": "-0.04281961", "e_to_g_thermal_eh": "0.08957027", "g_single_eh": "-382.82334006", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "62.29", "n_freq": "45", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "15836.9", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; the recorded e_sp_eh is the final Opt energy", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-10419.591101565", "g_single_ev": "-10417.153770352", "zpe_ev": "3.345322926", "thermal_corr_ev": "2.437331213", "std_state_corr_ev": "0.082148454", "core_hours": "17.596556"},
-    {"record_id": "C13|M", "mol_id": "C13", "name": "GBL", "state": "M", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVP", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVP SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/GBL/GBL_G2.xyz", "e_sp_eh": "-306.73708477", "electronic_eh": "-306.73708477", "zpe_eh": "0.09943860", "enthalpy_eh": "-306.63160526", "entropy_corr_eh": "-0.03461257", "e_to_g_thermal_eh": "0.07086694", "g_single_eh": "-306.66621783", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "150.06", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "3935.5", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY line.", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVP", "e_sp_solution_ev": "-8346.741289645", "g_single_ev": "-8344.812901968", "zpe_ev": "2.705862152", "thermal_corr_ev": "1.928387676", "std_state_corr_ev": "0.082148454", "core_hours": "4.372778"},
-    {"record_id": "C13|M_plus", "mol_id": "C13", "name": "GBL", "state": "M_plus", "charge": "1", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/GBL/GBL_G2_cation.xyz", "e_sp_eh": "-306.45395804", "electronic_eh": "-306.45395804", "zpe_eh": "0.09748803", "enthalpy_eh": "-306.35023859", "entropy_corr_eh": "-0.03548273", "e_to_g_thermal_eh": "0.06823672", "g_single_eh": "-306.38572132", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "164.90", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "10481.3", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY line.", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-8339.037018838", "g_single_ev": "-8337.180203094", "zpe_ev": "2.652784439", "thermal_corr_ev": "1.856815744", "std_state_corr_ev": "0.082148454", "core_hours": "11.645889"},
-    {"record_id": "C13|LiM_plus", "mol_id": "C13", "name": "GBL", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week5/c1/GBL/GBL_m1_G2Li.xyz", "e_sp_eh": "-314.19479755", "electronic_eh": "-314.19479755", "zpe_eh": "0.10103541", "enthalpy_eh": "-314.08591066", "entropy_corr_eh": "-0.03867035", "e_to_g_thermal_eh": "0.07021655", "g_single_eh": "-314.12458100", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "53.58", "n_freq": "39", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "7784.6", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "1.833", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-8549.675992613", "g_single_ev": "-8547.765302950", "zpe_ev": "2.749313566", "thermal_corr_ev": "1.910689663", "std_state_corr_ev": "0.082148454", "core_hours": "8.649556"},
-    {"record_id": "C14|M", "mol_id": "C14", "name": "SL", "state": "M", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVP", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVP SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/SL/SL_G2.xyz", "e_sp_eh": "-706.15322084", "electronic_eh": "-706.15322084", "zpe_eh": "0.12428876", "enthalpy_eh": "-706.02140690", "entropy_corr_eh": "-0.03823048", "e_to_g_thermal_eh": "0.09358347", "g_single_eh": "-706.05963738", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "37.15", "n_freq": "45", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "7409.8", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY line.", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVP", "e_sp_solution_ev": "-19215.408041126", "g_single_ev": "-19212.861505449", "zpe_ev": "3.382069454", "thermal_corr_ev": "2.546535948", "std_state_corr_ev": "0.082148454", "core_hours": "8.233111"},
-    {"record_id": "C14|M_plus", "mol_id": "C14", "name": "SL", "state": "M_plus", "charge": "1", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/SL/SL_G2_cation.xyz", "e_sp_eh": "-705.86571853", "electronic_eh": "-705.86571853", "zpe_eh": "0.12059954", "enthalpy_eh": "-705.73675361", "entropy_corr_eh": "-0.04034827", "e_to_g_thermal_eh": "0.08861666", "g_single_eh": "-705.77710188", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "68.25", "n_freq": "45", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "16565.6", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-19207.584704722", "g_single_ev": "-19205.173322831", "zpe_ev": "3.281680664", "thermal_corr_ev": "2.411382163", "std_state_corr_ev": "0.082148454", "core_hours": "18.406222"},
-    {"record_id": "C14|LiM_plus", "mol_id": "C14", "name": "SL", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week5/c1/SL/SL_m1_G2Li.xyz", "e_sp_eh": "-713.61011552", "electronic_eh": "-713.61011552", "zpe_eh": "0.12575882", "enthalpy_eh": "-713.47517483", "entropy_corr_eh": "-0.04178719", "e_to_g_thermal_eh": "0.09315350", "g_single_eh": "-713.51696202", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "24.01", "n_freq": "48", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "13818.8", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "2.053", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-19418.320482459", "g_single_ev": "-19415.785646590", "zpe_ev": "3.422071825", "thermal_corr_ev": "2.534835869", "std_state_corr_ev": "0.082148454", "core_hours": "15.354222"},
-    {"record_id": "C13|M_tzvpd", "mol_id": "C13", "name": "GBL", "state": "M_tzvpd", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/GBL/GBL_G2.xyz", "e_sp_eh": "-306.73892277", "electronic_eh": "-306.73892277", "zpe_eh": "0.09936051", "enthalpy_eh": "-306.63350971", "entropy_corr_eh": "-0.03463989", "e_to_g_thermal_eh": "0.07077317", "g_single_eh": "-306.66814960", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "146.18", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "6173.7", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-8346.791304173", "g_single_ev": "-8344.865468108", "zpe_ev": "2.703737215", "thermal_corr_ev": "1.925836065", "std_state_corr_ev": "0.082148454", "core_hours": "6.859667"},
+    {"record_id": "C01|M", "mol_id": "C01", "name": "DMC", "state": "M", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVP", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVP SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/DMC/DMC_G2.xyz", "e_sp_eh": "-343.85476184", "electronic_eh": "-343.85476184", "zpe_eh": "0.09586398", "enthalpy_eh": "-343.75105104", "entropy_corr_eh": "-0.03850812", "e_to_g_thermal_eh": "0.06520269", "g_single_eh": "-343.78955915", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "116.03", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "4856.6", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY line.", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVP", "e_sp_solution_ev": "-9356.764736950", "g_single_ev": "-9354.990481369", "zpe_ev": "2.608591787", "thermal_corr_ev": "1.774255582", "std_state_corr_ev": "0.082148454", "core_hours": "5.396222", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C01|M_plus", "mol_id": "C01", "name": "DMC", "state": "M_plus", "charge": "1", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/DMC/DMC_G2_cation.xyz", "e_sp_eh": "-343.54453019", "electronic_eh": "-343.54453019", "zpe_eh": "0.09014966", "enthalpy_eh": "-343.44601367", "entropy_corr_eh": "-0.04015030", "e_to_g_thermal_eh": "0.05836622", "g_single_eh": "-343.48616397", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "70.26", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "10616.6", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-9348.322903697", "g_single_ev": "-9346.734677940", "zpe_ev": "2.453097218", "thermal_corr_ev": "1.588225756", "std_state_corr_ev": "0.082148454", "core_hours": "11.796222", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C01|LiM_plus", "mol_id": "C01", "name": "DMC", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "e_sp_eh": "-351.31132724", "electronic_eh": "-351.31132724", "zpe_eh": "0.09794269", "enthalpy_eh": "-351.20396015", "entropy_corr_eh": "-0.04200699", "e_to_g_thermal_eh": "0.06536011", "g_single_eh": "-351.24596714", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "74.82", "n_freq": "39", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "8797.9", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "1.821", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-9559.668218118", "g_single_ev": "-9557.889679192", "zpe_ev": "2.665156368", "thermal_corr_ev": "1.778539198", "std_state_corr_ev": "0.082148454", "core_hours": "9.775444", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C01|LiM_2plus", "mol_id": "C01", "name": "DMC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week5/c1/DMC/DMC_m1_G2Li.xyz", "e_sp_eh": "-350.97956074", "electronic_eh": "-350.97956074", "zpe_eh": "0.09183248", "enthalpy_eh": "-350.87802536", "entropy_corr_eh": "-0.04308646", "e_to_g_thermal_eh": "0.05844892", "g_single_eh": "-350.92111182", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "96.62", "n_freq": "39", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "10733.8", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "1.927", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-9550.640391743", "g_single_ev": "-9549.049915606", "zpe_ev": "2.498889083", "thermal_corr_ev": "1.590476138", "std_state_corr_ev": "0.082148454", "core_hours": "11.926444", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C02|M", "mol_id": "C02", "name": "EMC", "state": "M", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVP", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVP SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/EMC/EMC_G2.xyz", "e_sp_eh": "-383.21194726", "electronic_eh": "-383.21194726", "zpe_eh": "0.12437320", "enthalpy_eh": "-383.07853290", "entropy_corr_eh": "-0.04136067", "e_to_g_thermal_eh": "0.09205369", "g_single_eh": "-383.11989357", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "77.89", "n_freq": "45", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "6035.4", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY line.", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVP", "e_sp_solution_ev": "-10427.728310969", "g_single_ev": "-10425.223402455", "zpe_ev": "3.384367184", "thermal_corr_ev": "2.504908514", "std_state_corr_ev": "0.082148454", "core_hours": "6.706000", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C02|M_plus", "mol_id": "C02", "name": "EMC", "state": "M_plus", "charge": "1", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/EMC/EMC_G2_cation.xyz", "e_sp_eh": "-382.91291033", "electronic_eh": "-382.91291033", "zpe_eh": "0.12293835", "enthalpy_eh": "-382.78052045", "entropy_corr_eh": "-0.04281961", "e_to_g_thermal_eh": "0.08957027", "g_single_eh": "-382.82334006", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "62.29", "n_freq": "45", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "15836.9", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; the recorded e_sp_eh is the final Opt energy", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-10419.591101565", "g_single_ev": "-10417.153770352", "zpe_ev": "3.345322926", "thermal_corr_ev": "2.437331213", "std_state_corr_ev": "0.082148454", "core_hours": "17.596556", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C02|LiM_plus", "mol_id": "C02", "name": "EMC", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "work/audit/EMC_Li/EMC_m1_G2Li.xyz", "e_sp_eh": "-390.66882506", "electronic_eh": "-390.66882506", "zpe_eh": "0.12631344", "enthalpy_eh": "-390.53187239", "entropy_corr_eh": "-0.04481787", "e_to_g_thermal_eh": "0.09213480", "g_single_eh": "-390.57669025", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "71.30", "n_freq": "48", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "9993.6", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "1.816", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-10630.640292974", "g_single_ev": "-10628.133177072", "zpe_ev": "3.437163804", "thermal_corr_ev": "2.507115629", "std_state_corr_ev": "0.082148454", "core_hours": "11.104000", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C02|LiM_2plus", "mol_id": "C02", "name": "EMC", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "work/audit/EMC_Li/EMC_m1_G2Li.xyz", "e_sp_eh": "-390.35140013", "electronic_eh": "-390.35140013", "zpe_eh": "0.12244595", "enthalpy_eh": "-390.21767885", "entropy_corr_eh": "-0.04657836", "e_to_g_thermal_eh": "0.08714292", "g_single_eh": "-390.26425721", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "60.85", "n_freq": "48", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "11485.7", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "1.901", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-10622.002720600", "g_single_ev": "-10619.631440945", "zpe_ev": "3.331924040", "thermal_corr_ev": "2.371279655", "std_state_corr_ev": "0.082148454", "core_hours": "12.761889", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C13|M", "mol_id": "C13", "name": "GBL", "state": "M", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVP", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVP SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/GBL/GBL_G2.xyz", "e_sp_eh": "-306.73708477", "electronic_eh": "-306.73708477", "zpe_eh": "0.09943860", "enthalpy_eh": "-306.63160526", "entropy_corr_eh": "-0.03461257", "e_to_g_thermal_eh": "0.07086694", "g_single_eh": "-306.66621783", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "150.06", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "3935.5", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY line.", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVP", "e_sp_solution_ev": "-8346.741289645", "g_single_ev": "-8344.812901968", "zpe_ev": "2.705862152", "thermal_corr_ev": "1.928387676", "std_state_corr_ev": "0.082148454", "core_hours": "4.372778", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C13|M_plus", "mol_id": "C13", "name": "GBL", "state": "M_plus", "charge": "1", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/GBL/GBL_G2_cation.xyz", "e_sp_eh": "-306.45395804", "electronic_eh": "-306.45395804", "zpe_eh": "0.09748803", "enthalpy_eh": "-306.35023859", "entropy_corr_eh": "-0.03548273", "e_to_g_thermal_eh": "0.06823672", "g_single_eh": "-306.38572132", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "164.90", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "10481.3", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY line.", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-8339.037018838", "g_single_ev": "-8337.180203094", "zpe_ev": "2.652784439", "thermal_corr_ev": "1.856815744", "std_state_corr_ev": "0.082148454", "core_hours": "11.645889", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C13|LiM_plus", "mol_id": "C13", "name": "GBL", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week5/c1/GBL/GBL_m1_G2Li.xyz", "e_sp_eh": "-314.19479755", "electronic_eh": "-314.19479755", "zpe_eh": "0.10103541", "enthalpy_eh": "-314.08591066", "entropy_corr_eh": "-0.03867035", "e_to_g_thermal_eh": "0.07021655", "g_single_eh": "-314.12458100", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "53.58", "n_freq": "39", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "7784.6", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "1.833", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-8549.675992613", "g_single_ev": "-8547.765302950", "zpe_ev": "2.749313566", "thermal_corr_ev": "1.910689663", "std_state_corr_ev": "0.082148454", "core_hours": "8.649556", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C13|LiM_2plus", "mol_id": "C13", "name": "GBL", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "work/wp2prod/_reopt/GBL_LiM_2plus_perturbed_s+1_a0.20.xyz", "e_sp_eh": "-313.87748657", "electronic_eh": "-313.87748657", "zpe_eh": "0.09341143", "enthalpy_eh": "-313.77567175", "entropy_corr_eh": "-0.04047418", "e_to_g_thermal_eh": "0.06134063", "g_single_eh": "-313.81614594", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "27.85", "n_freq": "39", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "6864.4", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "1.923", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-8541.041520976", "g_single_ev": "-8539.372357401", "zpe_ev": "2.541854502", "thermal_corr_ev": "1.669163576", "std_state_corr_ev": "0.082148454", "core_hours": "7.627111", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C14|M", "mol_id": "C14", "name": "SL", "state": "M", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVP", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVP SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/SL/SL_G2.xyz", "e_sp_eh": "-706.15322084", "electronic_eh": "-706.15322084", "zpe_eh": "0.12428876", "enthalpy_eh": "-706.02140690", "entropy_corr_eh": "-0.03823048", "e_to_g_thermal_eh": "0.09358347", "g_single_eh": "-706.05963738", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "37.15", "n_freq": "45", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "7409.8", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY line.", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVP", "e_sp_solution_ev": "-19215.408041126", "g_single_ev": "-19212.861505449", "zpe_ev": "3.382069454", "thermal_corr_ev": "2.546535948", "std_state_corr_ev": "0.082148454", "core_hours": "8.233111", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C14|M_plus", "mol_id": "C14", "name": "SL", "state": "M_plus", "charge": "1", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/SL/SL_G2_cation.xyz", "e_sp_eh": "-705.86571853", "electronic_eh": "-705.86571853", "zpe_eh": "0.12059954", "enthalpy_eh": "-705.73675361", "entropy_corr_eh": "-0.04034827", "e_to_g_thermal_eh": "0.08861666", "g_single_eh": "-705.77710188", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "68.25", "n_freq": "45", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "16565.6", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-19207.584704722", "g_single_ev": "-19205.173322831", "zpe_ev": "3.281680664", "thermal_corr_ev": "2.411382163", "std_state_corr_ev": "0.082148454", "core_hours": "18.406222", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C14|LiM_plus", "mol_id": "C14", "name": "SL", "state": "LiM_plus", "charge": "1", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week5/c1/SL/SL_m1_G2Li.xyz", "e_sp_eh": "-713.61011552", "electronic_eh": "-713.61011552", "zpe_eh": "0.12575882", "enthalpy_eh": "-713.47517483", "entropy_corr_eh": "-0.04178719", "e_to_g_thermal_eh": "0.09315350", "g_single_eh": "-713.51696202", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "24.01", "n_freq": "48", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "13818.8", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "2.053", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-19418.320482459", "g_single_ev": "-19415.785646590", "zpe_ev": "3.422071825", "thermal_corr_ev": "2.534835869", "std_state_corr_ev": "0.082148454", "core_hours": "15.354222", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C14|LiM_2plus", "mol_id": "C14", "name": "SL", "state": "LiM_2plus", "charge": "2", "multiplicity": "2", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "work/wp2prod/_reopt/SL_LiM_2plus_perturbed_s+1_a0.20.xyz", "e_sp_eh": "-713.29821312", "electronic_eh": "-713.29821312", "zpe_eh": "0.12173522", "enthalpy_eh": "-713.16626908", "entropy_corr_eh": "-0.04437881", "e_to_g_thermal_eh": "0.08756523", "g_single_eh": "-713.21064789", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "59.64", "n_freq": "48", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "13626.0", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "2.439", "nonli_components": "1", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-19409.833185781", "g_single_ev": "-19407.450414486", "zpe_ev": "3.312584091", "thermal_corr_ev": "2.382771295", "std_state_corr_ev": "0.082148454", "core_hours": "15.140000", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C01|M_tzvpd", "mol_id": "C01", "name": "DMC", "state": "M_tzvpd", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/DMC/DMC_G2.xyz", "e_sp_eh": "-343.85676276", "electronic_eh": "-343.85676276", "zpe_eh": "0.09574938", "enthalpy_eh": "-343.75313330", "entropy_corr_eh": "-0.03859191", "e_to_g_thermal_eh": "0.06503754", "g_single_eh": "-343.79172521", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "112.57", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "3325.4", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-9356.819184757", "g_single_ev": "-9355.049422864", "zpe_ev": "2.605473362", "thermal_corr_ev": "1.769761621", "std_state_corr_ev": "0.082148454", "core_hours": "3.694889", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C02|M_tzvpd", "mol_id": "C02", "name": "EMC", "state": "M_tzvpd", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/EMC/EMC_G2.xyz", "e_sp_eh": "-383.21392811", "electronic_eh": "-383.21392811", "zpe_eh": "0.12425294", "enthalpy_eh": "-383.08059930", "entropy_corr_eh": "-0.04144685", "e_to_g_thermal_eh": "0.09188196", "g_single_eh": "-383.12204615", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "75.46", "n_freq": "45", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "6075.8", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-10427.782212643", "g_single_ev": "-10425.281977141", "zpe_ev": "3.381094743", "thermal_corr_ev": "2.500235503", "std_state_corr_ev": "0.082148454", "core_hours": "6.750889", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C13|M_tzvpd", "mol_id": "C13", "name": "GBL", "state": "M_tzvpd", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/GBL/GBL_G2.xyz", "e_sp_eh": "-306.73892277", "electronic_eh": "-306.73892277", "zpe_eh": "0.09936051", "enthalpy_eh": "-306.63350971", "entropy_corr_eh": "-0.03463989", "e_to_g_thermal_eh": "0.07077317", "g_single_eh": "-306.66814960", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "146.18", "n_freq": "36", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "6173.7", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-8346.791304173", "g_single_ev": "-8344.865468108", "zpe_ev": "2.703737215", "thermal_corr_ev": "1.925836065", "std_state_corr_ev": "0.082148454", "core_hours": "6.859667", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
+    {"record_id": "C14|M_tzvpd", "mol_id": "C14", "name": "SL", "state": "M_tzvpd", "charge": "0", "multiplicity": "1", "method": "wB97X-D4 def2-TZVPD", "solvent": "SMD_acetonitrile", "level": "wB97X-D4 def2-TZVPD SMD(acetonitrile) Opt NumFreq (qRRHO=True)", "geometry_start": "outputs/week4/t2_opt_freq/SL/SL_G2.xyz", "e_sp_eh": "-706.15622236", "electronic_eh": "-706.15622236", "zpe_eh": "0.12414130", "enthalpy_eh": "-706.02452747", "entropy_corr_eh": "-0.03834863", "e_to_g_thermal_eh": "0.09334627", "g_single_eh": "-706.06287609", "std_state_corr_eh": "0.00301890", "qrrho": "True", "temp_k": "298.15", "pressure_atm": "1.00", "cutoff_cm1": "1.00", "lowest_freq_cm1": "29.85", "n_freq": "45", "imaginary_modes": "0", "opt_converged": "true", "terminated": "true", "wall_sec": "7557.4", "cores": "4", "job_kind": "opt_numfreq", "notes": "Opt and NumFreq run in one ORCA job; e_sp_eh is the ORCA thermochemistry Electronic energy at the converged geometry (same geometry as G-E(el)), not the first FINAL SINGLE POINT ENERGY printed for the start geometry", "qc_flag": "", "li_o_ang": "", "nonli_components": "", "status": "computed", "basis": "def2-TZVPD", "e_sp_solution_ev": "-19215.489716646", "g_single_ev": "-19212.949635238", "zpe_ev": "3.378056863", "thermal_corr_ev": "2.540081408", "std_state_corr_ev": "0.082148454", "core_hours": "8.397111", "cost_status": "complete", "hpc_wall_sec": "", "hpc_core_hours": ""},
 ]
 
-WP2_PRODUCTION_CORE_HOURS = sum(float(row["core_hours"]) for row in WP2_PRODUCTION_LEDGER)
+WP2_PRODUCTION_CORE_HOURS = sum(float(row["core_hours"]) for row in WP2_PRODUCTION_LEDGER if row.get("core_hours"))
+WP2_PRODUCTION_COST_UNKNOWN = sum(not row.get("core_hours") or row.get("cost_status") == "incomplete" for row in WP2_PRODUCTION_LEDGER)
 WP2_PRODUCTION_STATES_DONE = len([row for row in WP2_PRODUCTION_LEDGER
                                    if row["state"] in WP2_PRODUCTION_STATES])
 WP2_PRODUCTION_STATES_TOTAL = len(WP2_PRODUCTION_MOLECULES) * len(WP2_PRODUCTION_STATES)
@@ -2082,6 +2090,48 @@ ENSEMBLE_RULES = [
 ]
 
 
+def _pilot_cost_evidence(cost_row):
+    """Recover only provenance fields supported by surviving pilot files.
+
+    The pilot runner overwrote a fixed log name and kept no attempt journal, so
+    retry count is not inferable from one final log. Peak memory was never
+    sampled. Both are explicit sentinels rather than guessed zeroes.
+    """
+    mol_id = cost_row["mol_id"]
+    state_token = cost_row["job_id"].split("|")[1]
+    phase = cost_row["phase"]
+    if phase == "xtb_opt":
+        raw = REPO / "work" / "pilot12" / mol_id / ("xtb_" + state_token) / "xtb.log"
+    elif phase == "orca_sp":
+        directory = REPO / "work" / "pilot12" / mol_id / ("sp_%s_%s" % (mol_id, state_token))
+        matches = sorted(directory.glob("*.log")) if directory.is_dir() else []
+        raw = matches[0] if matches else directory / ("%s_%s.log" % (cost_row["molecule"], state_token))
+    elif phase == "orca_freq" and mol_id == "C01" and state_token == "M":
+        raw = REPO / "outputs" / "week4" / "t2_opt_freq" / "DMC" / "DMC_optfreq.out"
+    else:
+        raw = REPO / "work" / "pilot12" / mol_id / ("unresolved_" + phase + "_" + state_token)
+    try:
+        raw_rel = raw.relative_to(REPO).as_posix()
+    except ValueError:
+        raw_rel = "UNVERIFIABLE"
+    if raw.is_file():
+        digest = hashlib.sha256(raw.read_bytes()).hexdigest()
+        raw_status = "verified_on_disk"
+    else:
+        digest = ""
+        raw_status = "unverifiable"
+    return {
+        "memory": "MISSING",
+        "retry": "UNVERIFIABLE",
+        "conformer": "rdkit-etkdg-mmff-seed-12648430:representative-1",
+        "raw_output": raw_rel,
+        "raw_output_sha256": digest,
+        "raw_output_status": raw_status,
+        "evidence_note": ("peak memory was not recorded; the overwrite-in-place runner retained no "
+                          "attempt journal, so retry count is not recoverable from the final log"),
+    }
+
+
 def wp2():
     files = {}
     local = {}
@@ -2145,13 +2195,17 @@ def wp2():
 
     production_cost = []
     production_core_hours = 0.0
+    production_cost_unknown = WP2_PRODUCTION_COST_UNKNOWN
     for prod in all_production:
-        production_core_hours += float(prod["core_hours"])
+        if prod.get("core_hours"):
+            production_core_hours += float(prod["core_hours"])
         production_cost.append({
             "job_id": "%s|%s|opt_numfreq" % (prod["mol_id"], prod["state"]),
             "mol_id": prod["mol_id"], "name": prod["name"], "state": prod["state"],
             "phase": "opt_numfreq", "level": prod["level"], "cores": prod["cores"],
             "wall_sec": prod["wall_sec"], "core_hours": prod["core_hours"],
+            "cost_status": prod["cost_status"], "hpc_wall_sec": prod["hpc_wall_sec"],
+            "hpc_core_hours": prod["hpc_core_hours"],
             "status": prod["status"],
         })
 
@@ -2289,12 +2343,15 @@ def wp2():
     pilot_cost = []
     for cost_row in PILOT_COST_JOBS:
         core_hours = float(cost_row["wall_sec"]) * float(cost_row["cores"]) / 3600.0
-        pilot_cost.append({
+        evidence = _pilot_cost_evidence(cost_row)
+        item = {
             "job_id": cost_row["job_id"], "mol_id": cost_row["mol_id"], "molecule": cost_row["molecule"],
             "state": cost_row["state"], "phase": cost_row["phase"], "method": cost_row["method"],
             "cores": cost_row["cores"], "wall_sec": cost_row["wall_sec"],
             "core_hours": "%.6f" % core_hours, "status": cost_row["status"],
-        })
+        }
+        item.update(evidence)
+        pilot_cost.append(item)
     pilot_orca_jobs = sum(1 for r in PILOT_COST_JOBS if r["phase"].startswith("orca"))
     pilot_xtb_jobs = sum(1 for r in PILOT_COST_JOBS if r["phase"].startswith("xtb"))
     pilot_core_hours = sum(float(r["core_hours"]) for r in pilot_cost)
@@ -2364,6 +2421,15 @@ def wp2():
         {"id": "pilot_cost_ledger_records_core_hours", "description": "pilot 成本账本逐作业记录 allocated core-hours",
          "ok": bool(pilot_cost) and all(float(r["core_hours"]) > 0 for r in pilot_cost),
          "detail": "jobs=%d; total=%.6f core-hours" % (len(pilot_cost), pilot_core_hours)},
+        {"id": "pilot_cost_ledger_records_verifiable_provenance",
+         "description": "pilot 成本账本逐作业登记构象、原始输出证据；缺失 memory/retry 不猜零",
+         "ok": (bool(pilot_cost)
+                and all(r["conformer"] and r["raw_output"] for r in pilot_cost)
+                and all(r["memory"] == "MISSING" for r in pilot_cost)
+                and all(r["retry"] == "UNVERIFIABLE" for r in pilot_cost)),
+         "detail": "raw verified=%d/%d; memory=MISSING; retry=UNVERIFIABLE" % (
+             sum(1 for r in pilot_cost if r["raw_output_status"] == "verified_on_disk"),
+             len(pilot_cost))},
         {"id": "pilot_li_states_converged_and_intact", "description": "Li 两态收敛、分子骨架完整；LiM_plus 全部成键，2+ 态解离单独标注",
          "ok": len(PILOT_LI_STATE_ENERGIES) == 2 * len(PILOT_MAIN_MOLECULES)
                and all(r["terminated"] == "true" and r["nonli_components"] == "1"
@@ -2453,8 +2519,8 @@ def wp2():
                       sum(1 for r in production if r["identity_label"] == "bound"))},
         {"id": "wp2_production_cost_records_allocated_core_hours",
          "description": "生产作业逐条记录 allocated core-hours（cores x wall clock）",
-         "ok": len(production_cost) == len(all_production) and production_core_hours > 0.0,
-         "detail": "jobs=%d; total=%.6f core-hours" % (len(production_cost), production_core_hours)},
+         "ok": len(production_cost) == len(all_production) and production_core_hours > 0.0 and production_cost_unknown == 0,
+         "detail": "jobs=%d; known_subtotal=%.6f core-hours; unknown_jobs=%d" % (len(production_cost), production_core_hours, production_cost_unknown)},
         {"id": "wp2_production_redox_uses_basis_consistent_legs",
          "description": "自由腿与 Li 腿分开登记：自由腿 Gox_single 要 def2-TZVPD 中性腿 + def2-TZVPD 阳离子，Li 腿另要两个 Li 态；未齐的腿留空，两腿齐才标 computed",
          "ok": (len(production_extra) > 0
@@ -2531,7 +2597,10 @@ def wp2():
             "redox": production_redox,
             "cost_jobs": production_cost,
             "totals": {"orca_jobs": len(all_production),
-                       "core_hours": "%.6f" % production_core_hours},
+                       "core_hours": "%.6f" % production_core_hours if not production_cost_unknown else "",
+                       "known_subtotal_core_hours": "%.6f" % production_core_hours,
+                       "unknown_cost_jobs": production_cost_unknown,
+                       "cost_status": "incomplete" if production_cost_unknown else "complete"},
             "raw_outputs": "kept outside the repository (work/wp2prod, not mirrored)",
         },
         "counts": {"ledger_rows": len(ledger), "production_rows": len(production),
@@ -2564,7 +2633,7 @@ def wp2():
         production_redox)
     local["outputs/physics_completion/cost/production_cost_ledger.csv"] = csv_text(
         ["job_id", "mol_id", "name", "state", "phase", "level", "cores", "wall_sec",
-         "core_hours", "status"], production_cost)
+         "core_hours", "cost_status", "hpc_wall_sec", "hpc_core_hours", "status"], production_cost)
     local["outputs/physics_completion/free_states/sampling_plan.csv"] = csv_text(
         ["mol_id", "name", "state", "structures_round1", "structures_round2_max", "status",
          "escalation_rule"], sampling)
@@ -2600,7 +2669,8 @@ def wp2():
          "frozen_c1_d_ip_smd_ev", "note"], pilot_coord_shift)
     local["outputs/physics_completion/cost/pilot_cost_ledger.csv"] = csv_text(
         ["job_id", "mol_id", "molecule", "state", "phase", "method", "cores", "wall_sec",
-         "core_hours", "status"], pilot_cost)
+         "core_hours", "status", "memory", "retry", "conformer", "raw_output",
+         "raw_output_sha256", "raw_output_status", "evidence_note"], pilot_cost)
 
     summary = [
         "# Week 39 / WP2 — 固定背景配对自由能标签",
@@ -2701,8 +2771,8 @@ def wp2():
                           prod["identity_label"]))
     summary += [
         "",
-        "成本：%d 个 Opt+Freq 作业，合计 %.6f core-hours（allocated cores x wall clock）。"
-        % (len(production_cost), production_core_hours),
+        "成本：%d 个 Opt+Freq 作业，已知小计 %.6f core-hours；%d 个作业总成本未知（非零成本，非完整总计）。"
+        % (len(production_cost), production_core_hours, production_cost_unknown),
         "",
         "基组一致（同为 def2-TZVPD）的自由腿 Gox_single 与 Li 腿配位位移（两条腿分开登记）：",
         "",
@@ -2718,7 +2788,7 @@ def wp2():
     summary += [
         "",
         "## 限制",
-        "- 生产模板只回填已跑完的主态（本次 12/16）：中性腿 def2-TZVP、带电/Li 腿 def2-TZVPD，两腿相减不是基组一致的自由分子 IP，本报告不据此计算 Eox；其余行热校正保持为空（未把缺值写成 0）。",
+        "- 生产模板只回填已跑完的主态（本次 16/16）：中性腿 def2-TZVP、带电/Li 腿 def2-TZVPD，两腿相减不是基组一致的自由分子 IP，本报告不据此计算 Eox；其余行热校正保持为空（未把缺值写成 0）。",
         "- Gox_single 与配位位移在 production_redox.csv 单列，只用两腿同为 def2-TZVPD 的差值。",
         "- 生产首段每态只有**单一代表结构**（n_conformers = 1），不是方案 6.1 的多构象/多 motif 系综；6 kcal/mol 窗口与 3 结构上限仍是资源规则。",
         "- pilot 覆盖 12 主集全部分子，但每态只有单一构象（GFN2 起点），不是方案 6 的多构象系综生产；几何来自 GFN2 而非 r2SCAN-3c。",
@@ -2739,7 +2809,9 @@ def wp2():
                  "free_state_production_states": len(production),
                  "free_state_production_states_total": production_progress["states_total"],
                  "free_state_production_molecules_complete": len(molecules_complete),
-                 "free_state_production_core_hours": "%.6f" % production_core_hours,
+                 "free_state_production_core_hours": "%.6f" % production_core_hours if not production_cost_unknown else "",
+                 "free_state_production_known_subtotal_core_hours": "%.6f" % production_core_hours,
+                 "free_state_production_unknown_cost_jobs": production_cost_unknown,
                  "free_state_production_redox_computed": str(
                      any(row["status"] == "computed" for row in production_redox)).lower()})
     return files
@@ -3133,9 +3205,20 @@ def wp3():
         ["check_id", "description", "ok", "detail"], acceptance_rows(checks))
     local["outputs/physics_completion/pair_evidence/pair_evidence.csv"] = csv_text(
         ["i", "j", "d_lower_ev", "d_upper_ev", "sigma_ev", "z", "tol_ev", "state"], rows)
+
+    # 方案 §7.3：机制案例页的六项证据逐例状态（登记件；状态取自冻结证据盘点，不按结果反推）。
+    six_item_fields = ['six_item_original_structure', 'six_item_density_spin', 'six_item_coordination', 'six_item_eg_decomposition', 'six_item_method_sensitivity', 'six_item_selection_set_impact']
+    six_item_labels = ['原始结构', '电子密度/自旋', '配位变化', 'E/G 分解', '方法敏感性', '实际选集影响']
+    six_item_status = {
+        "CASE1": ['已具', '部分', '部分', '部分', '已具', '已具'],
+        "CASE2": ['已具', '部分', '部分', '部分', '已具', '已具'],
+    }
+    mech_cases = [dict(case, **dict(zip(six_item_fields, six_item_status[case["case_id"]])))
+                  for case in cases]
     local["outputs/physics_completion/pair_evidence/mechanism_cases.csv"] = csv_text(
         ["case_id", "rule", "pair", "axis", "d_lower_ev", "d_upper_ev", "sigma_ev", "label",
-         "selection_impact"], cases)
+         "selection_impact"] + six_item_fields, mech_cases)
+
     local["outputs/physics_completion/pair_evidence/mechanism_geometry.csv"] = csv_text(
         ["name", "family", "n_atoms", "element_sequence_matches", "n_heavy_bonds_shared",
          "mean_abs_bond_change_ang", "max_abs_bond_change_ang", "max_bond_pair",
@@ -3162,9 +3245,31 @@ def wp3():
         "4. 另给方法 pair spread 的 z 曲线作为 sensitivity；小数目相关泛函不是独立随机重复，\n"
         "   1.96×spread 不能自动标成校准 95% 置信度。\n"
         "5. 判据在既有冻结 rung（P1v→P1a，n=12）上演示，并已用 WP1 的 4 设定本机审计（竖直腿 + 弛豫腿）认证 EMC|GBL、EMC|SL 两个冻结翻转的方法轴。\n")
-    case_lines = ["# 机制案例页（最多 3 例）", "",
-                  "选择规则（事先冻结）：优先选证据最强的稳健翻转，再选影响 Top-k 的 unresolved 边界，再选有身份改变的代表；"
-                  "**无稳健翻转时不强行补案例**。", ""]
+
+    # 方案 §7.3 机制案例页：口径 / 六项覆盖总览 / 逐项证据与来源路径（与 CSV 六列同源）。
+    case_lines = [
+        '# 机制案例页（最多 3 例）',
+        '',
+        '选择规则（事先冻结）：优先选证据最强的稳健翻转，再选影响 Top-k 的 unresolved 边界，再选有身份改变的代表；**无稳健翻转时不强行补案例**。',
+        '',
+    ]
+    case_lines += [
+        '口径：本页只登记既有冻结产物（P1v→P1a 氧化台阶，n=12，66 pair，源自 `outputs/phase2_p1a/p1v_vs_p1a.json`），**零新增电子结构计算**。方案 §7.3 的六项证据逐例逐项标注 **已具 / 部分 / 未具**；凡缺原始产物支撑的一律标 部分 或 未具，不把日志里的定性描述说成计算证据。数字与既有产物逐字一致；不一致处在第 4、5 项显式登记，不做调和。',
+        '',
+        '## 六项覆盖总览（逐例）',
+        '',
+    ]
+    case_lines.append("| 项目（§7.3） | %s |" % " | ".join(
+        "%s %s" % (case["case_id"], case["pair"].replace("|", "\\|")) for case in cases))
+    case_lines.append("| --- |%s" % (" --- |" * len(cases)))
+    for idx, label in enumerate(six_item_labels):
+        case_lines.append("| %s |%s" % (label, "".join(
+            " %s |" % six_item_status[case["case_id"]][idx] for case in cases)))
+    case_lines += [
+        '',
+        '> 六项里「电子密度本体、多 motif/生产系综配位、G_ensemble」三处仍待补，故整体仍记 **partial**，不写 satisfied。',
+        '',
+    ]
     for case in cases:
         case_lines += [
             "## %s：%s" % (case["case_id"], case["pair"]), "",
@@ -3172,12 +3277,13 @@ def wp3():
             "- d_lower = %s eV；d_upper = %s eV；sigma = %s eV"
             % (case["d_lower_ev"], case["d_upper_ev"], case["sigma_ev"]),
             "- 判定：%s" % case["label"],
-            "- 选集影响：%s" % case["selection_impact"], "",
+            "- 选集影响（pair 级）：%s" % case["selection_impact"], "",
         ]
     case_lines += [
-        "## 原始结构证据（既有冻结几何，零新增计算）", "",
-        "| 分子 | 家族 | 原子数 | 元素序列一致 | 重原子成键对 | 平均 abs(dr) (Å) | 最大 abs(dr) (Å) | 最大变化键 | 该键 dr (Å) | dIP (eV) |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        '## 原始结构证据（既有冻结几何，零新增计算）',
+        '',
+        '| 分子 | 家族 | 原子数 | 元素序列一致 | 重原子成键对 | 平均 abs(dr) (Å) | 最大 abs(dr) (Å) | 最大变化键 | 该键 dr (Å) | dIP (eV) |',
+        '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
     ]
     for row in geometry_rows:
         case_lines.append(
@@ -3187,26 +3293,84 @@ def wp3():
                row["max_abs_bond_change_ang"], row["max_bond_pair"],
                row["max_bond_change_ang"], row["d_ip_ev"]))
     case_lines += [
-        "",
-        "结构来源（既有冻结路径；按交付层纪律不复制原始几何文件，只交付派生的键长变化）："
-        "中性松弛几何 `%s`；阳离子松弛几何 `%s`。" % (PB.MECHANISM_NEUTRAL_GEOMETRY, PB.MECHANISM_CATION_GEOMETRY),
-        "成键对只用 %.1f Å 几何截断枚举，不是力常数判据；键长是平移/旋转不变量，因此不需要结构叠合。"
-        % PB.GEOMETRY_BOND_CUTOFF_ANG,
-        "",
-        "## 逐例六项证据覆盖（方案 7.3）", "",
-        "| 项目 | 状态 | 说明 |",
-        "| --- | --- | --- |",
-        "| 原始结构 | 已提供（派生） | 上表 + `mechanism_bond_changes.csv` 逐键列出中性/阳离子键长（原始几何仍留在冻结路径，未复制进交付层） |",
-        "| 电子密度/自旋 | 待补 | 需专门的自旋布居分析；WP1 方法审计只做能量层 |",
-        "| 配位变化 | 待补 | 本 rung 为自由态；配位态属 WP2 |",
-        "| E/G 分解 | 部分 | 有电子能层分解（dIP 列）；G 层待 WP2 |",
-        "| 方法敏感性 | 已提供 | WP1 独立方法审计：4 设定下竖直腿与弛豫腿的 pair 级差值范围与符号一致性，见 outputs/physics_completion/method_audit/pair_gap_sensitivity.csv |",
-        "| 选集影响 | 已提供 | 每例的 pair 级翻转说明 |",
-        "",
-        "> 说明：本页登记判定、原始结构、方法敏感性与选集影响；电子密度/自旋、配位变化与 G 层分解"
-        "仍需 WP2 生产计算补入（本批次无可提供的对应计算）。",
+        '',
+        '结构来源（既有冻结路径；按交付层纪律不复制原始几何文件，只交付派生的键长变化）：中性松弛几何 `outputs/week4/t2_opt_freq/{name}/{name}_G2.xyz`（已核验存在）；阳离子松弛几何 `outputs/phase2_p1a/geometry_relaxation/{name}/{name}_cation_opt.xyz`（已核验存在）。逐键表见 `outputs/physics_completion/pair_evidence/mechanism_bond_changes.csv`（17 条键），汇总见 `outputs/physics_completion/pair_evidence/mechanism_geometry.csv`。成键对只用 1.8 Å 几何截断枚举，不是力常数判据；键长是平移/旋转不变量，因此不需要结构叠合。',
+        '',
+        '## 逐项证据与来源路径',
+        '',
+        '### 1. 原始结构 —— 已具',
+        '',
+        '- 中性 + 阳离子两套原始几何都在冻结路径上（见上表 `neutral_geometry` / `cation_geometry` 列，两文件均已核验存在），派生的逐键键长变化（`mechanism_bond_changes.csv`）可由冻结 .xyz 独立重算（`tests/test_physics_completion_batch.py::test_mechanism_bond_changes_recompute_from_frozen_geometry`）。',
+        '- CASE1：EMC 平均 |Δr| = 0.053936 Å、最大 0.089787 Å（C4-O5，伸缩 +0.089787）；GBL 平均 0.037918 Å、最大 0.085612 Å（C2-O6，-0.085612）。',
+        '- CASE2：SL 平均 0.009897 Å、最大 0.015528 Å（C5-C6，-0.015528）；EMC 同 CASE1。',
+        '- 缺口：无。原始几何留在冻结路径、未复制进交付层（这是交付层纪律，不是缺证据）。',
+        '',
+        '### 2. 电子密度/自旋 —— 部分（自旋/电荷布居 已具；电子密度本体与 frontier 局域化 未具、待补）',
+        '',
+        '- 已有（原始产物支撑）：`outputs/physics_completion/state_identity/state_identity_qc.csv` 逐态给出 Mulliken 与 Löwdin 原子电荷/自旋，并带原始日志路径与 sha256（如 `work/wp2prod/EMC/M_plus/EMC_M_plus.log`）。',
+        '  - 氧化态 M_plus 的自旋求和：EMC `spin_sum_mulliken` = 0.999999、GBL = 1.000002、SL = 1.000002（各一个未配对电子）；电荷求和与登记总电荷一致（`state_identity/state_identity_acceptance.csv` 的 `whole_atom_charge_sum...` 与 `whole_atom_spin_sum_matches_two_s` 均 ok=true）。',
+        '  - Li 条件态的自旋/电荷局域化类：EMC/GBL/SL 的 LiM_plus = Li_centered（`state_identity/Li_centered_states.csv`，share 0.950012 / 0.952082 / 0.921887），LiM_2plus = solvent_centered。',
+        '- 缺口（未具、待补）：没有电子密度本体产物——无 .cube/.dens、无密度差、无自旋密度分布图；frontier 轨道局域化在 `outputs/physics_completion/state_identity/thresholds.json` 里显式登记为 `frontier_localization.status = not_computed`（理由：生产 Opt 日志未要求逐轨道原子组成）。',
+        '- 结论：自旋/电荷布居这一半已具且可复算、带哈希；电子密度本体与 frontier 局域化未具 → 整项 部分。',
+        '',
+        '### 3. 配位变化 —— 部分（三例分子的单构象条件态 Li 腿 已具；多 motif / 生产系综 未具、待补；且非本例轴）',
+        '',
+        '- 已有（原始产物支撑，三个案例分子都在四分子生产子集内）：',
+        '  - `outputs/physics_completion/closure/four_molecule_state_closure.csv`：EMC/GBL/SL 的 LiM_plus、LiM_2plus 均 `register_status = produced_single_conformer`；Li–O 距离 `li_o_ang`：EMC 1.816 / 1.901，GBL 1.833 / 1.923，SL 2.053 / 2.439 Å；身份 bound/intact。',
+        '  - `outputs/physics_completion/free_states/production_redox.csv`：Li 条件态 IP 与配位位移 `coordination_shift_e_ev` / `_g_ev`：EMC 0.446461 / 0.373529，GBL 0.880186 / 0.707681，SL 0.582285 / 0.558920 eV。',
+        '  - `outputs/physics_completion/state_identity/state_identity_qc.csv`：Li–给体接触距离与 Mayer 键价（SL 的 LiM_plus 接触为 `O:2.0530;O:2.0545;S:2.5027`，valence 0.1491）。',
+        '  - `outputs/physics_completion/free_states/pilot_coordination_shift.csv`（更多分子的同类量）。',
+        '  - 条件态阶梯（筛选层 GFN2）：`outputs/physics_completion/ensembles/ensemble_pair_rungs.csv` 与 `closure/flip_persistence.csv` 的 R4_screen——EMC|GBL 的 Li 条件态 sign = negative，EMC|SL 的 Li 条件态 sign = negative（均为 screen，非生产）。',
+        '- 缺口（未具、待补）：每态只有 1 个 motif / 1 个构象（`li_motif_sampling/li_motif_screen.csv` 每态只保留 m1）；没有多 motif 或生产系综层的配位变化；且本案例轴是自由态氧化，配位变化属条件副轴（C0→C1），不是该翻转的成因。',
+        '- 结论：单构象条件态配位证据已具，多 motif / 生产系综未具 → 整项 部分。',
+        '',
+        '### 4. E/G 分解 —— 部分（E 与 G_single 已具；G_ensemble 未具、待补）',
+        '',
+        '- 已有（原始产物支撑）：',
+        '  - 逐态 E 与 G：`outputs/physics_completion/closure/four_molecule_state_closure.csv` 给出 `e_sp_solution_ev`、`g_single_ev`、`zpe_ev`、`thermal_corr_ev`、`std_state_corr_ev`（EMC/GBL/SL 各四主态）。',
+        '  - 单构象自由能标签：`outputs/physics_completion/free_states/production_redox.csv` 的 `eox_adiabatic_ev` / `gox_single_ev` / `thermal_step_free_ev`——EMC 8.191111 / 8.128207 / -0.062904，GBL 7.754285 / 7.685265 / -0.069020，SL 7.905012 / 7.776312 / -0.128700 eV。',
+        '  - pair 级 E 与 G：`outputs/physics_completion/closure/flip_persistence.csv` R2（溶液优化电子能）EMC|GBL = +0.436826、EMC|SL = +0.286099；R3（单构象自由能）EMC|GBL = +0.442942、EMC|SL = +0.351895。',
+        '- 缺口（未具、待补）：G_ensemble（生产 R4）未做——`flip_persistence.csv` R4 = `not_computed`；现有系综只有筛选层 GFN2（`outputs/physics_completion/ensembles/ensemble_free_energies.csv`，气相 GFN2），不能冒充生产 G_ensemble。',
+        '- **不一致（如实报告，不调和）**：R2/R3 的符号为正（+），与冻结的 R1b（负）相反。也就是说，垂直→绝热的这一对翻转**没有保留到溶液优化的电子能与单构象自由能层**（见 `outputs/physics_completion/closure/closure_summary.md` 的「固定几何 → 溶液各态优化 = 符号改变」）。',
+        '- 结论：E 与 G_single 分解已具，G_ensemble 未具 → 整项 部分。',
+        '',
+        '### 5. 方法敏感性 —— 已具',
+        '',
+        '- `outputs/physics_completion/method_audit/pair_gap_sensitivity.csv`：S1–S4 四设定下两对的竖直腿与弛豫腿 pair 差值，`vertical_sign_consistent` 与 `adiabatic_sign_consistent` 均 true，`sign_flip_across_legs` true。',
+        '  - EMC|GBL：竖直 0.612–0.697 eV；绝热 -0.328 … -0.345 eV（四条设定符号一致）。',
+        '  - EMC|SL：竖直 0.693–0.713 eV；绝热 -0.436 … -0.518 eV。',
+        '- `outputs/physics_completion/method_audit/robust_inversion_certification.csv`：EMC|GBL、EMC|SL 的 `certified` = true（对方法轴认证）。',
+        '- 设定与弛豫腿：`method_audit/method_settings.csv`（S1 omegaB97X-D4/def2-TZVP、S2 omegaB97X-D4/def2-TZVPD、S3 PBE0-D4/def2-TZVP、S4 PBE0-D4/def2-TZVPD）；`method_audit/relaxed_leg_matrix.csv` 32 格。',
+        '- **不一致（如实报告，不调和）**：本 CSV 与 `pair_evidence/pair_evidence.csv` 用的 `sigma = 0.206521142 eV` 是该台阶的**弛豫位移总体标准差**（`p1v_vs_p1a.json` `displacement.population_std_ev`），**不是方法 spread**；方法 spread 见 `robust_inversion_certification.csv`（EMC|GBL `adiabatic_sigma` = 0.006516 eV，EMC|SL = 0.032367 eV）。两者口径不同，不可混用。',
+        '- 反证：`outputs/physics_completion/pair_evidence/targeted_recheck/recheck_pair_gaps.csv`（S3/S4，生产 Opt 几何）给出 EMC|GBL = +0.4746 … +0.4819、EMC|SL = +0.3762 … +0.3900，均为正，`matches_frozen_r1b_sign` = false——**在生产几何上不复现冻结 R1b 的负号**（换几何与换泛函两因素不可分）。',
+        '- 结论：方法轴认证、范围与上述反证都齐 → 已具。',
+        '',
+        '### 6. 实际选集影响 —— 已具',
+        '',
+        '- `outputs/phase2_p1a/p1v_vs_p1a.json`（该台阶排序现算）：`kendall_tau_b` = 0.787879；`top_k_overlap` k=0.10 → 1.0、k=0.20 → 1.0、k=0.30 → 0.75；`decision_state_counts` = STABLE 55 / UNRESOLVED 9 / ROBUST_INVERSION 2。',
+        '- `outputs/physics_completion/pair_evidence/pair_evidence.csv`：66 pair 中 2 个 `state = ROBUST_INVERSION`，即本两例。',
+        '- 逐级 Top-k overlap 与 selection regret：`outputs/physics_completion/pair_evidence/frozen_rung_ladder.csv`（注意：该表 `G1_to_G2` 行是另一条 r2SCAN-3c 几何弛豫台阶，`f_robust_inversion` = 0、`top_k_overlap_main` = 1.0，**不是**本 P1v→P1a 台阶，口径不同）。',
+        '- 翻转持续性：`outputs/physics_completion/closure/flip_persistence.csv` 与 `closure_summary.md`——R1a（+）→ R1b（-）符号翻转，但 R2/R3 均为正、R4 `not_computed`；即 pair 级翻转**不保留**到生产溶液优化 E/G。',
+        '- 结论：pair 级翻转 + 该台阶的 tau_b/Top-k 均已具，并同时给出「不保留到 R2/R3」的实际边界 → 已具。',
+        '',
+        '## 逐例关键数字对照',
+        '',
+        '| 项目 | CASE1 EMC \\| GBL | CASE2 EMC \\| SL |',
+        '| --- | --- | --- |',
+        '| 原始结构 平均/最大 \\|Δr\\| (Å) | EMC 0.053936 / 0.089787；GBL 0.037918 / 0.085612 | EMC 同左；SL 0.009897 / 0.015528 |',
+        '| 自旋 M_plus `spin_sum_mulliken` | EMC 0.999999；GBL 1.000002 | EMC 同左；SL 1.000002 |',
+        '| 配位 `li_o_ang`（LiM+ / LiM2+） | EMC 1.816 / 1.901；GBL 1.833 / 1.923 | EMC 同左；SL 2.053 / 2.439 |',
+        '| `coordination_shift_g_ev` | EMC 0.373529；GBL 0.707681 | EMC 同左；SL 0.558920 |',
+        '| 台阶 R1a / R1b (eV) | +0.653471 / -0.336247 | +0.703086 / -0.477287 |',
+        '| 台阶 R2 / R3 (eV) | +0.436826 / +0.442942 | +0.286099 / +0.351895 |',
+        '| 方法范围 竖直 / 绝热 (eV) | 0.612–0.697 / -0.328…-0.345 | 0.693–0.713 / -0.436…-0.518 |',
+        '| 认证 | certified=true | certified=true |',
+        '| d_lower / d_upper (eV) | +0.250050009 / -0.455791550 | +0.408539433 / -0.277578589 |',
+        '',
+        '> 说明：本页登记判定、原始结构、电子密度/自旋（自旋布居）、配位变化（单构象条件态）、E/G 分解（单构象）、方法敏感性与实际选集影响；**电子密度本体、多 motif/生产系综配位与 G_ensemble 仍待补**，故六项整体仍为 partial。',
     ]
     local["outputs/physics_completion/pair_evidence/mechanism_cases.md"] = "\n".join(case_lines) + "\n"
+
 
     summary = [
         "# Week 40 / WP3 — 排序、独立不确定度与机制",
@@ -3468,6 +3632,10 @@ RECHECK_CORE_HOURS = sum(float(row["core_hours"]) for row in RECHECK_DONE_ROWS)
 WP2_PRODUCTION_EXPECTED_ROWS = (len(WP2_PRODUCTION_MOLECULES)
                                 * (len(WP2_PRODUCTION_STATES) + len(WP2_PRODUCTION_EXTRA_STATES)))
 WP2_LOOP_CLOSED = WP2_PRODUCTION_LEDGER_ROWS == WP2_PRODUCTION_EXPECTED_ROWS
+ABSOLUTE_COST_COMPLETE = (WP2_PRODUCTION_COST_UNKNOWN == 0
+                          and all(row.get("core_hours") for row in METHOD_AUDIT_COST)
+                          and all(row.get("wall_sec") and row.get("cores") for row in PILOT_COST_JOBS)
+                          and all(row.get("core_hours") for row in RECHECK_DONE_ROWS))
 
 
 def _pilot_job_core_hours(row):
@@ -3477,7 +3645,7 @@ def _pilot_job_core_hours(row):
 
 def _absolute_cost_jobs():
     values = [float(row["core_hours"]) for row in METHOD_AUDIT_COST if row.get("core_hours")]
-    values += [_pilot_job_core_hours(row) for row in PILOT_COST_JOBS]
+    values += [_pilot_job_core_hours(row) for row in PILOT_COST_JOBS if row.get("wall_sec") and row.get("cores")]
     values += [float(row["core_hours"]) for row in WP2_PRODUCTION_LEDGER if row.get("core_hours")]
     values += [float(row["core_hours"]) for row in RECHECK_DONE_ROWS if row.get("core_hours")]
     return values
@@ -3499,7 +3667,7 @@ def _median_value(values):
 
 
 ABSOLUTE_COST_JOBS_CORE_HOURS = _absolute_cost_jobs()
-ABSOLUTE_FREQ_ONLY_JOBS = [row for row in PILOT_COST_JOBS if row.get("phase") == "orca_freq"]
+ABSOLUTE_FREQ_ONLY_JOBS = [row for row in PILOT_COST_JOBS if row.get("phase") == "orca_freq" and row.get("wall_sec") and row.get("cores")]
 ABSOLUTE_CPU_CORE_HOURS = "%.6f" % sum(ABSOLUTE_COST_JOBS_CORE_HOURS)
 ABSOLUTE_P90_JOB_COST = ("%.6f" % _nearest_rank_p90(ABSOLUTE_COST_JOBS_CORE_HOURS)
                          if ABSOLUTE_COST_JOBS_CORE_HOURS else "")
@@ -3528,20 +3696,20 @@ COST_LEDGER = [
      "note": "the %d registered single points (the frozen second functional on the production Opt geometries, 2 cores each, serial) cost %.3f core-hours in total; the remaining rows of the 24-row plan wait on their production legs; the table is outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv and the raw ORCA outputs stay in work/recheck/"
              % (len(RECHECK_DONE_ROWS), RECHECK_CORE_HOURS)},
     {"item": "cpu_core_hours", "unit": "core-hour",
-     "value": ABSOLUTE_CPU_CORE_HOURS if WP2_LOOP_CLOSED else "",
-     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "value": ABSOLUTE_CPU_CORE_HOURS if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "MISSING",
      "note": "项目级 allocated core-hours（不是 process CPU time）：四分子 %d/%d 条腿闭环后按现算填入，"
              "口径 = 方法审计 + pilot + 生产 + 靶向复核四个逐作业台账里 %d 条带 core-hours 记录的作业之和；"
              "闭环前留空，不拿已跑的那部分作业冒充 headline 数。"
              % (WP2_PRODUCTION_LEDGER_ROWS, WP2_PRODUCTION_EXPECTED_ROWS, len(ABSOLUTE_COST_JOBS_CORE_HOURS))},
     {"item": "p90_job_cost", "unit": "core-hour",
-     "value": ABSOLUTE_P90_JOB_COST if WP2_LOOP_CLOSED else "",
-     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "value": ABSOLUTE_P90_JOB_COST if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "MISSING",
      "note": "逐作业 core-hours 的最近秩 p90（小样本下等于最大值，不插值假装样本充足）；逐类中位 / p90 "
              "另见 outputs/physics_completion/cost/remaining_cost_scenarios.csv；闭环前留空。"},
     {"item": "frequency_only_cost", "unit": "core-hour",
-     "value": ABSOLUTE_FREQ_ONLY_COST if WP2_LOOP_CLOSED else "",
-     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED else "MISSING",
+     "value": ABSOLUTE_FREQ_ONLY_COST if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "",
+     "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "MISSING",
      "note": "只做频率的作业（phase=orca_freq，%d 条，C01|M|orca_freq = wB97X-D4/def2-TZVP SMD NumFreq）"
              "的中位 core-hours；闭环前留空。" % len(ABSOLUTE_FREQ_ONLY_JOBS)},
 ]
@@ -3612,6 +3780,63 @@ def wp5():
 
     n_scenario = len({(row["task"], row["axis"]) for row in sb})
 
+    # §9.2 固定端点（回放前冻结）：O_3 >= 2/3 且 R_3 <= 0.10 eV。
+    NEW_ENDPOINT_R3_EV = "0.10"
+    NEW_ENDPOINT_O3 = "0.666666667"
+    endpoint_audit = {(r["task"], r["axis"]): r
+                      for r in PB.load_rows(REPO / "outputs/week33/al_protocol_audit.csv")}
+    endpoint_curves = PB.load_rows(REPO / "outputs/week33/budget_curves.csv")
+    legacy_curves = PB.load_rows(REPO / "outputs/week7/stage8_al_curves.csv")
+    legacy_regret_30 = {(r["task"], r["objective"], r["baseline"], r["n_T"]):
+                        r["selection_regret_30%"] for r in legacy_curves}
+
+    def _exact_k3(task, axis):
+        pool = int(endpoint_audit[(task, axis)]["pool_size"])
+        return pool if abs(0.30 * pool - 3.0) < 1e-9 else 0
+
+    round_diagnostics = []
+    for curve in endpoint_curves:
+        pool = int(endpoint_audit[(curve["task"], curve["axis"])]["pool_size"])
+        row = {
+            "task": curve["task"], "axis": curve["axis"], "baseline": curve["baseline"],
+            "n_T": curve["n_T"], "pool_size": str(pool), "requested_k": "3",
+            "legacy_k_fraction": "0.30", "regret_threshold_ev": NEW_ENDPOINT_R3_EV,
+            "tau_b": curve["tau_b"],
+            "remaining_unqueried_error_ev": "",
+            "remaining_unqueried_error_status": "MISSING",
+            "remaining_unqueried_error_reason": ("the frozen legacy replay shipped only aggregate "
+                "curves; it persisted no candidate-level predictions for the still-unqueried "
+                "candidates, so the per-round remaining error is not recoverable"),
+            "cumulative_core_hours": "",
+            "cumulative_core_hours_status": "MISSING",
+            "cumulative_core_hours_reason": ("the frozen legacy replay stored no per-query cost "
+                "mapping, so cumulative core-hours per budget point cannot be reconstructed from "
+                "the shipped tables"),
+        }
+        if _exact_k3(curve["task"], curve["axis"]):
+            row["O_3"] = curve["o30"]
+            row["R_3_ev"] = legacy_regret_30.get(
+                (curve["task"], curve["axis"], curve["baseline"], curve["n_T"]), "")
+            row["endpoint_status"] = "computed_from_exact_legacy_k3"
+            row["endpoint_reason"] = ""
+        else:
+            row["O_3"] = ""
+            row["R_3_ev"] = ""
+            row["endpoint_status"] = "blocked"
+            row["endpoint_reason"] = ("the legacy k grid is 0.1/0.2/0.3 of a %d-molecule pool, so "
+                "neither 30%% nor 10%% equals k=3; an exact top-3 overlap / regret needs "
+                "candidate-level predictions the frozen replay did not persist" % pool)
+        round_diagnostics.append(row)
+
+    for row in endpoint_rows:
+        exact = bool(_exact_k3(row["task"], row["axis"]))
+        row["O_3_threshold"] = NEW_ENDPOINT_O3
+        row["R_3_threshold_ev"] = NEW_ENDPOINT_R3_EV
+        row["required_success_repeats"] = "16"
+        row["required_total_repeats"] = "20"
+        row["required_consecutive_budget_points"] = "2"
+        row["new_endpoint_status"] = "computed" if exact else "blocked"
+
     replay_pool_note = ("declared protocol: 12-label pool replay (initial 4 labels, 1 per round, 20 acquisition seeds; "
                         "random/diversity/uncertainty/ranking-aware); the replay evidence shipped in outputs/week32-33 "
                         "is the frozen legacy 18-molecule pool, not a fresh 12-label pool, because the WP2 free-energy "
@@ -3640,8 +3865,8 @@ def wp5():
          "ok": "frozen legacy 18-molecule pool" in replay_pool_note, "detail": "协议与证据池身份一致；12 标签池回放待 WP2 标签补齐"},
         {"id": "absolute_cost_tracks_the_four_molecule_loop",
          "description": "绝对成本三项：四分子闭环后按实测台账现算填入，闭环前显式标 MISSING（不用部分作业当 headline 数）",
-         "ok": (sum(1 for item in COST_LEDGER if item["status"] == "MISSING") == 0) == WP2_LOOP_CLOSED,
-         "detail": "loop_closed=%s MISSING=%d total_jobs=%d"
+         "ok": ABSOLUTE_COST_COMPLETE and ((sum(1 for item in COST_LEDGER if item["status"] == "MISSING") == 0) == WP2_LOOP_CLOSED),
+         "detail": "loop_closed=%s MISSING=%d known_cost_jobs=%d"
                    % (WP2_LOOP_CLOSED,
                       sum(1 for item in COST_LEDGER if item["status"] == "MISSING"),
                       len(ABSOLUTE_COST_JOBS_CORE_HOURS))},
@@ -3703,8 +3928,9 @@ def wp5():
          "tau_winner_outside_family", "mae_winner_all", "mae_winner_frozen_family",
          "mae_all", "mae_frozen_family", "mae_winner_outside_family"], family_view)
     local["outputs/physics_completion/active_learning/success_budget.csv"] = csv_text(
-        ["task", "axis", "baseline", "n_T_median_tau080", "n_T_majority_tau080",
-         "n_T_majority_combined", "median_overstates_majority", "regret_tolerance_ev"], endpoint_rows)
+        ["task", "axis", "baseline", "n_T_median_tau080", "n_T_majority_tau080", "n_T_majority_combined", "median_overstates_majority", "regret_tolerance_ev", "O_3_threshold", "R_3_threshold_ev", "required_success_repeats", "required_total_repeats", "required_consecutive_budget_points", "new_endpoint_status"], endpoint_rows)
+    local["outputs/physics_completion/active_learning/round_diagnostics.csv"] = csv_text(
+        ["task", "axis", "baseline", "n_T", "pool_size", "requested_k", "legacy_k_fraction", "regret_threshold_ev", "tau_b", "O_3", "R_3_ev", "endpoint_status", "endpoint_reason", "remaining_unqueried_error_ev", "remaining_unqueried_error_status", "remaining_unqueried_error_reason", "cumulative_core_hours", "cumulative_core_hours_status", "cumulative_core_hours_reason"], round_diagnostics)
     local["outputs/physics_completion/active_learning/budget_to_threshold.csv"] = csv_text(
         list(btt[0].keys()), btt)
     local["outputs/physics_completion/cost/cost_ledger.csv"] = csv_text(
@@ -3873,7 +4099,7 @@ def build_final_report():
         "泛函效应 >> 基组效应；2 个冻结翻转的方法轴 certified=%s | 气相 r2SCAN-3c 冻结几何；8 分子口径；采样界限未纳入 |"
         % METHOD_AUDIT_CERTIFICATION["certified"],
         "| WP2 | week39 | 固定背景配对自由能标签 | 48 行账本；4 主集分子 x 4 主态生产中已登记 %d/%d 个真实 "
-        "Opt+Freq G 标签（%.6f core-hours，另含 %d 条 def2-TZVPD 中性腿）| 生产首段每态单构象；其余状态在产；"
+        "Opt+Freq G 标签（已知成本小计 %.6f core-hours，另含 %d 条 def2-TZVPD 中性腿）| 生产首段每态单构象；其余状态在产；"
         "基组一致 redox 的自由腿与 Li 腿分开登记，未齐不补数 |"
         % (WP2_PRODUCTION_STATES_DONE, WP2_PRODUCTION_STATES_TOTAL, WP2_PRODUCTION_CORE_HOURS,
            WP2_PRODUCTION_EXTRA_DONE),
@@ -3899,7 +4125,7 @@ def build_final_report():
            METHOD_AUDIT_CERTIFICATION["certified"]),
         "- WP4：Ue1994_Okoshi2015 序列 14 行、被模型覆盖 7 个；逐对一致 15 / 不一致 6 → tau_b = 0.428571（< 0.90）。",
         "- WP2：48 行状态账本，其中 4 主集分子 x 4 主态生产已登记 %d/%d 个真实 Opt+Freq 自由能标签"
-        "（qRRHO，合计 %.6f core-hours），另登记 %d 条 def2-TZVPD 中性腿；未完成的主态保持空串（None），未把缺值写成 0。"
+        "（qRRHO，已知成本小计 %.6f core-hours），另登记 %d 条 def2-TZVPD 中性腿；未完成的主态保持空串（None），未把缺值写成 0。"
         % (WP2_PRODUCTION_STATES_DONE, WP2_PRODUCTION_STATES_TOTAL,
            WP2_PRODUCTION_CORE_HOURS, WP2_PRODUCTION_EXTRA_DONE),
         "- WP5：shift 在 tau_b 上更好的格数与冻结表一致；绝对成本三项%s。"

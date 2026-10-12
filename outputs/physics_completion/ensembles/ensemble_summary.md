@@ -14,7 +14,7 @@
 | C01|LiM_plus | 2 | 2 | 0 | -21.564068616 | -21.564068659 | -21.564068189 | -0.000 | 0.001 | 0.001 | - |
 | C01|M | 1 | 1 | 0 | -21.640327426 | -21.640327426 | -21.640327426 | 0.000 | 0.000 | 0.000 | registered_pending_round1_free_energy_check |
 | C01|M_plus | 1 | 0 | 1 | - | - | - | - | - | - | registered_pending_round1_free_energy_check |
-| C02|LiM_2plus | 2 | 2 | 0 | -24.051502567 | -24.051503010 | -24.051499172 | -0.001 | 0.009 | 0.009 | - |
+| C02|LiM_2plus | 1 | 1 | 0 | -24.051502567 | -24.051502567 | -24.051502567 | 0.000 | 0.000 | 0.000 | - |
 | C02|LiM_plus | 2 | 1 | 1 | -24.709735233 | -24.709735233 | -24.709735233 | 0.000 | 0.000 | 0.000 | - |
 | C02|M | 2 | 2 | 0 | -24.782647517 | -24.783045764 | -24.782437958 | -1.046 | 0.550 | 0.971 | registered_pending_round1_free_energy_check |
 | C02|M_plus | 2 | 1 | 1 | -24.256662501 | -24.256662501 | -24.256662501 | 0.000 | 0.000 | 0.000 | registered_pending_round1_free_energy_check |
@@ -38,9 +38,9 @@ free_ionisation 是 `L(M_plus) - L(M)`，Li_conditioned 是 `L(LiM_2plus) - L(Li
 | pair | state | E_min | G_min | G_state | G_avg | 符号稳定 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | EMC vs GBL | free_ionisation | -26.917 | -25.169 | -24.124 | -25.719 | 是 | the sign survives all four levels |
-| EMC vs GBL | Li_conditioned | -29.282 | -31.604 | -31.605 | -31.595 | 是 | the sign survives all four levels |
+| EMC vs GBL | Li_conditioned | -29.282 | -31.604 | -31.604 | -31.604 | 是 | the sign survives all four levels |
 | EMC vs SL | free_ionisation | 33.945 | 34.758 | 35.804 | 34.208 | 是 | the sign survives all four levels |
-| EMC vs SL | Li_conditioned | -7.817 | -10.643 | -8.937 | -10.645 | 是 | the sign survives all four levels |
+| EMC vs SL | Li_conditioned | -7.817 | -10.643 | -8.935 | -10.654 | 是 | the sign survives all four levels |
 
 ### Li 配位是否改变这个符号
 
@@ -51,7 +51,7 @@ free_ionisation 是 `L(M_plus) - L(M)`，Li_conditioned 是 `L(LiM_2plus) - L(Li
 
 ## 本层给出的判断
 
-* 登记结构总数 23，计入系综 19；有系综的腿 15 / 16。
+* 登记结构总数 22，计入系综 18；有系综的腿 15 / 16。
 * `G_state-G_min` 与 `G_avg-G_min` 是同一个系综的两侧边界（下界侧含构象熵、上界侧是布居平均），
   它们明显小于关键 pair 的间距时，采样不足以推翻该 pair；只有跨过独立容差或改写 Top-k 时，才按同一规则扩到 6（本层不自行扩）。
 * 有虚频的结构留在 CSV 里并带虚频数，**排除出系综**，不是删掉。
@@ -61,16 +61,16 @@ free_ionisation 是 `L(M_plus) - L(M)`，Li_conditioned 是 `L(LiM_2plus) - L(Li
 
 | check | ok | detail |
 | --- | --- | --- |
-| every_registered_structure_has_a_row | True | 23 rows for 23 registered structures |
+| every_registered_structure_has_a_row | True | 22 rows for 22 registered structures |
 | every_geometry_still_matches_its_registered_sha256 | True | mismatched: none |
 | boltzmann_weights_sum_to_one_per_leg | True | offenders: none |
 | ensemble_shifts_obey_their_mathematical_bounds | True | offenders: none |
 | ensemble_layer_is_labelled_as_a_screen | True | xTB GFN2 (gas phase) ensemble free energy; claim_level=screen_gfn2_gas_phase |
-| imaginary_mode_structures_are_reported_not_dropped | True | 23 structures carry an imaginary-mode count |
+| imaginary_mode_structures_are_reported_not_dropped | True | 22 structures carry an imaginary-mode count |
 | pair_ladder_is_fully_reported | True | 16 pair cells for 2 pairs x 2 states x 4 levels |
 | pair_sign_verdict_matches_the_reported_signs | True | offenders: none |
 | pair_axis_never_mixes_stoichiometries | True | offenders: none |
-| registered_structures_have_unique_cache_keys | True | 23 distinct keys for 23 structures |
+| registered_structures_have_unique_cache_keys | True | 22 distinct keys for 22 structures |
 | leg_records_agree_with_their_leg_id | True | offenders: none |
 | published_gfn2_records_are_complete | True | incomplete: none |
 

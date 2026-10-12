@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import csv
 import importlib.util
+import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -43,12 +44,18 @@ def test_statuses_come_from_the_frozen_vocabulary() -> None:
 
 
 def test_wp2_counts_are_read_back_from_the_closure_table() -> None:
-    """写死就会在任一腿落地后失败：这里用闭环表现算的同一口径比对台账。"""
+    """生产进度从闭环表读回，但项目分母必须来自 12 分子主集。"""
     module = _module()
     states = module.read_rows("outputs/physics_completion/closure/four_molecule_state_closure.csv")
     produced = [r for r in states if r.get("register_status") == module.PRODUCED]
+    sample_rows = module.read_rows("data/metadata/physics_completion_set.csv")
+    main_ids = {r["mol_id"] for r in sample_rows if r.get("cohort") == "main"}
+    main_produced = [r for r in produced
+                     if r.get("mol_id") in main_ids and r.get("state") in module.MAIN_STATES]
     row = next(r for r in _rows() if r["item_id"] == "wp2_production_state_ledger")
-    assert "produced=%d total=%d" % (len(produced), len(states)) in row["measured"], row["measured"]
+    assert len(main_ids) == 12
+    assert "main_states_produced=%d/48" % len(main_produced) in row["measured"], row["measured"]
+    assert "pilot_subset_legs=%d/%d" % (len(produced), len(states)) in row["measured"]
 
 
 def test_overall_row_derives_from_the_live_ledgers() -> None:
@@ -56,10 +63,44 @@ def test_overall_row_derives_from_the_live_ledgers() -> None:
     overall = next(r for r in rows if r["item_id"] == "plan_overall_complete")
     main4 = next(r for r in rows if r["item_id"] == "wp2_four_state_complete")
     flip = next(r for r in rows if r["item_id"] == "wp2_flip_persistence")
-    assert "flip_rungs=" in overall["measured"]
-    assert "M/M+/LiM+/LiM2+=" in main4["measured"]
+    assert "main_states=" in overall["measured"]
+    assert "production_ensembles=" in overall["measured"]
+    assert "pilot_subset=" in overall["measured"]
+    assert "main_four_state_complete=" in main4["measured"]
     assert "rungs_computed=" in flip["measured"]
     assert overall["status"] in STATUSES
+
+
+def test_four_molecule_ledger_is_explicitly_a_pilot_subset() -> None:
+    rows = {r["item_id"]: r for r in _rows()}
+    pilot = rows["wp2_four_molecule_pilot_subset"]
+    overall = rows["plan_overall_complete"]
+    assert "pilot" in pilot["requirement"].lower()
+    assert "不参与总体完成判定" in pilot["requirement"]
+    assert "12 主集 x 4 主态" in overall["requirement"]
+    assert "main_states=" in overall["measured"] and "/48" in overall["measured"]
+
+
+def test_production_ensemble_uses_the_48_state_denominator() -> None:
+    row = {r["item_id"]: r for r in _rows()}["wp2_conformer_ensemble"]
+    assert "production_ensemble_labels=" in row["measured"]
+    assert "/48" in row["measured"]
+    assert "screen_gfn2_rows=" in row["measured"]
+
+
+def test_unique_production_method_freeze_is_machine_traceable() -> None:
+    path = REPO_ROOT / "config" / "production_method_freeze_v1.json"
+    freeze = json.loads(path.read_text(encoding="utf-8"))
+    assert freeze["status"] == "frozen"
+    assert freeze["functional"]["canonical_name"] == "wB97X-D4"
+    assert freeze["functional"]["audit_setting_id"] == "S2"
+    assert set(freeze["basis_by_state"]) == {"M", "M_plus", "LiM_plus", "LiM_2plus"}
+    assert set(freeze["basis_by_state"].values()) == {"def2-TZVPD"}
+    assert freeze["selected_by_inversion_outcome"] is False
+    assert freeze["selection_basis"]
+    row = {r["item_id"]: r for r in _rows()}["wp1_unique_production_method"]
+    assert row["status"] == "satisfied", row
+    assert "selected_by_inversion=False" in row["measured"]
 
 
 def test_table_covers_the_sample_and_landing_sections() -> None:
@@ -74,7 +115,7 @@ def test_items_with_open_gaps_are_never_marked_satisfied() -> None:
     rows = {r["item_id"]: r for r in _rows()}
 
     method = rows["wp1_unique_production_method"]
-    if "freeze_artifact=False" in method["measured"] or "production_settings=2" in method["measured"]:
+    if "freeze_artifact=False" in method["measured"] or "selected_by_inversion=missing" in method["measured"]:
         assert method["status"] == "partial", method
 
     sampling = rows["wp2_sampling_extension"]
@@ -97,6 +138,17 @@ def test_new_coverage_rows_are_derived_from_evidence() -> None:
         assert item_id in rows, "compliance table is missing %s" % item_id
         assert rows[item_id]["evidence"], item_id
         assert rows[item_id]["measured"], item_id
+
+
+def test_wp5_gap_rows_follow_machine_readable_round_diagnostics() -> None:
+    rows = {r["item_id"]: r for r in _rows()}
+    endpoint = rows["wp5_new_endpoint_in_budget"]
+    consecutive = rows["wp5_two_consecutive_points"]
+    unqueried = rows["wp5_remaining_unqueried_error"]
+    assert "fixed_R_3_0.10=True" in endpoint["measured"]
+    assert "rule=16/20 for 2 consecutive points" in consecutive["measured"]
+    assert "remaining_error_MISSING=" in unqueried["measured"]
+    assert "cumulative_core_hours_MISSING=" in unqueried["measured"]
 
 
 def test_state_identity_row_reads_its_own_thresholds() -> None:
@@ -146,3 +198,10 @@ def test_wp4_primary_text_check_records_the_reference_index_conflict() -> None:
     row = next(r for r in _rows() if r["item_id"] == "wp4_primary_text_check")
     assert "attribution_conflict_open" in row["note"], row["note"]
     assert "transcription-only" in row["note"]
+
+
+def test_pilot_cost_fields_do_not_turn_unknowns_into_zeroes() -> None:
+    row = {r["item_id"]: r for r in _rows()}["wp2_pilot_cost_fields"]
+    assert "missing_fields=none" in row["measured"], row
+    assert "memory_MISSING=" in row["measured"] and "retry_UNVERIFIABLE=" in row["measured"]
+    assert row["status"] == "partial", row

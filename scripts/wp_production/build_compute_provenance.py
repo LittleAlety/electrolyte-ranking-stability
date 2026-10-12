@@ -27,6 +27,7 @@ import hashlib
 import io
 import json
 import re
+import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -43,6 +44,21 @@ PREP_LEDGER_DERIVED = "outputs/physics_completion/cost/audit_cost_ledger.csv"
 GEOMETRY_PREP_DIR = AUDIT / "EMC_Li"
 GEOMETRY_PREP_JOB = "EMC_m1_G2Li_opt"
 OUTDIR = REPO / "outputs" / "physics_completion" / "provenance"
+
+# The implementation plan names this exact repository state as its evidence
+# boundary.  Historical bytes must come from Git objects, never today's worktree.
+BASELINE_COMMIT = "d5217a1f1f7e85c3e117b29d734efc2a8e535ecd"
+BASELINE_ROOT_FILES = {
+    "FINAL_CONCLUSIONS.md", "README.md", "config/prereg.yaml",
+    "config/scientific_definitions.yaml", "data/metadata/core_set.csv",
+    "data/metadata/broad_pool.csv", "data/metadata/core_set_metadata_ext.csv",
+}
+BASELINE_SHALLOW_DIRS = {
+    "outputs/gate1", "outputs/phase2_p1a", "outputs/week4", "outputs/week5",
+    "outputs/week6", "outputs/week7",
+}
+BASELINE_FIELDS = ("baseline_commit", "commit_time", "time_boundary", "artifact_path",
+                   "git_blob_oid", "sha256", "bytes", "verification_status", "note")
 
 RE_VERSION = re.compile(r"Program Version\s+(\S+)")
 RE_TERMINATED = re.compile(r"ORCA TERMINATED NORMALLY")
@@ -71,7 +87,8 @@ EXTRA_STATE = "M_tzvpd"
 
 LEG_FIELDS = ("leg_id", "mol_id", "name", "state", "manifest_job_id", "classification",
               "input_on_disk", "raw_output_on_disk", "log_terminated", "final_geometry_on_disk",
-              "registered_job_state", "duplicate_work_risk", "note")
+              "registered_job_state", "payload_on_disk", "imaginary_modes", "qc_accepted",
+              "duplicate_work_risk", "note")
 
 
 #: 每张派生表用哪几列拼出 derived_row_key，用来验证映射行真的存在。
@@ -136,6 +153,71 @@ def hash_entry(path):
     return (path.relative_to(REPO).as_posix(), sha256_file(path), str(path.stat().st_size))
 
 
+def _git(*args):
+    """Read immutable Git objects without checking them out or changing files."""
+    return subprocess.run(["git", *args], cwd=str(REPO), stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, check=False)
+
+
+def baseline_manifest():
+    """Hash key artifacts as they existed at the frozen baseline commit.
+
+    Scope is finite: seven named root/config/metadata files plus immediate files
+    in gate1, phase2_p1a and week4-week7. Nested raw-job trees are excluded. If
+    Git cannot supply an object, the row is ``unverifiable``; current bytes are
+    never substituted for historical evidence.
+    """
+    if _git("cat-file", "-e", BASELINE_COMMIT + "^{commit}").returncode:
+        return [{
+            "baseline_commit": BASELINE_COMMIT, "commit_time": "UNVERIFIABLE",
+            "time_boundary": "repository state at the named commit", "artifact_path": "*",
+            "git_blob_oid": "", "sha256": "", "bytes": "",
+            "verification_status": "unverifiable",
+            "note": "baseline commit object unavailable; worktree bytes were not substituted",
+        }]
+    stamp = _git("show", "-s", "--format=%cI", BASELINE_COMMIT)
+    commit_time = stamp.stdout.decode("utf-8", errors="replace").strip() or "UNVERIFIABLE"
+    listing = _git("ls-tree", "-r", "--name-only", BASELINE_COMMIT)
+    if listing.returncode:
+        return [{
+            "baseline_commit": BASELINE_COMMIT, "commit_time": commit_time,
+            "time_boundary": "repository state at the named commit", "artifact_path": "*",
+            "git_blob_oid": "", "sha256": "", "bytes": "",
+            "verification_status": "unverifiable",
+            "note": "baseline tree unavailable; worktree bytes were not substituted",
+        }]
+    selected = []
+    for rel in listing.stdout.decode("utf-8", errors="replace").splitlines():
+        parent = rel.rsplit("/", 1)[0] if "/" in rel else ""
+        if rel in BASELINE_ROOT_FILES or parent in BASELINE_SHALLOW_DIRS:
+            selected.append(rel)
+    rows = []
+    for rel in sorted(set(selected)):
+        blob = _git("rev-parse", "%s:%s" % (BASELINE_COMMIT, rel))
+        content = _git("show", "%s:%s" % (BASELINE_COMMIT, rel))
+        if blob.returncode or content.returncode:
+            rows.append({
+                "baseline_commit": BASELINE_COMMIT, "commit_time": commit_time,
+                "time_boundary": "repository state at commit_time (inclusive)",
+                "artifact_path": rel, "git_blob_oid": "", "sha256": "", "bytes": "",
+                "verification_status": "unverifiable",
+                "note": "Git object unavailable; worktree bytes were not substituted",
+            })
+        else:
+            rows.append({
+                "baseline_commit": BASELINE_COMMIT, "commit_time": commit_time,
+                "time_boundary": "repository state at commit_time (inclusive)",
+                "artifact_path": rel,
+                "git_blob_oid": blob.stdout.decode("ascii", errors="replace").strip(),
+                "sha256": hashlib.sha256(content.stdout).hexdigest(),
+                "bytes": str(len(content.stdout)),
+                "verification_status": "verified_from_git_object",
+                "note": ("scope: named root/config/metadata files and immediate derived files "
+                         "in gate1, phase2_p1a, week4-week7; nested raw-job trees excluded"),
+            })
+    return rows
+
+
 def method_echo(inp, log):
     keyword = ""
     if inp is not None and inp.is_file():
@@ -196,7 +278,8 @@ def audit_cell(mol_token, state_token, setting):
     return {}
 
 
-#: 从该作业自己 .log 的文本推导失败类型；只用于解释非正常结束，不改变任何数值。
+#: 从该作业自己 .log 的文本推导失败类型。failed 有两类，都必须给出可复核的原因：
+#: 基础设施事故（ORCA 没能正常结束）与 QC 判不合格（ORCA 正常结束，但频率/收敛不过关）。
 FAILURE_SIGNATURES = (
     ("mpi_smpd_unavailable",
      ("unable to start the local smpd manager", "ReadFile() failed, error 109")),
@@ -206,13 +289,31 @@ FAILURE_SIGNATURES = (
      ("CANNOT OPEN FILE",)),
 )
 
+#: QC 判不合格的签名：正常工作流里的物理结论，不是基础设施事故，两者不得混为一谈。
+QC_FAILURE_SIGNATURES = (
+    ("qc_rejected_imaginary_mode", ("***imaginary mode***",)),
+)
+
 
 def classify_failure(job_state, terminated, has_log, raw_text):
-    """把 failed 的 ORCA 作业归到一类可复核的原因；不需要原因时返回空串。"""
-    if job_state != "failed" or terminated == "true":
+    """把 failed 的 ORCA 作业归到一类可复核的原因；不需要原因时返回空串。
+
+    此前 `terminated == "true"` 一律返回空串，于是「ORCA 正常结束但 QC 判不合格」的腿
+    （例如 DEC LiM_2plus 的虚频）既不是 computed、也没有任何 failure_reason，把
+    `every_failed_orca_job_carries_a_log_derived_failure_reason` 撞红。现在这类显式记为
+    `qc_rejected_*`，与 smpd / scratch 之类的基础设施事故分开。
+    """
+    if job_state != "failed":
         return ""
     if not has_log:
         return "no_raw_output"
+    for label, needles in QC_FAILURE_SIGNATURES:
+        if any(needle in raw_text for needle in needles):
+            return label
+    if terminated == "true":
+        # ORCA 正常结束却被判 failed：那是 QC 结论（不据文本猜具体是哪一项），
+        # 不能与「没跑完」混为一类，也不能留空。
+        return "qc_rejected_unclassified"
     for label, needles in FAILURE_SIGNATURES:
         if any(needle in raw_text for needle in needles):
             return label
@@ -425,6 +526,10 @@ def leg_reconciliation(rows, root=None):
     ``*_opt.xyz``，以及清单里有没有它的作业行。``duplicate_work_risk=true`` 是本表唯一的告警，
     只在「磁盘上已有 ORCA 正常结束的原始输出，而清单里没有对应的 computed 作业行」时出现——
     那正是重复计算的入口。``not_started`` 不是失败，只是这条腿还没排上。
+
+    ``classification`` 只回答「这条腿有没有跑完」（作业层的 computed 口径）；``qc_accepted`` 另答
+    「它能不能进主极小集合」（Opt 收敛、正常结束、无虚频）。两者刻意分开：跑完但不通过 QC 的腿
+    （例如 ``SL|LiM_2plus`` 的一个虚频）在作业层是 computed，却必须被交付账本排除。
     """
     by_job = {row["job_id"]: row for row in rows if row["cohort"] == "wp2_production"}
     base = WP2PROD if root is None else root
@@ -437,6 +542,7 @@ def leg_reconciliation(rows, root=None):
             inp = pick(directory, "*.inp") if directory.is_dir() else None
             log = pick(directory, "*.log") if directory.is_dir() else None
             final = pick(directory, "*_opt.xyz") if directory.is_dir() else None
+            payload = directory / ("%s_%s.json" % (name, state)) if directory.is_dir() else None
             terminated = False
             if log is not None:
                 terminated = bool(RE_TERMINATED.search(log.read_text(encoding="utf-8", errors="replace")))
@@ -449,6 +555,17 @@ def leg_reconciliation(rows, root=None):
                 classification = "input_without_registration"
             else:
                 classification = "not_started"
+            record = {}
+            if payload is not None and payload.is_file():
+                try:
+                    record = json.loads(payload.read_text(encoding="utf-8"))
+                except (ValueError, OSError):
+                    record = {}
+            imaginary = str(record.get("imaginary_modes", ""))
+            qc_accepted = (record.get("status") == "computed"
+                           and str(record.get("terminated")) == "true"
+                           and str(record.get("opt_converged")) == "true"
+                           and imaginary == "0")
             risk = terminated and job_state != "computed"
             legs.append({
                 "leg_id": "%s|%s" % (name, state), "mol_id": mol_id, "name": name, "state": state,
@@ -459,6 +576,9 @@ def leg_reconciliation(rows, root=None):
                 "log_terminated": "true" if terminated else "false",
                 "final_geometry_on_disk": "true" if final is not None else "false",
                 "registered_job_state": job_state,
+                "payload_on_disk": "true" if (payload is not None and payload.is_file()) else "false",
+                "imaginary_modes": imaginary,
+                "qc_accepted": "true" if qc_accepted else "false",
                 "duplicate_work_risk": "true" if risk else "false",
                 "note": ("a finished raw output exists on disk but the manifest has no computed job row "
                          "for this leg; re-running it would duplicate work") if risk else "",
@@ -738,6 +858,25 @@ def acceptance(rows, mapping, cache, pools, legs):
             len(on_disk), len(risky),
             "" if not risky else "; first: " + risky[0]["leg_id"]),
     })
+    ledger_legs = set()
+    if PRODUCTION_LEDGER.is_file():
+        with PRODUCTION_LEDGER.open(encoding="utf-8-sig", newline="") as handle:
+            for entry in csv.DictReader(handle):
+                ledger_legs.add("%s|%s" % (entry.get("name", ""), entry.get("state", "")))
+    computed_legs = [row for row in legs if row["classification"] == "computed"]
+    qc_rejected = [row for row in computed_legs if row["qc_accepted"] == "false"]
+    folded_rejects = [row["leg_id"] for row in qc_rejected if row["leg_id"] in ledger_legs]
+    checks.append({
+        "check_id": "qc_rejected_legs_are_named_and_kept_out_of_the_ledger",
+        "description": "跑完但未通过 QC 的腿（虚频 / Opt 未收敛 / 未正常结束）逐条具名，"
+                       "且不得出现在交付账本 production_ledger.csv 里",
+        "ok": str(not folded_rejects).lower(),
+        "detail": "%d computed / %d qc-accepted / %d qc-rejected (%s); folded into the ledger anyway: %s"
+                  % (len(computed_legs), len(computed_legs) - len(qc_rejected), len(qc_rejected),
+                     ", ".join("%s imag=%s" % (row["leg_id"], row["imaginary_modes"] or "?")
+                               for row in qc_rejected) or "none",
+                     ", ".join(folded_rejects) or "none"),
+    })
     return checks
 
 
@@ -747,6 +886,7 @@ PREP_LEDGER_ROW_ID = prep_ledger_row_id()
 
 
 def build():
+    baseline = baseline_manifest()
     pools = derived_key_pools()
     cache, cache_rows = sampling_cache()
     rows = [build_row(*job) for job in scan_production() + scan_audit()]
@@ -757,6 +897,17 @@ def build():
     mapping = derived_map(rows)
     legs = leg_reconciliation(rows)
     checks = acceptance(rows, mapping, cache, pools, legs)
+    baseline_verified = [r for r in baseline
+                         if r["verification_status"] == "verified_from_git_object"]
+    baseline_unverifiable = [r for r in baseline
+                             if r["verification_status"] == "unverifiable"]
+    checks.append({
+        "check_id": "baseline_commit_and_key_artifacts_are_sha256_manifested",
+        "description": "方案基线提交及当时已有关键产物从 Git 对象生成 SHA256；取不到则显式 unverifiable",
+        "ok": str(bool(baseline_verified) and not baseline_unverifiable).lower(),
+        "detail": "%d verified / %d unverifiable at %s" % (
+            len(baseline_verified), len(baseline_unverifiable), BASELINE_COMMIT),
+    })
 
     evidence = []
     for row in rows:
@@ -811,6 +962,14 @@ def build():
         },
         "archive_policy": ("raw ORCA logs are not mirrored; the manifest records repository-relative "
                            "logical locations plus sha256 so an independent archive can be verified"),
+        "baseline_manifest": {
+            "path": "outputs/physics_completion/provenance/baseline_artifact_manifest.csv",
+            "commit": BASELINE_COMMIT,
+            "commit_time": baseline[0]["commit_time"] if baseline else "UNVERIFIABLE",
+            "verified": len(baseline_verified), "unverifiable": len(baseline_unverifiable),
+            "scope": ("named root/config/metadata files and immediate derived files in gate1, "
+                      "phase2_p1a, week4-week7; nested raw-job trees excluded"),
+        },
         "checks": checks,
         "n_checks": len(checks),
         "n_failed": sum(0 if item["ok"] else 1 for item in checks),
@@ -841,13 +1000,13 @@ def build():
         "`duplicate_work_risk=true` 是本表唯一的告警：磁盘上已有正常结束的原始输出、",
         "清单里却没有对应的 computed 作业行，重新排队就等于重复计算。",
         "",
-        "| 腿 | 分类 | 磁盘原始输出 | 正常结束 | 重复风险 |",
-        "| --- | --- | --- | --- | --- |",
+        "| 腿 | 分类 | 磁盘原始输出 | 正常结束 | QC 接受 | 重复风险 |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for row in legs:
-        md.append("| %s | %s | %s | %s | %s |" % (row["leg_id"], row["classification"],
-                                                 row["raw_output_on_disk"], row["log_terminated"],
-                                                 row["duplicate_work_risk"]))
+        md.append("| %s | %s | %s | %s | %s | %s |" % (row["leg_id"], row["classification"],
+                                                       row["raw_output_on_disk"], row["log_terminated"],
+                                                       row["qc_accepted"], row["duplicate_work_risk"]))
     failed_jobs = [row for row in rows if row["job_state"] == "failed"]
     if failed_jobs:
         md += [
@@ -864,7 +1023,9 @@ def build():
             "* 分类只依据该作业自己 `.log` 里的字符串，不做外部推断。",
             "* `mpi_smpd_*`：Microsoft MPI 的 smpd 在作业期间不可用或失联（主机重启后需要重新拉起，队列器 `ensure_smpd()` 已处理）。",
             "* `orca_cannot_open_scratch_file`：ORCA 打不开自己的 scratch 文件。",
-            "* 这类残骸不构成任何物理结论，也不替代缺失的腿。",
+            "* `qc_rejected_imaginary_mode`：ORCA 正常结束，但频率段给出虚频——腿按 QC 判不合格记 `status=failed`、不进交付账本（这是物理结论：该几何不是极小点，需要换起点重优化，不是基础设施事故）。",
+            "* `qc_rejected_unclassified`：ORCA 正常结束却被判 failed，但日志文本不足以指认具体 QC 项；如实标出，不猜。",
+            "* 基础设施残骸不构成任何物理结论，也不替代缺失的腿；`qc_rejected_*` 则是真实的 QC 结论，同样不进主极小集合。",
         ]
     md += [
         "",
@@ -872,6 +1033,10 @@ def build():
         "",
         "* `job_archive_manifest.csv`：逐作业的输入 / 起始几何 / 最终几何 / 原始输出路径与 sha256，",
         "  以及 `orca_keyword`、`orca_version`、能量与频率 QC。",
+        "* `baseline_artifact_manifest.csv`：以 `%s` 的 Git 对象为时间边界，对当时已有的关键派生产物"
+        "逐字节计算 SHA256；不读取今天的工作树替代历史内容。" % BASELINE_COMMIT,
+        "  范围仅含根目录/配置/元数据关键文件，以及 gate1、phase2_p1a、week4-week7 的直属文件；"
+        "嵌套原始作业树不在本清单范围。Git 对象取不到时只写 `unverifiable`，不猜哈希。",
         "* `derived_to_job_map.csv`：已提交派生表里的每一行数值对应哪个作业。",
         "* `provenance_index.json` 的 `evidence_digest` 是对全部哈希的确定性摘要：",
         "  解压独立归档后按同一配方重算即可复核。",
@@ -889,6 +1054,8 @@ def build():
         "",
     ]
     return {
+        "outputs/physics_completion/provenance/baseline_artifact_manifest.csv":
+            csv_text(BASELINE_FIELDS, baseline),
         "outputs/physics_completion/provenance/job_archive_manifest.csv":
             csv_text(JOB_FIELDS, rows),
         "outputs/physics_completion/provenance/derived_to_job_map.csv":

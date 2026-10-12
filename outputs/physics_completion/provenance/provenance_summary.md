@@ -10,9 +10,9 @@
 | --- | --- | --- | --- |
 | wp1_geometry_prep | 1 | 1 | 1 |
 | wp1_method_audit | 160 | 160 | 160 |
-| wp2_production | 17 | 16 | 13 |
+| wp2_production | 32 | 32 | 32 |
 | wp2_sampling | 640 | 640 | 640 |
-| wp3_recheck | 16 | 16 | 16 |
+| wp3_recheck | 24 | 24 | 24 |
 
 ## 四分子 20 条腿现场核对
 
@@ -20,46 +20,48 @@
 `duplicate_work_risk=true` 是本表唯一的告警：磁盘上已有正常结束的原始输出、
 清单里却没有对应的 computed 作业行，重新排队就等于重复计算。
 
-| 腿 | 分类 | 磁盘原始输出 | 正常结束 | 重复风险 |
-| --- | --- | --- | --- | --- |
-| DMC|M | computed | true | true | false |
-| DMC|M_plus | computed | true | true | false |
-| DMC|LiM_plus | computed | true | true | false |
-| DMC|LiM_2plus | computed | true | true | false |
-| DMC|M_tzvpd | not_started | false | false | false |
-| EMC|M | computed | true | true | false |
-| EMC|M_plus | computed | true | true | false |
-| EMC|LiM_plus | failed | true | false | false |
-| EMC|LiM_2plus | failed | true | false | false |
-| EMC|M_tzvpd | not_started | false | false | false |
-| GBL|M | computed | true | true | false |
-| GBL|M_plus | computed | true | true | false |
-| GBL|LiM_plus | computed | true | true | false |
-| GBL|LiM_2plus | in_flight | false | false | false |
-| GBL|M_tzvpd | computed | true | true | false |
-| SL|M | computed | true | true | false |
-| SL|M_plus | computed | true | true | false |
-| SL|LiM_plus | computed | true | true | false |
-| SL|LiM_2plus | failed | true | false | false |
-| SL|M_tzvpd | not_started | false | false | false |
+| 腿 | 分类 | 磁盘原始输出 | 正常结束 | QC 接受 | 重复风险 |
+| --- | --- | --- | --- | --- | --- |
+| DMC|M | computed | true | true | true | false |
+| DMC|M_plus | computed | true | true | true | false |
+| DMC|LiM_plus | computed | true | true | true | false |
+| DMC|LiM_2plus | computed | true | true | true | false |
+| DMC|M_tzvpd | computed | true | true | true | false |
+| EMC|M | computed | true | true | true | false |
+| EMC|M_plus | computed | true | true | true | false |
+| EMC|LiM_plus | computed | true | true | true | false |
+| EMC|LiM_2plus | computed | true | true | true | false |
+| EMC|M_tzvpd | computed | true | true | true | false |
+| GBL|M | computed | true | true | true | false |
+| GBL|M_plus | computed | true | true | true | false |
+| GBL|LiM_plus | computed | true | true | true | false |
+| GBL|LiM_2plus | computed | true | true | true | false |
+| GBL|M_tzvpd | computed | true | true | true | false |
+| SL|M | computed | true | true | true | false |
+| SL|M_plus | computed | true | true | true | false |
+| SL|LiM_plus | computed | true | true | true | false |
+| SL|LiM_2plus | computed | true | true | true | false |
+| SL|M_tzvpd | computed | true | true | true | false |
 
 ## 未正常结束的作业
 
 | job_id | state | failure_reason |
 | --- | --- | --- |
-| wp2prod/EMC/LiM_2plus | LiM_2plus | mpi_smpd_unavailable |
-| wp2prod/EMC/LiM_plus | LiM_plus | mpi_smpd_communication_lost |
-| wp2prod/SL/LiM_2plus | LiM_2plus | mpi_smpd_unavailable |
+| wp2prod/DEC/LiM_2plus | LiM_2plus | qc_rejected_imaginary_mode |
 
 * 分类只依据该作业自己 `.log` 里的字符串，不做外部推断。
 * `mpi_smpd_*`：Microsoft MPI 的 smpd 在作业期间不可用或失联（主机重启后需要重新拉起，队列器 `ensure_smpd()` 已处理）。
 * `orca_cannot_open_scratch_file`：ORCA 打不开自己的 scratch 文件。
-* 这类残骸不构成任何物理结论，也不替代缺失的腿。
+* `qc_rejected_imaginary_mode`：ORCA 正常结束，但频率段给出虚频——腿按 QC 判不合格记 `status=failed`、不进交付账本（这是物理结论：该几何不是极小点，需要换起点重优化，不是基础设施事故）。
+* `qc_rejected_unclassified`：ORCA 正常结束却被判 failed，但日志文本不足以指认具体 QC 项；如实标出，不猜。
+* 基础设施残骸不构成任何物理结论，也不替代缺失的腿；`qc_rejected_*` 则是真实的 QC 结论，同样不进主极小集合。
 
 ## 读法
 
 * `job_archive_manifest.csv`：逐作业的输入 / 起始几何 / 最终几何 / 原始输出路径与 sha256，
   以及 `orca_keyword`、`orca_version`、能量与频率 QC。
+* `baseline_artifact_manifest.csv`：以 `d5217a1f1f7e85c3e117b29d734efc2a8e535ecd` 的 Git 对象为时间边界，对当时已有的关键派生产物逐字节计算 SHA256；不读取今天的工作树替代历史内容。
+  范围仅含根目录/配置/元数据关键文件，以及 gate1、phase2_p1a、week4-week7 的直属文件；嵌套原始作业树不在本清单范围。Git 对象取不到时只写 `unverifiable`，不猜哈希。
 * `derived_to_job_map.csv`：已提交派生表里的每一行数值对应哪个作业。
 * `provenance_index.json` 的 `evidence_digest` 是对全部哈希的确定性摘要：
   解压独立归档后按同一配方重算即可复核。

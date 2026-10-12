@@ -117,6 +117,7 @@ def test_layout_doc_names_the_reproduction_evidence_chain():
     doc = _doc()
     for token in ("outputs/physics_completion/provenance/",
                   "job_archive_manifest.csv",
+                  "baseline_artifact_manifest.csv",
                   "derived_to_job_map.csv",
                   "provenance_acceptance.csv",
                   "provenance_index.json",

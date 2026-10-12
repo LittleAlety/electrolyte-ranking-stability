@@ -114,6 +114,12 @@ def test_shipped_reconciliation_matches_the_delivered_ledger():
     legs = _rows(RECON)
     assert len(legs) == 20 and len({row["leg_id"] for row in legs}) == 20
     assert all(row["duplicate_work_risk"] == "false" for row in legs)
+    # 「跑完」（作业层 computed）与「通过 QC 能进主极小集合」是两件事：跑完但有虚频的腿必须具名，
+    # 且不得出现在交付账本里。交付账本对齐的是 qc_accepted 集合，不是 computed 集合。
     computed = {row["leg_id"] for row in legs if row["classification"] == "computed"}
+    accepted = {row["leg_id"] for row in legs if row["qc_accepted"] == "true"}
+    rejected = sorted(computed - accepted)
+    assert all(_leg(legs, leg)["imaginary_modes"] for leg in rejected), rejected
     ledger = {"%s|%s" % (row["name"], row["state"]) for row in _rows(LEDGER)}
-    assert computed == ledger, "闭环现场核对与交付账本的 computed 集合必须一致"
+    assert accepted == ledger, "交付账本必须恰好是 QC 接受的腿集合"
+    assert not (set(rejected) & ledger), "被 QC 拒绝的腿不得进入交付账本"

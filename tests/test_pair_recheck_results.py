@@ -37,6 +37,8 @@ def _gaps():
 def test_results_cover_exactly_the_ready_rows_and_the_plan_stays_result_free():
     plan = _rows(RECHECK / "job_plan.csv")
     results = _results()
+    acceptance = {row["check_id"]: row for row in _rows(RECHECK / "acceptance.csv")}
+    coverage = acceptance["results_cover_exactly_the_ready_rows"]
     ready = {row["record_id"] for row in plan if row["status"] == "ready"}
     blocked = {row["record_id"] for row in plan if row["status"] != "ready"}
     # 24 行 = 3 分子 x 4 主态 x 2 设定（冻结）。ready / blocked 的切分随生产腿落地而移动
@@ -46,8 +48,18 @@ def test_results_cover_exactly_the_ready_rows_and_the_plan_stays_result_free():
     assert len(ready) + len(blocked) == len(plan)
     assert all(row["geometry_available"] == "true" for row in plan if row["status"] == "ready")
     assert all(row["geometry_available"] == "false" for row in plan if row["status"] != "ready")
-    assert {row["record_id"] for row in results} == ready
-    assert not (blocked & {row["record_id"] for row in results})
+    result_ids = {row["record_id"] for row in results}
+    # 结果只能落在 ready 行上：超出计划的结果迫使重新生成计划（不允许悄悄扩范围）。
+    assert result_ids <= ready
+    assert not (blocked & result_ids)
+    # 复核链跑完后结果恰好覆盖 ready；尚未跑完时，未覆盖的 ready 行必须由计划自身的验收逐条点名，
+    # 不允许「结果表悄悄少几条而计划自称 0 失败」。
+    if coverage["ok"] == "true":
+        assert result_ids == ready
+    else:
+        assert result_ids < ready
+        assert "ready %d" % len(ready) in coverage["detail"]
+        assert "registered %d" % len(result_ids) in coverage["detail"]
     result_columns = [field for field in plan[0]
                       if any(token in field for token in ("ev", "energy", "sign", "delta", "flip"))]
     assert result_columns == []

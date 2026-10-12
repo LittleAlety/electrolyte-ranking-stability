@@ -79,6 +79,8 @@ week36 与 week44 只存在于 part2 镜像。
 | `50-57` | 评审实施方案 WP1–WP7 与论文收敛（week28–35） |
 | `58-64` | physics_completion_v1 WP0–WP6（week37–43） |
 | `65-65` | 本骨架图 |
+| `66-66` | WP1 生产方法冻结（`66_wp1_production_method_freeze.md`，机器可读件 `config/production_method_freeze_v1.json`） |
+| `67-67` | WP1 还原态三项检查协议登记（`67_wp1_reduction_state_check_protocol.md`；判据与缺口先登记、本轮未计算） |
 
 不带数字前缀的文档（`claim_migration.md`、`gate1_negative_result.md`、
 `physics_completion_final_report.md`、`physics_completion_protocol.md`、
@@ -91,7 +93,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**34** 个跟踪文件）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**36** 个跟踪文件：31 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -100,7 +102,10 @@ week36 与 week44 只存在于 part2 镜像。
 
 | 脚本（`.py`） | 职责 | 主要输入 → 输出 |
 | --- | --- | --- |
-| `run_wp2_queue.py` | 20 条腿（4 分子 × {`M`,`M_tzvpd`,`M_plus`,`LiM_plus`,`LiM_2plus`}）的幂等队列器：统一调度、并发上限（2 worker × 4 核）、断点续跑、逐次开跑与周期复查 `smpd` | 队列登记表 → `work/wp2prod/**` 现场 + `_queue_<NAME>_<STATE>.out` |
+| `run_wp2_queue.py` | 12 主集分子 × 5 腿 = **60 条腿**（{`M`,`M_tzvpd`,`M_plus`,`LiM_plus`,`LiM_2plus`}）的幂等队列器：统一调度、并发上限（3 worker × 4 核）、断点续跑、逐次开跑与周期复查 `smpd`；覆盖范围与 `physics_completion_set.csv` 的 `in_main=true` 集合由 `tests/test_wp2_queue_scope.py` 钉死 | 队列登记表 → `work/wp2prod/**` 现场 + `_queue_<NAME>_<STATE>.out` |
+| `prepare_hpc_main_remaining.py` | 把队列 `missing` 的腿打成**超算任务包**（`tasks/<name>/<state>/` + `job.inp` + `geom.xyz` + `inputs.sha256`，17+18 分批 + `manifest.json` 记源文件 sha256）；只准备，不上传、不提交、不跑 ORCA | 队列 `inventory()` → `work/hpc_main_remaining_17_18/` |
+| `import_hpc_numfreq.py` | 超算 NumFreq 结果的**只读校验 + 非覆盖导入**：拒收混用梯度（`Restart` 复用位移几何且最大位移 > 2e-6 Å）、源 Opt 未收敛 / 源已有频率、几何身份不符、热化学不完整；虚频结果写 `status=failed` / `qc_flag=imaginary_modes`（**退出码仍为 0，判定要读 status**）；逐文件登记 sha256 且不覆盖内容不同者 | `work/hpc_results/<job>/…` + `work/wp2prod/<name>/<state>/` → `<NAME>_<STATE>.{json,log,_opt.xyz}` + `hpc_import/provenance.json` |
+| `import_hpc_opt_numfreq.py` | **自包含 HPC Opt+NumFreq 腿**的只读校验 + 非覆盖导入（主集任务包与鞍点重优化都是这一形态；续算导入器按构造拒收它们）：校验冻结输入语法与 `Opt TightOpt` 联合作业、输出回显、正常终止 + 优化收敛、**拒收频率重启**（`Restart:`/`%freq Restart` 即梯度可能被复用）、起点/终点几何与日志坐标块逐原子一致（2e-6 Å）、3N 个有限频率、热化学完整且 `G = E + 热校正`；虚频记 `status=failed` + `qc_flag=imaginary_modes`；任务包 `inputs.sha256` 与 `manifest.json` 起点档位不符即拒收 | 包内 `tasks/<NAME>/<STATE>/run/{job.log,job.xyz,job.inp,geom.xyz}` → `work/wp2prod/<name>/<state>/<NAME>_<STATE>.{json,log,opt.xyz,inp}` + `hpc_import/provenance.json` |
 | `run_wp2_production.py` | 生产级 Opt+NumFreq 驱动（`M` / `M_plus` / `LiM_plus` / `LiM_2plus`） | 起始几何 → ORCA 输入/日志/几何（`work/wp2prod/`） |
 | `run_wp2_extra.py` | 与带电腿**基组一致**的中性腿 `M_tzvpd`（def2-TZVPD）驱动 | 中性几何 → ORCA 现场（`work/wp2prod/`） |
 | `run_batch.py` | 12 主集分子 × 4 主态的 xTB/ORCA 批量驱动与公共工具（几何、ORCA/xTB 路径、片段分析）；`ORCA_CORES` 定义处 | 分子/态清单 → `work/pilot12/**` |
@@ -121,6 +126,7 @@ week36 与 week44 只存在于 part2 镜像。
 | `build_wp2_sampling.py` | 气相 GFN2 构象筛选层（派生层） | 生产 ledger → `outputs/physics_completion/sampling/**` |
 | `build_wp2_cost_scenarios.py` | 方案 11：按类中位 / p90 与剩余成本低-中-高情景（派生层） | 生产 ledger → `outputs/physics_completion/cost/**` |
 | `build_pair_recheck_plan.py` | 方案 5.3 / 11：关键 pair 第二泛函靶向复核的**结果前预注册** + 复核跑完后只读 `recheck_results.csv`、现算逐 (pair, 设定) 的 delta | 规则/对象/设定/几何来源 → `targeted_recheck/` 计划与验收层 |
+| `build_descriptor_analysis.py` | 方案 §7.3 描述符层（派生层，零新增计算）：donor type / chelation / flexibility / functionalization / 廉价 ESP 报**全部**检验（含不显著），Holm 与 BH 并列，TPSA 仅探索性；n=12 不拟合多参数模型 | 冻结产物 → `outputs/physics_completion/pair_evidence/descriptor_analysis.{csv,md}` |
 | `build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） | 结构登记 → `outputs/physics_completion/li_motif_sampling/**` |
 | `screen_li_motifs.py` | 方案 6.1 / 执行第 3 步的**执行器**：复用 `build_li_motifs.py` 里冻结的枚举规则（给体识别 / 单齿 / 双齿 / ESP 补点），按每条腿自己的电荷与多重度跑气相 GFN2-xTB 筛选、按配位模式 + 重原子 RMSD 去重、每腿保留最多 3 个独立 motif；`--check` 核对落盘 CSV 与运行记录同版、父几何未被重跑 | 各腿自己的生产几何（去 Li 后作为父结构）+ `work/limotif/**` → `outputs/physics_completion/li_motif_sampling/li_motif_screen.{csv,json,md}` |
 | `make_physics_completion_figures.py` | 方案 14 的六张主图（F59-F64）与图清单 | 交付层 CSV → `outputs/figures/**` |
@@ -141,8 +147,13 @@ week36 与 week44 只存在于 part2 镜像。
 
 `scripts/wp_production/finalize_wp2.ps1` 一条命令跑完：
 
-anchors → emit-wp2 → generator → provenance → state-identity → anchor-condition → sampling → li-motif-plan → ensemble → closure → compliance → cost
-→ recheck-plan → figures → mirror → site → freeze → clean-room → archive-verify → 各 `--check` → pytest。
+anchors → emit-wp2 → generator → provenance → state-identity → anchor-condition → sampling → li-motif-plan → ensemble → closure → cost
+→ recheck-plan → compliance → figures → mirror → site → freeze → clean-room → archive-verify → 各 `--check` → pytest。
+
+`cost` / `recheck-plan` **必须**排在 `compliance` 之前：`build_plan_compliance.py` 的 §11 条目读
+`cost/cost_scenario_acceptance.csv` + `cost/cost_scenario_index.json`，§5.1 条目读
+`pair_evidence/targeted_recheck/job_plan.csv` + `recheck_results.csv`。顺序反了，它会读上一轮的状态，
+同一轮里的 `--check` 就会报 `differs`（2026-10-11 四分子 20/20 时暴露）。
 
 任一步非零即打印 `ABORT`，全绿才打印 `ALL GREEN`。日志重定向到 `work/_chainN.log`
 （**不要**用 `Select-Object -First N` 接管道，会掐断链）。加 `-Commit` 才会提交。
@@ -175,6 +186,9 @@ anchors → emit-wp2 → generator → provenance → state-identity → anchor-
 
 - `outputs/physics_completion/provenance/`
   - `job_archive_manifest.csv`：逐作业的原始文件清单与 sha256，以及从原始日志登记的关键值（能量 / 频率 / QC）。
+  - `baseline_artifact_manifest.csv`：以方案基线提交 `d5217a1f` 的 **Git 对象**为时间边界，对当时已有关键派生产物逐字节计算
+    sha256（不读今天的工作树冒充历史）；范围是根/配置/元数据关键文件与 gate1、phase2_p1a、week4-week7 的直属文件，
+    嵌套原始作业树不在内。Git 对象取不到时只写 `unverifiable`，不猜哈希。
   - `derived_to_job_map.csv`：**派生值 → 作业 ID** 的映射（交付层每个数字该由哪个作业解释）。
   - `provenance_acceptance.csv`：证据链自检（缺文件 / 哈希不符 / 字段缺失）。
   - `provenance_index.json`：上述三者的机器可读索引；`provenance_summary.md` 是人读摘要。

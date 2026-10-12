@@ -1,20 +1,22 @@
-"""WP2 四分子四态生产队列：可断点续跑、并发上限 2 个 ORCA 作业。
+"""WP2 主集生产队列：可断点续跑、并发上限 3 个 ORCA 作业。
 
 用法:
     .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\run_wp2_queue.py --status
-    .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\run_wp2_queue.py --run [--max-jobs 2] [--force]
+    .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\run_wp2_queue.py --run [--max-jobs 3] [--force]
     .venv\\Scripts\\python.exe -X utf8 scripts\\wp_production\\run_wp2_queue.py --worker <NAME> <STATE>
 
-范围：DMC / EMC / GBL / SL 四分子 x {M, M_tzvpd, M_plus, LiM_plus, LiM_2plus} = 20 条腿。
+范围：主集 12 分子 x {M, M_tzvpd, M_plus, LiM_plus, LiM_2plus} = 60 条腿。
+（四分子 20 条腿是其中的**子集**，pilot 层的 provenance 记录见
+outputs/physics_completion/provenance/leg_reconciliation.csv，口径仍是那 20 条，不随本文件扩大。）
   * M 沿用既有 def2-TZVP 口径；M_tzvpd 与三个带电态走 def2-TZVPD，
     使 G(M+) - G(M_tzvpd) 与 G([LiM]2+) - G([LiM]+) 在同一基组下可相减。
   * 已 computed 的腿自动跳过（幂等）；被打断或 failed 的腿自动重新入队。
 
-并发纪律（用户硬要求：不要占满机器）：
-  * 本文件只做调度，最多同时 2 个 worker 子进程；每个 worker 内 ORCA 用 4 核
-    （run_batch.ORCA_CORES），即全机最多 8 个 ORCA 核。
+并发纪律（用户硬要求：不要占满机器；2026-10-10 由 2 提到 3）：
+  * 本文件只做调度，最多同时 3 个 worker 子进程；每个 worker 内 ORCA 用 4 核
+    （run_batch.ORCA_CORES），即全机最多 12 个 ORCA 核（本机 16 物理核）。
   * --run 开跑前先查是否已有别的 wp2 驱动 / orca 在跑；有则拒绝启动（--force 可覆盖），
-    避免叠加成 4 个 ORCA 作业。
+    避免叠加成 6 个 ORCA 作业。
 
 断点续跑：所有状态都在 work/wp2prod/<NAME>/<STATE>/<NAME>_<STATE>.json，
 机器重启后重跑 --run 即可。smpd（Microsoft MPI）在开跑前、每个作业开跑前、以及长跑期间
@@ -44,7 +46,14 @@ import run_wp2_production as prod  # noqa: E402
 OUT = REPO / "work" / "wp2prod"
 SMPD = Path(r"C:\Program Files\Microsoft MPI\Bin\smpd.exe")
 
-MOL_IDS = ("C01", "C02", "C13", "C14")
+#: 生产队列覆盖**方案主集全体**（方案 §3.1 的 12 个分子），不是四分子 pilot 子集。
+#:
+#: 这里曾经写死 ("C01","C02","C13","C14")，于是 20/20 跑完之后队列永远「empty」、
+#: 监守按 done 退出、看护按「腿已全齐」退出——**没有任何东西能把它推到 24/48**，
+#: 生产就静默停在 16/48（本次核实发现的空转根因）。覆盖范围与
+#: data/metadata/physics_completion_set.csv 的 in_main=true 集合由
+#: tests/test_wp2_queue_scope.py 钉死，避免再次无声漂移。
+MOL_IDS = ("C01", "C02", "C03", "C04", "C05", "C08", "C09", "C13", "C14", "C15", "C16", "C17")
 # (state, owner)：owner 决定复用哪个既有驱动的 run_state，本文件不重复实现 ORCA 调用
 LEGS = (
     ("M", "prod"),
@@ -214,7 +223,7 @@ def main(argv=None):
     parser.add_argument("--status", action="store_true", help="只打印队列状态，不跑任何计算")
     parser.add_argument("--run", action="store_true", help="跑完所有未完成的腿")
     parser.add_argument("--worker", nargs=2, metavar=("NAME", "STATE"), help="内部使用")
-    parser.add_argument("--max-jobs", type=int, default=2, help="并发 ORCA 作业上限（默认 2）")
+    parser.add_argument("--max-jobs", type=int, default=3, help="并发 ORCA 作业上限（默认 3）")
     parser.add_argument("--force", action="store_true", help="忽略「已有作业在跑」的保护")
     args = parser.parse_args(argv)
 
