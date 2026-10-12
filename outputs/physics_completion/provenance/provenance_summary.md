@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | wp1_geometry_prep | 1 | 1 | 1 |
 | wp1_method_audit | 160 | 160 | 160 |
-| wp2_production | 32 | 32 | 32 |
+| wp2_production | 36 | 36 | 36 |
 | wp2_sampling | 640 | 640 | 640 |
 | wp3_recheck | 24 | 24 | 24 |
 

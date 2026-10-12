@@ -47,6 +47,7 @@ import json
 import math
 import re
 import sys
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -61,6 +62,90 @@ ALL_STATES = {state: (method, charge, mult)
               for state, method, charge, mult in list(prod.STATES) + list(extra.STATES)}
 RESTART_MARKERS = (re.compile(r"Restart:\s*\d+\s+calculations left"),
                    re.compile(r"%freq\s+Restart\s+true", re.I))
+RE_TOTAL_RUN = re.compile(r"TOTAL RUN TIME:\s*(\d+) days (\d+) hours (\d+) minutes "
+                          r"(\d+) seconds (\d+) msec")
+RE_FINAL_SP = re.compile(r"FINAL SINGLE POINT ENERGY([^\r\n]*)")
+
+
+def printed_number(token):
+    """Exact decimal center and half a unit of the displayed last place."""
+    try:
+        value = Decimal(token.replace("D", "E").replace("d", "e"))
+    except InvalidOperation as exc:
+        raise ValueError("Hessian linkage contains invalid numeric evidence") from exc
+    if not value.is_finite():
+        raise ValueError("Hessian linkage contains non-finite numeric evidence")
+    return value, Decimal(5).scaleb(value.as_tuple().exponent - 1)
+
+
+def validate_hessian(data, xyz, electronic):
+    """Link the frequency energy to its geometry using printed precision, not a ratio."""
+    lines = [line.strip() for line in data.decode("utf-8").splitlines() if line.strip()]
+
+    def section(name):
+        if lines.count(name) != 1:
+            raise ValueError("Hessian must contain exactly one " + name)
+        start = lines.index(name) + 1
+        end = next((i for i in range(start, len(lines)) if lines[i].startswith("$")), len(lines))
+        return lines[start:end]
+
+    energy = section("$act_energy")
+    if len(energy) != 1 or len(energy[0].split()) != 1:
+        raise ValueError("Hessian must contain one finite energy")
+    e, ep = printed_number(energy[0])
+    t, tp = printed_number(electronic)
+    if abs(e - t) > ep + tp:
+        raise ValueError("Hessian energy disagrees with thermochemistry at printed precision")
+    atoms = section("$atoms")
+    xyz_lines = xyz.decode("utf-8").splitlines()
+    try:
+        count = int(atoms[0])
+        if count <= 0 or count != int(xyz_lines[0]) or len(atoms) != count + 1:
+            raise ValueError
+        coords = [line.split() for line in xyz_lines[2:] if line.strip()]
+        if len(coords) != count:
+            raise ValueError
+    except (ValueError, IndexError) as exc:
+        raise ValueError("Hessian atom count is invalid or differs from final XYZ") from exc
+    # ORCA uses the older Bohr conversion (not CODATA 2018's 0.529177210903).
+    # ORCA manual 5.0.4, section 4.2 (kofo.mpg.de/970274/orca_manual_5_0_4.pdf);
+    # cross-checked against the paired ORCA 6.1.1 job.xyz / $atoms outputs.
+    bohr, bp = printed_number("0.5291772083")
+    for hline, xline in zip(atoms[1:], coords):
+        h = hline.split()
+        if len(h) != 5 or len(xline) != 4 or h[0] != xline[0]:
+            raise ValueError("Hessian atoms differ from final XYZ")
+        mass, _ = printed_number(h[1])
+        if mass <= 0:
+            raise ValueError("Hessian atom mass is invalid")
+        for hv, xv in zip(h[2:], xline[1:]):
+            b, br = printed_number(hv)
+            a, ar = printed_number(xv)
+            tolerance = br * bohr + (abs(b) + br) * bp + ar
+            if abs(b * bohr - a) > tolerance:
+                raise ValueError("Hessian geometry differs from final XYZ at printed precision")
+
+
+def self_contained_cost(text):
+    """Cost of a *single* self-contained HPC job.
+
+    The continuation import must leave ``wall_sec`` blank because the interrupted local
+    Opt segment's runtime is unknown, and its scope note says so.  A self-contained leg
+    has no local segment: ORCA's ``TOTAL RUN TIME`` covers the whole leg, and it is the
+    same quantity the local driver measures around its ORCA process.  Recording it makes
+    the leg's core-hours computable instead of silently dropping every cluster leg out of
+    the cost ledger.
+    """
+    match = RE_TOTAL_RUN.search(text)
+    if not match:
+        return {"wall_sec": "", "hpc_wall_sec": "", "cost_status": "incomplete",
+                "cost_scope": ("ORCA TOTAL RUN TIME not found in this log; wall time left blank "
+                               "rather than guessed")}
+    days, hours, minutes, seconds, msec = (int(value) for value in match.groups())
+    wall = "%.3f" % (days * 86400 + hours * 3600 + minutes * 60 + seconds + msec / 1000.0)
+    return {"wall_sec": wall, "hpc_wall_sec": wall, "cost_status": "complete",
+            "cost_scope": ("single self-contained HPC Opt+NumFreq job; wall_sec = hpc_wall_sec = "
+                           "ORCA TOTAL RUN TIME for the whole leg (no local segment to add)")}
 
 
 def sha256(data: bytes) -> str:
@@ -134,8 +219,9 @@ def validate(run_dir: Path, start_level: str, root=prod.REPO):
              "hpc_input": run_dir / "job.inp",
              "final_geometry": run_dir / "job.xyz",
              "start_geometry": run_dir / "geom.xyz",
+             "hpc_hessian": run_dir / "job.hess",
              "hpc_stderr": run_dir / "job.stderr"}
-    required = ("hpc_log", "hpc_input", "final_geometry", "start_geometry")
+    required = ("hpc_log", "hpc_input", "final_geometry", "start_geometry", "hpc_hessian")
     missing = [key for key in required if not paths[key].is_file()]
     if missing:
         raise ValueError("missing required HPC artifacts: %s" % ", ".join(missing))
@@ -193,6 +279,24 @@ def validate(run_dir: Path, start_level: str, root=prod.REPO):
            - float(fields["g_single_eh"])) > 2e-7:
         raise ValueError("G != electronic + thermal correction")
 
+    # The last SP may use a different SCF pass; retain its absolute guard, and
+    # independently bind thermochemistry to Hessian energy AND final geometry.
+    sp_tokens = RE_FINAL_SP.findall(text)
+    if not sp_tokens or any(len(value.split()) != 1 for value in sp_tokens):
+        raise ValueError("missing/non-finite FINAL SINGLE POINT ENERGY")
+    try:
+        single_points = [float(printed_number(value.strip())[0]) for value in sp_tokens]
+    except ValueError as exc:
+        raise ValueError("invalid/non-finite FINAL SINGLE POINT ENERGY") from exc
+    if not all(math.isfinite(value) for value in single_points):
+        raise ValueError("non-finite FINAL SINGLE POINT ENERGY")
+    if single_points:
+        delta_last = abs(float(fields["electronic_eh"]) - single_points[-1])
+        if delta_last > 1e-5:
+            raise ValueError("thermochemistry electronic energy is not the converged-geometry "
+                             "energy (|E - last FINAL SINGLE POINT ENERGY| = %.2e Eh)" % delta_last)
+    validate_hessian(blobs["hpc_hessian"], blobs["final_geometry"], fields["electronic_eh"])
+
     start_sha = sha256(blobs["start_geometry"])
     sha_status = check_package_sha(task_dir, blobs)
     manifest_status, start_level = check_package_manifest(task_dir, name, state, start_sha, start_level)
@@ -220,8 +324,13 @@ def validate(run_dir: Path, start_level: str, root=prod.REPO):
                qc_flag="imaginary_modes" if imag else "",
                status="failed" if imag else "computed",
                li_o_ang="", nonli_components="")
-    row.update(imp.cost_segments(text))
-    row["notes"] += " COST INCOMPLETE: " + row["cost_scope"]
+    cost = self_contained_cost(text)
+    row["wall_sec"] = cost["wall_sec"]
+    row["hpc_wall_sec"] = cost["hpc_wall_sec"]
+    row["local_wall_sec"] = ""
+    row["cost_status"] = cost["cost_status"]
+    row["cost_scope"] = cost["cost_scope"]
+    row["notes"] += " COST: " + cost["cost_scope"]
     if state in prod.LI_STATES:
         symbols = [atom[0] for atom in final]
         coords = [atom[1:] for atom in final]
@@ -244,7 +353,7 @@ def validate(run_dir: Path, start_level: str, root=prod.REPO):
         "start_geometry_sha256": start_sha,
         "restart_markers": "none",
         "qc_accepted": not imag, "imaginary_modes": imag,
-        "cost": imp.cost_segments(text),
+        "cost": self_contained_cost(text),
         "log_relationship": ("canonical .log is the HPC job.log byte-for-byte; no concatenation "
                              "and no local segment is involved"),
     }
@@ -255,6 +364,7 @@ def validate(run_dir: Path, start_level: str, root=prod.REPO):
               target / (stem + ".log"): blobs["hpc_log"],
               target / (stem + "_opt.xyz"): blobs["final_geometry"],
               target / (stem + ".inp"): blobs["hpc_input"],
+              target / (stem + ".hess"): blobs["hpc_hessian"],
               # 起点几何也落在腿目录里（本机生产腿一贯如此），provenance 才能按
               # work/wp2prod/<NAME>/<STATE>/geom.xyz 登记起点几何的 sha256。
               target / "geom.xyz": blobs["start_geometry"],

@@ -93,7 +93,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**36** 个跟踪文件：31 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**38** 个跟踪文件：33 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -105,7 +105,8 @@ week36 与 week44 只存在于 part2 镜像。
 | `run_wp2_queue.py` | 12 主集分子 × 5 腿 = **60 条腿**（{`M`,`M_tzvpd`,`M_plus`,`LiM_plus`,`LiM_2plus`}）的幂等队列器：统一调度、并发上限（3 worker × 4 核）、断点续跑、逐次开跑与周期复查 `smpd`；覆盖范围与 `physics_completion_set.csv` 的 `in_main=true` 集合由 `tests/test_wp2_queue_scope.py` 钉死 | 队列登记表 → `work/wp2prod/**` 现场 + `_queue_<NAME>_<STATE>.out` |
 | `prepare_hpc_main_remaining.py` | 把队列 `missing` 的腿打成**超算任务包**（`tasks/<name>/<state>/` + `job.inp` + `geom.xyz` + `inputs.sha256`，17+18 分批 + `manifest.json` 记源文件 sha256）；只准备，不上传、不提交、不跑 ORCA | 队列 `inventory()` → `work/hpc_main_remaining_17_18/` |
 | `import_hpc_numfreq.py` | 超算 NumFreq 结果的**只读校验 + 非覆盖导入**：拒收混用梯度（`Restart` 复用位移几何且最大位移 > 2e-6 Å）、源 Opt 未收敛 / 源已有频率、几何身份不符、热化学不完整；虚频结果写 `status=failed` / `qc_flag=imaginary_modes`（**退出码仍为 0，判定要读 status**）；逐文件登记 sha256 且不覆盖内容不同者 | `work/hpc_results/<job>/…` + `work/wp2prod/<name>/<state>/` → `<NAME>_<STATE>.{json,log,_opt.xyz}` + `hpc_import/provenance.json` |
-| `import_hpc_opt_numfreq.py` | **自包含 HPC Opt+NumFreq 腿**的只读校验 + 非覆盖导入（主集任务包与鞍点重优化都是这一形态；续算导入器按构造拒收它们）：校验冻结输入语法与 `Opt TightOpt` 联合作业、输出回显、正常终止 + 优化收敛、**拒收频率重启**（`Restart:`/`%freq Restart` 即梯度可能被复用）、起点/终点几何与日志坐标块逐原子一致（2e-6 Å）、3N 个有限频率、热化学完整且 `G = E + 热校正`；虚频记 `status=failed` + `qc_flag=imaginary_modes`；任务包 `inputs.sha256` 与 `manifest.json` 起点档位不符即拒收 | 包内 `tasks/<NAME>/<STATE>/run/{job.log,job.xyz,job.inp,geom.xyz}` → `work/wp2prod/<name>/<state>/<NAME>_<STATE>.{json,log,opt.xyz,inp}` + `hpc_import/provenance.json` |
+| `import_hpc_opt_numfreq.py` | **自包含 HPC Opt+NumFreq 腿**的只读校验 + 非覆盖导入（主集任务包与鞍点重优化都是这一形态；续算导入器按构造拒收它们）：校验冻结输入语法与 `Opt TightOpt` 联合作业、输出回显、正常终止 + 优化收敛、**拒收频率重启**（`Restart:`/`%freq Restart` 即梯度可能被复用）、起点/终点几何与日志坐标块逐原子一致（2e-6 Å）、3N 个有限频率、热化学完整且 `G = E + 热校正`，并守卫「登记的是**收敛几何**电子能而非起点几何」（贴末次 FINAL SP、远离首次）；虚频记 `status=failed` + `qc_flag=imaginary_modes`；任务包 `inputs.sha256` 与 `manifest.json` 起点档位不符即拒收 | 包内 `tasks/<NAME>/<STATE>/run/{job.log,job.xyz,job.inp,geom.xyz}` → `work/wp2prod/<name>/<state>/<NAME>_<STATE>.{json,log,opt.xyz,inp}` + `hpc_import/provenance.json` |
+| `reopt_saddle.py` | 收敛到**鞍点**（虚频）的生产腿的**可复现逃逸**：解析该腿日志 NORMAL MODES 的虚频位移向量 → 把收敛几何沿它位移（最大单原子位移 = `--amplitude`，默认 0.20 Å）→ 写出扰动起点 + JSON（模式号/频率/符号/幅度/源日志与 opt.xyz 的 sha256/最大位移原子/方案 §6.3 原文）；**先校验该模式确为虚频**，否则拒收；`--leg-dir` 可指向 `work/wp2prod/_saddle_attempt1/` 冻结现场以复现历史输入；`--run` 才起本机 ORCA（超算路线：扰动几何打包 → `import_hpc_opt_numfreq.py` 导入） | 腿 `work/wp2prod/<NAME>/<STATE>/{<NAME>_<STATE>.log,_opt.xyz}` → `work/wp2prod/_reopt/<NAME>_<STATE>_perturbed_s<±>_a<amp>.{xyz,json}` |
 | `run_wp2_production.py` | 生产级 Opt+NumFreq 驱动（`M` / `M_plus` / `LiM_plus` / `LiM_2plus`） | 起始几何 → ORCA 输入/日志/几何（`work/wp2prod/`） |
 | `run_wp2_extra.py` | 与带电腿**基组一致**的中性腿 `M_tzvpd`（def2-TZVPD）驱动 | 中性几何 → ORCA 现场（`work/wp2prod/`） |
 | `run_batch.py` | 12 主集分子 × 4 主态的 xTB/ORCA 批量驱动与公共工具（几何、ORCA/xTB 路径、片段分析）；`ORCA_CORES` 定义处 | 分子/态清单 → `work/pilot12/**` |
