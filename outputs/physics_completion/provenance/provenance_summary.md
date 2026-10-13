@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | wp1_geometry_prep | 1 | 1 | 1 |
 | wp1_method_audit | 160 | 160 | 160 |
-| wp2_production | 36 | 36 | 36 |
+| wp2_production | 60 | 60 | 60 |
 | wp2_sampling | 640 | 640 | 640 |
 | wp3_recheck | 24 | 24 | 24 |
 
@@ -47,7 +47,16 @@
 
 | job_id | state | failure_reason |
 | --- | --- | --- |
+| wp2prod/AN/LiM_2plus | LiM_2plus | qc_rejected_imaginary_mode |
 | wp2prod/DEC/LiM_2plus | LiM_2plus | qc_rejected_imaginary_mode |
+| wp2prod/DME/M_plus | M_plus | qc_rejected_imaginary_mode |
+| wp2prod/DME/M_tzvpd | M_tzvpd | qc_rejected_imaginary_mode |
+| wp2prod/DOL/M_tzvpd | M_tzvpd | qc_rejected_imaginary_mode |
+| wp2prod/PC/LiM_2plus | LiM_2plus | qc_rejected_imaginary_mode |
+| wp2prod/TMP/LiM_2plus | LiM_2plus | qc_rejected_imaginary_mode |
+| wp2prod/TMP/LiM_plus | LiM_plus | qc_rejected_imaginary_mode |
+| wp2prod/TMP/M_plus | M_plus | qc_rejected_imaginary_mode |
+| wp2prod/TMP/M_tzvpd | M_tzvpd | qc_rejected_imaginary_mode |
 
 * 分类只依据该作业自己 `.log` 里的字符串，不做外部推断。
 * `mpi_smpd_*`：Microsoft MPI 的 smpd 在作业期间不可用或失联（主机重启后需要重新拉起，队列器 `ensure_smpd()` 已处理）。
