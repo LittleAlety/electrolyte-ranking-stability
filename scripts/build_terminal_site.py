@@ -40,23 +40,45 @@ REPO_URL = "https://github.com/LittleAlety/electrolyte-ranking-stability"
 PAGES_URL = "https://littlealety.github.io/electrolyte-ranking-stability/"
 
 
-def _wp2_main_progress():
-    """Main-state WP2 production progress, read from the week39 payload.
+def _wp2_progress():
+    """Published WP2 runtime/scientific snapshot from the compliance chain.
 
-    The figure caption below must not hardcode the count: it grows every time
-    another Opt+Freq state lands, and a stale caption would overstate or
-    understate the evidence the site shows.
+    ``work/wp2prod`` is intentionally gitignored, so the site must read the
+    tracked snapshot emitted by ``build_plan_compliance.py`` rather than the
+    machine-local working tree.  This keeps a clean clone reproducible while
+    preserving the distinction between completion and scientific acceptance.
     """
-    path = os.path.join(REPO, "outputs", "week39", "wp2_free_energy_labels.json")
+    path = os.path.join(
+        REPO, "outputs", "physics_completion", "compliance",
+        "plan_compliance_meta.json",
+    )
     try:
         with io.open(path, encoding="utf-8") as handle:
-            progress = json.load(handle)["free_state_production"]["progress"]
-        return int(progress["states_done"]), int(progress["states_total"])
+            raw = json.load(handle)
+        return {
+            "generated_at_utc": raw["generated_at_utc"],
+            "runtime": raw["runtime"],
+            "main_runtime": raw["main_runtime"],
+            "scientific": raw["scientific"],
+            "frozen": raw["frozen"],
+            "stale": bool(raw["stale"]),
+            "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
+        }
     except (OSError, KeyError, ValueError, TypeError):
-        return 0, 16
+        return {
+            "generated_at_utc": "unknown",
+            "runtime": {"computed": 0, "total": 60},
+            "main_runtime": {"computed": 0, "total": 48},
+            "scientific": {"accepted": 0, "total": 48},
+            "frozen": {"accepted": 0, "total": 48},
+            "stale": True,
+            "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
+        }
 
 
-WP2_MAIN_DONE, WP2_MAIN_TOTAL = _wp2_main_progress()
+WP2_PROGRESS = _wp2_progress()
+WP2_MAIN_DONE = int(WP2_PROGRESS["scientific"]["accepted"])
+WP2_MAIN_TOTAL = int(WP2_PROGRESS["scientific"]["total"])
 
 # ---------------------------------------------------------------- figure table
 # (id, png, week, caption).  Captions are verbatim (or trimmed verbatim) from
@@ -233,9 +255,13 @@ KEY_NUMBERS = [
     ("Gate 1", "NOT CLOSED 且 NOT CLOSABLE：τ_b = 0.4286 < 0.90、n_pairs = 21（一致 15 / 不一致 6）", "docs/gate1_negative_result.md"),
     ("Gate 1 绝对标定层", "溶液锚点 31 行仍全部为 est，升级 0 行", "docs/gate1_negative_result.md"),
     ("WP1 方法审计", "128 个单点 + 32 格阳离子弛豫腿，全部收敛；验收 14/14 通过", "docs/59_week38_wp1_method_audit.md"),
-    ("WP2 主态登记", "43 / 48 个主态的真实 Opt+Freq 账本行（缺值保持为空，未写 0）", "docs/60_week39_wp2_free_energy_labels.md"),
+    ("WP2 主态登记", "%d / %d 个主态通过严格科学 QC（缺值保持为空，未写 0）"
+     % (WP2_PROGRESS["scientific"]["accepted"], WP2_PROGRESS["scientific"]["total"]),
+     "docs/60_week39_wp2_free_energy_labels.md"),
     ("四分子闭环", "主态登记 16/16、基组一致中性腿 M_tzvpd 4/4", "outputs/physics_completion/closure/closure_summary.md"),
-    ("方案合规运行进度", "53 / 60；科学验收（四主态）43 / 48；总体判定未闭环（blocked_on_production）",
+    ("方案合规运行进度", "%d / %d；科学验收（四主态）%d / %d；总体判定未闭环（blocked_on_production）"
+     % (WP2_PROGRESS["runtime"]["computed"], WP2_PROGRESS["runtime"]["total"],
+        WP2_PROGRESS["scientific"]["accepted"], WP2_PROGRESS["scientific"]["total"]),
      "outputs/physics_completion/compliance/plan_compliance.md"),
     ("最小昂贵信息预算", "τ_b ≥ 0.80 需 n_T = 8–9（10 分子池）/ 12–15（18 分子池）", "FINAL_CONCLUSIONS.md"),
 ]
@@ -662,24 +688,70 @@ def render_hero_counts(payload):
 
 def render_hero_links(payload):
     last = payload["weeks"][-1]
-    return ('    <div class="grid cols-3">\n'
-            '      <a class="card" href="#results"><h4>结果</h4>'
+    return ('    <nav class="hero-links" aria-label="研究内容快捷入口">\n'
+            '      <a class="hero-link" href="#results"><h4>结果</h4>'
             "<p>八个小节：从值误差 vs 排序误差，到最小昂贵信息预算。</p></a>\n"
-            '      <a class="card" href="#timeline"><h4>阶段记录</h4>'
+            '      <a class="hero-link" href="#timeline"><h4>阶段记录</h4>'
             '<p><span class="js-weeks">%d</span> 条，从 Stage 0 到 '
             "physics_completion_v1 的 WP6。</p></a>\n"
-            '      <a class="card" href="#figures"><h4>图集</h4>'
+            '      <a class="hero-link" href="#figures"><h4>图集</h4>'
             '<p><span class="js-figures">%d</span> 张交付图（F0–F64），可检索、可放大。</p></a>\n'
-            '      <a class="card" href="#data"><h4>数据与代码</h4>'
+            '      <a class="hero-link" href="#data"><h4>数据与代码</h4>'
             "<p>源码 <code>src/</code>、生成器 <code>scripts/</code>、周报 <code>docs/</code>。</p></a>\n"
-            '      <a class="card" id="card-report-latest" href="%s/blob/main/%s">'
+            '      <a class="hero-link" id="card-report-latest" href="%s/blob/main/%s">'
             '<h4>最新记录</h4><p><span class="js-latest-week">%d</span> · '
             '<span class="js-latest">Week %d / %s</span></p></a>\n'
-            '      <a class="card" href="%s" rel="noopener"><h4>GitHub 仓库</h4>'
+            '      <a class="hero-link" href="%s" rel="noopener"><h4>GitHub 仓库</h4>'
             "<p>源码、测试与全部生成器。</p></a>\n"
-            "    </div>"
+            "    </nav>"
             % (len(payload["weeks"]), len(payload["figures"]), REPO_URL, last["doc"],
                last["n"], last["n"], last["stage"], REPO_URL))
+
+
+def _progress_percent(done, total):
+    return 0 if not total else max(0, min(100, int(round(100.0 * done / total))))
+
+
+def render_production_status(payload):
+    p = payload["wp2_progress"]
+    metrics = (
+        ("运行完成", p["runtime"]["computed"], p["runtime"]["total"],
+         "五腿现场 payload"),
+        ("四主态运行", p["main_runtime"]["computed"], p["main_runtime"]["total"],
+         "进程已产出，不代表 QC 通过"),
+        ("科学验收", p["scientific"]["accepted"], p["scientific"]["total"],
+         "收敛 + 完整频率 + 0 虚频"),
+    )
+    rows = []
+    for label, done, total, note in metrics:
+        pct = _progress_percent(done, total)
+        rows.append(
+            '      <div class="production-metric">\n'
+            '        <span class="production-label">%s</span>\n'
+            '        <strong>%d<span>/ %d</span></strong>\n'
+            '        <div class="production-track" role="progressbar" aria-label="%s" '
+            'aria-valuemin="0" aria-valuemax="%d" aria-valuenow="%d">'
+            '<i style="--progress:%d%%"></i></div>\n'
+            '        <small>%s</small>\n'
+            '      </div>'
+            % (esc(label), done, total, esc(label), total, done, pct, esc(note)))
+    freshness = "账本已同步" if not p["stale"] else "账本需重建"
+    freshness_class = "fresh" if not p["stale"] else "stale"
+    return (
+        '    <div class="production-status" id="production">\n'
+        '      <div class="production-head">\n'
+        '        <div><p class="eyebrow">physics completion · WP2</p>'
+        '<h2>生产进度与科学验收分开计数</h2></div>\n'
+        '        <a class="snapshot %s" href="%s/blob/main/%s">%s · %s</a>\n'
+        '      </div>\n'
+        '      <div class="production-grid">\n%s\n      </div>\n'
+        '      <p class="production-note">正常终止不等于科学闭环；运行中、未收敛、虚频和身份 QC '
+        '失败的腿均不进入科学验收。固化交付为 <strong>%d/%d</strong>。</p>\n'
+        '    </div>'
+        % (freshness_class, REPO_URL, p["source"], esc(freshness),
+           esc(p["generated_at_utc"]), "\n".join(rows),
+           p["frozen"]["accepted"], p["frozen"]["total"])
+    )
 
 
 def render_key_numbers(payload):
@@ -754,6 +826,7 @@ def managed_blocks(payload):
         ("static-meta", render_meta(payload)),
         ("static-fallbacks", render_noscript(payload)),
         ("hero-counts", render_hero_counts(payload)),
+        ("production-status", render_production_status(payload)),
         ("hero-links", render_hero_links(payload)),
         ("key-numbers", render_key_numbers(payload)),
         ("repo-inventory", render_deliverables(payload)),
@@ -766,6 +839,7 @@ def build_payload():
         "repo": REPO_URL,
         "pages": PAGES_URL,
         "counts": counts(),
+        "wp2_progress": WP2_PROGRESS,
         "pipeline": [{"n": n, "name": nm, "detail": d} for n, nm, d in PIPELINE],
         "gates": gates(),
         "phases": [{"key": k, "title": t, "subtitle": s, "blurb": b}

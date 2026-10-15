@@ -10,6 +10,27 @@ window.HB = {
   "test_files": 101,
   "tests_passed": 1656
  },
+ "wp2_progress": {
+  "generated_at_utc": "2026-10-15T03:42:00Z",
+  "runtime": {
+   "computed": 53,
+   "total": 60
+  },
+  "main_runtime": {
+   "computed": 44,
+   "total": 48
+  },
+  "scientific": {
+   "accepted": 43,
+   "total": 48
+  },
+  "frozen": {
+   "accepted": 43,
+   "total": 48
+  },
+  "stale": false,
+  "source": "outputs/physics_completion/compliance/plan_compliance_meta.json"
+ },
  "pipeline": [
   {
    "n": "1",
@@ -1715,7 +1736,7 @@ window.HB = {
   },
   {
    "label": "WP2 主态登记",
-   "value": "43 / 48 个主态的真实 Opt+Freq 账本行（缺值保持为空，未写 0）",
+   "value": "43 / 48 个主态通过严格科学 QC（缺值保持为空，未写 0）",
    "source": "docs/60_week39_wp2_free_energy_labels.md"
   },
   {

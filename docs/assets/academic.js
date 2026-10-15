@@ -180,11 +180,43 @@
     window.addEventListener("popstate", route);
   }
 
+  /* ------------------------------------------------ scroll hierarchy */
+  function wireScrollPresence() {
+    var sections = $$("main > section:not(.hero)");
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!("IntersectionObserver" in window) || reduce) return;
+
+    sections.forEach(function (section) { section.classList.add("reveal-ready"); });
+    var reveal = new IntersectionObserver(function (entries, observer) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -10% 0px", threshold: 0.08 });
+    sections.forEach(function (section) { reveal.observe(section); });
+
+    var links = $$("#nav a[href^='#']");
+    var byID = {};
+    links.forEach(function (link) { byID[link.getAttribute("href").slice(1)] = link; });
+    var current = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting || !entry.target.id || !byID[entry.target.id]) return;
+        links.forEach(function (link) { link.removeAttribute("aria-current"); });
+        byID[entry.target.id].setAttribute("aria-current", "true");
+      });
+    }, { rootMargin: "-15% 0px -70% 0px", threshold: 0 });
+    $$('[id]', $("main")).forEach(function (section) {
+      if (byID[section.id]) current.observe(section);
+    });
+  }
+
   /* ------------------------------------------------ boot */
   function boot() {
     fillDynamic();
     renderGallery();
     wireNav();
+    wireScrollPresence();
     route();
   }
 
@@ -199,6 +231,7 @@
     renderGallery: renderGallery,
     filterGallery: filterGallery,
     openFigure: openFigure,
-    closeFigure: closeFigure
+    closeFigure: closeFigure,
+    wireScrollPresence: wireScrollPresence
   };
 })();

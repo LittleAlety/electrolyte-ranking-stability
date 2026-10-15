@@ -39,8 +39,8 @@ PRELUDE = "window.HB = "
 #: The regions of docs/index.html that the builder owns.  Each is delimited by a
 #: BEGIN/END marker comment pair and re-rendered from the payload on every
 #: build, so a hand edit or a stale number cannot survive --check.
-MANAGED_BLOCKS = ("static-meta", "static-fallbacks", "hero-counts", "hero-links",
-                  "key-numbers", "repo-inventory", "argument-timeline")
+MANAGED_BLOCKS = ("static-meta", "static-fallbacks", "hero-counts", "production-status",
+                  "hero-links", "key-numbers", "repo-inventory", "argument-timeline")
 
 
 def _load_generator():
@@ -98,12 +98,28 @@ def test_nojekyll_is_present_so_pages_serves_the_files_raw():
 
 def test_data_js_is_a_json_payload_with_the_expected_shape():
     payload = _payload()
-    for key in ("repo", "counts", "pipeline", "gates", "weeks", "figures",
+    for key in ("repo", "counts", "wp2_progress", "pipeline", "gates", "weeks", "figures",
                 "phases", "repo_inventory", "key_numbers"):
         assert key in payload, "payload misses " + key
     assert len(payload["pipeline"]) == 5
     assert payload["counts"]["weeks"] == len(payload["weeks"])
     assert payload["counts"]["figures"] == len(payload["figures"])
+
+
+def test_wp2_status_separates_runtime_from_scientific_acceptance():
+    payload = _payload()
+    progress = payload["wp2_progress"]
+    assert progress["runtime"]["total"] == 60
+    assert progress["main_runtime"]["total"] == 48
+    assert progress["scientific"]["total"] == 48
+    assert progress["scientific"]["accepted"] <= progress["main_runtime"]["computed"]
+    assert progress["frozen"]["accepted"] <= progress["scientific"]["accepted"]
+
+    block = _managed_region((DOCS / "index.html").read_text(encoding="utf-8"),
+                            "production-status")
+    assert 'role="progressbar"' in block
+    assert "正常终止不等于科学闭环" in block
+    assert progress["source"] in block
 
 
 def test_weeks_cover_both_stages_and_three_phases():
