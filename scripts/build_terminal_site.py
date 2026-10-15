@@ -2,9 +2,9 @@
 
 Everything the page claims is read out of the repository at build time: the
 week headings come from ``docs/*.md``, the figure captions from the manifests,
-the gate state from ``outputs/week{1,2}/gate*_record.md``, the delivery-mirror
-inventory from ``deliverables/``.  Nothing is retyped by hand, so the site
-cannot drift from the science.
+the gate state from ``outputs/week{1,2}/gate*_record.md``, and the repository
+inventory (including the ``deliverables/`` mirrors) from walking the tree.
+Nothing is retyped by hand, so the site cannot drift from the science.
 
 Outputs (all under docs/):
 
@@ -196,7 +196,7 @@ WEEKS = [
     (34, "docs/56_week34_wp7_external_reference_boundary.md", "WP7 · 边界", "two", "外部验证与结论边界（Gate 1 复核）"),
     (35, "docs/57_week35_paper_convergence.md", "Paper", "two", "论文主文收敛包（七图 / 六节 / 数字溯源 / 边界声明）"),
     (36, "deliverables/part2/01_结题论文与提交/SUBMISSION_评审阶段_WP1-WP7.json", "结题提交", "two",
-     "论文 v7 成品 + 生成与溯源脚本 + 独立数字审计 + WP1–WP7 对照映射（本目录无 outputs/week36，由 scripts/build_week36_final_submission.py 生成）"),
+     "论文 v7 成品 + 生成与溯源脚本 + 独立数字审计 + WP1–WP7 对照映射（仓库内没有 outputs/week36：成品由 scripts/build_week36_final_submission.py 生成到交付层）"),
 
     # ---- 阶段三：physics_completion_v1 WP0-WP6（week37-44） ----
     (37, "docs/58_week37_wp0_definition_migration.md", "WP0 · 定义迁移", "three", "把仓库外执行方案登记为可追溯新批次，只登记定义与样本（零新增电子结构计算）"),
@@ -405,27 +405,56 @@ def counts():
         # Recorded, not measured: pytest cannot be run from the generator.  Bump
         # it in the same commit that adds or removes a test, otherwise the page
         # will advertise a number the suite no longer produces.
-        "tests_passed": 1691,
+        "tests_passed": 1655,
     }
 
 
-def deliverables_payload():
-    """Inventory of the in-repo delivery mirrors (deliverables/part1|part2)."""
+def repo_inventory():
+    """What actually lives in the repository, counted from the repository.
+
+    Every row is derived by walking the tree, so a directory that is renamed or
+    removed cannot leave a stale row behind.  ``deliverables/`` is included only
+    when it is actually present: the page must not link to a path that is not
+    published, because that is a claim the reader cannot check.
+    """
+    spec = [
+        ("src/electrolyte_ranking", "可复用库：ORCA / xTB 驱动、不确定度、排序、稳健性、决策状态"),
+        ("scripts", "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）"),
+        ("config", "冻结定义与预注册（scientific_definitions.yaml、prereg.yaml）"),
+        ("data", "元数据、外部锚点与参考文献"),
+        ("structures", "起始几何：构象池、Li 配位 motif、微溶剂化"),
+        ("outputs", "全部产物：逐阶段载荷、physics_completion/、figures/、溯源与合规"),
+        ("tests", "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引"),
+        ("docs", "技术报告与周报（NN_*.md）、协议、结题报告、站点"),
+        ("deliverables", "交付镜像（按成果种类分组）：part1 = Stage 0–24，part2 = 评审 WP1–WP7 + physics_completion_v1"),
+    ]
     rows = []
-    for part, label in (("part1", "part1 · Stage 0–24（week1–week25）"),
-                        ("part2", "part2 · 评审实施方案 WP1–WP7 + physics_completion_v1")):
-        root = os.path.join(DELIVERABLES, part)
+    for rel, note in spec:
+        root = os.path.join(REPO, rel)
         if not os.path.isdir(root):
             continue
-        n = 0
-        cats = []
-        for dirpath, dirnames, filenames in os.walk(root):
-            n += len(filenames)
-            if os.path.abspath(dirpath) == os.path.abspath(root):
-                cats = sorted(d for d in dirnames if not d.startswith("."))
-        rows.append({"part": part, "label": label, "path": "deliverables/" + part,
-                     "files": n, "categories": cats})
+        n = sum(len(files) for _d, _s, files in os.walk(root))
+        rows.append({"path": rel, "note": note, "files": n})
     return rows
+
+
+def render_repo_inventory(payload):
+    rows = []
+    for d in payload["repo_inventory"]:
+        rows.append(
+            "      <tr>\n"
+            '        <td><a href="%s/tree/main/%s"><code>%s/</code></a></td>\n'
+            "        <td>%s</td>\n"
+            "        <td>%d</td>\n"
+            "      </tr>"
+            % (REPO_URL, d["path"], d["path"], esc(d["note"]), d["files"]))
+    return ('<div class="tablewrap">\n'
+            "  <table>\n"
+            "    <thead><tr><th>目录</th><th>职责</th><th>文件数</th></tr></thead>\n"
+            "    <tbody>\n" + "\n".join(rows) + "\n"
+            "    </tbody>\n"
+            "  </table>\n"
+            "</div>")
 
 
 def key_numbers_payload():
@@ -552,15 +581,15 @@ def render_noscript(payload):
             '<a href="%s/tree/main/docs">全部报告（docs/）</a></li>\n'
             '      <li>图目录：<a href="%s/tree/main/outputs/figures">outputs/figures</a>'
             "（%d 张）</li>\n"
-            '      <li>交付镜像：<a href="%s/tree/main/deliverables">deliverables/</a>'
-            "（按成果种类分组的 part1 / part2）</li>\n"
+            '      <li>交付件（论文 v7 / 周报 / 图 / 载荷）由生成器输出到仓库外交付层，'
+            "仓库内可直接浏览的是 <code>docs/</code>、<code>outputs/</code> 与 <code>src/</code>。</li>\n"
             '      <li>源码与全部文档：<a href="%s">GitHub 仓库</a></li>\n'
             "      <li>质检：<span class=\"js-tests\">%d</span> 个测试通过（pytest）</li>\n"
             "      <li>%s</li>\n"
             "    </ul>\n"
             "  </div>\n"
             "</noscript>"
-            % (c["weeks"], REPO_URL, REPO_URL, c["figures"], REPO_URL, REPO_URL,
+            % (c["weeks"], REPO_URL, REPO_URL, c["figures"], REPO_URL,
                c["tests_passed"], gate_summary(payload)))
 
 
@@ -591,7 +620,7 @@ def render_hero_links(payload):
             '      <a class="card" href="#figures"><h4>图集</h4>'
             '<p><span class="js-figures">%d</span> 张交付图（F0–F64），可检索、可放大。</p></a>\n'
             '      <a class="card" href="#data"><h4>数据与代码</h4>'
-            "<p>交付镜像 <code>deliverables/</code>、源码 <code>src/</code>、周报 <code>docs/</code>。</p></a>\n"
+            "<p>源码 <code>src/</code>、生成器 <code>scripts/</code>、周报 <code>docs/</code>。</p></a>\n"
             '      <a class="card" id="card-report-latest" href="%s/blob/main/%s">'
             '<h4>最新记录</h4><p><span class="js-latest-week">%d</span> · '
             '<span class="js-latest">Week %d / %s</span></p></a>\n'
@@ -622,20 +651,19 @@ def render_key_numbers(payload):
 
 
 def render_deliverables(payload):
+    """Kept as the managed-block renderer for the repository inventory."""
     rows = []
-    for d in payload["deliverables"]:
-        cats = " · ".join(d["categories"])
+    for d in payload["repo_inventory"]:
         rows.append(
             "      <tr>\n"
-            '        <td><a href="%s/tree/main/%s"><code>%s</code></a></td>\n'
+            '        <td><a href="%s/tree/main/%s"><code>%s/</code></a></td>\n'
             "        <td>%s</td>\n"
             "        <td>%d</td>\n"
-            "        <td>%s</td>\n"
             "      </tr>"
-            % (REPO_URL, d["path"], d["path"], esc(d["label"]), d["files"], esc(cats)))
+            % (REPO_URL, d["path"], d["path"], esc(d["note"]), d["files"]))
     return ('<div class="tablewrap">\n'
             "  <table>\n"
-            "    <thead><tr><th>镜像</th><th>覆盖</th><th>文件数</th><th>按成果种类的 9 类目录</th></tr></thead>\n"
+            "    <thead><tr><th>目录</th><th>职责</th><th>文件数</th></tr></thead>\n"
             "    <tbody>\n" + "\n".join(rows) + "\n"
             "    </tbody>\n"
             "  </table>\n"
@@ -677,7 +705,7 @@ def managed_blocks(payload):
         ("hero-counts", render_hero_counts(payload)),
         ("hero-links", render_hero_links(payload)),
         ("key-numbers", render_key_numbers(payload)),
-        ("deliverables", render_deliverables(payload)),
+        ("repo-inventory", render_deliverables(payload)),
         ("argument-timeline", render_argument_timeline(payload)),
     ]
 
@@ -693,7 +721,7 @@ def build_payload():
                    for k, t, s, b in PHASES],
         "weeks": week_payload(),
         "figures": figure_payload(),
-        "deliverables": deliverables_payload(),
+        "repo_inventory": repo_inventory(),
         "key_numbers": key_numbers_payload(),
     }
 

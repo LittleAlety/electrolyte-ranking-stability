@@ -1,0 +1,3661 @@
+{
+  "stage": "Week 28 / WP1",
+  "title": "unified scientific evidence master table",
+  "plane": "next-phase implementation plan, work package WP1",
+  "frozen_conventions": {
+    "direction": "oxidation: IP (eV) maximise; reduction: -EA (eV) maximise",
+    "sigma_ij": "std([dP_A_ij, dP_B_ij], ddof=1) = |dP_A_ij - dP_B_ij| / sqrt(2)",
+    "resolved_rule": "|dP_ij| >= max(z * sigma_ij, tolerance)",
+    "z_primary": 1.0,
+    "z_sensitivity": 1.96,
+    "tolerance_z_only_ev": 0.0,
+    "decision_states": [
+      "STABLE",
+      "UNRESOLVED",
+      "ROBUST_INVERSION"
+    ],
+    "state_identity_gate": "C1/C2 reduction: molecule_centered_redox only (R13)"
+  },
+  "rung_registry": {
+    "P0": {
+      "rung": "P0",
+      "axis_A": "P0",
+      "label": "cheap scalar proxy (GFN2-xTB Koopmans orbital energy)",
+      "geometry_policy": "G1 (single shared geometry, RDKit/MMFF seed, xTB single point)",
+      "thermochemistry": "none (orbital energy)",
+      "solvent": "gas-phase (no continuum)",
+      "cost_class": "cheap (GFN2-xTB only)",
+      "source": "outputs/week3/p0_core_set.csv",
+      "source_field": "p0_ox_ev | p0_red_ev",
+      "scope": "core 18 + broad 40",
+      "parameter": null,
+      "note": ""
+    },
+    "P1v": {
+      "rung": "P1v",
+      "axis_A": "P1v",
+      "label": "gas-phase vertical redox-energy proxy (r2SCAN-3c, three states on one geometry)",
+      "geometry_policy": "G1 shared by neutral/cation/anion (single point only)",
+      "thermochemistry": "vertical: no relaxation and no ZPE for the charged state",
+      "solvent": "gas-phase (no continuum)",
+      "cost_class": "expensive (r2SCAN-3c single point)",
+      "source": "outputs/week4/p1_core_set_derived.csv",
+      "source_field": "p1_ox_ev | p1_red_ev",
+      "scope": "core 18",
+      "parameter": null,
+      "note": "R13 alias: the early layer named P1 is this rung (config/scientific_definitions.yaml:legacy_aliases)."
+    },
+    "P1a": {
+      "rung": "P1a",
+      "axis_A": "P1a",
+      "label": "gas-phase adiabatic redox thermodynamics (r2SCAN-3c, each charged state relaxed)",
+      "geometry_policy": "G2 (per-charge-state r2SCAN-3c Opt started from G1)",
+      "thermochemistry": "adiabatic: relaxed charged state, no ZPE",
+      "solvent": "gas-phase (no continuum)",
+      "cost_class": "expensive (r2SCAN-3c geometry optimisation)",
+      "source": "outputs/phase2_p1a/p1a_adiabatic.csv",
+      "source_field": "ip_p1a_ev | ea_p1a_ev",
+      "scope": "audit 12",
+      "parameter": null,
+      "note": "Oxidation axis only: the frozen unbound_anion failure rule excludes the reduction axis."
+    },
+    "P2a": {
+      "rung": "P2a",
+      "axis_A": "P2a",
+      "label": "fixed continuum target: CPCM(SMD, acetonitrile) at G1",
+      "geometry_policy": "G1 (shared, unchanged)",
+      "thermochemistry": "vertical single points inside the production solvent model",
+      "solvent": "CPCM(SMD, acetonitrile)",
+      "cost_class": "expensive (r2SCAN-3c single point in solvent)",
+      "source": "outputs/week4/p2_core_set_smd_acetonitrile.csv",
+      "source_field": "final_energy_eh(neutral,cation,anion) -> IP, EA",
+      "scope": "core 18",
+      "parameter": null,
+      "note": ""
+    },
+    "C0": {
+      "rung": "C0",
+      "axis_A": "C0",
+      "label": "free molecule at the G2 geometry (vertical single points)",
+      "geometry_policy": "G2 (T2 relaxed neutral geometry)",
+      "thermochemistry": "vertical single points at the relaxed neutral geometry",
+      "solvent": "gas-phase (no continuum)",
+      "cost_class": "expensive (r2SCAN-3c single point)",
+      "source": "outputs/week4/t2_opt_freq.csv",
+      "source_field": "ip_g2_ev | ea_g2_ev",
+      "scope": "audit 12",
+      "parameter": null,
+      "note": ""
+    },
+    "C1": {
+      "rung": "C1",
+      "axis_A": "C1",
+      "label": "conditional state [LiM]+ (primary motif), vertical at the optimised complex geometry",
+      "geometry_policy": "optimised [LiM]+ motif geometry (m_primary)",
+      "thermochemistry": "vertical single points on the complex",
+      "solvent": "gas-phase (no continuum)",
+      "cost_class": "expensive (r2SCAN-3c single point on the complex)",
+      "source": "outputs/week5/c1_coord_shifts.csv",
+      "source_field": "ip_c1_ev | ea_c1_ev",
+      "scope": "primary motif per molecule",
+      "parameter": null,
+      "note": ""
+    },
+    "C2": {
+      "rung": "C2",
+      "axis_A": "C2",
+      "label": "first-shell microsolvation [Li(M)2]+ (coordination number 2)",
+      "geometry_policy": "optimised [Li(M)2]+ geometry",
+      "thermochemistry": "vertical single points on the 1:2 complex",
+      "solvent": "gas-phase (no continuum)",
+      "cost_class": "expensive (r2SCAN-3c single point on the 1:2 complex)",
+      "source": "outputs/week8/stage9_shell_shifts.csv",
+      "source_field": "ip_shell2_ev | ea_shell2_ev",
+      "scope": "audit 12",
+      "parameter": null,
+      "note": "R13 rename: C2 is the first solvation shell at coordination number 2, not a second shell."
+    },
+    "P2eps@5.0": {
+      "rung": "P2eps@5.0",
+      "axis_A": "P2eps",
+      "label": "bare CPCM dielectric scan (eps = 5.0) at G1",
+      "geometry_policy": "G1 (shared, unchanged)",
+      "thermochemistry": "vertical single points, dielectric-only continuum (no SMD non-electrostatic terms)",
+      "solvent": "bare CPCM, eps = 5.0",
+      "cost_class": "expensive (r2SCAN-3c single point in solvent)",
+      "source": "outputs/week4/p2_core_set_cpcm_5.csv",
+      "source_field": "final_energy_eh(neutral,cation,anion) -> IP, EA",
+      "scope": "audit 12",
+      "parameter": 5.0,
+      "note": ""
+    },
+    "P2eps@10.0": {
+      "rung": "P2eps@10.0",
+      "axis_A": "P2eps",
+      "label": "bare CPCM dielectric scan (eps = 10.0) at G1",
+      "geometry_policy": "G1 (shared, unchanged)",
+      "thermochemistry": "vertical single points, dielectric-only continuum (no SMD non-electrostatic terms)",
+      "solvent": "bare CPCM, eps = 10.0",
+      "cost_class": "expensive (r2SCAN-3c single point in solvent)",
+      "source": "outputs/week4/p2_core_set_cpcm_10.csv",
+      "source_field": "final_energy_eh(neutral,cation,anion) -> IP, EA",
+      "scope": "audit 12",
+      "parameter": 10.0,
+      "note": ""
+    },
+    "P2eps@20.0": {
+      "rung": "P2eps@20.0",
+      "axis_A": "P2eps",
+      "label": "bare CPCM dielectric scan (eps = 20.0) at G1",
+      "geometry_policy": "G1 (shared, unchanged)",
+      "thermochemistry": "vertical single points, dielectric-only continuum (no SMD non-electrostatic terms)",
+      "solvent": "bare CPCM, eps = 20.0",
+      "cost_class": "expensive (r2SCAN-3c single point in solvent)",
+      "source": "outputs/week4/p2_core_set_cpcm_20.csv",
+      "source_field": "final_energy_eh(neutral,cation,anion) -> IP, EA",
+      "scope": "audit 12",
+      "parameter": 20.0,
+      "note": ""
+    },
+    "P2eps@40.0": {
+      "rung": "P2eps@40.0",
+      "axis_A": "P2eps",
+      "label": "bare CPCM dielectric scan (eps = 40.0) at G1",
+      "geometry_policy": "G1 (shared, unchanged)",
+      "thermochemistry": "vertical single points, dielectric-only continuum (no SMD non-electrostatic terms)",
+      "solvent": "bare CPCM, eps = 40.0",
+      "cost_class": "expensive (r2SCAN-3c single point in solvent)",
+      "source": "outputs/week4/p2_core_set_cpcm_40.csv",
+      "source_field": "final_energy_eh(neutral,cation,anion) -> IP, EA",
+      "scope": "audit 12",
+      "parameter": 40.0,
+      "note": ""
+    }
+  },
+  "declared_scope": {
+    "P0": [
+      "DMC",
+      "EMC",
+      "DEC",
+      "EC",
+      "PC",
+      "FEC",
+      "VC",
+      "DME",
+      "DOL",
+      "TEGDME",
+      "EA",
+      "MA",
+      "GBL",
+      "SL",
+      "DMSO",
+      "AN",
+      "TMP",
+      "SN",
+      "MPC",
+      "DPC",
+      "FEMC",
+      "VEC",
+      "TFMEC",
+      "TMC",
+      "DMEC",
+      "ClEC",
+      "DEE",
+      "G2",
+      "G3",
+      "THF",
+      "2MeTHF",
+      "DIOX",
+      "DMM",
+      "DEE2",
+      "HFE347",
+      "HFE7100",
+      "BTFE",
+      "DMS",
+      "EMS",
+      "SULFOLENE",
+      "DESO",
+      "THTO",
+      "PN",
+      "BN",
+      "ADN",
+      "MPN",
+      "MN",
+      "TEP",
+      "TBP",
+      "TFP",
+      "MP",
+      "EF",
+      "GVL",
+      "DVL",
+      "ES",
+      "PS",
+      "HMDSO",
+      "OMTS"
+    ],
+    "P1v": [
+      "DMC",
+      "EMC",
+      "DEC",
+      "EC",
+      "PC",
+      "FEC",
+      "VC",
+      "DME",
+      "DOL",
+      "TEGDME",
+      "EA",
+      "MA",
+      "GBL",
+      "SL",
+      "DMSO",
+      "AN",
+      "TMP",
+      "SN"
+    ],
+    "P1a": [
+      "EC",
+      "PC",
+      "DMC",
+      "EMC",
+      "DME",
+      "DOL",
+      "GBL",
+      "AN",
+      "SN",
+      "DMSO",
+      "SL",
+      "TMP"
+    ],
+    "P2a": [
+      "DMC",
+      "EMC",
+      "DEC",
+      "EC",
+      "PC",
+      "FEC",
+      "VC",
+      "DME",
+      "DOL",
+      "TEGDME",
+      "EA",
+      "MA",
+      "GBL",
+      "SL",
+      "DMSO",
+      "AN",
+      "TMP",
+      "SN"
+    ],
+    "C0": [
+      "EC",
+      "PC",
+      "DMC",
+      "EMC",
+      "DME",
+      "DOL",
+      "GBL",
+      "AN",
+      "SN",
+      "DMSO",
+      "SL",
+      "TMP"
+    ],
+    "C1": [
+      "DMC",
+      "EMC",
+      "DEC",
+      "EC",
+      "PC",
+      "FEC",
+      "VC",
+      "DME",
+      "DOL",
+      "TEGDME",
+      "EA",
+      "MA",
+      "GBL",
+      "SL",
+      "DMSO",
+      "AN",
+      "TMP",
+      "SN"
+    ],
+    "C2": [
+      "EC",
+      "PC",
+      "DMC",
+      "EMC",
+      "DME",
+      "DOL",
+      "GBL",
+      "AN",
+      "SN",
+      "DMSO",
+      "SL",
+      "TMP"
+    ],
+    "P2eps@5.0": [
+      "EC",
+      "PC",
+      "DMC",
+      "EMC",
+      "DME",
+      "DOL",
+      "GBL",
+      "AN",
+      "SN",
+      "DMSO",
+      "SL",
+      "TMP"
+    ],
+    "P2eps@10.0": [
+      "EC",
+      "PC",
+      "DMC",
+      "EMC",
+      "DME",
+      "DOL",
+      "GBL",
+      "AN",
+      "SN",
+      "DMSO",
+      "SL",
+      "TMP"
+    ],
+    "P2eps@20.0": [
+      "EC",
+      "PC",
+      "DMC",
+      "EMC",
+      "DME",
+      "DOL",
+      "GBL",
+      "AN",
+      "SN",
+      "DMSO",
+      "SL",
+      "TMP"
+    ],
+    "P2eps@40.0": [
+      "EC",
+      "PC",
+      "DMC",
+      "EMC",
+      "DME",
+      "DOL",
+      "GBL",
+      "AN",
+      "SN",
+      "DMSO",
+      "SL",
+      "TMP"
+    ]
+  },
+  "declared_scope_source": {
+    "P0": "config/scientific_definitions.yaml:dataset.core_set.purpose + dataset.broad_pool.purpose",
+    "P1v": "config/scientific_definitions.yaml:dataset.core_set.n_rows = 18",
+    "P1a": "config/prereg.yaml:amendment_log[R13].geometry_and_data = 'P1a 只在 T2 12 分子子集上执行'",
+    "P2a": "config/scientific_definitions.yaml:dataset.core_set.n_rows = 18",
+    "C0": "outputs/week4/t2_opt_freq_summary.json:subset（T2 12 分子审计子集）",
+    "C1": "config/scientific_definitions.yaml:dataset.core_set.purpose = '完成 P0 / P1 / P2 以及 C1 conditional Li-coordination'",
+    "C2": "config/scientific_definitions.yaml:axis_B_environment_states.C2.scope = '第一阶段只做 targeted sensitivity check'（无固定名单，上界取审计子集）",
+    "P2eps@5.0": "config/scientific_definitions.yaml:dataset.core_set + prereg 预注册 eps 扫描名单（12 分子审计子集）",
+    "P2eps@10.0": "config/scientific_definitions.yaml:dataset.core_set + prereg 预注册 eps 扫描名单（12 分子审计子集）",
+    "P2eps@20.0": "config/scientific_definitions.yaml:dataset.core_set + prereg 预注册 eps 扫描名单（12 分子审计子集）",
+    "P2eps@40.0": "config/scientific_definitions.yaml:dataset.core_set + prereg 预注册 eps 扫描名单（12 分子审计子集）"
+  },
+  "coverage": {
+    "P0_to_P1v": {
+      "oxidation": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN",
+          "MPC",
+          "DPC",
+          "FEMC",
+          "VEC",
+          "TFMEC",
+          "TMC",
+          "DMEC",
+          "ClEC",
+          "DEE",
+          "G2",
+          "G3",
+          "THF",
+          "2MeTHF",
+          "DIOX",
+          "DMM",
+          "DEE2",
+          "HFE347",
+          "HFE7100",
+          "BTFE",
+          "DMS",
+          "EMS",
+          "SULFOLENE",
+          "DESO",
+          "THTO",
+          "PN",
+          "BN",
+          "ADN",
+          "MPN",
+          "MN",
+          "TEP",
+          "TBP",
+          "TFP",
+          "MP",
+          "EF",
+          "GVL",
+          "DVL",
+          "ES",
+          "PS",
+          "HMDSO",
+          "OMTS"
+        ],
+        "declared_upper": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_intersection_size": 18,
+        "available_common": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "n_available_common": 18,
+        "common_set_label": "core18",
+        "used_all": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "used_primary": null,
+        "unavailable_declared": []
+      },
+      "reduction": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN",
+          "MPC",
+          "DPC",
+          "FEMC",
+          "VEC",
+          "TFMEC",
+          "TMC",
+          "DMEC",
+          "ClEC",
+          "DEE",
+          "G2",
+          "G3",
+          "THF",
+          "2MeTHF",
+          "DIOX",
+          "DMM",
+          "DEE2",
+          "HFE347",
+          "HFE7100",
+          "BTFE",
+          "DMS",
+          "EMS",
+          "SULFOLENE",
+          "DESO",
+          "THTO",
+          "PN",
+          "BN",
+          "ADN",
+          "MPN",
+          "MN",
+          "TEP",
+          "TBP",
+          "TFP",
+          "MP",
+          "EF",
+          "GVL",
+          "DVL",
+          "ES",
+          "PS",
+          "HMDSO",
+          "OMTS"
+        ],
+        "declared_upper": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_intersection_size": 18,
+        "available_common": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "n_available_common": 18,
+        "common_set_label": "core18",
+        "used_all": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "used_primary": null,
+        "unavailable_declared": []
+      }
+    },
+    "P1v_to_P1a": {
+      "oxidation": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_upper": [
+          "EC",
+          "PC",
+          "DMC",
+          "EMC",
+          "DME",
+          "DOL",
+          "GBL",
+          "AN",
+          "SN",
+          "DMSO",
+          "SL",
+          "TMP"
+        ],
+        "declared_intersection_size": 12,
+        "available_common": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "EMC",
+          "GBL",
+          "PC",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "n_available_common": 12,
+        "common_set_label": "audit12",
+        "used_all": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "EMC",
+          "GBL",
+          "PC",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "used_primary": null,
+        "unavailable_declared": []
+      },
+      "reduction": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_upper": [
+          "EC",
+          "PC",
+          "DMC",
+          "EMC",
+          "DME",
+          "DOL",
+          "GBL",
+          "AN",
+          "SN",
+          "DMSO",
+          "SL",
+          "TMP"
+        ],
+        "declared_intersection_size": 12,
+        "available_common": [],
+        "n_available_common": 0,
+        "common_set_label": "subset00",
+        "used_all": [],
+        "used_primary": null,
+        "unavailable_declared": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "EMC",
+          "GBL",
+          "PC",
+          "SL",
+          "SN",
+          "TMP"
+        ]
+      }
+    },
+    "P1v_to_P2a": {
+      "oxidation": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_upper": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_intersection_size": 18,
+        "available_common": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "n_available_common": 18,
+        "common_set_label": "core18",
+        "used_all": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "used_primary": null,
+        "unavailable_declared": []
+      },
+      "reduction": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_upper": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_intersection_size": 18,
+        "available_common": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "n_available_common": 18,
+        "common_set_label": "core18",
+        "used_all": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "used_primary": null,
+        "unavailable_declared": []
+      }
+    },
+    "P1v_to_P2eps10": {
+      "oxidation": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_upper": [
+          "EC",
+          "PC",
+          "DMC",
+          "EMC",
+          "DME",
+          "DOL",
+          "GBL",
+          "AN",
+          "SN",
+          "DMSO",
+          "SL",
+          "TMP"
+        ],
+        "declared_intersection_size": 12,
+        "available_common": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "EMC",
+          "GBL",
+          "PC",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "n_available_common": 12,
+        "common_set_label": "audit12",
+        "used_all": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "EMC",
+          "GBL",
+          "PC",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "used_primary": null,
+        "unavailable_declared": []
+      },
+      "reduction": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_upper": [
+          "EC",
+          "PC",
+          "DMC",
+          "EMC",
+          "DME",
+          "DOL",
+          "GBL",
+          "AN",
+          "SN",
+          "DMSO",
+          "SL",
+          "TMP"
+        ],
+        "declared_intersection_size": 12,
+        "available_common": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "EMC",
+          "GBL",
+          "PC",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "n_available_common": 12,
+        "common_set_label": "audit12",
+        "used_all": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "EMC",
+          "GBL",
+          "PC",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "used_primary": null,
+        "unavailable_declared": []
+      }
+    },
+    "P0_to_P2a": {
+      "oxidation": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN",
+          "MPC",
+          "DPC",
+          "FEMC",
+          "VEC",
+          "TFMEC",
+          "TMC",
+          "DMEC",
+          "ClEC",
+          "DEE",
+          "G2",
+          "G3",
+          "THF",
+          "2MeTHF",
+          "DIOX",
+          "DMM",
+          "DEE2",
+          "HFE347",
+          "HFE7100",
+          "BTFE",
+          "DMS",
+          "EMS",
+          "SULFOLENE",
+          "DESO",
+          "THTO",
+          "PN",
+          "BN",
+          "ADN",
+          "MPN",
+          "MN",
+          "TEP",
+          "TBP",
+          "TFP",
+          "MP",
+          "EF",
+          "GVL",
+          "DVL",
+          "ES",
+          "PS",
+          "HMDSO",
+          "OMTS"
+        ],
+        "declared_upper": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_intersection_size": 18,
+        "available_common": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "n_available_common": 18,
+        "common_set_label": "core18",
+        "used_all": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "used_primary": null,
+        "unavailable_declared": []
+      },
+      "reduction": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN",
+          "MPC",
+          "DPC",
+          "FEMC",
+          "VEC",
+          "TFMEC",
+          "TMC",
+          "DMEC",
+          "ClEC",
+          "DEE",
+          "G2",
+          "G3",
+          "THF",
+          "2MeTHF",
+          "DIOX",
+          "DMM",
+          "DEE2",
+          "HFE347",
+          "HFE7100",
+          "BTFE",
+          "DMS",
+          "EMS",
+          "SULFOLENE",
+          "DESO",
+          "THTO",
+          "PN",
+          "BN",
+          "ADN",
+          "MPN",
+          "MN",
+          "TEP",
+          "TBP",
+          "TFP",
+          "MP",
+          "EF",
+          "GVL",
+          "DVL",
+          "ES",
+          "PS",
+          "HMDSO",
+          "OMTS"
+        ],
+        "declared_upper": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_intersection_size": 18,
+        "available_common": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "n_available_common": 18,
+        "common_set_label": "core18",
+        "used_all": [
+          "AN",
+          "DEC",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EA",
+          "EC",
+          "EMC",
+          "FEC",
+          "GBL",
+          "MA",
+          "PC",
+          "SL",
+          "SN",
+          "TEGDME",
+          "TMP",
+          "VC"
+        ],
+        "used_primary": null,
+        "unavailable_declared": []
+      }
+    },
+    "C0_to_C1": {
+      "oxidation": {
+        "declared_lower": [
+          "EC",
+          "PC",
+          "DMC",
+          "EMC",
+          "DME",
+          "DOL",
+          "GBL",
+          "AN",
+          "SN",
+          "DMSO",
+          "SL",
+          "TMP"
+        ],
+        "declared_upper": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_intersection_size": 12,
+        "available_common": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "n_available_common": 10,
+        "common_set_label": "subset10",
+        "used_all": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "used_primary": [
+          "DMC",
+          "DME",
+          "EC",
+          "GBL",
+          "SL",
+          "TMP"
+        ],
+        "unavailable_declared": [
+          "EMC",
+          "PC"
+        ]
+      },
+      "reduction": {
+        "declared_lower": [
+          "EC",
+          "PC",
+          "DMC",
+          "EMC",
+          "DME",
+          "DOL",
+          "GBL",
+          "AN",
+          "SN",
+          "DMSO",
+          "SL",
+          "TMP"
+        ],
+        "declared_upper": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_intersection_size": 12,
+        "available_common": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "n_available_common": 10,
+        "common_set_label": "subset10",
+        "used_all": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "used_primary": [
+          "SN"
+        ],
+        "unavailable_declared": [
+          "EMC",
+          "PC"
+        ]
+      }
+    },
+    "C1_to_C2": {
+      "oxidation": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_upper": [
+          "EC",
+          "PC",
+          "DMC",
+          "EMC",
+          "DME",
+          "DOL",
+          "GBL",
+          "AN",
+          "SN",
+          "DMSO",
+          "SL",
+          "TMP"
+        ],
+        "declared_intersection_size": 12,
+        "available_common": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "n_available_common": 10,
+        "common_set_label": "subset10",
+        "used_all": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "used_primary": [
+          "DMC",
+          "DME",
+          "EC",
+          "GBL",
+          "SL",
+          "TMP"
+        ],
+        "unavailable_declared": [
+          "EMC",
+          "PC"
+        ]
+      },
+      "reduction": {
+        "declared_lower": [
+          "DMC",
+          "EMC",
+          "DEC",
+          "EC",
+          "PC",
+          "FEC",
+          "VC",
+          "DME",
+          "DOL",
+          "TEGDME",
+          "EA",
+          "MA",
+          "GBL",
+          "SL",
+          "DMSO",
+          "AN",
+          "TMP",
+          "SN"
+        ],
+        "declared_upper": [
+          "EC",
+          "PC",
+          "DMC",
+          "EMC",
+          "DME",
+          "DOL",
+          "GBL",
+          "AN",
+          "SN",
+          "DMSO",
+          "SL",
+          "TMP"
+        ],
+        "declared_intersection_size": 12,
+        "available_common": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "n_available_common": 10,
+        "common_set_label": "subset10",
+        "used_all": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "used_primary": [
+          "SN"
+        ],
+        "unavailable_declared": [
+          "EMC",
+          "PC"
+        ]
+      }
+    }
+  },
+  "comparisons": {
+    "P0_to_P1v": {
+      "rung_lower": "P0",
+      "rung_upper": "P1v",
+      "axes": {
+        "oxidation": {
+          "n_common_available": 18,
+          "scopes": {
+            "all": {
+              "n_molecules": 18,
+              "n_pairs": 153,
+              "kendall_tau_b": 0.673202614379085,
+              "spearman_rho": 0.803921568627451,
+              "f_unresolved_lower": 0.35947712418300654,
+              "f_unresolved_upper": 0.1568627450980392,
+              "f_unresolved_lower_z1p96": 0.5490196078431373,
+              "f_unresolved_upper_z1p96": 0.35947712418300654,
+              "n_resolved_both": 83,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 83,
+                "UNRESOLVED": 70,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.5424836601307189,
+                "UNRESOLVED": 0.45751633986928103,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DEC",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EA",
+                "EC",
+                "EMC",
+                "FEC",
+                "GBL",
+                "MA",
+                "PC",
+                "SL",
+                "SN",
+                "TEGDME",
+                "TMP",
+                "VC"
+              ]
+            }
+          }
+        },
+        "reduction": {
+          "n_common_available": 18,
+          "scopes": {
+            "all": {
+              "n_molecules": 18,
+              "n_pairs": 153,
+              "kendall_tau_b": 0.5947712418300654,
+              "spearman_rho": 0.7997936016511867,
+              "f_unresolved_lower": 0.16993464052287582,
+              "f_unresolved_upper": 0.6209150326797386,
+              "f_unresolved_lower_z1p96": 0.7058823529411765,
+              "f_unresolved_upper_z1p96": 0.6993464052287581,
+              "n_resolved_both": 44,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 44,
+                "UNRESOLVED": 109,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.2875816993464052,
+                "UNRESOLVED": 0.7124183006535948,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DEC",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EA",
+                "EC",
+                "EMC",
+                "FEC",
+                "GBL",
+                "MA",
+                "PC",
+                "SL",
+                "SN",
+                "TEGDME",
+                "TMP",
+                "VC"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "P1v_to_P1a": {
+      "rung_lower": "P1v",
+      "rung_upper": "P1a",
+      "axes": {
+        "oxidation": {
+          "n_common_available": 12,
+          "scopes": {
+            "all": {
+              "n_molecules": 12,
+              "n_pairs": 66,
+              "kendall_tau_b": 0.7878787878787878,
+              "spearman_rho": 0.9230769230769231,
+              "f_unresolved_lower": 0.12121212121212122,
+              "f_unresolved_upper": 0.12121212121212122,
+              "f_unresolved_lower_z1p96": 0.16666666666666666,
+              "f_unresolved_upper_z1p96": 0.15151515151515152,
+              "n_resolved_both": 55,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 55,
+                "UNRESOLVED": 11,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.8333333333333334,
+                "UNRESOLVED": 0.16666666666666666,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EC",
+                "EMC",
+                "GBL",
+                "PC",
+                "SL",
+                "SN",
+                "TMP"
+              ]
+            }
+          }
+        },
+        "reduction": {
+          "n_common_available": 0,
+          "scopes": {
+            "all": {
+              "n_molecules": 0,
+              "skipped": "fewer than two candidates after the all filter"
+            }
+          }
+        }
+      }
+    },
+    "P1v_to_P2a": {
+      "rung_lower": "P1v",
+      "rung_upper": "P2a",
+      "axes": {
+        "oxidation": {
+          "n_common_available": 18,
+          "scopes": {
+            "all": {
+              "n_molecules": 18,
+              "n_pairs": 153,
+              "kendall_tau_b": 0.8954248366013072,
+              "spearman_rho": 0.9628482972136223,
+              "f_unresolved_lower": 0.0915032679738562,
+              "f_unresolved_upper": 0.1111111111111111,
+              "f_unresolved_lower_z1p96": 0.20261437908496732,
+              "f_unresolved_upper_z1p96": 0.2549019607843137,
+              "n_resolved_both": 125,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 125,
+                "UNRESOLVED": 28,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.8169934640522876,
+                "UNRESOLVED": 0.1830065359477124,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DEC",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EA",
+                "EC",
+                "EMC",
+                "FEC",
+                "GBL",
+                "MA",
+                "PC",
+                "SL",
+                "SN",
+                "TEGDME",
+                "TMP",
+                "VC"
+              ]
+            }
+          }
+        },
+        "reduction": {
+          "n_common_available": 18,
+          "scopes": {
+            "all": {
+              "n_molecules": 18,
+              "n_pairs": 153,
+              "kendall_tau_b": 0.673202614379085,
+              "spearman_rho": 0.826625386996904,
+              "f_unresolved_lower": 0.23529411764705882,
+              "f_unresolved_upper": 0.2222222222222222,
+              "f_unresolved_lower_z1p96": 0.43790849673202614,
+              "f_unresolved_upper_z1p96": 0.42483660130718953,
+              "n_resolved_both": 94,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 94,
+                "UNRESOLVED": 59,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.6143790849673203,
+                "UNRESOLVED": 0.38562091503267976,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DEC",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EA",
+                "EC",
+                "EMC",
+                "FEC",
+                "GBL",
+                "MA",
+                "PC",
+                "SL",
+                "SN",
+                "TEGDME",
+                "TMP",
+                "VC"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "P1v_to_P2eps10": {
+      "rung_lower": "P1v",
+      "rung_upper": "P2eps@10.0",
+      "axes": {
+        "oxidation": {
+          "n_common_available": 12,
+          "scopes": {
+            "all": {
+              "n_molecules": 12,
+              "n_pairs": 66,
+              "kendall_tau_b": 0.9090909090909091,
+              "spearman_rho": 0.972027972027972,
+              "f_unresolved_lower": 0.07575757575757576,
+              "f_unresolved_upper": 0.13636363636363635,
+              "f_unresolved_lower_z1p96": 0.16666666666666666,
+              "f_unresolved_upper_z1p96": 0.19696969696969696,
+              "n_resolved_both": 53,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 53,
+                "UNRESOLVED": 13,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.803030303030303,
+                "UNRESOLVED": 0.19696969696969696,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EC",
+                "EMC",
+                "GBL",
+                "PC",
+                "SL",
+                "SN",
+                "TMP"
+              ]
+            }
+          }
+        },
+        "reduction": {
+          "n_common_available": 12,
+          "scopes": {
+            "all": {
+              "n_molecules": 12,
+              "n_pairs": 66,
+              "kendall_tau_b": 0.8484848484848485,
+              "spearman_rho": 0.9230769230769231,
+              "f_unresolved_lower": 0.09090909090909091,
+              "f_unresolved_upper": 0.25757575757575757,
+              "f_unresolved_lower_z1p96": 0.3333333333333333,
+              "f_unresolved_upper_z1p96": 0.3939393939393939,
+              "n_resolved_both": 46,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 46,
+                "UNRESOLVED": 20,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.696969696969697,
+                "UNRESOLVED": 0.30303030303030304,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EC",
+                "EMC",
+                "GBL",
+                "PC",
+                "SL",
+                "SN",
+                "TMP"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "P0_to_P2a": {
+      "rung_lower": "P0",
+      "rung_upper": "P2a",
+      "axes": {
+        "oxidation": {
+          "n_common_available": 18,
+          "scopes": {
+            "all": {
+              "n_molecules": 18,
+              "n_pairs": 153,
+              "kendall_tau_b": 0.673202614379085,
+              "spearman_rho": 0.8142414860681114,
+              "f_unresolved_lower": 0.3006535947712418,
+              "f_unresolved_upper": 0.22875816993464052,
+              "f_unresolved_lower_z1p96": 0.5032679738562091,
+              "f_unresolved_upper_z1p96": 0.41830065359477125,
+              "n_resolved_both": 84,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 84,
+                "UNRESOLVED": 69,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.5490196078431373,
+                "UNRESOLVED": 0.45098039215686275,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DEC",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EA",
+                "EC",
+                "EMC",
+                "FEC",
+                "GBL",
+                "MA",
+                "PC",
+                "SL",
+                "SN",
+                "TEGDME",
+                "TMP",
+                "VC"
+              ]
+            }
+          }
+        },
+        "reduction": {
+          "n_common_available": 18,
+          "scopes": {
+            "all": {
+              "n_molecules": 18,
+              "n_pairs": 153,
+              "kendall_tau_b": 0.7908496732026143,
+              "spearman_rho": 0.9195046439628483,
+              "f_unresolved_lower": 0.10457516339869281,
+              "f_unresolved_upper": 0.6797385620915033,
+              "f_unresolved_lower_z1p96": 0.6666666666666666,
+              "f_unresolved_upper_z1p96": 0.7450980392156863,
+              "n_resolved_both": 40,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 40,
+                "UNRESOLVED": 113,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.26143790849673204,
+                "UNRESOLVED": 0.738562091503268,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DEC",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EA",
+                "EC",
+                "EMC",
+                "FEC",
+                "GBL",
+                "MA",
+                "PC",
+                "SL",
+                "SN",
+                "TEGDME",
+                "TMP",
+                "VC"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "C0_to_C1": {
+      "rung_lower": "C0",
+      "rung_upper": "C1",
+      "axes": {
+        "oxidation": {
+          "n_common_available": 10,
+          "scopes": {
+            "all": {
+              "n_molecules": 10,
+              "n_pairs": 45,
+              "kendall_tau_b": 0.6888888888888889,
+              "spearman_rho": 0.7696969696969697,
+              "f_unresolved_lower": 0.17777777777777778,
+              "f_unresolved_upper": 0.2,
+              "f_unresolved_lower_z1p96": 0.28888888888888886,
+              "f_unresolved_upper_z1p96": 0.4222222222222222,
+              "n_resolved_both": 30,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 30,
+                "UNRESOLVED": 15,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.6666666666666666,
+                "UNRESOLVED": 0.3333333333333333,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EC",
+                "GBL",
+                "SL",
+                "SN",
+                "TMP"
+              ]
+            },
+            "primary": {
+              "n_molecules": 6,
+              "n_pairs": 15,
+              "kendall_tau_b": 0.7333333333333333,
+              "spearman_rho": 0.8285714285714286,
+              "f_unresolved_lower": 0.13333333333333333,
+              "f_unresolved_upper": 0.26666666666666666,
+              "f_unresolved_lower_z1p96": 0.3333333333333333,
+              "f_unresolved_upper_z1p96": 0.6,
+              "n_resolved_both": 9,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 9,
+                "UNRESOLVED": 6,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.6,
+                "UNRESOLVED": 0.4,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "DMC",
+                "DME",
+                "EC",
+                "GBL",
+                "SL",
+                "TMP"
+              ]
+            }
+          }
+        },
+        "reduction": {
+          "n_common_available": 10,
+          "scopes": {
+            "all": {
+              "n_molecules": 10,
+              "n_pairs": 45,
+              "kendall_tau_b": -0.4666666666666667,
+              "spearman_rho": -0.5515151515151515,
+              "f_unresolved_lower": 0.4444444444444444,
+              "f_unresolved_upper": 0.8,
+              "f_unresolved_lower_z1p96": 0.8666666666666667,
+              "f_unresolved_upper_z1p96": 0.8444444444444444,
+              "n_resolved_both": 4,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 4,
+                "UNRESOLVED": 41,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.08888888888888889,
+                "UNRESOLVED": 0.9111111111111111,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EC",
+                "GBL",
+                "SL",
+                "SN",
+                "TMP"
+              ]
+            },
+            "primary": {
+              "n_molecules": 1,
+              "skipped": "fewer than two candidates after the primary filter"
+            }
+          }
+        }
+      }
+    },
+    "C1_to_C2": {
+      "rung_lower": "C1",
+      "rung_upper": "C2",
+      "axes": {
+        "oxidation": {
+          "n_common_available": 10,
+          "scopes": {
+            "all": {
+              "n_molecules": 10,
+              "n_pairs": 45,
+              "kendall_tau_b": 0.8666666666666667,
+              "spearman_rho": 0.9515151515151515,
+              "f_unresolved_lower": 0.13333333333333333,
+              "f_unresolved_upper": 0.08888888888888889,
+              "f_unresolved_lower_z1p96": 0.17777777777777778,
+              "f_unresolved_upper_z1p96": 0.2,
+              "n_resolved_both": 36,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 36,
+                "UNRESOLVED": 9,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.8,
+                "UNRESOLVED": 0.2,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EC",
+                "GBL",
+                "SL",
+                "SN",
+                "TMP"
+              ]
+            },
+            "primary": {
+              "n_molecules": 6,
+              "n_pairs": 15,
+              "kendall_tau_b": 0.6,
+              "spearman_rho": 0.7714285714285715,
+              "f_unresolved_lower": 0.26666666666666666,
+              "f_unresolved_upper": 0.26666666666666666,
+              "f_unresolved_lower_z1p96": 0.4,
+              "f_unresolved_upper_z1p96": 0.4666666666666667,
+              "n_resolved_both": 8,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 8,
+                "UNRESOLVED": 7,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.5333333333333333,
+                "UNRESOLVED": 0.4666666666666667,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "DMC",
+                "DME",
+                "EC",
+                "GBL",
+                "SL",
+                "TMP"
+              ]
+            }
+          }
+        },
+        "reduction": {
+          "n_common_available": 10,
+          "scopes": {
+            "all": {
+              "n_molecules": 10,
+              "n_pairs": 45,
+              "kendall_tau_b": 0.28888888888888886,
+              "spearman_rho": 0.2727272727272727,
+              "f_unresolved_lower": 0.35555555555555557,
+              "f_unresolved_upper": 0.35555555555555557,
+              "f_unresolved_lower_z1p96": 0.5777777777777777,
+              "f_unresolved_upper_z1p96": 0.6222222222222222,
+              "n_resolved_both": 18,
+              "f_robust_inversion": 0.0,
+              "decision_state_counts": {
+                "STABLE": 18,
+                "UNRESOLVED": 27,
+                "ROBUST_INVERSION": 0
+              },
+              "decision_state_fractions": {
+                "STABLE": 0.4,
+                "UNRESOLVED": 0.6,
+                "ROBUST_INVERSION": 0.0
+              },
+              "labels": [
+                "AN",
+                "DMC",
+                "DME",
+                "DMSO",
+                "DOL",
+                "EC",
+                "GBL",
+                "SL",
+                "SN",
+                "TMP"
+              ]
+            },
+            "primary": {
+              "n_molecules": 1,
+              "skipped": "fewer than two candidates after the primary filter"
+            }
+          }
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "id": "provenance_completeness",
+      "question": "主文数字是否都能追溯到明确的分子、模型、状态和原始计算记录？",
+      "ok": true,
+      "detail": "392 property 行全部带 source_file + source_field；0 个来源文件缺失",
+      "evidence": {
+        "n_rows": 392,
+        "absent_sources": [],
+        "n_rows_without_source": 0
+      }
+    },
+    {
+      "id": "same_target_quantity",
+      "question": "同一个 pair 的两个模型是否比较同一可解释的目标量？",
+      "ok": true,
+      "detail": "1326 个 pair 行全部使用 (quantity=IP / -EA, units=eV, direction=maximise)；没有任何 molecule x axis 在不同 rung 间混用不同目标量",
+      "evidence": {
+        "n_pair_rows": 1326,
+        "violations": [],
+        "n_mixed_targets": 0,
+        "mixed_examples": [],
+        "comparison_definitions": [
+          {
+            "comparison": "P0_to_P1v",
+            "rung_lower": "P0",
+            "rung_upper": "P1v",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "P1v_to_P1a",
+            "rung_lower": "P1v",
+            "rung_upper": "P1a",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "P1v_to_P2a",
+            "rung_lower": "P1v",
+            "rung_upper": "P2a",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "solvent",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "P1v_to_P2eps10",
+            "rung_lower": "P1v",
+            "rung_upper": "P2eps@10.0",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "solvent",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "P0_to_P2a",
+            "rung_lower": "P0",
+            "rung_upper": "P2a",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "solvent",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "C0_to_C1",
+            "rung_lower": "C0",
+            "rung_upper": "C1",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "C1_to_C2",
+            "rung_lower": "C1",
+            "rung_upper": "C2",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "cost_class",
+              "label"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "p1v_vs_p1a_distinct",
+      "question": "P1v 和 P1a 是否有不同的属性定义（而非只改了标签）？",
+      "ok": true,
+      "detail": "定义层：几何策略（G1 shared by neutral/cation/anion (single point only) vs G2 (per-charge-state r2SCAN-3c Opt started from G1)）与热化学（vertical: no relaxation and no ZPE for the charged state vs adiabatic: relaxed charged state, no ZPE）都不同；经验层：12 个共同分子上 |IP(P1a)-IP(P1v)| > 0 全部成立，中位 0.3181 eV；还原轴按 unbound_anion 规则全部排除",
+      "evidence": {
+        "definitional_differs": true,
+        "n_molecules_compared": 12,
+        "n_with_nonzero_gap": 12,
+        "d_ip_ev_min": 0.14075649793764278,
+        "d_ip_ev_median": 0.31809533981658866,
+        "d_ip_ev_max": 0.9503160071914678,
+        "all_gaps_negative": true,
+        "n_p1v_unbound_anion_flagged": 18,
+        "n_p1a_reduction_excluded": 12,
+        "n_p1a_reduction_values": 0,
+        "per_molecule": [
+          {
+            "name": "AN",
+            "ip_p1v_ev": 12.14043668219169,
+            "ip_p1a_ev": 11.828993591125073,
+            "d_ip_ev": -0.31144309106661616
+          },
+          {
+            "name": "DMC",
+            "ip_p1v_ev": 10.579877088551207,
+            "ip_p1a_ev": 10.17417420745493,
+            "d_ip_ev": -0.4057028810962766
+          },
+          {
+            "name": "DME",
+            "ip_p1v_ev": 8.856018336592793,
+            "ip_p1a_ev": 8.44604068024466,
+            "d_ip_ev": -0.40997765634813277
+          },
+          {
+            "name": "DMSO",
+            "ip_p1v_ev": 8.814169357077578,
+            "ip_p1a_ev": 8.53092291168049,
+            "d_ip_ev": -0.2832464453970882
+          },
+          {
+            "name": "DOL",
+            "ip_p1v_ev": 9.313142144474957,
+            "ip_p1a_ev": 9.172385646537315,
+            "d_ip_ev": -0.14075649793764278
+          },
+          {
+            "name": "EC",
+            "ip_p1v_ev": 10.76912321254072,
+            "ip_p1a_ev": 10.39413878305565,
+            "d_ip_ev": -0.37498442948506927
+          },
+          {
+            "name": "EMC",
+            "ip_p1v_ev": 10.201591260622601,
+            "ip_p1a_ev": 9.251275253431134,
+            "d_ip_ev": -0.9503160071914678
+          },
+          {
+            "name": "GBL",
+            "ip_p1v_ev": 9.951541251997265,
+            "ip_p1a_ev": 9.707066803297796,
+            "d_ip_ev": -0.244474448699469
+          },
+          {
+            "name": "PC",
+            "ip_p1v_ev": 10.538833241026927,
+            "ip_p1a_ev": 10.214085652460366,
+            "d_ip_ev": -0.32474758856656116
+          },
+          {
+            "name": "SL",
+            "ip_p1v_ev": 9.793051827534025,
+            "ip_p1a_ev": 9.528853842724846,
+            "d_ip_ev": -0.26419798480917933
+          },
+          {
+            "name": "SN",
+            "ip_p1v_ev": 11.6036374886256,
+            "ip_p1a_ev": 11.370724098602059,
+            "d_ip_ev": -0.2329133900235405
+          },
+          {
+            "name": "TMP",
+            "ip_p1v_ev": 10.056812227977222,
+            "ip_p1a_ev": 9.437638738078098,
+            "d_ip_ev": -0.6191734898991239
+          }
+        ]
+      }
+    },
+    {
+      "id": "li_centered_not_misused_as_molecular",
+      "question": "Li-centered reduction 是否被误用为 molecule-centered reduction？",
+      "ok": true,
+      "detail": "C1/C2 的还原轴严格按 R13 闸门过滤：C1 的 10 个候选里只有 SN 通过闸门，另外 9 个被排除在 primary scope 之外；旧的 all scope 还原排序（含 Li-centered 对象）Kendall tau_b = -0.4666666666666667，说明不加闸门时这条排序轴在物理上不是同一件事",
+      "evidence": {
+        "molecule_centered_oxidation": [
+          "DMC",
+          "DME",
+          "EC",
+          "GBL",
+          "SL",
+          "TMP"
+        ],
+        "molecule_centered_reduction": [
+          "SN"
+        ],
+        "li_centered_or_mixed_reduction": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "TMP"
+        ],
+        "no_intact_minimum_oxidation": [
+          "AN",
+          "DMSO",
+          "DOL",
+          "SN"
+        ],
+        "n_conditional_rows_entering_primary": 14,
+        "n_conditional_rows_total": 60,
+        "n_c1_molecules": 10,
+        "c1_molecules": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "primary_reduction_after_gate": [
+          "SN"
+        ],
+        "excluded_from_primary_reduction": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "TMP"
+        ],
+        "n_excluded_from_primary_reduction": 9,
+        "legacy_all_scope_kendall_tau_b_reduction": {
+          "C0_to_C1": -0.4666666666666667,
+          "C1_to_C2": 0.28888888888888886
+        },
+        "n_misused": 0,
+        "misused": [],
+        "n_conditional_rows_without_identity_label": 0
+      }
+    },
+    {
+      "id": "status_vocabulary_separated",
+      "question": "缺失、未收敛、未解析、不适用是否被分别编码？",
+      "ok": true,
+      "detail": "property 层的 value_status 只用 ok/missing/not_converged/not_applicable；未解析（UNRESOLVED）只作为 pairwise 层的 decision_state 出现，从不写进 value_status",
+      "evidence": {
+        "counts": {
+          "ok": 280,
+          "not_applicable": 12,
+          "missing": 100
+        },
+        "unknown_statuses": [],
+        "n_non_ok_without_reason": 0,
+        "n_missing_or_na_with_value": 0,
+        "pairwise_decision_states": [
+          "STABLE",
+          "UNRESOLVED"
+        ],
+        "unresolved_used_in_pairwise": true,
+        "n_unresolved_leaked_into_value_status": 0,
+        "examples": [
+          {
+            "name": "EC",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "PC",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "DMC",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "EMC",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "DME",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "DOL",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "GBL",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "AN",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          }
+        ]
+      }
+    },
+    {
+      "id": "frozen_number_reproduction",
+      "question": "本主表是否就是已发表冻结数字的同一个对象（而不是并行的一套定义）？",
+      "ok": true,
+      "detail": "逐位复现 outputs/week6 的 6 组 stored pair 数值（最大绝对误差 0.000e+00 eV），并用 tau_b / spearman 复核 outputs/week4 的 4 组 P2a 数值（最大绝对误差 0.000e+00），从而证明主表与已冻结数字是同一个对象、且 P2a/P2eps 的命名映射正确",
+      "evidence": [
+        {
+          "stage6_label": "P0_to_P1",
+          "master_table_label": "P0_to_P1v",
+          "axis": "oxidation",
+          "n_molecules": 12,
+          "n_pairs_compared": 66,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "stage6_label": "P0_to_P1",
+          "master_table_label": "P0_to_P1v",
+          "axis": "reduction",
+          "n_molecules": 12,
+          "n_pairs_compared": 66,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "stage6_label": "P1_to_P2",
+          "master_table_label": "P1v_to_P2eps10",
+          "axis": "oxidation",
+          "n_molecules": 12,
+          "n_pairs_compared": 66,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "stage6_label": "P1_to_P2",
+          "master_table_label": "P1v_to_P2eps10",
+          "axis": "reduction",
+          "n_molecules": 12,
+          "n_pairs_compared": 66,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "stage6_label": "C0_to_C1",
+          "master_table_label": "C0_to_C1",
+          "axis": "oxidation",
+          "n_molecules": 10,
+          "n_pairs_compared": 45,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "stage6_label": "C0_to_C1",
+          "master_table_label": "C0_to_C1",
+          "axis": "reduction",
+          "n_molecules": 10,
+          "n_pairs_compared": 45,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "source": "outputs/week4/p2_decision_stability.json",
+          "source_key": "p1_to_p2.oxidation",
+          "master_table_label": "P1v_to_P2a",
+          "rung_lower": "P1v",
+          "rung_upper": "P2a",
+          "axis": "oxidation",
+          "n_molecules": 18,
+          "kendall_tau_b_stored": 0.8954248366013072,
+          "kendall_tau_b_master": 0.8954248366013072,
+          "spearman_rho_stored": 0.9628482972136223,
+          "spearman_rho_master": 0.9628482972136223,
+          "max_abs_error": 0.0,
+          "ok": true
+        },
+        {
+          "source": "outputs/week4/p2_decision_stability.json",
+          "source_key": "p1_to_p2.reduction",
+          "master_table_label": "P1v_to_P2a",
+          "rung_lower": "P1v",
+          "rung_upper": "P2a",
+          "axis": "reduction",
+          "n_molecules": 18,
+          "kendall_tau_b_stored": 0.673202614379085,
+          "kendall_tau_b_master": 0.673202614379085,
+          "spearman_rho_stored": 0.826625386996904,
+          "spearman_rho_master": 0.826625386996904,
+          "max_abs_error": 0.0,
+          "ok": true
+        },
+        {
+          "source": "outputs/week4/p2_decision_stability.json",
+          "source_key": "p0_to_p2.oxidation",
+          "master_table_label": "P0_to_P2a",
+          "rung_lower": "P0",
+          "rung_upper": "P2a",
+          "axis": "oxidation",
+          "n_molecules": 18,
+          "kendall_tau_b_stored": 0.673202614379085,
+          "kendall_tau_b_master": 0.673202614379085,
+          "spearman_rho_stored": 0.8142414860681114,
+          "spearman_rho_master": 0.8142414860681114,
+          "max_abs_error": 0.0,
+          "ok": true
+        },
+        {
+          "source": "outputs/week4/p2_decision_stability.json",
+          "source_key": "p0_to_p2.reduction",
+          "master_table_label": "P0_to_P2a",
+          "rung_lower": "P0",
+          "rung_upper": "P2a",
+          "axis": "reduction",
+          "n_molecules": 18,
+          "kendall_tau_b_stored": 0.7908496732026143,
+          "kendall_tau_b_master": 0.7908496732026143,
+          "spearman_rho_stored": 0.9195046439628483,
+          "spearman_rho_master": 0.9195046439628483,
+          "max_abs_error": 0.0,
+          "ok": true
+        }
+      ]
+    }
+  ],
+  "checks_by_id": {
+    "provenance_completeness": {
+      "id": "provenance_completeness",
+      "question": "主文数字是否都能追溯到明确的分子、模型、状态和原始计算记录？",
+      "ok": true,
+      "detail": "392 property 行全部带 source_file + source_field；0 个来源文件缺失",
+      "evidence": {
+        "n_rows": 392,
+        "absent_sources": [],
+        "n_rows_without_source": 0
+      }
+    },
+    "same_target_quantity": {
+      "id": "same_target_quantity",
+      "question": "同一个 pair 的两个模型是否比较同一可解释的目标量？",
+      "ok": true,
+      "detail": "1326 个 pair 行全部使用 (quantity=IP / -EA, units=eV, direction=maximise)；没有任何 molecule x axis 在不同 rung 间混用不同目标量",
+      "evidence": {
+        "n_pair_rows": 1326,
+        "violations": [],
+        "n_mixed_targets": 0,
+        "mixed_examples": [],
+        "comparison_definitions": [
+          {
+            "comparison": "P0_to_P1v",
+            "rung_lower": "P0",
+            "rung_upper": "P1v",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "P1v_to_P1a",
+            "rung_lower": "P1v",
+            "rung_upper": "P1a",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "P1v_to_P2a",
+            "rung_lower": "P1v",
+            "rung_upper": "P2a",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "solvent",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "P1v_to_P2eps10",
+            "rung_lower": "P1v",
+            "rung_upper": "P2eps@10.0",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "solvent",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "P0_to_P2a",
+            "rung_lower": "P0",
+            "rung_upper": "P2a",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "solvent",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "C0_to_C1",
+            "rung_lower": "C0",
+            "rung_upper": "C1",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "cost_class",
+              "label"
+            ]
+          },
+          {
+            "comparison": "C1_to_C2",
+            "rung_lower": "C1",
+            "rung_upper": "C2",
+            "differing_fields": [
+              "geometry_policy",
+              "thermochemistry",
+              "cost_class",
+              "label"
+            ]
+          }
+        ]
+      }
+    },
+    "p1v_vs_p1a_distinct": {
+      "id": "p1v_vs_p1a_distinct",
+      "question": "P1v 和 P1a 是否有不同的属性定义（而非只改了标签）？",
+      "ok": true,
+      "detail": "定义层：几何策略（G1 shared by neutral/cation/anion (single point only) vs G2 (per-charge-state r2SCAN-3c Opt started from G1)）与热化学（vertical: no relaxation and no ZPE for the charged state vs adiabatic: relaxed charged state, no ZPE）都不同；经验层：12 个共同分子上 |IP(P1a)-IP(P1v)| > 0 全部成立，中位 0.3181 eV；还原轴按 unbound_anion 规则全部排除",
+      "evidence": {
+        "definitional_differs": true,
+        "n_molecules_compared": 12,
+        "n_with_nonzero_gap": 12,
+        "d_ip_ev_min": 0.14075649793764278,
+        "d_ip_ev_median": 0.31809533981658866,
+        "d_ip_ev_max": 0.9503160071914678,
+        "all_gaps_negative": true,
+        "n_p1v_unbound_anion_flagged": 18,
+        "n_p1a_reduction_excluded": 12,
+        "n_p1a_reduction_values": 0,
+        "per_molecule": [
+          {
+            "name": "AN",
+            "ip_p1v_ev": 12.14043668219169,
+            "ip_p1a_ev": 11.828993591125073,
+            "d_ip_ev": -0.31144309106661616
+          },
+          {
+            "name": "DMC",
+            "ip_p1v_ev": 10.579877088551207,
+            "ip_p1a_ev": 10.17417420745493,
+            "d_ip_ev": -0.4057028810962766
+          },
+          {
+            "name": "DME",
+            "ip_p1v_ev": 8.856018336592793,
+            "ip_p1a_ev": 8.44604068024466,
+            "d_ip_ev": -0.40997765634813277
+          },
+          {
+            "name": "DMSO",
+            "ip_p1v_ev": 8.814169357077578,
+            "ip_p1a_ev": 8.53092291168049,
+            "d_ip_ev": -0.2832464453970882
+          },
+          {
+            "name": "DOL",
+            "ip_p1v_ev": 9.313142144474957,
+            "ip_p1a_ev": 9.172385646537315,
+            "d_ip_ev": -0.14075649793764278
+          },
+          {
+            "name": "EC",
+            "ip_p1v_ev": 10.76912321254072,
+            "ip_p1a_ev": 10.39413878305565,
+            "d_ip_ev": -0.37498442948506927
+          },
+          {
+            "name": "EMC",
+            "ip_p1v_ev": 10.201591260622601,
+            "ip_p1a_ev": 9.251275253431134,
+            "d_ip_ev": -0.9503160071914678
+          },
+          {
+            "name": "GBL",
+            "ip_p1v_ev": 9.951541251997265,
+            "ip_p1a_ev": 9.707066803297796,
+            "d_ip_ev": -0.244474448699469
+          },
+          {
+            "name": "PC",
+            "ip_p1v_ev": 10.538833241026927,
+            "ip_p1a_ev": 10.214085652460366,
+            "d_ip_ev": -0.32474758856656116
+          },
+          {
+            "name": "SL",
+            "ip_p1v_ev": 9.793051827534025,
+            "ip_p1a_ev": 9.528853842724846,
+            "d_ip_ev": -0.26419798480917933
+          },
+          {
+            "name": "SN",
+            "ip_p1v_ev": 11.6036374886256,
+            "ip_p1a_ev": 11.370724098602059,
+            "d_ip_ev": -0.2329133900235405
+          },
+          {
+            "name": "TMP",
+            "ip_p1v_ev": 10.056812227977222,
+            "ip_p1a_ev": 9.437638738078098,
+            "d_ip_ev": -0.6191734898991239
+          }
+        ]
+      }
+    },
+    "li_centered_not_misused_as_molecular": {
+      "id": "li_centered_not_misused_as_molecular",
+      "question": "Li-centered reduction 是否被误用为 molecule-centered reduction？",
+      "ok": true,
+      "detail": "C1/C2 的还原轴严格按 R13 闸门过滤：C1 的 10 个候选里只有 SN 通过闸门，另外 9 个被排除在 primary scope 之外；旧的 all scope 还原排序（含 Li-centered 对象）Kendall tau_b = -0.4666666666666667，说明不加闸门时这条排序轴在物理上不是同一件事",
+      "evidence": {
+        "molecule_centered_oxidation": [
+          "DMC",
+          "DME",
+          "EC",
+          "GBL",
+          "SL",
+          "TMP"
+        ],
+        "molecule_centered_reduction": [
+          "SN"
+        ],
+        "li_centered_or_mixed_reduction": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "TMP"
+        ],
+        "no_intact_minimum_oxidation": [
+          "AN",
+          "DMSO",
+          "DOL",
+          "SN"
+        ],
+        "n_conditional_rows_entering_primary": 14,
+        "n_conditional_rows_total": 60,
+        "n_c1_molecules": 10,
+        "c1_molecules": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "SN",
+          "TMP"
+        ],
+        "primary_reduction_after_gate": [
+          "SN"
+        ],
+        "excluded_from_primary_reduction": [
+          "AN",
+          "DMC",
+          "DME",
+          "DMSO",
+          "DOL",
+          "EC",
+          "GBL",
+          "SL",
+          "TMP"
+        ],
+        "n_excluded_from_primary_reduction": 9,
+        "legacy_all_scope_kendall_tau_b_reduction": {
+          "C0_to_C1": -0.4666666666666667,
+          "C1_to_C2": 0.28888888888888886
+        },
+        "n_misused": 0,
+        "misused": [],
+        "n_conditional_rows_without_identity_label": 0
+      }
+    },
+    "status_vocabulary_separated": {
+      "id": "status_vocabulary_separated",
+      "question": "缺失、未收敛、未解析、不适用是否被分别编码？",
+      "ok": true,
+      "detail": "property 层的 value_status 只用 ok/missing/not_converged/not_applicable；未解析（UNRESOLVED）只作为 pairwise 层的 decision_state 出现，从不写进 value_status",
+      "evidence": {
+        "counts": {
+          "ok": 280,
+          "not_applicable": 12,
+          "missing": 100
+        },
+        "unknown_statuses": [],
+        "n_non_ok_without_reason": 0,
+        "n_missing_or_na_with_value": 0,
+        "pairwise_decision_states": [
+          "STABLE",
+          "UNRESOLVED"
+        ],
+        "unresolved_used_in_pairwise": true,
+        "n_unresolved_leaked_into_value_status": 0,
+        "examples": [
+          {
+            "name": "EC",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "PC",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "DMC",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "EMC",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "DME",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "DOL",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "GBL",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          },
+          {
+            "name": "AN",
+            "rung": "P1a",
+            "axis": "reduction",
+            "value_status": "not_applicable",
+            "status_reason": "frozen unbound_anion failure rule: the gas-phase anion is not a bound electronic state, so the adiabatic EA has no physi"
+          }
+        ]
+      }
+    },
+    "frozen_number_reproduction": {
+      "id": "frozen_number_reproduction",
+      "question": "本主表是否就是已发表冻结数字的同一个对象（而不是并行的一套定义）？",
+      "ok": true,
+      "detail": "逐位复现 outputs/week6 的 6 组 stored pair 数值（最大绝对误差 0.000e+00 eV），并用 tau_b / spearman 复核 outputs/week4 的 4 组 P2a 数值（最大绝对误差 0.000e+00），从而证明主表与已冻结数字是同一个对象、且 P2a/P2eps 的命名映射正确",
+      "evidence": [
+        {
+          "stage6_label": "P0_to_P1",
+          "master_table_label": "P0_to_P1v",
+          "axis": "oxidation",
+          "n_molecules": 12,
+          "n_pairs_compared": 66,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "stage6_label": "P0_to_P1",
+          "master_table_label": "P0_to_P1v",
+          "axis": "reduction",
+          "n_molecules": 12,
+          "n_pairs_compared": 66,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "stage6_label": "P1_to_P2",
+          "master_table_label": "P1v_to_P2eps10",
+          "axis": "oxidation",
+          "n_molecules": 12,
+          "n_pairs_compared": 66,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "stage6_label": "P1_to_P2",
+          "master_table_label": "P1v_to_P2eps10",
+          "axis": "reduction",
+          "n_molecules": 12,
+          "n_pairs_compared": 66,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "stage6_label": "C0_to_C1",
+          "master_table_label": "C0_to_C1",
+          "axis": "oxidation",
+          "n_molecules": 10,
+          "n_pairs_compared": 45,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "stage6_label": "C0_to_C1",
+          "master_table_label": "C0_to_C1",
+          "axis": "reduction",
+          "n_molecules": 10,
+          "n_pairs_compared": 45,
+          "max_abs_error_ev": 0.0,
+          "n_mask_mismatches": 0,
+          "mask_mismatch_examples": [],
+          "ok": true
+        },
+        {
+          "source": "outputs/week4/p2_decision_stability.json",
+          "source_key": "p1_to_p2.oxidation",
+          "master_table_label": "P1v_to_P2a",
+          "rung_lower": "P1v",
+          "rung_upper": "P2a",
+          "axis": "oxidation",
+          "n_molecules": 18,
+          "kendall_tau_b_stored": 0.8954248366013072,
+          "kendall_tau_b_master": 0.8954248366013072,
+          "spearman_rho_stored": 0.9628482972136223,
+          "spearman_rho_master": 0.9628482972136223,
+          "max_abs_error": 0.0,
+          "ok": true
+        },
+        {
+          "source": "outputs/week4/p2_decision_stability.json",
+          "source_key": "p1_to_p2.reduction",
+          "master_table_label": "P1v_to_P2a",
+          "rung_lower": "P1v",
+          "rung_upper": "P2a",
+          "axis": "reduction",
+          "n_molecules": 18,
+          "kendall_tau_b_stored": 0.673202614379085,
+          "kendall_tau_b_master": 0.673202614379085,
+          "spearman_rho_stored": 0.826625386996904,
+          "spearman_rho_master": 0.826625386996904,
+          "max_abs_error": 0.0,
+          "ok": true
+        },
+        {
+          "source": "outputs/week4/p2_decision_stability.json",
+          "source_key": "p0_to_p2.oxidation",
+          "master_table_label": "P0_to_P2a",
+          "rung_lower": "P0",
+          "rung_upper": "P2a",
+          "axis": "oxidation",
+          "n_molecules": 18,
+          "kendall_tau_b_stored": 0.673202614379085,
+          "kendall_tau_b_master": 0.673202614379085,
+          "spearman_rho_stored": 0.8142414860681114,
+          "spearman_rho_master": 0.8142414860681114,
+          "max_abs_error": 0.0,
+          "ok": true
+        },
+        {
+          "source": "outputs/week4/p2_decision_stability.json",
+          "source_key": "p0_to_p2.reduction",
+          "master_table_label": "P0_to_P2a",
+          "rung_lower": "P0",
+          "rung_upper": "P2a",
+          "axis": "reduction",
+          "n_molecules": 18,
+          "kendall_tau_b_stored": 0.7908496732026143,
+          "kendall_tau_b_master": 0.7908496732026143,
+          "spearman_rho_stored": 0.9195046439628483,
+          "spearman_rho_master": 0.9195046439628483,
+          "max_abs_error": 0.0,
+          "ok": true
+        }
+      ]
+    }
+  },
+  "cost_table": [
+    {
+      "rung": "P0",
+      "axis_A": "P0",
+      "cost_class": "cheap (GFN2-xTB only)",
+      "feature_availability": "usable before any expensive calculation (cheap proxy layer)",
+      "n_objects": 58,
+      "n_property_rows": 116,
+      "n_value_rows": 36,
+      "n_missing": 80,
+      "n_not_converged": 0,
+      "n_not_applicable": 0,
+      "n_qc_flagged": 0,
+      "wall_seconds": 0.0,
+      "wall_seconds_note": "the distilled table outputs/week3/p0_core_set.csv records no wall time; 0.0 means 'not recorded', not 'free'",
+      "n_failed_jobs": 0,
+      "source_file": "outputs/week3/p0_core_set.csv"
+    },
+    {
+      "rung": "P1v",
+      "axis_A": "P1v",
+      "cost_class": "expensive (r2SCAN-3c single point)",
+      "feature_availability": "available only after this rung's r2SCAN-3c calculation is finished",
+      "n_objects": 18,
+      "n_property_rows": 36,
+      "n_value_rows": 36,
+      "n_missing": 0,
+      "n_not_converged": 0,
+      "n_not_applicable": 0,
+      "n_qc_flagged": 0,
+      "wall_seconds": 2194.13,
+      "wall_seconds_note": "summed from the seconds column of outputs/week4/p1_core_set.csv",
+      "n_failed_jobs": 0,
+      "source_file": "outputs/week4/p1_core_set.csv"
+    },
+    {
+      "rung": "P1a",
+      "axis_A": "P1a",
+      "cost_class": "expensive (r2SCAN-3c geometry optimisation)",
+      "feature_availability": "available only after this rung's r2SCAN-3c calculation is finished",
+      "n_objects": 12,
+      "n_property_rows": 24,
+      "n_value_rows": 12,
+      "n_missing": 0,
+      "n_not_converged": 0,
+      "n_not_applicable": 12,
+      "n_qc_flagged": 0,
+      "wall_seconds": 0.0,
+      "wall_seconds_note": "the distilled table outputs/phase2_p1a/p1a_adiabatic.csv records no wall time; 0.0 means 'not recorded', not 'free'",
+      "n_failed_jobs": 0,
+      "source_file": "outputs/phase2_p1a/p1a_adiabatic.csv"
+    },
+    {
+      "rung": "P2a",
+      "axis_A": "P2a",
+      "cost_class": "expensive (r2SCAN-3c single point in solvent)",
+      "feature_availability": "available only after this rung's r2SCAN-3c calculation is finished",
+      "n_objects": 18,
+      "n_property_rows": 36,
+      "n_value_rows": 36,
+      "n_missing": 0,
+      "n_not_converged": 0,
+      "n_not_applicable": 0,
+      "n_qc_flagged": 0,
+      "wall_seconds": 2914.98,
+      "wall_seconds_note": "summed from the seconds column of outputs/week4/p2_core_set_smd_acetonitrile.csv",
+      "n_failed_jobs": 0,
+      "source_file": "outputs/week4/p2_core_set_smd_acetonitrile.csv"
+    },
+    {
+      "rung": "C0",
+      "axis_A": "C0",
+      "cost_class": "expensive (r2SCAN-3c single point)",
+      "feature_availability": "available only after this rung's r2SCAN-3c calculation is finished",
+      "n_objects": 12,
+      "n_property_rows": 24,
+      "n_value_rows": 24,
+      "n_missing": 0,
+      "n_not_converged": 0,
+      "n_not_applicable": 0,
+      "n_qc_flagged": 4,
+      "wall_seconds": 3453.8899999999994,
+      "wall_seconds_note": "summed from the opt_seconds column of outputs/week4/t2_opt_freq.csv",
+      "n_failed_jobs": 0,
+      "source_file": "outputs/week4/t2_opt_freq.csv"
+    },
+    {
+      "rung": "C1",
+      "axis_A": "C1",
+      "cost_class": "expensive (r2SCAN-3c single point on the complex)",
+      "feature_availability": "available only after this rung's r2SCAN-3c calculation is finished",
+      "n_objects": 18,
+      "n_property_rows": 36,
+      "n_value_rows": 20,
+      "n_missing": 16,
+      "n_not_converged": 0,
+      "n_not_applicable": 0,
+      "n_qc_flagged": 14,
+      "wall_seconds": 17737.590000000007,
+      "wall_seconds_note": "summed from the seconds column of outputs/week5/c1_li_coordination.csv",
+      "n_failed_jobs": 1,
+      "source_file": "outputs/week5/c1_li_coordination.csv"
+    },
+    {
+      "rung": "C2",
+      "axis_A": "C2",
+      "cost_class": "expensive (r2SCAN-3c single point on the 1:2 complex)",
+      "feature_availability": "available only after this rung's r2SCAN-3c calculation is finished",
+      "n_objects": 12,
+      "n_property_rows": 24,
+      "n_value_rows": 20,
+      "n_missing": 4,
+      "n_not_converged": 0,
+      "n_not_applicable": 0,
+      "n_qc_flagged": 14,
+      "wall_seconds": 12333.71,
+      "wall_seconds_note": "summed from the seconds column of outputs/week8/stage9_jobs.csv",
+      "n_failed_jobs": 0,
+      "source_file": "outputs/week8/stage9_jobs.csv"
+    },
+    {
+      "rung": "P2eps@5.0",
+      "axis_A": "P2eps",
+      "cost_class": "expensive (r2SCAN-3c single point in solvent)",
+      "feature_availability": "available only after this rung's r2SCAN-3c calculation is finished",
+      "n_objects": 12,
+      "n_property_rows": 24,
+      "n_value_rows": 24,
+      "n_missing": 0,
+      "n_not_converged": 0,
+      "n_not_applicable": 0,
+      "n_qc_flagged": 0,
+      "wall_seconds": 877.6899999999999,
+      "wall_seconds_note": "summed from the seconds column of outputs/week4/p2_core_set_cpcm_5.csv",
+      "n_failed_jobs": 0,
+      "source_file": "outputs/week4/p2_core_set_cpcm_5.csv"
+    },
+    {
+      "rung": "P2eps@10.0",
+      "axis_A": "P2eps",
+      "cost_class": "expensive (r2SCAN-3c single point in solvent)",
+      "feature_availability": "available only after this rung's r2SCAN-3c calculation is finished",
+      "n_objects": 12,
+      "n_property_rows": 24,
+      "n_value_rows": 24,
+      "n_missing": 0,
+      "n_not_converged": 0,
+      "n_not_applicable": 0,
+      "n_qc_flagged": 0,
+      "wall_seconds": 1103.7499999999998,
+      "wall_seconds_note": "summed from the seconds column of outputs/week4/p2_core_set_cpcm_10.csv",
+      "n_failed_jobs": 0,
+      "source_file": "outputs/week4/p2_core_set_cpcm_10.csv"
+    },
+    {
+      "rung": "P2eps@20.0",
+      "axis_A": "P2eps",
+      "cost_class": "expensive (r2SCAN-3c single point in solvent)",
+      "feature_availability": "available only after this rung's r2SCAN-3c calculation is finished",
+      "n_objects": 12,
+      "n_property_rows": 24,
+      "n_value_rows": 24,
+      "n_missing": 0,
+      "n_not_converged": 0,
+      "n_not_applicable": 0,
+      "n_qc_flagged": 0,
+      "wall_seconds": 983.8500000000001,
+      "wall_seconds_note": "summed from the seconds column of outputs/week4/p2_core_set_cpcm_20.csv",
+      "n_failed_jobs": 0,
+      "source_file": "outputs/week4/p2_core_set_cpcm_20.csv"
+    },
+    {
+      "rung": "P2eps@40.0",
+      "axis_A": "P2eps",
+      "cost_class": "expensive (r2SCAN-3c single point in solvent)",
+      "feature_availability": "available only after this rung's r2SCAN-3c calculation is finished",
+      "n_objects": 12,
+      "n_property_rows": 24,
+      "n_value_rows": 24,
+      "n_missing": 0,
+      "n_not_converged": 0,
+      "n_not_applicable": 0,
+      "n_qc_flagged": 0,
+      "wall_seconds": 763.11,
+      "wall_seconds_note": "summed from the seconds column of outputs/week4/p2_core_set_cpcm_40.csv",
+      "n_failed_jobs": 0,
+      "source_file": "outputs/week4/p2_core_set_cpcm_40.csv"
+    }
+  ],
+  "manifest": {
+    "molecule_registry": {
+      "file": "outputs/week28/molecule_registry.csv",
+      "n_rows": 58,
+      "columns": [
+        "mol_id",
+        "name",
+        "smiles",
+        "family",
+        "role",
+        "population",
+        "donor_atoms",
+        "donor_count",
+        "donor_types",
+        "heteroatom_count",
+        "n_heavy",
+        "mw",
+        "rotatable_bonds",
+        "tpsa",
+        "functionalization_tags",
+        "source_file"
+      ],
+      "sha256": "aacfae74ec78511c52cf8942f42c04c24d3f48d040f41d41f97bdbf7ca531fb7"
+    },
+    "state_registry": {
+      "file": "outputs/week28/state_registry.csv",
+      "n_rows": 242,
+      "columns": [
+        "state_id",
+        "mol_id",
+        "name",
+        "family",
+        "object_class",
+        "geometry_label",
+        "charge",
+        "multiplicity",
+        "stoichiometry",
+        "motif_id",
+        "coord_number",
+        "state_identity_label",
+        "label_source",
+        "energy_reference",
+        "energy_availability",
+        "qc_state",
+        "qc_flags",
+        "parent_bonds_intact",
+        "source_file"
+      ],
+      "sha256": "6f19966e7e21b58ec1289332a2af3473cae723723ab4ddb992fa527200ebd998"
+    },
+    "property_table": {
+      "file": "outputs/week28/property_table.csv",
+      "n_rows": 392,
+      "columns": [
+        "mol_id",
+        "name",
+        "family",
+        "population",
+        "rung",
+        "axis_A",
+        "axis",
+        "quantity",
+        "units",
+        "direction",
+        "value",
+        "value_status",
+        "status_reason",
+        "qc_flags",
+        "state_id",
+        "state_identity_label",
+        "in_primary_ranking",
+        "source_file",
+        "source_field"
+      ],
+      "sha256": "1edb4936f9b3836d9f8247d8b2089e5faea7683d887a9d8e622e48cacfd59d8a"
+    },
+    "pairwise_table": {
+      "file": "outputs/week28/pairwise_table.csv",
+      "n_rows": 1326,
+      "columns": [
+        "comparison",
+        "scope",
+        "axis",
+        "n_molecules",
+        "common_set_label",
+        "rung_lower",
+        "rung_upper",
+        "i",
+        "j",
+        "d_lower_ev",
+        "d_upper_ev",
+        "delta_shift_ev",
+        "sigma_ev",
+        "z_primary",
+        "threshold_ev",
+        "resolution_ratio_lower",
+        "resolution_ratio_upper",
+        "resolved_lower",
+        "resolved_upper",
+        "resolved_both",
+        "decision_state",
+        "structurally_non_testable"
+      ],
+      "sha256": "9b740ca2da61f6fe51c9d9a0b86ffbacdbcf2fcd97041240682c1bc31516e004"
+    },
+    "decision_table": {
+      "file": "outputs/week28/decision_table.csv",
+      "n_rows": 45,
+      "columns": [
+        "comparison",
+        "scope",
+        "axis",
+        "n_molecules",
+        "common_set_label",
+        "n_pairs",
+        "k_fraction",
+        "k",
+        "selected_lower",
+        "selected_upper",
+        "overlap",
+        "jaccard",
+        "selection_regret_ev",
+        "kendall_tau_b",
+        "spearman_rho",
+        "f_unresolved_lower",
+        "f_unresolved_upper",
+        "f_unresolved_lower_z1p96",
+        "f_unresolved_upper_z1p96",
+        "n_stable",
+        "n_unresolved",
+        "n_robust_inversion",
+        "f_robust_inversion"
+      ],
+      "sha256": "d512fc5a4a966aeb1e8d5c0f2b4a8c5356f1d2a0507489a4aa4538041763350e"
+    },
+    "cost_table": {
+      "file": "outputs/week28/cost_table.csv",
+      "n_rows": 11,
+      "columns": [
+        "rung",
+        "axis_A",
+        "cost_class",
+        "feature_availability",
+        "n_objects",
+        "n_property_rows",
+        "n_value_rows",
+        "n_missing",
+        "n_not_converged",
+        "n_not_applicable",
+        "n_qc_flagged",
+        "wall_seconds",
+        "wall_seconds_note",
+        "n_failed_jobs",
+        "source_file"
+      ],
+      "sha256": "3c26799c57d836a3236632c1873a493fee730cd2e5b4ff3be88f869bf786d2a6"
+    }
+  },
+  "n_rows_total": 2074
+}

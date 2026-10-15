@@ -8,7 +8,7 @@ window.HB = {
   "orca_out": 1535,
   "scripts": 166,
   "test_files": 101,
-  "tests_passed": 1691
+  "tests_passed": 1655
  },
  "pipeline": [
   {
@@ -841,7 +841,7 @@ window.HB = {
    "title": "deliverables/part2/01_结题论文与提交/SUBMISSION_评审阶段_WP1-WP7.json",
    "stage": "结题提交",
    "phase": "two",
-   "tag": "论文 v7 成品 + 生成与溯源脚本 + 独立数字审计 + WP1–WP7 对照映射（本目录无 outputs/week36，由 scripts/build_week36_final_submission.py 生成）",
+   "tag": "论文 v7 成品 + 生成与溯源脚本 + 独立数字审计 + WP1–WP7 对照映射（仓库内没有 outputs/week36：成品由 scripts/build_week36_final_submission.py 生成到交付层）",
    "summary": "\"stage\": \"Week 36 / Final submission\", \"label\": \"结题提交：论文 v7 成品 + 生成/溯源脚本 + 独立审计 + WP1-WP7 对照\", \"gate_status\": \"Gate 0 CLOSED；Gate 1 NOT CLOSED 且 NOT CLOSABLE（结题提交只冻结既有结论：不复核、不关闭、不跳过；零新增电子结构计算、零数据剔除、零阈值改动）\", \"discipline\": \"三层表述（模型事实 / 统计判定 / 材料意义）不得混写；方向 ox = IP、red = -EA（均 maximise）；sigma_ij = |d_lower - d_upper| / sqrt(0.5)；主结论带 Track A / Track B / 待验证推断标签；措辞只用 designated computational target / designated reference model，Gate 1 闭合前禁用 validated target；NOT CLOSABLE 不等于 NO SUCH DATA EXIST ANYWHERE。",
    "sections": []
   },
@@ -1615,40 +1615,51 @@ window.HB = {
    "h": 832
   }
  ],
- "deliverables": [
+ "repo_inventory": [
   {
-   "part": "part1",
-   "label": "part1 · Stage 0–24（week1–week25）",
-   "path": "deliverables/part1",
-   "files": 893,
-   "categories": [
-    "00_项目总览",
-    "01_论文变更说明",
-    "02_技术报告",
-    "03_数据成果",
-    "05_配置与口径",
-    "06_基础与参照数据",
-    "07_代码与脚本",
-    "08_图表",
-    "09_校验与按周元数据"
-   ]
+   "path": "src/electrolyte_ranking",
+   "note": "可复用库：ORCA / xTB 驱动、不确定度、排序、稳健性、决策状态",
+   "files": 18
   },
   {
-   "part": "part2",
-   "label": "part2 · 评审实施方案 WP1–WP7 + physics_completion_v1",
-   "path": "deliverables/part2",
-   "files": 393,
-   "categories": [
-    "01_结题论文与提交",
-    "02_技术报告",
-    "03_评审阶段数据成果",
-    "04_物理补全批次数据成果",
-    "05_配置与口径",
-    "06_基础与参照数据",
-    "07_代码与测试",
-    "08_图表",
-    "09_校验与清单"
-   ]
+   "path": "scripts",
+   "note": "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）",
+   "files": 212
+  },
+  {
+   "path": "config",
+   "note": "冻结定义与预注册（scientific_definitions.yaml、prereg.yaml）",
+   "files": 4
+  },
+  {
+   "path": "data",
+   "note": "元数据、外部锚点与参考文献",
+   "files": 20
+  },
+  {
+   "path": "structures",
+   "note": "起始几何：构象池、Li 配位 motif、微溶剂化",
+   "files": 57
+  },
+  {
+   "path": "outputs",
+   "note": "全部产物：逐阶段载荷、physics_completion/、figures/、溯源与合规",
+   "files": 7537
+  },
+  {
+   "path": "tests",
+   "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
+   "files": 104
+  },
+  {
+   "path": "docs",
+   "note": "技术报告与周报（NN_*.md）、协议、结题报告、站点",
+   "files": 147
+  },
+  {
+   "path": "deliverables",
+   "note": "交付镜像（按成果种类分组）：part1 = Stage 0–24，part2 = 评审 WP1–WP7 + physics_completion_v1",
+   "files": 1286
   }
  ],
  "key_numbers": [

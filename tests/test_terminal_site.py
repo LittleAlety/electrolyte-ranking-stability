@@ -40,7 +40,7 @@ PRELUDE = "window.HB = "
 #: BEGIN/END marker comment pair and re-rendered from the payload on every
 #: build, so a hand edit or a stale number cannot survive --check.
 MANAGED_BLOCKS = ("static-meta", "static-fallbacks", "hero-counts", "hero-links",
-                  "key-numbers", "deliverables", "argument-timeline")
+                  "key-numbers", "repo-inventory", "argument-timeline")
 
 
 def _load_generator():
@@ -99,7 +99,7 @@ def test_nojekyll_is_present_so_pages_serves_the_files_raw():
 def test_data_js_is_a_json_payload_with_the_expected_shape():
     payload = _payload()
     for key in ("repo", "counts", "pipeline", "gates", "weeks", "figures",
-                "phases", "deliverables", "key_numbers"):
+                "phases", "repo_inventory", "key_numbers"):
         assert key in payload, "payload misses " + key
     assert len(payload["pipeline"]) == 5
     assert payload["counts"]["weeks"] == len(payload["weeks"])
@@ -200,18 +200,33 @@ def test_key_numbers_each_cite_a_source_that_exists():
             "key number %r cites a missing source: %s" % (row["label"], row["source"])
 
 
-def test_deliverables_inventory_matches_the_repository():
-    """The data section advertises the in-repo delivery mirrors by file count."""
+def test_repo_inventory_matches_the_repository():
+    """Every advertised directory must exist, with the file count it reports."""
     payload = _payload()
-    rows = {d["part"]: d for d in payload["deliverables"]}
-    assert set(rows) == {"part1", "part2"}, "both delivery mirrors must be listed"
-    for part, row in rows.items():
+    rows = payload["repo_inventory"]
+    assert rows, "the data section advertises no directories"
+    paths = {d["path"] for d in rows}
+    assert "deliverables" in paths, "the delivery mirrors must be listed"
+    for row in rows:
         root = REPO_ROOT / row["path"]
-        assert root.is_dir(), "missing delivery mirror: " + row["path"]
-        on_disk = sum(1 for _ in root.rglob("*") if _.is_file())
+        assert root.is_dir(), "missing advertised directory: " + row["path"]
+        on_disk = sum(1 for p in root.rglob("*") if p.is_file())
         assert row["files"] == on_disk, \
-            "%s advertises %d files but holds %d" % (part, row["files"], on_disk)
-        assert row["categories"], part + " lists no category directories"
+            "%s advertises %d files but holds %d" % (row["path"], row["files"], on_disk)
+        assert row["note"].strip(), row["path"] + " has no description"
+
+
+def test_delivery_mirrors_are_present_and_match_their_own_manifests():
+    """The in-repo delivery mirrors must be complete and self-consistent."""
+    for part in ("part1", "part2"):
+        root = REPO_ROOT / "deliverables" / part
+        assert root.is_dir(), "missing delivery mirror: " + part
+        sums = sorted(root.glob("09_*/SHA256SUMS_新结构.txt"))
+        assert sums, part + " carries no SHA256SUMS_新结构.txt"
+        # Every top-level category directory named in the mirror's README exists.
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        for name in sorted(p.name for p in root.iterdir() if p.is_dir()):
+            assert name in readme, "%s/%s is not described in the mirror README" % (part, name)
 
 
 def test_gate_payload_matches_the_frozen_gate_records():
