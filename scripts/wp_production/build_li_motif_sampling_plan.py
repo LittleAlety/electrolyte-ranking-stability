@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
-"""方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（零新增电子结构计算）。
+"""方案 6.1 / 执行第 3 步：主集分子 Li 配位 motif 采样的结果前预注册（零新增电子结构计算）。
 
 方案 6.1 明确要求：「不同电荷态各自采样。除母态构象传播外，应对带电态补独立种子/扭转结构，
 不能假定母态最低构象就覆盖其搜索空间。motif 能切换，电子身份与连接关系必须重新检查。」
 
 现状（本脚本只读登记，不改数）：
-* 生产 Li 腿（LiM_plus / LiM_2plus）目前各自从**一个冻结几何**起步
-  （outputs/week5/c1/<NAME>/<NAME>_m1_G2Li.xyz；EMC 为 work/audit/EMC_Li/…），
+* 生产 Li 腿（LiM_plus / LiM_2plus）目前各自从**一个冻结几何**起步，
   即 n_conformers = 1 的单代表 motif，不是 motif 系综；
-* outputs/physics_completion/sampling/sampling_index.json 的 li_motif_sampling 8 条全为 not_computed；
+* 分子集不是硬编码的四分子，而是**从冻结的 data/metadata/physics_completion_set.csv 的
+  in_main=true 集合推导**（12 个主集分子），每个分子两个 Li 态 = 24 条腿；
 * 24 条 Li 态 pilot 单点已登记（outputs/physics_completion/free_states/pilot_li_state_energies.csv），
   其中 **SL 的 LiM_plus 是 bidentate、LiM_2plus 是 monodentate** —— 直接证明 motif 会在母态与氧化态之间切换，
   因此「传播一个母态结构」在本批次是被证据否证的默认做法。
 
 冻结的规则（先写规则、后看结果）
 --------------------------------
-1. 对象 = 四分子分母（DMC / EMC / GBL / SL）x 两个 Li 态（LiM_plus / LiM_2plus）= 8 条腿；
+1. 对象 = physics_completion_set.csv 的 in_main 分子集（12 个）x 两个 Li 态（LiM_plus / LiM_2plus）= 24 条腿；
 2. 每条腿**独立构造**候选 motif：从该态自己的电荷/多重度出发，枚举该分子可达给体集合上的
    单齿（round-0 类别）与双齿（给体间距允许 Li 桥接者）配位位置，再叠加母态构象种子；
    禁止把 LiM_plus 的优化结构直接当作 LiM_2plus 或多聚 motif 的起点；
@@ -24,6 +24,12 @@
 4. 只有关键 pair 的 Li 台阶对 motif 选择敏感时，才按同一规则靶向扩到 6（升级登记待判，不按结果事后决定）；
 5. 停止规则：两轮筛选后仍不能解析 → 报 sampling_limited / unresolved，不继续加算；
 6. 生产级后续只把**选定的一条代表 motif** 送进 DFT 单构象腿，其余独立 motif 登记在案以备 3 -> 6 展开。
+
+登记纪律
+--------
+`screen_parent_current` / `production_leg_status` / `motif_screen_status` / `screen_verdict` 逐腿取自
+**已登记的运行记录**：没有记录的腿保持 `not_computed` 且结论字段留空，绝不默认通过；
+有记录的腿必须与记录逐字一致（present+kept -> computed，present+无保留 -> unresolved）。
 
 用法
 ----
@@ -45,9 +51,35 @@ PC = REPO / "outputs" / "physics_completion"
 PILOT_LI = PC / "free_states" / "pilot_li_state_energies.csv"
 SAMPLING_INDEX = PC / "sampling" / "sampling_index.json"
 PRODUCTION_LEDGER = PC / "free_states" / "production_ledger.csv"
+PHYSICS_SET = REPO / "data" / "metadata" / "physics_completion_set.csv"
 OUT = PC / "li_motif_sampling"
 
-MOLS = (("C01", "DMC"), ("C02", "EMC"), ("C13", "GBL"), ("C14", "SL"))
+
+def _read_csv_rows(path):
+    with path.open(encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _main_cohort_molecules():
+    """(mol_id, name) of the frozen in_main set, in the frozen file order.
+
+    The molecule list is *derived* from the registered cohort definition instead
+    of being transcribed into this script: a second hard-coded copy is exactly
+    how the previous four-molecule list would drift away from the plan.
+    """
+    pairs = []
+    for row in _read_csv_rows(PHYSICS_SET):
+        if row.get("in_main", "").strip().lower() != "true":
+            continue
+        pair = (row["mol_id"], row["name"])
+        if pair not in pairs:
+            pairs.append(pair)
+    if not pairs:
+        raise SystemExit("no in_main molecule found in " + str(PHYSICS_SET))
+    return tuple(pairs)
+
+
+MOLS = _main_cohort_molecules()
 LI_STATES = ("LiM_plus", "LiM_2plus")
 SCREEN_LEVEL = "xTB GFN2 (gas phase) coordination-motif screen"
 KEEP_LOWEST = 3
@@ -138,6 +170,8 @@ def build():
                 core_hours = float(evidence["cores"]) * float(evidence["wall_sec"]) / 3600.0
             leg = registered.get((mol_id, state))
             screen_leg = screen_legs.get(key)
+            # 逐腿如实登记：没有运行记录条目的腿保持 not_computed，结论字段留空。
+            # 绝不用「计划里有这一行」冒充「已经算过」。
             if screen_leg is None:
                 screen_status = "not_computed"
             elif screen_leg["kept"]:
@@ -179,18 +213,41 @@ def build():
                                         for other in plan_rows)})
     pilot_core_hours = sum(float(row["round0_core_hours"] or 0.0) for row in plan_rows)
     round0_registered = sum(1 for row in plan_rows if row["round0_identity"])
-    screening_untouched = all(entry["status"] == "not_computed"
-                              for entry in sampling["li_motif_sampling"])
     screen_legs_out = sum(1 for row in plan_rows if row["motif_screen_status"] != "not_computed")
     screen_legs_computed = sum(1 for row in plan_rows if row["motif_screen_status"] == "computed")
     screen_stale = [row["record_id"] for row in plan_rows
                     if row["screen_parent_current"] not in ("", "true")]
 
+    # 逐腿复算运行记录的回显：有记录的腿必须与记录逐字一致，没记录的腿必须留空。
+    def _expected(row):
+        entry = screen_legs.get(row["record_id"])
+        if entry is None:
+            return ("not_computed", "", "", "")
+        status = "computed" if entry["kept"] else "unresolved"
+        return (status, str(len(entry["kept"])), entry["verdict"], screen_parent_current(entry))
+
+    misregistered = [
+        row["record_id"] for row in plan_rows
+        if (row["motif_screen_status"], row["screen_kept_motifs"], row["screen_verdict"],
+            row["screen_parent_current"]) != _expected(row)
+    ]
+    record_ids = set(screen_legs)
+    plan_ids = {row["record_id"] for row in plan_rows}
+    stray_record_legs = sorted(record_ids - plan_ids)
+    # sampling_index 是另一个登记处（由 build_physics_completion_batch.py 写）；它声称 computed 的腿
+    # 必须有本层的运行记录条目，否则两个登记处互相矛盾。
+    sampling_claims_without_record = sorted(
+        "%s|%s" % (mol_id, state) for (mol_id, state), entry in sampling_status.items()
+        if entry.get("status") == "computed" and "%s|%s" % (mol_id, state) not in record_ids
+    )
+
     checks = [
-        {"check_id": "covers_every_li_leg_of_the_four_molecule_subcohort",
-         "description": "覆盖四分子分母 x 两个 Li 态 = 8 条腿",
-         "ok": len(plan_rows) == len(MOLS) * len(LI_STATES),
-         "detail": "%d legs = %d molecules x %d Li states" % (len(plan_rows), len(MOLS), len(LI_STATES))},
+        {"check_id": "covers_every_li_leg_of_the_main_cohort",
+         "description": "覆盖 physics_completion_set.csv 的 in_main 分子集（12 个）x 两个 Li 态 = 24 条腿",
+         "ok": (len(plan_rows) == len(MOLS) * len(LI_STATES)
+                and {row["record_id"] for row in plan_rows}
+                == {"%s|%s" % (mol_id, state) for mol_id, _ in MOLS for state in LI_STATES}),
+         "detail": "%d legs = %d in_main molecules x %d Li states" % (len(plan_rows), len(MOLS), len(LI_STATES))},
         {"check_id": "mother_and_oxidised_states_are_screened_separately",
          "description": "母态与氧化态各自构造、各自筛选，计划里是独立两行",
          "ok": all(len([row for row in plan_rows if row["mol_id"] == mol_id]) == len(LI_STATES)
@@ -200,8 +257,8 @@ def build():
          "description": "禁止把一个 Li 态的优化结构当作另一个 Li 态的起点",
          "ok": all("never from the other Li state" in row["motif_classes_to_enumerate"]
                    for row in plan_rows),
-         "detail": "8/8 rows carry the prohibition; production_start_kind=single_frozen_motif is "
-                   "registered as a caveat, not as an ensemble"},
+         "detail": "%d/%d rows carry the prohibition; production_start_kind=single_frozen_motif is "
+                   "registered as a caveat, not as an ensemble" % (len(plan_rows), len(plan_rows))},
         {"check_id": "motif_switching_is_documented_from_the_pilot",
          "description": "母态与氧化态 motif 会切换这一点有已登记证据（不是假设）",
          "ok": bool(mother_vs_oxidised),
@@ -229,37 +286,60 @@ def build():
         {"check_id": "budget_uses_the_measured_li_pilot_cost",
          "description": "预算不靠廉价单点外推：引用已实测的 Li pilot 成本与每腿起点数",
          "ok": pilot_core_hours > 0 and all(row["starts_round1"] == str(STARTS_ROUND1) for row in plan_rows),
-         "detail": "8 legs measured round-0 core-hours = %.6f (sum of cores x wall over the 8 Li pilot "
-                   "single points); round-1 starts per leg = %d" % (pilot_core_hours, STARTS_ROUND1)},
+         "detail": "%d legs measured round-0 core-hours = %.6f (sum of cores x wall over the Li pilot "
+                   "single points); round-1 starts per leg = %d"
+                   % (len(plan_rows), pilot_core_hours, STARTS_ROUND1)},
         {"check_id": "screen_claims_match_the_run_record",
-         "description": "每条腿的 motif_screen_status 与 li_motif_screen.json 的运行记录一致：没有记录文件时必须全是 not_computed，有记录文件时不允许再留 not_computed",
-         "ok": ((screen is None and all(row["motif_screen_status"] == "not_computed" for row in plan_rows)
-                 and screening_untouched)
-                or (screen is not None
-                    and all(row["motif_screen_status"] != "not_computed" for row in plan_rows))),
-         "detail": ("no run record: 8/8 not_computed" if screen is None
-                    else "run record present: %d/%d legs carry an outcome (%d computed, %d unresolved)"
-                         % (screen_legs_out, len(plan_rows), screen_legs_computed, screen_legs_out - screen_legs_computed))},
+         "description": "逐腿回显运行记录：有记录的腿与 li_motif_screen.json 逐字一致，没记录的腿必须是 "
+                        "not_computed 且结论字段留空（不许默认通过）；记录里不许出现计划外的腿",
+         "ok": not misregistered and not stray_record_legs,
+         "detail": ("no run record: %d/%d not_computed" % (len(plan_rows), len(plan_rows))
+                    if screen is None else
+                    "run record present: %d/%d legs carry an outcome (%d computed, %d unresolved); "
+                    "%d leg(s) without a record stay not_computed; stray record legs: %s"
+                    % (screen_legs_out, len(plan_rows), screen_legs_computed,
+                       screen_legs_out - screen_legs_computed, len(plan_rows) - screen_legs_out,
+                       ", ".join(stray_record_legs) or "none"))},
+        {"check_id": "sampling_index_does_not_claim_a_leg_this_layer_never_screened",
+         "description": "sampling_index.json 声称 computed 的腿必须有本层运行记录条目，两个登记处不许互相矛盾",
+         "ok": not sampling_claims_without_record,
+         "detail": ("all sampling_index computed claims are backed by a run-record leg"
+                    if not sampling_claims_without_record else
+                    "claims without a run record: " + ", ".join(sampling_claims_without_record))},
         {"check_id": "screen_parent_geometries_are_current",
          "description": "筛选所用父几何与登记一致；生产腿重跑后必须重跑筛选（重跑约 30 秒）",
          "ok": not screen_stale,
          "detail": ("no run record yet" if screen is None else (
-             "all %d parents unchanged" % len(plan_rows) if not screen_stale
+             "all %d screened parents unchanged" % screen_legs_out if not screen_stale
              else "stale parent geometry for: " + ", ".join(screen_stale)))},
+        {"check_id": "uncomputed_legs_are_registered_as_uncomputed",
+         "description": "筛选进度如实登记：未算的腿只报 not_computed 且结论字段留空，不冒充 computed",
+         "ok": all((row["motif_screen_status"] == "not_computed")
+                   == (row["screen_verdict"] == "" and row["screen_kept_motifs"] == ""
+                       and row["screen_parent_current"] == "")
+                   for row in plan_rows),
+         "detail": "%d/%d legs carry a run-record outcome; the remaining %d stay not_computed "
+                   "(re-run scripts/wp_production/screen_li_motifs.py to close the gap)"
+                   % (screen_legs_out, len(plan_rows), len(plan_rows) - screen_legs_out)},
     ]
     n_failed = sum(0 if item["ok"] else 1 for item in checks)
 
     rule = {
         "scope": ("plan 6.1 / execution step 3: pre-registration of the Li coordination-motif screen for the "
-                  "four-molecule subcohort (zero new electronic structure)"),
+                  "main cohort (physics_completion_set.csv in_main = %d molecules x %d Li states = %d legs; "
+                  "zero new electronic structure)" % (len(MOLS), len(LI_STATES), len(plan_rows))),
         "registered_before_any_motif_screen": True,
+        "cohort_source": "data/metadata/physics_completion_set.csv (in_main = true)",
         "frozen_inputs": {
             "li_pilot_single_points": "outputs/physics_completion/free_states/pilot_li_state_energies.csv",
             "sampling_index": "outputs/physics_completion/sampling/sampling_index.json",
             "production_ledger": "outputs/physics_completion/free_states/production_ledger.csv",
+            "cohort_definition": "data/metadata/physics_completion_set.csv",
         },
         "selection_rule": [
-            "object = the four-molecule subcohort (DMC / EMC / GBL / SL) x the two Li states LiM_plus / LiM_2plus",
+            "object = the %d in_main molecules of physics_completion_set.csv x the two Li states "
+            "LiM_plus / LiM_2plus = %d legs" % (len(MOLS), len(plan_rows)),
+            "the molecule list is derived from the frozen cohort file, never transcribed into this script",
             "each leg is constructed from its own charge and multiplicity; the two Li states are never chained",
             "candidates = monodentate placements on the round-0 donor class plus bidentate pairs whose donor-donor "
             "distance allows a Li bridge, layered with the state's own conformer seeds",
@@ -274,11 +354,12 @@ def build():
         "prohibited": ["propagating one Li state's optimised structure to the other Li state",
                        "treating the single frozen production start geometry as a motif ensemble",
                        "calling the gas-phase screen a production free energy",
-                       "widening the window to obtain a preferred motif"],
+                       "widening the window to obtain a preferred motif",
+                       "reporting an unscreened leg as computed (uncomputed legs stay not_computed)"],
         "evidence": {
             "round0_li_pilot_single_points": round0_registered,
             "motif_switching_between_the_two_li_states": mother_vs_oxidised,
-            "measured_core_hours_for_the_8_li_legs": round(pilot_core_hours, 6),
+            "measured_core_hours_for_the_%d_li_legs" % len(plan_rows): round(pilot_core_hours, 6),
             "kernel": ("the round-0 pilot already shows the motif changes between the two Li states, so "
                        "assuming transfer would be contradicted by registered evidence"),
         },
@@ -291,6 +372,7 @@ def build():
         "screen_run_record": ("outputs/physics_completion/li_motif_sampling/li_motif_screen.json"
                               if screen is not None else ""),
         "screen_legs_computed": screen_legs_computed,
+        "screen_legs_with_an_outcome": screen_legs_out,
         "plan": plan_rows,
         "checks": checks,
         "n_checks": len(checks),
@@ -298,10 +380,12 @@ def build():
     }
 
     md = [
-        "# 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样预注册",
+        "# 方案 6.1 / 执行第 3 步：主集 Li 配位 motif 采样预注册",
         "",
         "> 由 `scripts/wp_production/build_li_motif_sampling_plan.py` 生成；**零新增电子结构计算**。",
         "> 规则在任何 motif 筛选跑出结果之前登记，不随后续结果修改。",
+        "> 对象 = `data/metadata/physics_completion_set.csv` 的 `in_main` 分子集（%d 个）x 两个 Li 态 = %d 条腿。"
+        % (len(MOLS), len(plan_rows)),
         "",
         "## 为什么必须先冻结这条规则",
         "",
@@ -357,7 +441,9 @@ def build():
             lowest = entry["kept"][0]["_motif_class"] if entry["kept"] else "-"
             screen_summary.append("| %s | %d | %d | %d | %s | %s |" % (
                 row["record_id"], entry["n_sites"], entry["n_ok"], len(entry["kept"]), entry["verdict"], lowest))
-        screen_summary += ["", "> 筛选层是气相 GFN2-xTB，不是生产自由能；保留结构的几何路径见 li_motif_screen.md。", ""]
+        screen_summary += ["", "> 筛选层是气相 GFN2-xTB，不是生产自由能；保留结构的几何路径见 li_motif_screen.md。",
+                           "> 本次运行记录覆盖 %d/%d 条腿；其余 %d 条腿保持 `not_computed`，等执行器重跑后补齐。"
+                           % (screen_legs_out, len(plan_rows), len(plan_rows) - screen_legs_out), ""]
     md += screen_summary
     md += [
         "",
@@ -373,9 +459,10 @@ def build():
         "## 边界",
         "",
         "* 本层只登记规则；筛选由 `scripts/wp_production/screen_li_motifs.py` 执行，运行记录写在"
-        "`outputs/physics_completion/li_motif_sampling/li_motif_screen.json`。没有运行记录时 8 条腿仍是"
-        "`motif_screen_status = not_computed`；有记录时逐腿写 computed / unresolved，并核对父几何是否已被重跑。",
+        "`outputs/physics_completion/li_motif_sampling/li_motif_screen.json`。没有运行记录条目的腿仍是"
+        "`motif_screen_status = not_computed`；有记录条目的腿逐条写 computed / unresolved，并核对父几何是否已被重跑。",
         "* round-0 身份/给体接触数逐条取自已登记的 Li pilot 单点，不是推断；其成本为重测值（cores x wall）。",
+        "* 分子集从冻结的 `physics_completion_set.csv` 的 `in_main` 集合推导，不在本脚本里另抄一份。",
         "* 生产级 Li 腿仍是单代表 motif：本层只登记「系综该怎么做、怎么做才算不违规」。",
         "",
     ]

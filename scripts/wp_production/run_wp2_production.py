@@ -28,6 +28,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 import run_batch as rb  # noqa: E402
+from orca_derivative_policy import require_analytic_gradient  # noqa: E402
 
 ORCA = rb.ORCA
 CORES = rb.ORCA_CORES
@@ -191,9 +192,11 @@ def run_state(mol_id: str, name: str, state: str, method: str, charge: int, mult
         run_geometry, geometry_level = geometry_start_with_level(mol_id, name, state)
     (d / "geom.xyz").write_bytes(run_geometry.read_bytes())
     inp = d / ("%s_%s.inp" % (name, state))
-    inp.write_text("! %s Opt NumFreq SMD(acetonitrile) TightOpt TightSCF SlowConv\n"
-                   "%%maxcore 2000\n%%pal nprocs %d end\n%%scf MaxIter 300 end\n"
-                   "* xyzfile %d %d geom.xyz\n" % (method, CORES, charge, mult), encoding="utf-8")
+    input_body = ("! %s Opt NumFreq SMD(acetonitrile) VeryTightOpt TightSCF SlowConv\n"
+                  "%%maxcore 2000\n%%pal nprocs %d end\n%%scf MaxIter 300 end\n"
+                  "* xyzfile %d %d geom.xyz\n" % (method, CORES, charge, mult))
+    require_analytic_gradient(input_body, minimum_optimization_tier="verytight")
+    inp.write_text(input_body, encoding="utf-8")
     _code, text, wall = rb.capture_run([str(ORCA), inp.name], d,
                                        d / ("%s_%s.log" % (name, state)))
 

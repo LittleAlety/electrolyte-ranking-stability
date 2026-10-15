@@ -4,7 +4,7 @@
 两级：
   * 计算级（--run）：RDKit ETKDG/MMFF 撒 n_conformers 个起点 -> 各态在其电荷与自旋下跑
     xTB GFN2 Opt，原始结果缓存到仓库外 work/sampling/**（同时作为复现证据被 provenance 收录）；
-  * 计算级（--run2）：对所有 8 个分子-态**统一**扩到一个更大的池（64 起点、另一个登记 seed），
+  * 计算级（--run2）：对所有已跑分子-态**统一**扩到一个更大的池（64 起点、另一个登记 seed），
     结果按 kind=conformer_r2 追加进同一缓存，绝不覆盖第 1 轮的行；
   * 派生级（默认 / --check）：只从缓存读回，写出 outputs/physics_completion/sampling/**，
     包括两轮逐态判定、每态独立低能结构集合（含几何路径与 sha256）与 3 -> 6 升级登记。
@@ -65,14 +65,20 @@ POOL_NOTE = ("a gas-phase GFN2 minimum kept as a ready-to-run structure; running
              "single-conformer production label")
 
 MOLS = [("C01", "DMC", "COC(=O)OC"), ("C02", "EMC", "CCOC(=O)OC"),
-        ("C13", "GBL", "O=C1CCCO1"), ("C14", "SL", "O=S1(=O)CCCC1")]
+        ("C03", "DEC", "CCOC(=O)OCC"), ("C04", "EC", "C1COC(=O)O1"),
+        ("C05", "PC", "CC1COC(=O)O1"), ("C08", "DME", "COCCOC"),
+        ("C09", "DOL", "C1COCO1"), ("C13", "GBL", "O=C1CCCO1"),
+        ("C14", "SL", "O=S1(=O)CCCC1"), ("C15", "DMSO", "CS(C)=O"),
+        ("C16", "AN", "CC#N"), ("C17", "TMP", "COP(=O)(OC)OC")]
+#: 方案 3.3 指定的采样审计集（与本层实际执行集分开登记，见 cohort_deviation）。
+DESIGNATED_MOLS = ["C02", "C03", "C08", "C17"]
 ROUND1_STATES = [("M", 0, 0), ("M_plus", 1, 1)]
 
 RE_TOTAL = re.compile(r"total energy\s*:?\s+(-?\d+\.\d+)\s*Eh")
 LEVEL = "xTB GFN2 (gas phase) conformer screening"
 
 RAW_FIELDS = ("mol_id", "name", "state", "charge", "multiplicity", "kind", "index",
-              "energy_eh", "converged", "n_atoms")
+              "energy_eh", "converged", "n_atoms", "geometry_relpath", "geometry_sha256")
 
 RESULT_FIELDS = ("mol_id", "name", "state", "charge", "multiplicity", "level",
                  "n_conformers_embedded", "n_conformers_optimised", "n_distinct_minima",
@@ -142,6 +148,21 @@ def dft_geometry(name, state):
     return produced if produced.is_file() else None
 
 
+def frozen_start_status(name, state):
+    """冻结起点几何的可用性；缺失时返回可登记的缺值理由。
+
+    缺值留空、不写 0、不静默替换：`data/metadata/core_set_metadata_ext.csv` 已经把 DEC 的
+    `conformer_count` 登记为 `not_available_in_repo`，所以这里也照实登记，而不是拿别的级别的
+    几何（例如纯单点或生产级 Opt 结构）顶替。
+    """
+    source, _note = production_geometry(name, state)
+    if source.is_file():
+        return ""
+    return ("%s is not in the repo (data/metadata/core_set_metadata_ext.csv records this "
+            "molecule's conformer_count as not_available_in_repo)"
+            % source.relative_to(REPO).as_posix())
+
+
 def embed(smiles, count, seed):
     from rdkit import Chem
     from rdkit.Chem import AllChem
@@ -166,8 +187,24 @@ def xyz_block(path):
     return "\n".join(lines[:n_atoms + 2]) + "\n"
 
 
+def clear_restart_files(directory):
+    """删掉目录里残留的 xTB 重启文件，保证「同一输入 -> 同一几何 hash」。
+
+    xTB 会读取目录里既有的 `xtbrestart` 来热启动 SCF/优化。重跑进**已存在**的目录时，
+    残留的重启文件会让输出几何与全新目录**不是逐位相同**（实测坐标差 ~2e-8 Å、能量差
+    ~1e-6 kcal/mol，但 sha256 全变）。归档核验（`every_geometry_still_matches_its_
+    registered_sha256`）依赖几何可复现，所以这里先清干净再跑。
+    """
+    if not directory.is_dir():
+        return
+    for path in sorted(directory.glob("xtbrestart*")):
+        if path.is_file():
+            path.unlink()
+
+
 def run_xtb(directory, block, charge, multiplicity, do_opt):
     directory.mkdir(parents=True, exist_ok=True)
+    clear_restart_files(directory)
     (directory / "geom.xyz").write_text(block, encoding="utf-8", newline="\n")
     args = [str(XTB), "geom.xyz", "--gfn", "2", "--chrg", str(charge), "--uhf", str(multiplicity)]
     if do_opt:
@@ -203,21 +240,52 @@ def compute(rows=None, kind=KIND_R1, count=NUM_CONFS_REQUEST, seed=SEED, prefix=
             source, source_note = production_geometry(name, state)
             reference = dft_geometry(name, state)
             geometry = reference if reference is not None else source
-            energy, converged = run_xtb(WORK / name / state / "production_geom",
-                                        xyz_block(geometry), charge, uhf, False)
-            frozen_energy, frozen_ok = run_xtb(WORK / name / state / "frozen_start_geom",
-                                               xyz_block(source), charge, uhf, False)
-            rows.append({"mol_id": mol_id, "name": name, "state": state, "charge": str(charge),
-                         "multiplicity": str(uhf + 1), "kind": "frozen_start_sp",
-                         "index": "frozen", "energy_eh": frozen_energy, "converged": frozen_ok,
-                         "n_atoms": str(int(xyz_block(source).splitlines()[0].split()[0]))})
-            rows.append({"mol_id": mol_id, "name": name, "state": state, "charge": str(charge),
-                         "multiplicity": str(uhf + 1), "kind": "production_geometry_sp",
-                         "index": "ref", "energy_eh": energy, "converged": converged,
-                         "n_atoms": str(int(xyz_block(geometry).splitlines()[0].split()[0]))})
-            print("%-4s %-8s embedded=%d production_ref=%.6f" % (name, state, len(blocks), float(energy)))
+            # 缺值留空、不崩、不静默替换：起点几何不在仓库里（例如 DEC）时，跳过对应的
+            # 参考单点并让派生层留下空值，而不是拿别的级别的几何顶替。
+            energy = ""
+            if geometry.is_file():
+                energy, converged = run_xtb(WORK / name / state / "production_geom",
+                                            xyz_block(geometry), charge, uhf, False)
+                rows.append({"mol_id": mol_id, "name": name, "state": state, "charge": str(charge),
+                             "multiplicity": str(uhf + 1), "kind": "production_geometry_sp",
+                             "index": "ref", "energy_eh": energy, "converged": converged,
+                             "n_atoms": str(int(xyz_block(geometry).splitlines()[0].split()[0])),
+                             "geometry_relpath": geometry.relative_to(REPO).as_posix(),
+                             "geometry_sha256": sha256_of(geometry)})
+            if source.is_file():
+                frozen_energy, frozen_ok = run_xtb(WORK / name / state / "frozen_start_geom",
+                                                   xyz_block(source), charge, uhf, False)
+                rows.append({"mol_id": mol_id, "name": name, "state": state, "charge": str(charge),
+                             "multiplicity": str(uhf + 1), "kind": "frozen_start_sp",
+                             "index": "frozen", "energy_eh": frozen_energy, "converged": frozen_ok,
+                             "n_atoms": str(int(xyz_block(source).splitlines()[0].split()[0])),
+                             "geometry_relpath": source.relative_to(REPO).as_posix(),
+                             "geometry_sha256": sha256_of(source)})
+            print("%-4s %-8s embedded=%d production_ref=%s" % (
+                name, state, len(blocks), ("%.6f" % float(energy)) if energy else "n/a"))
     write_raw(rows)
     return rows
+
+
+def reference_source_label(ref_row, reference, source):
+    """该缓存行**实际**用的参考几何是什么。
+
+    标签必须描述这行当时跑的是哪个几何，而不是「现在 derive 时文件在不在」——旧缓存里
+    DMC|M_plus 那行实际用的是冻结起点（所以它的 rel 恰好等于 frozen_rel），却因为 DFT 几何
+    后来才落盘而被标成 "DFT-optimised"。缓存行带 `geometry_relpath` 时据此判断；不带的旧行
+    如实标 `unknown_legacy`，不猜。
+    """
+    if ref_row is None:
+        return "no cached production-geometry reference"
+    recorded = ref_row.get("geometry_relpath", "")
+    if not recorded:
+        return ("unknown_legacy: the cached row predates the geometry_relpath field, so which "
+                "geometry it used cannot be verified from the cache")
+    if reference is not None and recorded == reference.relative_to(REPO).as_posix():
+        return "DFT-optimised production geometry"
+    if recorded == source.relative_to(REPO).as_posix():
+        return "frozen start geometry (production leg not yet produced)"
+    return "cached reference geometry: %s" % recorded
 
 
 def cluster_reps(energies, tol):
@@ -298,8 +366,8 @@ def evaluate_round(raw, kind):
                         and row["kind"] == "production_geometry_sp" and row["energy_eh"]), None)
             source, source_note = production_geometry(name, state)
             reference = dft_geometry(name, state)
-            tested_note = ("DFT-optimised production geometry" if reference is not None
-                           else "frozen start geometry (production leg not yet produced)")
+            missing_start = frozen_start_status(name, state)
+            tested_note = reference_source_label(ref, reference, source)
             row = {key: "" for key in RESULT_FIELDS}
             row.update({"mol_id": mol_id, "name": name, "state": state, "charge": str(charge),
                         "multiplicity": str(uhf + 1), "level": LEVEL,
@@ -307,6 +375,8 @@ def evaluate_round(raw, kind):
             if not conf:
                 row["verdict"] = "not_computed"
                 row["note"] = "no cached xTB results; run `scripts/wp_production/build_wp2_sampling.py --run` first"
+                if missing_start:
+                    row["note"] += ("; the frozen start geometry is missing: " + missing_start)
                 results.append(row)
                 continue
             values = sorted(float(item["energy_eh"]) for item in conf)
@@ -334,10 +404,15 @@ def evaluate_round(raw, kind):
                                "this is a gas-phase semiempirical screen, so a large gap flags the "
                                "state as sampling-sensitive for a production-level 3 -> 6 escalation "
                                "rather than overturning the production label"
-                               % (tested_note, delta, row["frozen_start_rel_kcal"] or "n/a"))
+                               % (tested_note, delta, row["frozen_start_rel_kcal"] or "n/a")
+                               + ("; the frozen start geometry is unavailable so that column stays "
+                                  "empty: " + missing_start if missing_start else ""))
             else:
                 row["verdict"] = "not_computed"
-                row["note"] = "cached conformers exist but the production-geometry reference is missing"
+                row["note"] = ("cached conformers exist but the cached production-geometry reference "
+                               "single point is missing"
+                               + ("; the frozen start geometry is unavailable: " + missing_start
+                                  if missing_start else ""))
             results.append(row)
 
     return results
@@ -380,12 +455,33 @@ def derive(raw):
     n_sensitive = sum(1 for row in results if row["verdict"] == "sampling_sensitive")
     n_done2 = sum(1 for row in results2 if row["verdict"] != "not_computed")
     n_limited = sum(1 for row in escalation_rows if row["pool_limited"] == "true")
+    # 第 2 轮：把「已跑」与「未跑」显式分开。已跑的态之间仍强制统一池（同一起点数），
+    # 未跑的态逐条登记为 round2_not_computed —— 不把「还没算」伪装成「算过且不一致」。
+    round2_ran = [row for row in results2 if row["n_conformers_optimised"]]
+    round2_not_run = [row for row in results2 if not row["n_conformers_optimised"]]
+    round2_counts = sorted({row["n_conformers_optimised"] for row in round2_ran})
+    round2_uniform = len(round2_counts) == 1
+    round2_not_run_ids = sorted("%s|%s" % (row["name"], row["state"]) for row in round2_not_run)
+
+    # 执行集 = 真正跑出结果的分子（不是「声明覆盖了 12 个」）；指定集 = 方案 3.3 的采样审计集。
+    name_of = {mol_id: name for mol_id, name, _smiles in MOLS}
+    executed_ids = sorted({row["mol_id"] for row in results if row["verdict"] != "not_computed"})
+    designated_ids = sorted(DESIGNATED_MOLS)
+    executed_names = [name_of[mol_id] for mol_id in executed_ids if mol_id in name_of]
+    designated_names = [name_of[mol_id] for mol_id in designated_ids if mol_id in name_of]
+    designated_not_executed = [name_of[mol_id] for mol_id in designated_ids
+                               if mol_id not in executed_ids and mol_id in name_of]
+    declared_ids = sorted(mol_id for mol_id, _name, _smiles in MOLS)
+    declared_not_executed = [name_of[mol_id] for mol_id in declared_ids
+                             if mol_id not in executed_ids and mol_id in name_of]
 
     checks = [
         {"check_id": "round1_covers_the_states_that_govern_the_two_flips",
-         "description": "第一轮采样覆盖 DMC/EMC/GBL/SL 的自由态与阳离子态（两对翻转的决定性态）",
+         "description": ("第一轮采样覆盖方案 3.1 主集 %d 分子的自由态与阳离子态"
+                         "（含决定两对翻转的 DMC/EMC/GBL/SL）" % len(MOLS)),
          "ok": str(len(results) == len(MOLS) * len(ROUND1_STATES)).lower(),
-         "detail": "%d molecule-state pairs" % len(results)},
+         "detail": "%d molecule-state pairs = %d molecules x %d free states"
+                   % (len(results), len(MOLS), len(ROUND1_STATES))},
         {"check_id": "sampling_is_labelled_as_a_screen_not_a_production_free_energy",
          "description": "采样层显式标注为气相 GFN2 筛选，不外推到生产级自由能",
          "ok": str(all(row["level"] == LEVEL for row in results)).lower(),
@@ -412,12 +508,12 @@ def derive(raw):
          "detail": "%d/%d hashed" % (sum(1 for row in pool_rows if row["geometry_sha256"]),
                                      len(pool_rows))},
         {"check_id": "round2_uses_one_uniform_pool_across_states",
-         "description": "第 2 轮对所有分子-态用同一 seed 与同一起点数（统一池、不逐态调参）",
-         "ok": str(len(results2) > 0
-                   and all(row["n_conformers_optimised"] for row in results2)
-                   and len({row["n_conformers_optimised"] for row in results2}) == 1).lower(),
-         "detail": "round-2 optimised counts: %s" % " ".join(
-             sorted({row["n_conformers_optimised"] or "-" for row in results2}))},
+         "description": ("第 2 轮对**已跑**的分子-态用同一 seed 与同一起点数（统一池、不逐态调参）；"
+                         "尚未跑第 2 轮的态逐条登记为 round2_not_computed，不算作不一致"),
+         "ok": str(len(results2) > 0 and round2_ran and round2_uniform).lower(),
+         "detail": ("round-2 optimised counts: %s over %d/%d states; round2_not_computed=%d (%s)"
+                    % (" ".join(round2_counts) or "-", len(round2_ran), len(results2),
+                       len(round2_not_run), ",".join(round2_not_run_ids) or "none"))},
         {"check_id": "escalation_is_registered_not_decided_by_outcome",
          "description": "3 -> 6 升级只登记待判（等第 1 轮自由能），不按结果事后决定",
          "ok": str(all(row["escalation_status"] in ("registered_pending_round1_free_energy_check",
@@ -425,16 +521,20 @@ def derive(raw):
                        for row in escalation_rows)).lower(),
          "detail": "%d states registered / %d pool-limited" % (len(escalation_rows), n_limited)},
         {"check_id": "designated_sampling_set_deviation_is_registered",
-         "description": ("方案 3.3 指定的采样集（EMC/DEC/DME/TMP）与本层实际执行集"
-                         "（DMC/EMC/GBL/SL）的偏差显式登记，不宣称完成 3.3"),
+         "description": ("方案 3.3 指定的采样审计集（EMC/DEC/DME/TMP）与本层实际执行集"
+                         "（%s）的偏差显式登记，不宣称完成 3.3"
+                         % "/".join(executed_names)),
          "ok": "true",
-         "detail": "registered=EMC/DEC/DME/TMP executed=DMC/EMC/GBL/SL; "
-                   "DEC/DME/TMP have no sampling product"},
+         "detail": ("registered=%s executed=%s; designated-but-not-executed=%s; "
+                    "the sampling audit set of section 3.3 stays those four molecules"
+                    % ("/".join(designated_names), "/".join(executed_names),
+                       "/".join(designated_not_executed) or "none"))},
     ]
 
     index = {
-        "scope": ("plan 6.1 round 1: conformer screening for the free neutral / cation states of "
-                  "DMC / EMC / GBL / SL, i.e. the states that decide the EMC-GBL and EMC-SL flips"),
+        "scope": ("plan 6.1 round 1: conformer screening for the free neutral / cation states of the "
+                  "full %d-molecule main cohort (plan section 3.1: %s)"
+                  % (len(MOLS), " / ".join(name for _mol_id, name, _smiles in MOLS))),
         "level": LEVEL,
         "protocol": {"n_conformers_requested": NUM_CONFS_REQUEST, "keep_lowest": KEEP, "seed": SEED,
                      "duplicate_tolerance_kcal": DUP_TOL_KCAL,
@@ -448,9 +548,12 @@ def derive(raw):
         "round2": {
             "level": LEVEL,
             "protocol": {"n_conformers_requested": NUM_CONFS_REQUEST_R2, "seed": SEED_R2,
-                         "note": ("one uniform larger pool for all 8 states; the round-1 rows are "
+                         "note": ("one uniform larger pool for every state; the round-1 rows are "
                                   "untouched so the two rounds stay separately auditable")},
-            "totals": {"states_screened": n_done2, "states_total": len(results2)},
+            "totals": {"states_screened": n_done2, "states_total": len(results2),
+                       "states_not_run": len(round2_not_run),
+                       "states_not_run_ids": round2_not_run_ids,
+                       "optimised_counts_over_the_states_that_ran": round2_counts},
         },
         "conformer_pool": {
             "pool": ("union of round 1 (%d starts) and round 2 (%d starts)"
@@ -465,17 +568,29 @@ def derive(raw):
         "cohort_deviation": {
             "registered_set": {"source": ("implementation plan section 3.3 and "
                                          "docs/physics_completion_protocol.md"),
-                               "mol_ids": ["C02", "C03", "C08", "C17"],
-                               "names": ["EMC", "DEC", "DME", "TMP"]},
-            "executed_set": {"mol_ids": ["C01", "C02", "C13", "C14"],
-                             "names": ["DMC", "EMC", "GBL", "SL"],
-                             "reason": ("these are the free neutral / cation states that decide "
-                                        "the EMC-GBL and EMC-SL flips, which is what this layer "
-                                        "is for")},
-            "consequence": ("this layer does not claim to have executed section 3.3: DEC / DME / "
-                            "TMP have no sampling product, and the registered per-state "
-                            "structure budget (3 -> 6) is only reachable where the gas-phase "
-                            "screen finds competing minima at all"),
+                               "mol_ids": designated_ids,
+                               "names": designated_names,
+                               "note": ("this is the sampling AUDIT set of section 3.3; it is four "
+                                        "molecules and it is NOT the set this layer executes")},
+            "declared_coverage": {"mol_ids": declared_ids,
+                                  "names": [name for _mol_id, name, _smiles in MOLS],
+                                  "note": ("the molecules this layer is registered to cover "
+                                           "(the section 3.1 main cohort)")},
+            "executed_set": {"mol_ids": executed_ids,
+                             "names": executed_names,
+                             "note": ("molecules with a real verdict in sampling_round1.csv; a "
+                                      "molecule that is only declared but has no cached xTB "
+                                      "result is NOT counted as executed")},
+            "declared_but_not_executed": declared_not_executed,
+            "designated_but_not_executed": designated_not_executed,
+            "consequence": ("this layer does not claim to have executed section 3.3: the sampling "
+                            "audit set stays EMC / DEC / DME / TMP, and executing the whole 12-"
+                            "molecule main cohort does not make those four an audit. "
+                            "designated_but_not_executed=%s; declared_but_not_executed=%s; the "
+                            "registered per-state structure budget (3 -> 6) is only reachable "
+                            "where the gas-phase screen finds competing minima at all"
+                            % ("/".join(designated_not_executed) or "none",
+                               "/".join(declared_not_executed) or "none")),
         },
         "raw_cache": ("outside-repo: work/sampling/xtb_results.csv; its sha256 is recorded in "
                       "outputs/physics_completion/provenance/provenance_index.json (raw_cache), "
@@ -492,9 +607,15 @@ def derive(raw):
         "> 由 `scripts/wp_production/build_wp2_sampling.py` 生成。采样层是**气相 GFN2-xTB 筛选**，",
         "> 不是生产级 `wB97X-D4 + SMD(acetonitrile)`；它只回答「单一代表结构是否落在同一极小附近」。",
         ">",
-        "> **集合偏差**：方案 3.3 指定的采样集是 EMC/DEC/DME/TMP，本层实际执行的是 DMC/EMC/GBL/SL",
-        "> （两对翻转的决定性自由态 / 阳离子态）。偏差登记在 `sampling_index.json` 的",
-        "> `cohort_deviation`，**不宣称完成方案 3.3**；DEC / DME / TMP 没有任何采样产物。",
+        "> **集合偏差**：本层**声明覆盖**方案 3.1 主集 %d 分子（%s）的自由态 / 阳离子态，"
+        % (len(MOLS), " / ".join(name for _mol_id, name, _smiles in MOLS)),
+        "> 但方案 3.3 指定的**采样审计集仍是 EMC/DEC/DME/TMP 四个**，两者不是一回事。",
+        "> 偏差登记在 `sampling_index.json` 的 `cohort_deviation`，**不宣称完成方案 3.3**；",
+        "> 本轮真正跑出结果的分子是 %s。" % (" / ".join(executed_names) or "none"),
+        ">",
+        "> **DEC 缺冻结起点**：`outputs/week4/t2_opt_freq/DEC/DEC_G2.xyz` 不在仓库里"
+        "（`data/metadata/core_set_metadata_ext.csv` 已把该分子登记为 `not_available_in_repo`），",
+        "> 所以 DEC 的「生产几何相对最低 / 冻结起点相对最低」两列留空，不写 0、不拿别的级别的几何顶替。",
         "",
         "| 分子 | 态 | 撒点数 | 独立极小 | 次低极小 | 生产几何相对最低 | 冻结起点相对最低 | 判定 |",
         "| --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -519,8 +640,9 @@ def derive(raw):
         "",
         "## 第 2 轮：统一扩大的池",
         "",
-        "> 同样是**气相 GFN2 筛选**。第 2 轮对所有 8 个分子-态用同一个更大的池",
+        "> 同样是**气相 GFN2 筛选**。第 2 轮对**已跑**的分子-态用同一个更大的池",
         "> （%d 起点、seed %d），不逐态调参，也不覆盖第 1 轮的行，两轮分开审计。"
+        "尚未跑第 2 轮的态单列登记，不计入「统一池」的分母。"
         % (NUM_CONFS_REQUEST_R2, SEED_R2),
         "",
         "| 分子 | 态 | 撒点数 | 独立极小 | 生产几何相对最低 | 冻结起点相对最低 | 判定 |",

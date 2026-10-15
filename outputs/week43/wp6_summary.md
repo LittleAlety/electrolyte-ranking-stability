@@ -1,12 +1,12 @@
 # Week 43 / WP6 — 显式配体检查（可选）与论文主线收敛
 
-**状态**：可选 WP6 的协议已登记；首轮不执行，待关键 free→Li 结论可解析后启用。
+**状态**：可选 WP6 的协议已登记；Li 配对 complete >= 9/12 且生产系综 = 48/48 时自动升级为计划内。
 
 ## 冻结内容
 
 - 固定 R = DME，在 EC / DME / AN / TMP 上比较 `[LiM]+` 与 `[LiMR]+`；DME 情况自动成为 `[Li(DME)2]+`。
 - 所有样本同一背景配体、同一介质、相同化学计量；比较的是不同条件态的 redox 差值。
-- **不**将 cluster 裸 G 跨化学计量 Boltzmann 平均；**不**模拟真实配位 population；不纳入首轮必需闭环。
+- **不**将 cluster 裸 G 跨化学计量 Boltzmann 平均；**不**模拟真实配位 population；升级闸门前不纳入首轮必需闭环。
 
 ## 验收（4/4 通过）
 
@@ -15,7 +15,7 @@
 | single_background_ligand | PASS | R=DME; 4 molecules |
 | dme_auto_case_declared | PASS | 已声明 |
 | no_bare_cluster_boltzmann | PASS | 禁止项已写清 |
-| wp6_is_optional | PASS | 只在关键 free->Li 结论可解析后做 |
+| wp6_is_optional | PASS | Li 配对 complete >= 9/12 且生产系综 = 48/48 时自动升级为计划内 |
 
 ## 论文主线（六张主图）
 

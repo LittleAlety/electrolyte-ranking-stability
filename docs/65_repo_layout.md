@@ -19,13 +19,14 @@
 | `structures/` | 起始几何：`conformers/`（构象池）、`li_motifs/`（Li 配位 motif）、`microsolvation/`（微溶剂化） | 是 |
 | `tests/` | pytest 契约：生成器 `--check`、镜像一致性、冻结哈希、脚本索引、骨架覆盖等 | 部分（`test_physics_completion_batch.py` 随 week44 收录） |
 | `work/` | 运行期暂存：队列 stdout、生成器基线缓存、监守单实例锁、ORCA scratch | **否**（`.gitignore` 忽略 `work/*`，仅 3 个文件白名单） |
+| `deliverables/` | **交付镜像入库副本**：`part1/`（Stage 0–24 / week1–week25）与 `part2/`（评审实施方案 WP1–WP7 + physics_completion_v1 批次），各含 9 类「按成果种类」目录 + `README.md` + `进度说明.md` + `SHA256SUMS_新结构.txt` + 路径映射表。与仓库外 `成果输出（part1）/`、`成果输出（part2）/` 内容一致，入库是为了让 GitHub 上可直接浏览交付件 | 是 |
 | `.toolchain/`、`.venv/`、`.mamba/` | 本机工具链与运行环境（**不入库**）：`.toolchain/xtb/xtb-6.7.1/bin/xtb.exe`、`.venv/`（收口链用的解释器）、`.mamba/`；ORCA 在仓库外 `E:\orca_6_1_1\orca.exe`（定位见 `src/electrolyte_ranking/toolchain.py`）。骨架测试按 `startswith(".")` 跳过点目录，因此本行是人读登记 | 否 |
 
 顶层文件：`README.md`（由 `scripts/build_github_readme.py` 确定性生成的逐周日志，**不要手改**）、
 `计划.md`（研究计划 v1）、`FINAL_CONCLUSIONS.md`、`pyproject.toml`、
 `.gitattributes`（`* text=auto eol=lf`）、`.gitignore`、`.env.example`。
 
-仓库外同级目录：`成果输出（part1）/`、`成果输出（part2）/`（交付镜像）、
+仓库外同级目录：`成果输出（part1）/`、`成果输出（part2）/`（交付镜像；其入库副本见上表 `deliverables/`）、
 `_compute_archive/`（原始作业输出的确定性 zip 归档 + `.index.csv` + `.README.md`）。
 
 ### `outputs/` 子目录
@@ -93,7 +94,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**38** 个跟踪文件：33 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**42** 个跟踪文件：36 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -104,8 +105,9 @@ week36 与 week44 只存在于 part2 镜像。
 | --- | --- | --- |
 | `run_wp2_queue.py` | 12 主集分子 × 5 腿 = **60 条腿**（{`M`,`M_tzvpd`,`M_plus`,`LiM_plus`,`LiM_2plus`}）的幂等队列器：统一调度、并发上限（3 worker × 4 核）、断点续跑、逐次开跑与周期复查 `smpd`；覆盖范围与 `physics_completion_set.csv` 的 `in_main=true` 集合由 `tests/test_wp2_queue_scope.py` 钉死 | 队列登记表 → `work/wp2prod/**` 现场 + `_queue_<NAME>_<STATE>.out` |
 | `prepare_hpc_main_remaining.py` | 把队列 `missing` 的腿打成**超算任务包**（`tasks/<name>/<state>/` + `job.inp` + `geom.xyz` + `inputs.sha256`，17+18 分批 + `manifest.json` 记源文件 sha256）；只准备，不上传、不提交、不跑 ORCA | 队列 `inventory()` → `work/hpc_main_remaining_17_18/` |
+| `submit_hpc_batch.py` | 受控提交已冻结的 HPC 包：提交前核验包清单、任务身份、输入哈希、并发上限与 Slurm 现有占用；提供只读预检，实际提交必须显式启用，防止观察超时造成重复投递 | 冻结任务包 + Slurm 现场 → 单次 `sbatch` 作业号与提交记录 |
 | `import_hpc_numfreq.py` | 超算 NumFreq 结果的**只读校验 + 非覆盖导入**：拒收混用梯度（`Restart` 复用位移几何且最大位移 > 2e-6 Å）、源 Opt 未收敛 / 源已有频率、几何身份不符、热化学不完整；虚频结果写 `status=failed` / `qc_flag=imaginary_modes`（**退出码仍为 0，判定要读 status**）；逐文件登记 sha256 且不覆盖内容不同者 | `work/hpc_results/<job>/…` + `work/wp2prod/<name>/<state>/` → `<NAME>_<STATE>.{json,log,_opt.xyz}` + `hpc_import/provenance.json` |
-| `import_hpc_opt_numfreq.py` | **自包含 HPC Opt+NumFreq 腿**的只读校验 + 非覆盖导入（主集任务包与鞍点重优化都是这一形态；续算导入器按构造拒收它们）：校验冻结输入语法与 `Opt TightOpt` 联合作业、输出回显、正常终止 + 优化收敛、**拒收频率重启**（`Restart:`/`%freq Restart` 即梯度可能被复用）、起点/终点几何与日志坐标块逐原子一致（2e-6 Å）、3N 个有限频率、热化学完整且 `G = E + 热校正`，并守卫「登记的是**收敛几何**电子能而非起点几何」（贴末次 FINAL SP、远离首次）；虚频记 `status=failed` + `qc_flag=imaginary_modes`；任务包 `inputs.sha256` 与 `manifest.json` 起点档位不符即拒收 | 包内 `tasks/<NAME>/<STATE>/run/{job.log,job.xyz,job.inp,geom.xyz}` → `work/wp2prod/<name>/<state>/<NAME>_<STATE>.{json,log,opt.xyz,inp}` + `hpc_import/provenance.json` |
+| `import_hpc_opt_numfreq.py` | **自包含 HPC Opt+NumFreq 腿**的只读校验 + 非覆盖导入：默认只收冻结输入；仅 `--start-level continued_from_unconverged_opt_frame` 可额外带唯一且精确的 `%geom MaxIter 200 end`，其他值、重复行、其他来源或额外 directive 全部 fail-closed，原始输入仍参与 sha256 与逐行回显。另校验正常终止 + 优化收敛、无频率重启、起点/终点几何、3N 有限频率、完整热化学与收敛几何电子能；虚频记 `status=failed`，任务包哈希/manifest 不符即拒收 | 包内 `tasks/<NAME>/<STATE>/run/{job.log,job.xyz,job.inp,geom.xyz}` → `work/wp2prod/<name>/<state>/<NAME>_<STATE>.{json,log,opt.xyz,inp}` + `hpc_import/provenance.json` |
 | `reopt_saddle.py` | 收敛到**鞍点**（虚频）的生产腿的**可复现逃逸**：解析该腿日志 NORMAL MODES 的虚频位移向量 → 把收敛几何沿它位移（最大单原子位移 = `--amplitude`，默认 0.20 Å）→ 写出扰动起点 + JSON（模式号/频率/符号/幅度/源日志与 opt.xyz 的 sha256/最大位移原子/方案 §6.3 原文）；**先校验该模式确为虚频**，否则拒收；`--leg-dir` 可指向 `work/wp2prod/_saddle_attempt1/` 冻结现场以复现历史输入；`--run` 才起本机 ORCA（超算路线：扰动几何打包 → `import_hpc_opt_numfreq.py` 导入） | 腿 `work/wp2prod/<NAME>/<STATE>/{<NAME>_<STATE>.log,_opt.xyz}` → `work/wp2prod/_reopt/<NAME>_<STATE>_perturbed_s<±>_a<amp>.{xyz,json}` |
 | `run_wp2_production.py` | 生产级 Opt+NumFreq 驱动（`M` / `M_plus` / `LiM_plus` / `LiM_2plus`） | 起始几何 → ORCA 输入/日志/几何（`work/wp2prod/`） |
 | `run_wp2_extra.py` | 与带电腿**基组一致**的中性腿 `M_tzvpd`（def2-TZVPD）驱动 | 中性几何 → ORCA 现场（`work/wp2prod/`） |
@@ -115,6 +117,8 @@ week36 与 week44 只存在于 part2 镜像。
 | `run_to_closure.py` | 队列收尾：把已 computed 的腿折进 production_ledger / 四分子闭环表 / 标签 / week37–44 镜像，未齐的腿留空并显式列出；**折入前先跑关键 pair 第二泛函靶向复核**（重建计划 → 在已登记的生产 Opt 几何上补跑 S3/S4 单点 → 折进 `recheck_results.csv`），腿一落地 ready 行就变多、不补跑则收口链 ABORT；`--check`/`--dry-run`/`--commit`/`--require-complete`/`--skip-recheck` | `work/wp2prod/**` + `work/recheck/**` + 生成器 → 交付层 CSV |
 | `supervisor_policy.py` | 监守收敛判据（纯函数，有单测）：`--computed-count` 按队列 `inventory()` 口径数已 computed 的腿，`--decide` 判断继续 / 完成 / 停摆或轮数上限而停 | 队列快照 → `done`/`continue`/`stop_stalled`/`stop_round_cap` |
 | `emit_wp2.py` | 把 `work/wp2prod/**` 已跑完的状态**折进生成器**：确定性重打 `WP2_PRODUCTION_LEDGER` 等补丁块 | 生产现场 + 生成器基线 → `scripts/build_physics_completion_batch.py` |
+| `wp2_progress.py` | 只读 12×5 现场 payload 与固化 production ledger，分离 runtime computed、四主态严格科学验收与固化交付；生成聚合 sha256 与 stale 判定 | `work/wp2prod/**` + production ledger → 内存快照（供 compliance 使用） |
+| `orca_derivative_policy.py` | 机器强制的 ORCA 导数策略（纯函数，有单测）：禁止 `NumGrad`（数值一阶导），保留冻结协议里的 `NumFreq`（在支持的 DFT 方法上由解析梯度构造数值 Hessian）；`AnFreq` 属独立的二阶导/协议变更，需显式记录兼容性研究；另校验优化收敛层级（normal/tight/verytight）与 verytight 阈值 | ORCA 输入文本 → 通过/拒收结论（fail-closed） |
 | `emit_wp1.py` | 把 WP1 方法审计矩阵折进生成器（读带 SECTION 标记的 `wp1_audit_src.txt`） | `wp1_audit_src.txt` + 生成器基线 → 生成器补丁块 |
 | `emit_pair_recheck.py` | 靶向复核**手工折步**：把 `work/recheck/` 的原始单点折成 `recheck_results.csv`（逐行带几何 sha256）；输入在仓库外，故不进收口链 | `work/recheck/**` → `outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv` |
 | `check_wp2_anchors.py` | 复核 `emit_wp2.py` 的补丁锚点在当前生成器基线里唯一存在 | 生成器基线 → 锚点自检结论 |

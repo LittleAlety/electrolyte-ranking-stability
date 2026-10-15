@@ -120,6 +120,10 @@ def test_shipped_reconciliation_matches_the_delivered_ledger():
     accepted = {row["leg_id"] for row in legs if row["qc_accepted"] == "true"}
     rejected = sorted(computed - accepted)
     assert all(_leg(legs, leg)["imaginary_modes"] for leg in rejected), rejected
-    ledger = {"%s|%s" % (row["name"], row["state"]) for row in _rows(LEDGER)}
-    assert accepted == ledger, "交付账本必须恰好是 QC 接受的腿集合"
+    # reconciliation 的设计范围只有四分子 20 腿；生产账本还包含其余主集分子，
+    # 因此只能在同一四分子范围内比较，不能把新增生产腿误报为 provenance 不一致。
+    names = {row["name"] for row in legs}
+    ledger = {"%s|%s" % (row["name"], row["state"]) for row in _rows(LEDGER)
+              if row["name"] in names}
+    assert accepted == ledger, "四分子范围内，交付账本必须恰好是 QC 接受的腿集合"
     assert not (set(rejected) & ledger), "被 QC 拒绝的腿不得进入交付账本"

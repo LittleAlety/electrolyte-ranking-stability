@@ -81,10 +81,74 @@ def log_text(state="M", convergence=True, restart=None, freqs=None, echo=True, t
     return "\n".join(parts)
 
 
+ATTEMPT_EVIDENCE = ["attempt.env", "attempt.journal", "module.list", "mpirun.path",
+                    "mpirun.version", "orca.path", "orca.sha256", "started.utc", "ended.utc",
+                    "process.exit", "scheduler_state.request", "slurm.stdout"]
+
+
+def structured_attempt_evidence(run):
+    values = {
+        "attempt.env": """attempt=123_4_999
+slurm_array_job_id=123
+slurm_array_task_id=4
+slurm_job_id=999
+slurm_restart_count=0
+manifest_batch=1
+manifest_array_task_id=4
+host=node01
+slurm_ntasks=4
+slurm_cpus_per_task=
+slurm_cpus_on_node=4
+slurm_mem_per_cpu=5625M
+slurm_mem_per_node=
+scratch=/tmp/wp2_123_4_999
+scratch_kind=slurm_tmpdir
+omp_num_threads=1
+mkl_num_threads=1
+openblas_num_threads=1
+blis_num_threads=1
+numexpr_num_threads=1
+omp_dynamic=FALSE
+mkl_dynamic=FALSE
+orca_path=/project/pengqihang/soft/orca/orca
+""",
+        "attempt.journal": """attempt=123_4_999
+slurm_array_job_id=123
+slurm_array_task_id=4
+slurm_job_id=999
+failure_stage=complete
+shell_exit_code=0
+orca_exit_code=0
+process_success=true
+technical_status=success
+success_scope=process_only
+scheduler_final_state=requires_independent_sacct
+scientific_qc=not_evaluated_by_scheduler
+""",
+        "module.list": "openmpi/5.0\n",
+        "mpirun.path": "/software/openmpi/5.0.9/bin/mpirun\n",
+        "mpirun.version": "mpirun (Open MPI) 5.0.9\n",
+        "orca.path": "/project/pengqihang/soft/orca/orca\n",
+        "orca.sha256": "a" * 64 + "  /project/pengqihang/soft/orca/orca\n",
+        "started.utc": "2026-10-14T00:00:00Z\n",
+        "ended.utc": "2026-10-14T01:00:00Z\n",
+        "process.exit": "0\n",
+        "scheduler_state.request": """slurm_array_job_id=123
+slurm_array_task_id=4
+slurm_job_id=999
+required_for_automatic_technical_retry=true
+""",
+        "slurm.stdout": "fixture slurm output\n",
+    }
+    for name, value in values.items():
+        (run / name).write_text(value, encoding="utf-8")
+
+
 def make_leg(root: Path, name="EC", state="M", manifest=True, sha_ok=True,
-             start_level="r2SCAN-3c", **log_kwargs):
+             start_level="r2SCAN-3c", attempt=False, **log_kwargs):
     pkg = root / "pkg"
-    run = pkg / "tasks" / name / state / "run"
+    task = pkg / "tasks" / name / state
+    run = task / ("attempts/123_4_999" if attempt else "run")
     run.mkdir(parents=True, exist_ok=True)
     (run / "geom.xyz").write_text(xyz_text(M_ATOMS), encoding="utf-8", newline="")
     (run / "job.xyz").write_text(xyz_text(M_ATOMS_FINAL), encoding="utf-8", newline="")
@@ -95,17 +159,32 @@ def make_leg(root: Path, name="EC", state="M", manifest=True, sha_ok=True,
            "%%maxcore 2000\n%%pal nprocs 4 end\n%%scf MaxIter 300 end\n"
            "* xyzfile %d %d geom.xyz\n") % (method, charge, mult)
     (run / "job.inp").write_text(inp, encoding="utf-8", newline="")
-    task = run.parent
     geom_sha = hashlib.sha256((run / "geom.xyz").read_bytes()).hexdigest()
     inp_sha = hashlib.sha256((run / "job.inp").read_bytes()).hexdigest()
     task.joinpath("inputs.sha256").write_text(
         "%s  geom.xyz\n%s  job.inp\n" % (geom_sha if sha_ok else "0" * 64, inp_sha),
         encoding="utf-8", newline="")
     if manifest:
-        pkg.joinpath("manifest.json").write_text(json.dumps({
-            "schema_version": 1,
-            "legs": [{"name": name, "state": state, "geometry_start_level": start_level,
-                      "geometry_sha256": geom_sha}]}), encoding="utf-8")
+        leg = {"mol_id": mod.NAME_TO_MOL[name], "name": name, "state": state,
+               "task_dir": "tasks/%s/%s" % (name, state),
+               "geometry_start_level": start_level, "geometry_sha256": geom_sha,
+               "input_sha256": inp_sha, "method": method, "charge": charge,
+               "multiplicity": mult, "cores": 4, "batch": 1, "array_task_id": 4}
+        payload = {"schema_version": 2 if attempt else 1, "cores_per_task": 4,
+                   "legs": [leg]}
+        if attempt:
+            payload["attempt_contract"] = {
+                "directory": "attempts/{array_job_id}_{array_task_id}_{job_id}",
+                "required_evidence": ATTEMPT_EVIDENCE,
+                "technical_success_marker": "TECHNICAL_SUCCESS",
+                "scheduler_terminal_evidence": {
+                    "filename": "sacct.terminal",
+                    "required_for_automatic_technical_retry": True,
+                },
+            }
+            structured_attempt_evidence(run)
+            (run / "TECHNICAL_SUCCESS").write_text("process_success\n", encoding="utf-8")
+        pkg.joinpath("manifest.json").write_text(json.dumps(payload), encoding="utf-8")
     return run
 
 
@@ -311,6 +390,155 @@ def test_package_inputs_sha256_mismatch_is_rejected(tmp_path):
         mod.validate(run, "", root=tmp_path)
 
 
+@pytest.mark.parametrize("content", [
+    "{geom}  geom.xyz\n",
+    "{geom}  geom.xyz\n{geom}  geom.xyz\n{inp}  job.inp\n",
+    "not-a-sha  geom.xyz\n{inp}  job.inp\n",
+    "{geom}  geom.xyz\n{inp}  job.inp\n{inp}  unexpected.inp\n",
+])
+def test_inputs_sha256_must_be_exact_complete_and_well_formed(tmp_path, content):
+    run = make_leg(tmp_path)
+    geom = hashlib.sha256((run / "geom.xyz").read_bytes()).hexdigest()
+    inp = hashlib.sha256((run / "job.inp").read_bytes()).hexdigest()
+    run.parent.joinpath("inputs.sha256").write_text(content.format(geom=geom, inp=inp),
+                                                     encoding="utf-8")
+    with pytest.raises(ValueError, match="inputs.sha256"):
+        mod.validate(run, "", root=tmp_path)
+
+
+def test_missing_inputs_sha256_is_rejected(tmp_path):
+    run = make_leg(tmp_path)
+    run.parent.joinpath("inputs.sha256").unlink()
+    with pytest.raises(ValueError, match="inputs.sha256"):
+        mod.validate(run, "", root=tmp_path)
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("mol_id", "C99"), ("name", "DMC"), ("state", "M_plus"),
+    ("task_dir", "tasks/EC/M_plus"), ("input_sha256", "0" * 64),
+    ("geometry_sha256", "0" * 64), ("method", "B3LYP"),
+    ("charge", 9), ("multiplicity", 9), ("cores", 8),
+])
+def test_manifest_binds_every_identity_and_resource_field(tmp_path, field, bad):
+    run = make_leg(tmp_path)
+    path = tmp_path / "pkg/manifest.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["legs"][0][field] = bad
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="manifest"):
+        mod.validate(run, "", root=tmp_path)
+
+
+def test_manifest_requires_exactly_one_matching_leg(tmp_path):
+    run = make_leg(tmp_path)
+    path = tmp_path / "pkg/manifest.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["legs"].append(dict(payload["legs"][0]))
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="exactly one"):
+        mod.validate(run, "", root=tmp_path)
+
+
+def test_attempt_contract_evidence_is_required_hashed_and_imported(tmp_path):
+    run = make_leg(tmp_path, attempt=True)
+    row, writes = mod.validate(run, "", root=tmp_path)
+    provenance = json.loads(writes[next(p for p in writes if p.name == "provenance.json")])
+    for name in ATTEMPT_EVIDENCE:
+        key = "attempt_" + name.replace(".", "_")
+        assert provenance["sources"][key]["sha256"] == hashlib.sha256(
+            (run / name).read_bytes()).hexdigest()
+        assert any(path.name == name and "evidence" in path.parts for path in writes)
+    assert provenance["sources"]["package_inputs_sha256_file"]["sha256"]
+    assert provenance["sources"]["package_manifest_file"]["sha256"]
+    assert provenance["sources"]["attempt_technical_success_marker"]["sha256"]
+
+    (run / "attempt.journal").unlink()
+    with pytest.raises(ValueError, match="attempt.journal"):
+        mod.validate(run, "", root=tmp_path)
+
+
+def test_attempt_contract_directory_template_and_success_marker_are_fail_closed(tmp_path):
+    run = make_leg(tmp_path, attempt=True)
+    manifest = tmp_path / "pkg/manifest.json"
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["attempt_contract"]["directory"] = "run"
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="attempt_contract.*directory"):
+        mod.validate(run, "", root=tmp_path)
+
+    payload["attempt_contract"]["directory"] = "attempts/{array_job_id}_{array_task_id}_{job_id}"
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    (run / "TECHNICAL_SUCCESS").unlink()
+    with pytest.raises(ValueError, match="technical success marker"):
+        mod.validate(run, "", root=tmp_path)
+
+
+@pytest.mark.parametrize("filename,old,new,match", [
+    ("attempt.env", "slurm_array_task_id=4", "slurm_array_task_id=5", "array_task"),
+    ("attempt.env", "slurm_ntasks=4", "slurm_ntasks=3", "ranks|ntasks"),
+    ("attempt.env", "omp_num_threads=1", "omp_num_threads=2", "thread|omp"),
+    ("attempt.env", "omp_dynamic=FALSE", "omp_dynamic=TRUE", "dynamic"),
+    ("attempt.env", "scratch_kind=slurm_tmpdir", "scratch_kind=unknown", "scratch"),
+    ("attempt.journal", "shell_exit_code=0", "shell_exit_code=1", "shell_exit"),
+    ("attempt.journal", "orca_exit_code=0", "orca_exit_code=9", "orca_exit"),
+    ("attempt.journal", "technical_status=success", "technical_status=failed", "technical_status"),
+    ("process.exit", "0\n", "1\n", "process.exit"),
+    ("orca.sha256", "a" * 64, "not-a-hash", "orca.sha256"),
+])
+def test_attempt_evidence_semantics_are_fail_closed(tmp_path, filename, old, new, match):
+    run = make_leg(tmp_path, attempt=True)
+    path = run / filename
+    path.write_text(path.read_text(encoding="utf-8").replace(old, new), encoding="utf-8")
+    with pytest.raises(ValueError, match=match):
+        mod.validate(run, "", root=tmp_path)
+
+
+def test_attempt_evidence_rejects_duplicate_keys_and_filename_key_collisions(tmp_path):
+    run = make_leg(tmp_path / "duplicate", attempt=True)
+    env = run / "attempt.env"
+    env.write_text(env.read_text(encoding="utf-8") + "slurm_ntasks=4\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate"):
+        mod.validate(run, "", root=tmp_path / "duplicate")
+
+    run = make_leg(tmp_path / "collision", attempt=True)
+    manifest = tmp_path / "collision/pkg/manifest.json"
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["attempt_contract"]["required_evidence"].extend(["a.b", "a_b"])
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    (run / "a.b").write_text("one\n", encoding="utf-8")
+    (run / "a_b").write_text("two\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="collision"):
+        mod.validate(run, "", root=tmp_path / "collision")
+
+
+def test_optional_sacct_terminal_evidence_is_bound_or_auto_retry_forbidden(tmp_path):
+    run = make_leg(tmp_path / "absent", attempt=True)
+    _, writes = mod.validate(run, "", root=tmp_path / "absent")
+    provenance = json.loads(writes[next(p for p in writes if p.name == "provenance.json")])
+    assert provenance["scheduler_terminal_evidence"] == "absent_auto_retry_forbidden"
+    assert provenance["automatic_technical_retry_allowed"] is False
+
+    run = make_leg(tmp_path / "present", attempt=True)
+    (run / "sacct.terminal").write_text("""source=sacct
+slurm_array_job_id=123
+slurm_array_task_id=4
+slurm_job_id=999
+state=COMPLETED
+exit_code=0:0
+collected_at_utc=2026-10-14T02:00:00Z
+""", encoding="utf-8")
+    _, writes = mod.validate(run, "", root=tmp_path / "present")
+    provenance = json.loads(writes[next(p for p in writes if p.name == "provenance.json")])
+    assert provenance["scheduler_terminal_evidence"] == "verified:COMPLETED"
+    assert provenance["sources"]["attempt_sacct_terminal"]["sha256"]
+
+    path = run / "sacct.terminal"
+    path.write_text(path.read_text(encoding="utf-8").replace("state=COMPLETED", "state=TIMEOUT"),
+                    encoding="utf-8")
+    with pytest.raises(ValueError, match="scheduler.*TIMEOUT|TIMEOUT.*scheduler"):
+        mod.validate(run, "", root=tmp_path / "present")
+
+
 def test_manifest_start_level_disagreement_is_rejected(tmp_path):
     run = make_leg(tmp_path, start_level="r2SCAN-3c")
     with pytest.raises(ValueError, match="--start-level"):
@@ -356,3 +584,85 @@ def test_wrong_state_directory_name_is_rejected(tmp_path):
     (bad / "run").mkdir(exist_ok=True)
     with pytest.raises((ValueError, OSError)):
         mod.validate(bad / "run", "r2SCAN-3c", root=tmp_path)
+
+
+def test_apply_computed_leg_runs_shared_finalize_without_commit(monkeypatch, tmp_path):
+    monkeypatch.setattr(mod, "validate", lambda *args, **kwargs: ({"status": "computed"}, {}))
+    monkeypatch.setattr(mod.imp, "apply_writes", lambda writes: None)
+    calls = []
+    monkeypatch.setattr(mod.imp, "finalize_wp2", lambda **kwargs: calls.append(kwargs))
+    assert mod.main([str(tmp_path), "--apply"]) == 0
+    assert calls == [{"python_executable": mod.sys.executable}]
+
+
+def test_apply_can_defer_shared_finalize_for_batch(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(mod, "validate", lambda *args, **kwargs: ({"status": "computed"}, {}))
+    monkeypatch.setattr(mod.imp, "apply_writes", lambda writes: None)
+    calls = []
+    monkeypatch.setattr(mod.imp, "finalize_wp2", lambda **kwargs: calls.append(kwargs))
+    assert mod.main([str(tmp_path), "--apply", "--defer-finalize"]) == 0
+    assert calls == []
+    assert json.loads(capsys.readouterr().out)["mode"] == "applied_deferred"
+
+
+def test_opt_finalize_failure_is_propagated_after_import(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(mod, "validate", lambda *args, **kwargs: ({"status": "computed"}, {}))
+    monkeypatch.setattr(mod.imp, "apply_writes", lambda writes: None)
+    monkeypatch.setattr(mod.imp, "finalize_wp2", lambda **kwargs: (_ for _ in ()).throw(
+        mod.imp.FinalizeError("收口 exit 7")))
+    assert mod.main([str(tmp_path), "--apply"]) == 3
+    assert "import已写入但收口失败" in capsys.readouterr().out
+
+
+CONTINUED_BASE_INPUT = """! wB97X-D4 def2-TZVPD Opt NumFreq SMD(acetonitrile) TightOpt TightSCF SlowConv
+%maxcore 2000
+%pal nprocs 4 end
+%scf MaxIter 300 end
+* xyzfile 1 2 geom.xyz
+"""
+
+
+def test_continued_unconverged_opt_allows_only_exact_geom_maxiter_200():
+    continued = CONTINUED_BASE_INPUT.replace("%scf MaxIter 300 end\n",
+                              "%scf MaxIter 300 end\n%geom MaxIter 200 end\n")
+    mod.validate_production_input(continued, "wB97X-D4 def2-TZVPD", 1, 2,
+                                  "continued_from_unconverged_opt_frame")
+
+
+@pytest.mark.parametrize("geom_line,start_level", [
+    ("%geom MaxIter 199 end", "continued_from_unconverged_opt_frame"),
+    ("%geom MaxIter 300 end", "continued_from_unconverged_opt_frame"),
+    ("%geom Trust 0.2 end", "continued_from_unconverged_opt_frame"),
+    ("%geom MaxIter 200 end", "r2SCAN-3c"),
+])
+def test_continued_opt_rejects_other_geom_directives_or_start_levels(geom_line, start_level):
+    continued = CONTINUED_BASE_INPUT.replace("%scf MaxIter 300 end\n",
+                              "%scf MaxIter 300 end\n" + geom_line + "\n")
+    with pytest.raises(ValueError, match="%geom|continued"):
+        mod.validate_production_input(continued, "wB97X-D4 def2-TZVPD", 1, 2, start_level)
+
+
+def test_continued_opt_rejects_duplicate_geom_line():
+    continued = CONTINUED_BASE_INPUT.replace("%scf MaxIter 300 end\n",
+                              "%scf MaxIter 300 end\n%geom MaxIter 200 end\n%geom MaxIter 200 end\n")
+    with pytest.raises(ValueError, match="exactly one"):
+        mod.validate_production_input(continued, "wB97X-D4 def2-TZVPD", 1, 2,
+                                      "continued_from_unconverged_opt_frame")
+
+
+def test_verytight_geometry_convergence_requires_all_five_final_criteria():
+    inp = "! wB97X-D4 def2-TZVPD Opt NumFreq SMD(acetonitrile) VeryTightOpt TightSCF SlowConv\n"
+    table = """
+----------------------|Geometry convergence|-------------------------
+Item                value                   Tolerance       Converged
+Energy change       0.0000001000            0.0000002000      YES
+RMS gradient        0.0000070000            0.0000080000      YES
+MAX gradient        0.0000200000            0.0000300000      YES
+RMS step            0.0000800000            0.0001000000      YES
+MAX step            0.0001500000            0.0002000000      YES
+"""
+    result = mod.enforce_geometry_convergence(table, inp)
+    assert result["tier"] == "verytight"
+    assert result["max_gradient_Eh_per_Bohr"] == pytest.approx(2e-5)
+    with pytest.raises(ValueError, match="final criterion not met"):
+        mod.enforce_geometry_convergence(table.replace("0.0000200000", "0.0000400000"), inp)

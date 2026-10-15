@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.2",
   "freeze_id": "physics_completion_v1_production_method",
   "batch_id": "physics_completion_v1",
   "status": "frozen",
@@ -10,7 +10,29 @@
   },
   "solvent": "SMD(acetonitrile)",
   "temperature_K": 298.15,
-  "geometry_and_frequency": "wB97X-D4 / state-specific target basis / SMD(acetonitrile), Opt NumFreq TightOpt TightSCF SlowConv",
+  "geometry_and_frequency": "wB97X-D4 / state-specific target basis / SMD(acetonitrile), Opt VeryTightOpt NumFreq TightSCF SlowConv for all newly generated or rescued legs",
+  "derivative_policy": {
+    "geometry_gradient": "analytic",
+    "forbidden_first_derivative_keyword": "NumGrad",
+    "frequency_keyword": "NumFreq",
+    "frequency_hessian": "numerical finite difference of analytical gradients",
+    "terminology": "NumFreq is not NumGrad; AnFreq changes the Hessian algorithm, not the frozen first-derivative requirement",
+    "anfreq_audit": "run as a paired diagnostic on identical converged geometries",
+    "anfreq_adoption_gate": "require exact wB97X-D4/basis/SMD compatibility and complete model-term, full-mode, thermochemistry QC; if adopted, amend the protocol globally rather than selecting per-leg winners"
+  },
+  "geometry_convergence_policy": {
+    "new_and_rescue_keyword": "VeryTightOpt",
+    "thresholds": {
+      "TolE_Eh": "2e-7",
+      "TolMaxG_Eh_per_Bohr": "3e-5",
+      "TolRMSG_Eh_per_Bohr": "8e-6",
+      "TolMaxD_Bohr": "2e-4",
+      "TolRMSD_Bohr": "1e-4"
+    },
+    "imaginary_mode_workflow": "restart from latest converged geometry with VeryTightOpt, then NumFreq and paired AnFreq on the identical final geometry before mode displacement or sampling-limited classification",
+    "legacy_policy": "retain prior TightOpt legs only when zero-imaginary-mode and all other QC passed; imaginary, suspicious-low-mode and resubmitted legs require VeryTightOpt",
+    "evidence_required": "convergence tier plus final energy, maximum/RMS gradient and maximum/RMS displacement criteria"
+  },
   "basis_by_state": {
     "M": "def2-TZVPD",
     "M_plus": "def2-TZVPD",

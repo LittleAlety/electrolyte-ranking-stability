@@ -4,6 +4,14 @@
 导致「仓库里的 `outputs/physics_completion/**` 到底怎么来的」在仓库内无法复现；
 迁移到 `scripts/` 后，交付物与生成器同处一个被跟踪的命名空间。
 
+## 导数政策（v1.2）
+
+生产与救援优化只允许 wB97X-D4 解析一阶梯度，`NumGrad`/`%numgrad` 禁止。
+冻结的 `NumFreq` 是解析梯度有限差分 Hessian；`AnFreq` 先在相同收敛几何上做配对审计，
+不得逐腿择优混入账本。任务输入通过 `orca_derivative_policy.py` fail-closed 校验。
+所有新任务和虚频救援进一步要求 `VeryTightOpt`；旧 `TightOpt` 仅在零虚频且其他 QC
+均通过时保留。虚频处理顺序固定为严优化 → 同几何 `NumFreq` → 配对 `AnFreq` → 必要时模式扰动。
+
 ## 一键收口
 
 ```powershell
@@ -49,6 +57,7 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | --- | --- |
 | `check_wp2_anchors.py` | 复核 `emit_wp2.py` 的补丁锚点在当前生成器基线里唯一存在 |
 | `emit_wp2.py` | 把 `work/wp2prod/**` 已跑完的状态折进生成器：重打 `WP2_PRODUCTION_LEDGER` 等补丁块 |
+| `wp2_progress.py` | 只读 12×5 现场 payload 与固化 production ledger，分别给出运行进度、四主态严格科学验收、输入聚合哈希和 stale 判定；不把运行结束冒充 QC 通过 |
 | `emit_wp1.py` + `wp1_audit_src.txt` | 把 WP1 方法审计矩阵折进生成器；`wp1_audit_src.txt` 是带 SECTION 标记的分段源码（`emit_wp1.py` 直接读它）。同内容的 `wp1_newsrc.py`（无 import、从不执行）已删除，避免在「每个 .py 都是入口」的目录里留一个假入口 |
 | `run_batch.py` | 12 主集分子 × 4 主态的 xTB/ORCA 批量驱动与公共工具（几何、ORCA/xTB 路径、片段分析） |
 | `run_wp2_production.py` | 生产级 Opt+NumFreq 驱动（`M` / `M_plus` / `LiM_plus` / `LiM_2plus`） |
@@ -57,9 +66,10 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
 | `run_to_closure.py` | 队列收尾：队列已停就把**已 computed 的腿**折进 production_ledger / 四分子闭环表 / 四分子标签 / week37-week44 镜像；未齐的腿在交付层留空并显式列出（不补数、不替换结构）——硬门禁会让某条反复失败的腿把交付层永远钉在旧数，那才是失败模式。`--check` 只报告，`--dry-run` 只打印，`--commit` 在 ALL GREEN 时提交（不 push），需要严格门禁时用 `--require-complete`。**折入前先跑关键 pair 第二泛函靶向复核**（`build_pair_recheck_plan.py` → `run_pair_recheck.py` → `emit_pair_recheck.py`）：腿一落地，`build_pair_recheck_plan.py` 的 ready 行就变多，不补跑复核则收口链的「结果表恰好覆盖 ready 行」验收失败、`-Commit` 不执行，交付层停在「腿算完了、还是旧数」；`--skip-recheck` 可跳过（一般不要用） |
 | `run_method_audit.py` | WP1 的 128 单点 / 32 弛豫腿本机方法审计驱动 |
 | `make_commit_msg.py` | 按当前已落地子集生成提交信息（写 `work/_wp2_commit_msg.txt`） |
-| `prepare_hpc_main_remaining.py` | 把队列里 `missing` 的腿打成**超算任务包**（每态 `tasks/<name>/<state>/` + `job.inp` + `geom.xyz` + `inputs.sha256`，按 17+18 分批附 `batch_N.sbatch` / `batch_N.txt` / `manifest.json`）；只准备，不上传、不提交、不跑 ORCA；起点几何与输入逐条解析并记 sha256 | 队列 `inventory()` → `work/hpc_main_remaining_17_18/`（再由人工 `hpc put` 上传） |
+| `prepare_hpc_main_remaining.py` | 把队列里 `missing` 的腿打成**超算任务包**；每个数组任务写入不可变的 `attempts/<attempt-id>`，EXIT trap 保存 Slurm/主机/资源/线程/scratch/module/MPI/ORCA/退出码证据，并用追加式 selected/success marker 区分技术运行与后续科学 QC；只准备，不上传、不提交、不跑 ORCA | 队列 `inventory()` → HPC 包 |
+| `submit_hpc_batch.py` | 唯一允许的批次提交入口：只走受保护 `hpc.ps1` 桥；doctor 后先原子获取账户级 `~/project/electrolyte_wp2/.wp2_submit.lock`，持锁完成真实 `squeue`、**运行中 + 排队中 ≤20** 门禁、submit 响应与本地 durable journal，再在 finally 经桥释放。并发/陈旧锁一律 fail-closed、不得静默删除。`--collect-sacct ATTEMPT_DIR` 通过桥独立采集终态 `sacct.terminal`；缺它不得做自动技术重试分类。**不得直接调用 `hpc submit`** | HPC 包提交 journal；或 attempt 的 scheduler 终态证据 |
 | `import_hpc_numfreq.py` | 超算 NumFreq 结果的**只读校验 + 非覆盖导入**：拒绝混用梯度（`Restart` 复用位移几何且最大位移 > 2e-6 Å 即拒收）、拒绝源 Opt 未收敛 / 源已有频率、核对 HPC 起始几何与本地部分腿逐原子一致、要求热化学完整且 `G = E + 热校正`；**虚频结果照样登记但写 `status=failed` / `qc_flag=imaginary_modes`（退出码仍为 0，判定必须读 status）**；写盘一律不覆盖内容不同的既有文件 | `work/hpc_results/<job>/…` + `work/wp2prod/<name>/<state>/` → `<NAME>_<STATE>.{json,log,_opt.xyz}` + `hpc_import/provenance.json` |
-| `import_hpc_opt_numfreq.py` | **自包含 HPC Opt+NumFreq 腿**（主集任务包 `hpc_main_remaining_17_18`、鞍点重优化 `hpc_dec_reopt_*`）的只读校验 + 非覆盖导入——续算导入器按构造拒收这类结果，因为它们的 Opt 与 NumFreq 都在集群上一次跑完：校验冻结输入语法与 `Opt TightOpt` 联合作业、输入逐行回显、`ORCA TERMINATED NORMALLY` + `THE OPTIMIZATION HAS CONVERGED`、**拒收频率重启**（`Restart: N calculations left` / `%freq Restart true` → 梯度可能复用位移几何）、起点几何与日志坐标块一致且 `job.xyz` 与末块一致（2e-6 Å）、频率恰为 3N 且有限、热化学完整且 `G = E + 热校正`；虚频记 `status=failed`/`qc_flag=imaginary_modes`；`inputs.sha256` 与包 `manifest.json` 的起点档位不符即拒收 | 包内 `tasks/<NAME>/<STATE>/run/{job.log,job.xyz,job.inp,geom.xyz}` → `work/wp2prod/<name>/<state>/<NAME>_<STATE>.{json,log,opt.xyz,inp}` + `hpc_import/provenance.json` |
+| `import_hpc_opt_numfreq.py` | **自包含 HPC Opt+NumFreq 腿**的只读校验 + 非覆盖导入：新包必须显式传入 `tasks/<NAME>/<STATE>/attempts/<attempt-id>`，旧包仍兼容固定 `run/`；严格要求 checksum 两行唯一、manifest 单腿全字段绑定，并导入/哈希 schema 声明的运行环境、journal 与 Slurm stdout 证据。默认只收冻结输入；仅受控 continuation 可增加精确 `%geom MaxIter 200 end`。正常终止只是技术证据；优化收敛与虚频仍由 importer 独立科学 QC，虚频记 `status=failed` 而不触发技术重试。批量回收可对各腿使用 `--apply --defer-finalize`，全部写入后只运行一次 `finalize_wp2.ps1`，避免重复全量哈希与测试 | 明确 attempt 目录 → `work/wp2prod/**` + `hpc_import/provenance.json`/`evidence/` |
 | `build_descriptor_analysis.py` | 方案 §7.3 描述符层（派生层，零新增计算）：只读冻结的样本元数据、氧化标签与廉价 ESP，对 donor type / chelation / flexibility / functionalization / 廉价 ESP 报**全部**检验（含不显著），Holm 与 BH 两种多重比较并列，TPSA 仅探索性；n=12 不拟合多参数机制模型 | 冻结产物 → `outputs/physics_completion/pair_evidence/descriptor_analysis.{csv,md}` |
 | `reopt_saddle.py` | 收敛到**鞍点**（虚频）的生产腿的**可复现逃逸**（原先只活在 gitignore 的 `work/wp2prod/_reopt/` 里，导致账本引用的扰动起点无人能复现）：解析腿日志 NORMAL MODES 的虚频位移向量、把收敛几何沿它位移（最大单原子位移 = `--amplitude`，默认 0.20 Å）、写出扰动起点 + JSON（模式号/频率/符号/幅度/源文件 sha256/方案 §6.3 原文）；**先校验该模式确是虚频**否则拒收；`--leg-dir` 指向 `work/wp2prod/_saddle_attempt1/` 可复现历史输入（已对 GBL 验证：归一化行尾后逐字节相同）；`--run` 才起本机 ORCA，超算路线是「扰动几何打包 → `import_hpc_opt_numfreq.py` 导入」 | 腿 `work/wp2prod/<NAME>/<STATE>/{log,_opt.xyz}` → `work/wp2prod/_reopt/*_perturbed_s<±>_a<amp>.{xyz,json}` |
 | `finalize_wp2.ps1` | 上面那条一键收口链 |

@@ -10,8 +10,8 @@
 | --- | --- | --- | --- |
 | wp1_geometry_prep | 1 | 1 | 1 |
 | wp1_method_audit | 160 | 160 | 160 |
-| wp2_production | 60 | 60 | 60 |
-| wp2_sampling | 640 | 640 | 640 |
+| wp2_production | 62 | 62 | 62 |
+| wp2_sampling | 1920 | 1920 | 1920 |
 | wp3_recheck | 24 | 24 | 24 |
 
 ## 四分子 20 条腿现场核对
@@ -48,11 +48,8 @@
 | job_id | state | failure_reason |
 | --- | --- | --- |
 | wp2prod/AN/LiM_2plus | LiM_2plus | qc_rejected_imaginary_mode |
-| wp2prod/DEC/LiM_2plus | LiM_2plus | qc_rejected_imaginary_mode |
-| wp2prod/DME/M_plus | M_plus | qc_rejected_imaginary_mode |
 | wp2prod/DME/M_tzvpd | M_tzvpd | qc_rejected_imaginary_mode |
 | wp2prod/DOL/M_tzvpd | M_tzvpd | qc_rejected_imaginary_mode |
-| wp2prod/PC/LiM_2plus | LiM_2plus | qc_rejected_imaginary_mode |
 | wp2prod/TMP/LiM_2plus | LiM_2plus | qc_rejected_imaginary_mode |
 | wp2prod/TMP/LiM_plus | LiM_plus | qc_rejected_imaginary_mode |
 | wp2prod/TMP/M_plus | M_plus | qc_rejected_imaginary_mode |

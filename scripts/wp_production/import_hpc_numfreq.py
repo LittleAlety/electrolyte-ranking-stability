@@ -11,22 +11,50 @@ import json
 import math
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import sys
 
 import run_wp2_production as prod
+from orca_derivative_policy import require_analytic_gradient
+
+
+class FinalizeError(RuntimeError):
+    """The import is durable, but the derived-deliverable closure failed."""
+
+
+def finalize_wp2(python_executable=sys.executable):
+    """Run the repository closure chain without ever enabling its ``-Commit`` switch."""
+    script = prod.REPO / "scripts/wp_production/finalize_wp2.ps1"
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if not shell:
+        raise FinalizeError("PowerShell executable not found")
+    command = [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script),
+               "-PythonPath", str(python_executable)]
+    try:
+        result = subprocess.run(command, cwd=prod.REPO, check=False)
+    except OSError as exc:
+        raise FinalizeError("could not launch finalize_wp2.ps1: %s" % exc) from exc
+    if result.returncode:
+        raise FinalizeError("finalize_wp2.ps1 exited %d" % result.returncode)
 
 
 def validate_input(value, method, charge, mult, label):
     """Accept only the frozen production grammar, never arbitrary ORCA blocks."""
+    require_analytic_gradient(value, require_opt=(label == "source"))
     lines = [line.strip() for line in value.splitlines() if line.strip()]
     keyword_lines = [line for line in lines if line.startswith("!")]
     if len(keyword_lines) != 1:
         raise ValueError(f"{label} requires exactly one keyword line")
     tokens = keyword_lines[0][1:].lower().split()
     required = set((method + " NumFreq SMD(acetonitrile) TightSCF SlowConv").lower().split())
-    if len(tokens) != len(set(tokens)) or not required <= set(tokens) or set(tokens) - required - {"opt", "tightopt"}:
+    allowed_geometry = {"opt", "tightopt", "verytightopt"}
+    if len(tokens) != len(set(tokens)) or not required <= set(tokens) or set(tokens) - required - allowed_geometry:
         raise ValueError(f"{label} method/keyword mismatch")
-    if label == "source" and not {"opt", "tightopt"} <= set(tokens):
-        raise ValueError("source requires original Opt TightOpt")
+    if {"tightopt", "verytightopt"} <= set(tokens):
+        raise ValueError(f"{label} has conflicting geometry convergence keywords")
+    if label == "source" and ("opt" not in tokens or not ({"tightopt", "verytightopt"} & set(tokens))):
+        raise ValueError("source requires original Opt with an explicit tight convergence tier")
     patterns = {
         "maxcore": r"%maxcore\s+[1-9]\d*",
         "pal": r"%pal\s+nprocs\s+[1-9]\d*\s+end",
@@ -228,12 +256,28 @@ def main(argv=None):
     parser.add_argument("--mol-id", default="C03")
     parser.add_argument("--state", choices=[s for s, *_ in prod.STATES], required=True)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument(
+        "--defer-finalize", action="store_true",
+        help="write a validated import without running finalize_wp2.ps1; batch all imports, then finalize once",
+    )
     args = parser.parse_args(argv)
+    if args.defer_finalize and not args.apply:
+        parser.error("--defer-finalize requires --apply")
     try:
         row, writes = validate(args.source, args.name, args.state, args.mol_id)
         if args.apply:
             apply_writes(writes)
-        print(json.dumps({"mode": "applied" if args.apply else "preview", "row": row}, ensure_ascii=False, indent=2))
+            if row.get("status") == "computed" and not args.defer_finalize:
+                try:
+                    finalize_wp2(python_executable=sys.executable)
+                except FinalizeError as exc:
+                    print(json.dumps({"mode": "applied_finalize_failed",
+                                      "reason": "import已写入但收口失败: %s" % exc,
+                                      "row": row}, ensure_ascii=False))
+                    return 3
+        mode = "applied_deferred" if args.apply and args.defer_finalize else (
+            "applied" if args.apply else "preview")
+        print(json.dumps({"mode": mode, "row": row}, ensure_ascii=False, indent=2))
         return 0
     except (ValueError, OSError, StopIteration) as exc:
         print(json.dumps({"mode": "rejected", "reason": str(exc)}, ensure_ascii=False))

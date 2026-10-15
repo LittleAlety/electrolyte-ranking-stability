@@ -60,7 +60,7 @@
 
 ### 3. 配位变化 —— 部分（三例分子的单构象条件态 Li 腿 已具；多 motif / 生产系综 未具、待补；且非本例轴）
 
-- 已有（原始产物支撑，三个案例分子都在四分子生产子集内）：
+- 已有（原始产物支撑，三个案例分子都在 12 分子生产主集内）：
   - `outputs/physics_completion/closure/four_molecule_state_closure.csv`：EMC/GBL/SL 的 LiM_plus、LiM_2plus 均 `register_status = produced_single_conformer`；Li–O 距离 `li_o_ang`：EMC 1.816 / 1.901，GBL 1.833 / 1.923，SL 2.053 / 2.439 Å；身份 bound/intact。
   - `outputs/physics_completion/free_states/production_redox.csv`：Li 条件态 IP 与配位位移 `coordination_shift_e_ev` / `_g_ev`：EMC 0.446461 / 0.373529，GBL 0.880186 / 0.707681，SL 0.582285 / 0.558920 eV。
   - `outputs/physics_completion/state_identity/state_identity_qc.csv`：Li–给体接触距离与 Mayer 键价（SL 的 LiM_plus 接触为 `O:2.0530;O:2.0545;S:2.5027`，valence 0.1491）。

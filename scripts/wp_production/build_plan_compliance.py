@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from datetime import datetime, timezone
 import io
 import json
 import re
@@ -19,16 +20,25 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import wp2_progress  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[2]
 OUTDIR = REPO / "outputs" / "physics_completion" / "compliance"
 CSV_NAME = "plan_compliance.csv"
 MD_NAME = "plan_compliance.md"
+META_NAME = "plan_compliance_meta.json"
 NL = chr(10)
 TICK = chr(96)
 
 FIELDS = ["item_id", "plan_section", "requirement", "status", "measured", "evidence", "note"]
 
-STATUSES = ("satisfied", "partial", "not_satisfied", "blocked_on_production")
+STATUSES = ("satisfied", "partial", "not_satisfied", "blocked_on_production", "exempt")
+OPEN_STATUSES = ("partial", "not_satisfied", "blocked_on_production")
+
+WP6_REQUIRED_LI_PAIRS = 9
+WP6_REQUIRED_PRODUCTION_ENSEMBLES = 48
 
 PLAN_SECTIONS = {
     "1": "§1 研究问题与最终交付",
@@ -108,7 +118,26 @@ def item(item_id, section, requirement, status, measured, evidence, note=""):
     }
 
 
-def build_rows():
+def wp6_gate_ready(li_pair_complete, production_ensemble_complete):
+    """Return the frozen v1.1 promotion gate for optional WP6."""
+    return (li_pair_complete >= WP6_REQUIRED_LI_PAIRS
+            and production_ensemble_complete >= WP6_REQUIRED_PRODUCTION_ENSEMBLES)
+
+
+def strict_main_counts(main_ids, accepted_legs):
+    """Project-level closure counts from the strict live accepted-leg set only."""
+    accepted = set(accepted_legs)
+    main_ids = list(main_ids)
+    main4_ok = sum(all("%s|%s" % (mol_id, state) in accepted for state in MAIN_STATES)
+                   for mol_id in main_ids)
+    li_pair_ok = sum(all("%s|%s" % (mol_id, state) in accepted for state in LI_STATES)
+                     for mol_id in main_ids)
+    li_legs_done = sum("%s|%s" % (mol_id, state) in accepted
+                       for mol_id in main_ids for state in LI_STATES)
+    return {"main4_ok": main4_ok, "li_pair_ok": li_pair_ok, "li_legs_done": li_legs_done}
+
+
+def build_rows(progress=None):
     out = []
 
     # ---------------- §4 WP0 ----------------
@@ -136,6 +165,7 @@ def build_rows():
     set_sampling = sorted({r.get("mol_id", "") for r in cfg_set
                            if r.get("cohort") == "sampling_audit" and r.get("mol_id")})
     set_excluded = count(cfg_set, lambda r: r.get("cohort") == "excluded" and r.get("exclusion_reason"))
+    progress = progress or wp2_progress.build_snapshot(REPO)
     sets_ok = ((len(set_main), len(set_method), len(set_sampling)) == (12, 8, 4) and set_excluded > 0)
     out.append(item(
         "plan_designated_sets_registered", "3",
@@ -164,11 +194,16 @@ def build_rows():
     out.append(item(
         "wp1_reduction_state_checks", "5",
         "还原态三项检查：电子空间扩展 / 脱附稳定性 / 波函数身份",
-        "satisfied" if has_reduced_leg else "not_satisfied",
-        "audited_states=%s has_reduced_leg=%s" % (",".join(jm_states), has_reduced_leg),
-        "outputs/physics_completion/method_audit/job_matrix.csv; docs/59_week38_wp1_method_audit.md",
+        "satisfied" if has_reduced_leg else "exempt",
+        "audited_states=%s has_reduced_leg=%s eligible_reduction_objects=%d "
+        "exemption_reason=%s" % (",".join(jm_states), has_reduced_leg,
+                                  1 if has_reduced_leg else 0,
+                                  "none" if has_reduced_leg else "unbound_anion"),
+        "outputs/physics_completion/method_audit/job_matrix.csv; docs/59_week38_wp1_method_audit.md; "
+        "docs/67_wp1_reduction_state_check_protocol.md",
         "本批次只做 M / M+ / [LiM]+ / [LiM]2+，没有还原态腿（还原轴按 unbound_anion 规则排除），"
-        "因此这三项检查在本批次没有可执行对象；显式记为未做，而不是默认通过。",
+        "因此三项检查在本批次没有可执行对象；exempt 只豁免本批次合规缺口，不代表检查通过，"
+        "也不把旧 unbound_anion 外推为普适物理结论。",
     ))
     ms = read_rows("outputs/physics_completion/method_audit/method_settings.csv")
     freeze_rel = "config/production_method_freeze_v1.json"
@@ -243,11 +278,10 @@ def build_rows():
                      if r.get("mol_id") in set_main and r.get("state") in MAIN_STATES]
     main_covered = sorted({r.get("mol_id", "") for r in states
                            if r.get("mol_id") in set_main and r.get("state") in MAIN_STATES})
-    main4_ok = sum(1 for mol_id in set_main
-                   if all(bymol.get(mol_id, {}).get(s) for s in MAIN_STATES))
-    li_pair_ok = sum(1 for mol_id in set_main
-                     if all(bymol.get(mol_id, {}).get(s) for s in LI_STATES))
-    li_legs_done = count(main_produced, lambda r: r.get("state") in LI_STATES)
+    live_counts = strict_main_counts(set_main, progress["scientific"]["accepted_legs"])
+    main4_ok = live_counts["main4_ok"]
+    li_pair_ok = live_counts["li_pair_ok"]
+    li_legs_done = live_counts["li_legs_done"]
     recon = read_rows("outputs/physics_completion/provenance/leg_reconciliation.csv")
     failed_legs = [r.get("leg_id", "") for r in recon if r.get("classification") == "failed"]
     flight_legs = [r.get("leg_id", "") for r in recon if r.get("classification") == "in_flight"]
@@ -255,17 +289,24 @@ def build_rows():
     out.append(item(
         "wp2_production_state_ledger", "6",
         "原方案 12 主集 x 4 主态的真实 Opt+NumFreq 生产登记",
-        "satisfied" if len(main_produced) == main_expected_states else (
-            "blocked_on_production" if main_produced else "not_satisfied"),
-        "main_states_produced=%d/%d; main_molecules_covered=%d/%d; pilot_subset_legs=%d/%d"
-        % (len(main_produced), main_expected_states, len(main_covered), len(set_main),
+        "satisfied" if progress["scientific"]["accepted"] == main_expected_states else (
+            "blocked_on_production" if progress["runtime"]["computed"] else "not_satisfied"),
+        "runtime_legs_computed=%d/%d; main_runtime_computed=%d/%d; "
+        "main_states_scientifically_accepted=%d/%d; frozen_delivery_main_states=%d/%d; "
+        "pilot_subset_legs=%d/%d"
+        % (progress["runtime"]["computed"], progress["runtime"]["total"],
+           progress["main_runtime"]["computed"], progress["main_runtime"]["total"],
+           progress["scientific"]["accepted"], progress["scientific"]["total"],
+           progress["frozen"]["accepted"], progress["frozen"]["total"],
            len(produced), len(states)),
-        "data/metadata/physics_completion_set.csv; "
+        "work/wp2prod/**/<name>_<state>.json; data/metadata/physics_completion_set.csv; "
         "outputs/physics_completion/closure/four_molecule_state_closure.csv",
-        "总分母始终是原方案 12x4=48 个主态。现有 DMC/EMC/GBL/SL 的 20 腿表（16 主态 + 4 个"
-        "同基组中性补腿）只是 pilot subset，不能把 pilot 分母替换成项目分母。未产出的腿保持缺失。"
-        "但闭环表不区分「还没排上」与「跑过但失败」：逐腿磁盘核对在 provenance/leg_reconciliation.csv 里"
-        "另记 failed=%d (%s)、in_flight=%d (%s)、not_started=%d，不把失败静默折成未开始。"
+        "运行进度的分母是 12x5=60；科学验收的分母是 12x4=48，且只接受 computed + 正常终止 + "
+        "优化收敛 + 零虚频。现有四分子闭环表只是 pilot subset，不能替代实时队列。"
+        "旧 pilot 闭环表不区分「还没排上」与「跑过但失败」：其逐腿磁盘核对在 "
+        "provenance/leg_reconciliation.csv 里另记 pilot_reconciliation_failed=%d (%s)、"
+        "pilot_reconciliation_in_flight=%d (%s)、pilot_reconciliation_not_started=%d；这些只描述 pilot，"
+        "不代表全 60 腿，也不把失败静默折成未开始。"
         % (len(failed_legs), ",".join(failed_legs) or "none",
            len(flight_legs), ",".join(flight_legs) or "none", len(nostart_legs)),
     ))
@@ -291,9 +332,9 @@ def build_rows():
         "pilot_four_state_complete=%d/%d; pilot_five_leg_complete=%d/%d"
         % (main4_ok, len(set_main), li_pair_ok, len(set_main), pilot_main4_ok, pilot_mol_count,
            five_ok, pilot_mol_count),
-        "data/metadata/physics_completion_set.csv; "
+        "work/wp2prod/**/<name>_<state>.json; data/metadata/physics_completion_set.csv; "
         "outputs/physics_completion/closure/four_molecule_state_closure.csv",
-        "方案主验收线使用 12 分子分母；四分子 pilot 完成数只作进度旁证。",
+        "方案主验收线只从实时 payload 的严格 QC 接受集合计算；四分子 pilot 完成数只作进度旁证。",
     ))
     redox = read_rows("outputs/physics_completion/free_states/production_redox.csv")
     free_ok = count(redox, lambda r: r.get("free_status") == "computed")
@@ -315,7 +356,7 @@ def build_rows():
         "main_li_legs_produced=%d/%d; main_li_pair_complete=%d/%d; main_li_labels=%d/%d"
         % (li_legs_done, len(set_main) * len(LI_STATES), li_pair_ok, len(set_main),
            li_ok, len(set_main)),
-        "outputs/physics_completion/closure/four_molecule_state_closure.csv; "
+        "work/wp2prod/**/<name>_<state>.json; "
         "outputs/physics_completion/free_states/production_redox.csv",
         "配位位移需要两个 Li 腿齐备，缺一即空。",
     ))
@@ -484,22 +525,25 @@ def build_rows():
     out.append(item(
         "wp4_anchor_tiers", "8",
         "既有氧化锚点逐条复核并分三级（可定量 / 仅趋势 / 不可用）",
-        "partial" if anchors and tier1 == 0 else ("satisfied" if anchors else "not_satisfied"),
+        "satisfied" if anchors else "not_satisfied",
         "anchor_rows=%d tier_1=%d tier_2=%d tier_3=%d" % (
             len(anchors), tier1, tier.get("tier_2", 0), tier.get("tier_3", 0)),
         "data/references/anchor_primary_audit.csv",
-        "tier_1 = 0：仓库里没有条件匹配的绝对标定序列。",
+        "逐条三级分类工作已完成；tier_1 = 0 是审计结论，并作为永久 validation_limitation 保留，"
+        "不把缺少条件匹配的绝对标定序列写成验证成功。",
     ))
     trans = vd.get("transcription_only_not_reverified_against_primary", 0)
     out.append(item(
         "wp4_primary_text_check", "8",
         "回原始文献页码/表号复核（而非二级转抄）",
-        "partial" if anchors else "not_satisfied",
-        "transcription_only=%d/%d" % (trans, len(anchors)),
+        "exempt" if anchors else "not_satisfied",
+        "transcription_only=%d/%d permanent_validation_limitation=%s" % (
+            trans, len(anchors), str(bool(anchors)).lower()),
         "data/anchors/primary_source_verification.csv; docs/62_week41_wp4_anchor_comparability.md",
         "两篇 Ue 正文未取得（付费墙 + IOPscience 验证码页）；14 行保持 transcription-only。"
         "二轮检索执行中另发现 Okoshi 2015 的被引登记（OpenAlex 2 条 / Semantic Scholar 4 条）指向 Ue 参编专著 + CRC 手册，"
-        "与仓库猜测的两篇 Ue JES 论文不一致，已登记为 attribution_conflict_open（见 data/references/anchor_retrieval_execution.md §5）。",
+        "与仓库猜测的两篇 Ue JES 论文不一致，已登记为 attribution_conflict_open（见 data/references/anchor_retrieval_execution.md §5）。"
+        "按 v1.1 决断永久归入 validation_limitation；exempt 不表示原文已复核。",
     ))
     protocol_text = (REPO / "data/references/anchor_retrieval_protocol.md")
     protocol_text = protocol_text.read_text(encoding="utf-8") if protocol_text.is_file() else ""
@@ -508,13 +552,17 @@ def build_rows():
     out.append(item(
         "wp4_new_comparable_entries", "8",
         "按明确检索协议再找 6-10 条条件可比条目",
-        "partial" if retrieval_executed else "not_satisfied",
-        "protocol_executed=%s record=%s tier_1_condition_matched=%d" % (
-            str(retrieval_executed).lower(), str(execution_record).lower(), tier1),
+        "exempt" if (retrieval_executed and tier1 == 0) else (
+            "satisfied" if tier1 >= 6 else ("partial" if retrieval_executed else "not_satisfied")),
+        "protocol_executed=%s record=%s tier_1_condition_matched=%d "
+        "permanent_validation_limitation=%s" % (
+            str(retrieval_executed).lower(), str(execution_record).lower(), tier1,
+            str(retrieval_executed and tier1 == 0).lower()),
         "data/references/anchor_retrieval_execution.md; data/references/anchor_retrieval_protocol.md",
         "检索协议已按登记的源与检索式**执行**（Crossref / OpenAlex / Unpaywall / Semantic Scholar），"
         "新命中可纳入 0 条，按协议 §6 停止规则保留 computational target + external-validity limitation（方案 8(d)）；"
-        "因实际未取得 6-10 条条件可比条目，记 partial 而不是 satisfied。",
+        "因实际未取得 6-10 条条件可比条目，按 v1.1 决断记为 exempt 的永久 validation_limitation，"
+        "而不是 satisfied；完整检索证据链继续保留。",
     ))
 
     # ---------------- §9 WP5 ----------------
@@ -604,15 +652,23 @@ def build_rows():
     lig_executed = (len([p for p in lig_dir.iterdir()
                          if p.is_file() and p.name != "explicit_ligand_plan.csv"])
                     if lig_dir.is_dir() else 0)
+    wp6_ready = wp6_gate_ready(li_pair_ok, len(prod_ens_keys))
+    wp6_scope = "planned" if wp6_ready else "optional"
     out.append(item(
         "wp6_explicit_ligand", "10",
         "可选 WP6：固定 R=DME 的共同背景显式配体检查",
-        "satisfied" if (lig and lig_executed) else ("blocked_on_production" if lig else "not_satisfied"),
-        "plan_rows=%d executed_jobs=%d" % (len(lig), lig_executed),
+        "satisfied" if (lig and lig_executed) else (
+            "not_satisfied" if (lig and wp6_ready) else (
+                "blocked_on_production" if lig else "not_satisfied")),
+        "plan_rows=%d executed_jobs=%d li_pair_complete=%d/%d required_li_pairs=%d "
+        "production_ensembles=%d/%d gate_ready=%s scope=%s" % (
+            len(lig), lig_executed, li_pair_ok, len(set_main), WP6_REQUIRED_LI_PAIRS,
+            len(prod_ens_keys), WP6_REQUIRED_PRODUCTION_ENSEMBLES,
+            str(wp6_ready).lower(), wp6_scope),
         "outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv",
-        "WP6 本身可选；本轮只做结果前预注册、没有落任何显式配体作业产物，零执行。"
-        "它的 gate 写明「要等关键 free->Li 结论可解析」，而 free->Li 正卡在生产腿上，"
-        "所以记 blocked_on_production（被闸门挡住），不把「登记完整」折成部分完成。",
+        "WP6 在 gate 前保持可选；当且仅当 Li 配对 complete >= 9/12 且生产系综 = 48/48 时，"
+        "自动升级为计划内。gate 后若仍零执行则记 not_satisfied；gate 前记 blocked_on_production，"
+        "不把「登记完整」折成部分完成。",
     ))
 
     # ---------------- §11 停止规则 ----------------
@@ -690,7 +746,7 @@ def build_rows():
     # 20 腿即使全部完成，也只能关闭 pilot 子集，不能关闭完整 physics_completion_v1。
     plan_complete = (
         method_frozen
-        and len(main_produced) == main_expected_states
+        and progress["scientific"]["accepted"] == main_expected_states
         and main4_ok == len(set_main)
         and free_ok == len(set_main)
         and li_ok == len(set_main)
@@ -705,10 +761,10 @@ def build_rows():
         "main_states=%d/%d; main_four_state_complete=%d/%d; free_labels=%d/%d; "
         "li_labels=%d/%d; production_ensembles=%d/%d; sampling_complete=%s; "
         "flip_rungs=%d/%d; pilot_subset=%d/%d"
-        % (len(main_produced), main_expected_states, main4_ok, len(set_main),
+        % (progress["scientific"]["accepted"], main_expected_states, main4_ok, len(set_main),
            free_ok, len(set_main), li_ok, len(set_main), len(prod_ens_keys), main_expected_states,
            samp_extension_ok, flip_done, len(flip), len(produced), len(states)),
-        "data/metadata/physics_completion_set.csv; "
+        "work/wp2prod/**/<name>_<state>.json; data/metadata/physics_completion_set.csv; "
         "outputs/physics_completion/closure/four_molecule_state_closure.csv; "
         "outputs/physics_completion/ensembles/production_ensemble_labels.csv; "
         "outputs/physics_completion/closure/flip_persistence.csv",
@@ -803,8 +859,9 @@ def render_csv(rows):
     return buf.getvalue()
 
 
-def render_md(rows):
+def render_md(rows, snapshot, generated_at_utc):
     counts = Counter(r["status"] for r in rows)
+    open_count = sum(counts[status] for status in OPEN_STATUSES)
     overall_ok = any(r["item_id"] == "plan_overall_complete" and r["status"] == "satisfied" for r in rows)
     lines = [
         "# 方案合规台账（derived）",
@@ -813,6 +870,15 @@ def render_md(rows):
         + TICK + "outputs/physics_completion/**" + TICK + "、" + TICK + "outputs/week7/" + TICK + "、" +
         TICK + "data/references/anchor_primary_audit.csv" + TICK,
         "> 只读现算；本文件不写死任何状态或数字，生产腿每落地一批重跑即更新。",
+        "> generated_at_utc=" + generated_at_utc + "; runtime_input_sha256="
+        + snapshot["runtime_input_sha256"] + "; scientific_ledger_sha256="
+        + snapshot["scientific_ledger_sha256"] + "; stale=" + str(snapshot["stale"]).lower(),
+        "> **运行进度：%d/%d**；**主态运行完成：%d/%d**；**科学验收（四主态）：%d/%d**；"
+        "**固化交付主态：%d/%d**。QC 失败、partial、missing、running 均不计入科学验收。"
+        % (snapshot["runtime"]["computed"], snapshot["runtime"]["total"],
+           snapshot["main_runtime"]["computed"], snapshot["main_runtime"]["total"],
+           snapshot["scientific"]["accepted"], snapshot["scientific"]["total"],
+           snapshot["frozen"]["accepted"], snapshot["frozen"]["total"]),
         "",
         "| item_id | 方案节 | 要求 | 状态 | 实测 | 证据 |",
         "| --- | --- | --- | --- | --- | --- |",
@@ -823,6 +889,7 @@ def render_md(rows):
     lines += [
         "",
         "**状态合计**：" + "; ".join("%s=%d" % (k, counts[k]) for k in STATUSES),
+        "**未闭合项（不含 exempt）**：%d；exempt 仅表示经证据支持的范围豁免/永久限制，不表示科学检查通过。" % open_count,
         "",
         "**总体判定**：" + ("可结题（方案第 1-5 步闭环）" if overall_ok
                          else "未闭环 -- 见 " + TICK + "plan_overall_complete" + TICK + " 行"),
@@ -831,15 +898,56 @@ def render_md(rows):
     return NL.join(lines)
 
 
-def write_outputs(rows):
+def _metadata(snapshot, generated_at_utc):
+    return {
+        "schema_version": 1,
+        "generated_at_utc": generated_at_utc,
+        "runtime_input_sha256": snapshot["runtime_input_sha256"],
+        "scientific_ledger_sha256": snapshot["scientific_ledger_sha256"],
+        "stale": snapshot["stale"],
+        "runtime": {k: snapshot["runtime"][k] for k in ("computed", "total")},
+        "main_runtime": {k: snapshot["main_runtime"][k] for k in ("computed", "total")},
+        "scientific": {k: snapshot["scientific"][k] for k in ("accepted", "total")},
+        "frozen": {k: snapshot["frozen"][k] for k in ("accepted", "total")},
+        "input_paths": snapshot["input_paths"],
+    }
+
+
+def write_outputs(rows, snapshot=None, generated_at_utc=None):
+    snapshot = snapshot or wp2_progress.build_snapshot(REPO)
+    generated_at_utc = generated_at_utc or datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     OUTDIR.mkdir(parents=True, exist_ok=True)
     (OUTDIR / CSV_NAME).write_text(render_csv(rows), encoding="utf-8", newline=NL)
-    (OUTDIR / MD_NAME).write_text(render_md(rows), encoding="utf-8", newline=NL)
+    (OUTDIR / MD_NAME).write_text(render_md(rows, snapshot, generated_at_utc), encoding="utf-8", newline=NL)
+    (OUTDIR / META_NAME).write_text(json.dumps(_metadata(snapshot, generated_at_utc),
+                                                ensure_ascii=False, indent=2) + NL,
+                                    encoding="utf-8", newline=NL)
 
 
-def check(rows):
+def check(rows, snapshot=None):
+    snapshot = snapshot or wp2_progress.build_snapshot(REPO)
     failures = []
-    for name, text in ((CSV_NAME, render_csv(rows)), (MD_NAME, render_md(rows))):
+    meta_path = OUTDIR / META_NAME
+    if not meta_path.is_file():
+        return ["missing %s" % META_NAME]
+    try:
+        saved = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return ["invalid %s: %s" % (META_NAME, exc)]
+    generated_at = saved.get("generated_at_utc", "")
+    if not generated_at:
+        failures.append("missing generated_at_utc")
+    if saved.get("runtime_input_sha256") != snapshot["runtime_input_sha256"]:
+        failures.append("runtime input hash changed")
+    if saved.get("scientific_ledger_sha256") != snapshot["scientific_ledger_sha256"]:
+        failures.append("scientific ledger hash changed")
+    if snapshot["stale"] or saved.get("stale") is True:
+        failures.append("stale=true: runtime scientific legs differ from frozen delivery ledger")
+    expected_meta = json.dumps(_metadata(snapshot, generated_at), ensure_ascii=False, indent=2) + NL
+    if meta_path.read_text(encoding="utf-8") != expected_meta:
+        failures.append("differs %s" % META_NAME)
+    for name, text in ((CSV_NAME, render_csv(rows)),
+                       (MD_NAME, render_md(rows, snapshot, generated_at))):
         path = OUTDIR / name
         if not path.is_file():
             failures.append("missing %s" % name)
@@ -853,9 +961,10 @@ def main(argv=None):
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args(argv)
 
-    rows = build_rows()
+    snapshot = wp2_progress.build_snapshot(REPO)
+    rows = build_rows(snapshot)
     if args.check:
-        failures = check(rows)
+        failures = check(rows, snapshot)
         if failures:
             print("CHECK FAILED (%d)" % len(failures))
             for line in failures[:40]:
@@ -864,11 +973,12 @@ def main(argv=None):
         print("CHECK OK -- plan-compliance table is byte-identical (%d items)" % len(rows))
         return 0
 
-    write_outputs(rows)
+    write_outputs(rows, snapshot)
     counts = Counter(r["status"] for r in rows)
     overall = next(r for r in rows if r["item_id"] == "plan_overall_complete")
     print("plan_compliance: %d items -> %s" % (len(rows), OUTDIR.relative_to(REPO).as_posix()))
     print("  " + "; ".join("%s=%d" % (k, counts[k]) for k in STATUSES))
+    print("  open_excluding_exempt=%d" % sum(counts[status] for status in OPEN_STATUSES))
     print("  overall=%s (%s)" % (overall["status"], overall["measured"]))
     return 0
 

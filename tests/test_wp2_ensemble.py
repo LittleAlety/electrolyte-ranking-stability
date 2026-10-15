@@ -30,6 +30,14 @@ RECORDS = ENSEMBLES / "ensemble_raw_records.csv"
 PER_STRUCTURE = ENSEMBLES / "ensemble_free_energies.csv"
 PAIR_RUNGS = ENSEMBLES / "ensemble_pair_rungs.csv"
 POOL = REPO_ROOT / "outputs" / "physics_completion" / "sampling" / "sampling_conformer_set.csv"
+SAMPLING_SCRIPT = REPO_ROOT / "scripts" / "wp_production" / "build_wp2_sampling.py"
+SAMPLING_DIR = REPO_ROOT / "outputs" / "physics_completion" / "sampling"
+SAMPLING_INDEX = SAMPLING_DIR / "sampling_index.json"
+SAMPLING_ROUND1 = SAMPLING_DIR / "sampling_round1.csv"
+SAMPLING_ESCALATION = SAMPLING_DIR / "sampling_escalation.csv"
+COMPLETION_SET = REPO_ROOT / "data" / "metadata" / "physics_completion_set.csv"
+CORE_SET = REPO_ROOT / "data" / "metadata" / "core_set.csv"
+FREE_STATES = ("M", "M_plus")
 LI_SCREEN = REPO_ROOT / "outputs" / "physics_completion" / "li_motif_sampling" / "li_motif_screen.json"
 FLIP = REPO_ROOT / "outputs" / "physics_completion" / "closure" / "flip_persistence.csv"
 KJ_PER_EV = 96.48533212331002
@@ -106,7 +114,9 @@ def test_boltzmann_weights_sum_to_one_and_the_two_conventions_obey_their_bounds(
             assert leg["g_state_eh"] is None and leg["g_avg_eh"] is None
             continue
         total = sum(float(row["boltzmann_weight"]) for row in counted)
-        assert abs(total - 1.0) < 1e-6, leg["leg_id"]
+        # 权重按 "%.6f" 发布，每项舍入误差 <= 5e-7；n 项累加的上界就是 n*5e-7。
+        # 用舍入预算而不是固定 1e-6：它随结构数自适应，池子变大不会误报，也不会放过真错误。
+        assert abs(total - 1.0) <= len(counted) * 5e-7 + 1e-9, leg["leg_id"]
         lowest = min(float(row["total_free_energy_eh"]) for row in counted)
         assert abs(leg["g_lowest_eh"] - lowest) < 1e-8, "the CSV rounds G to 8 decimals"
         assert -rt * math.log(len(counted)) - 1e-6 <= leg["entropy_shift_kj"] <= 1e-9
@@ -178,3 +188,96 @@ def test_the_two_source_pools_are_registered_by_hash():
     for key, path in (("free_state_conformer_pool", POOL), ("li_motif_screen", LI_SCREEN)):
         assert sources[key].endswith(path.name)
         assert sources[key + "_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# 自由态构象池的覆盖契约（方案 §3.1 主集 12 分子）
+# ---------------------------------------------------------------------------
+
+def _sampling_module():
+    spec = importlib.util.spec_from_file_location("wp2_sampling_under_test", SAMPLING_SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _completion_rows():
+    with io.open(COMPLETION_SET, encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _core_smiles():
+    with io.open(CORE_SET, encoding="utf-8", newline="") as handle:
+        return {row["mol_id"]: row["smiles"] for row in csv.DictReader(handle)}
+
+
+def _sampling_payload():
+    if not SAMPLING_INDEX.is_file():
+        pytest.skip("the sampling layer is not registered yet")
+    return json.loads(SAMPLING_INDEX.read_text(encoding="utf-8"))
+
+
+def test_free_state_pool_covers_every_main_cohort_molecule():
+    """方案 §3.1 主集 12 分子的自由态（M / M_plus）都要进池子，一个不少也不许多。"""
+    module = _sampling_module()
+    expected = sorted((row["mol_id"], row["name"]) for row in _completion_rows()
+                      if row.get("cohort") == "main")
+    got = sorted((mol_id, name) for mol_id, name, _smiles in module.MOLS)
+    assert len(expected) == 12, "the main cohort is registered as 12 molecules"
+    assert got == expected, "MOLS must be exactly the registered main cohort"
+    assert len({mol_id for mol_id, _name, _smiles in module.MOLS}) == len(module.MOLS)
+
+
+def test_free_state_pool_smiles_are_copied_from_the_registered_core_set():
+    """SMILES 逐字来自 core_set.csv：不许臆造，也不许用等价但不同的写法顶替。"""
+    module = _sampling_module()
+    registered = _core_smiles()
+    for mol_id, name, smiles in module.MOLS:
+        assert mol_id in registered, "unregistered molecule id: %s" % mol_id
+        assert smiles == registered[mol_id], ("%s (%s) SMILES is not the registered one"
+                                              % (name, mol_id))
+
+
+def test_free_state_pool_keeps_the_registered_screen_discipline():
+    """扩覆盖不许放松既有纪律：KEEP / 去重容差 / 升级容差 / 两态定义都不变。"""
+    module = _sampling_module()
+    assert module.KEEP == 3
+    assert module.DUP_TOL_KCAL == 0.10
+    assert module.ESCALATE_TOL_KCAL == 1.00
+    assert module.MAX_POOL == 6
+    assert module.ROUND1_STATES == [("M", 0, 0), ("M_plus", 1, 1)]
+    assert "GFN2" in module.LEVEL and "gas phase" in module.LEVEL
+
+
+def test_designated_sampling_set_is_still_the_section_3_3_cohort():
+    """方案 §3.3 的采样审计集是 C02/C03/C08/C17；扩覆盖不等于改写指定集。"""
+    payload = _sampling_payload()
+    cohort = sorted(row["mol_id"] for row in _completion_rows()
+                    if row.get("cohort") == "sampling_audit")
+    assert cohort == ["C02", "C03", "C08", "C17"]
+    assert sorted(payload["cohort_deviation"]["registered_set"]["mol_ids"]) == cohort
+
+
+def test_executed_set_is_read_back_from_the_rows_that_actually_ran():
+    """「执行集」= 真正跑出结果的分子；不许把「声明覆盖 12 个」写成「12 个都跑了」。"""
+    payload = _sampling_payload()
+    rows = _rows(SAMPLING_ROUND1)
+    assert rows, "sampling_round1.csv must be registered"
+    ran = sorted({row["mol_id"] for row in rows if row["verdict"] != "not_computed"})
+    registered = sorted(payload["cohort_deviation"]["executed_set"]["mol_ids"])
+    assert registered == ran, ("cohort_deviation.executed_set must be the molecules with a real "
+                               "verdict, not the declared coverage")
+
+
+def test_the_deviation_between_designated_and_executed_is_stated_not_hidden():
+    """偏差必须写在产物里：未执行的指定分子要读得出来，且不许宣称完成 §3.3。"""
+    payload = _sampling_payload()
+    dev = payload["cohort_deviation"]
+    designated = set(dev["registered_set"]["mol_ids"])
+    executed = set(dev["executed_set"]["mol_ids"])
+    text = json.dumps(dev, ensure_ascii=False)
+    assert "3.3" in text, "the deviation note must name the section it does not claim"
+    names = {row["mol_id"]: row["name"] for row in _completion_rows()}
+    for mol_id in sorted(designated - executed):
+        assert mol_id in text or names[mol_id] in text, (
+            "%s is designated but not executed; the deviation must say so" % mol_id)

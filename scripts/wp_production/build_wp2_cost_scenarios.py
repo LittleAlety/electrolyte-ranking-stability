@@ -12,7 +12,7 @@
 
 三条硬约束（与方案一致，勿放宽）：
 * 缺值不写 0；没有实测作业的类别显式标 unmeasured，用带标记的界给出，不冒充估计值；
-* 绝对成本三项在四分子闭环前仍是 MISSING，本脚本不改写它们，只登记可测的分项；
+* 绝对成本三项只在 12x5=60 项目腿齐全且逐腿成本完整时填入，否则保持 MISSING；
 * 历史产物按方案 13 不被覆盖（outputs/week25 的 cpu_core_hours_available=false 只在 index 里登记 supersedes）。
 
 用法
@@ -104,18 +104,37 @@ def stats(values):
 
 
 def production_legs():
-    """已折入生产账本的腿：{state: [core_hours, ...]} 与是否已折入。"""
+    """项目生产账本：可核成本样本、全部登记 key、原始行。"""
     by_state = {}
     measured = set()
-    for record in read_csv(PRODUCTION):
+    rows = read_csv(PRODUCTION)
+    for record in rows:
         state = record.get("state", "")
+        measured.add((record.get("mol_id", ""), state))
         try:
             hours = float(record.get("core_hours", ""))
-        except ValueError:
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(hours) or hours <= 0:
             continue
         by_state.setdefault(state, []).append(hours)
-        measured.add((record.get("mol_id", ""), state))
-    return by_state, measured
+    return by_state, measured, rows
+
+
+def project_cost_complete(rows, expected=60):
+    """All 12x5 project jobs must have positive, recoverable allocated cost."""
+    if len(rows) != expected:
+        return False
+    for row in rows:
+        if row.get("cost_status") != "complete":
+            return False
+        try:
+            values = [float(row.get(field, "")) for field in ("wall_sec", "cores", "core_hours")]
+        except (TypeError, ValueError):
+            return False
+        if not all(math.isfinite(value) and value > 0 for value in values):
+            return False
+    return True
 
 
 def production_classes(by_state):
@@ -173,7 +192,9 @@ def closure_rows():
 
 def build():
     legs = closure_rows()
-    by_state, measured_keys = production_legs()
+    by_state, project_measured_keys, production_rows = production_legs()
+    registered_keys = {(row.get("mol_id", ""), row.get("state", "")) for row in legs}
+    pilot_measured_keys = project_measured_keys & registered_keys
     per_class = production_classes(by_state)
     pilot_sp, audit_sp = sp_stats()
     all_measured = [value for values in per_class.values() for value in values]
@@ -240,15 +261,16 @@ def build():
     checks.append({
         "check_id": "every_registered_leg_is_accounted_for",
         "description": "20 条登记腿全部归位：已测 + 待补 = 20，不丢腿",
-        "ok": str(len(legs) == 20 and len(measured_keys) + len(pending) == 20).lower(),
-        "detail": "registered=%d measured=%d pending=%d" % (len(legs), len(measured_keys), len(pending)),
+        "ok": str(len(legs) == 20 and len(pilot_measured_keys) + len(pending) == 20).lower(),
+        "detail": "registered=%d pilot_measured=%d pending=%d; project_measured=%d" % (
+            len(legs), len(pilot_measured_keys), len(pending), len(project_measured_keys)),
     })
     pending_keys = {(row["mol_id"], row["state"]) for row in pending}
     checks.append({
         "check_id": "pending_legs_are_exactly_the_legs_without_a_production_label",
         "description": "待补集合 = 闭环表里没有产出的腿，不夹带已算腿重复计费",
-        "ok": str(pending_keys.isdisjoint(measured_keys)).lower(),
-        "detail": "overlap=%d" % len(pending_keys & measured_keys),
+        "ok": str(pending_keys.isdisjoint(pilot_measured_keys)).lower(),
+        "detail": "overlap=%d" % len(pending_keys & pilot_measured_keys),
     })
     monotone = all(float(row["core_hours_low"]) <= float(row["core_hours_mid"]) <= float(row["core_hours_high"])
                    for row in estimate_rows)
@@ -302,13 +324,16 @@ def build():
               and all(row["status"] != "MISSING" and row["value"] != "" for row in absolute))
     still_missing = (len(absolute) == 3
                      and all(row["status"] == "MISSING" and row["value"] == "" for row in absolute))
-    loop_closed = len(measured_keys) == len(legs)
+    project_loop_closed = len(project_measured_keys) == 60
+    costs_complete = project_cost_complete(production_rows)
+    headline_ready = project_loop_closed and costs_complete
     checks.append({
-        "check_id": "absolute_cost_tracks_the_four_molecule_loop",
-        "description": "绝对成本三项：四分子闭环后按实测台账现算填入；闭环前必须留空并标 MISSING（不给部分数据当 headline 数）",
-        "ok": str((filled and loop_closed) or (still_missing and not loop_closed)).lower(),
-        "detail": "items=%s; filled=%s; legs=%d/%d" % (
-            " ".join(row["item"] for row in absolute), filled, len(measured_keys), len(legs)),
+        "check_id": "absolute_cost_tracks_the_main_production_loop",
+        "description": "项目绝对成本三项仅在 12x5=60 腿齐全且每腿成本完整时填入，否则必须留空并标 MISSING",
+        "ok": str(filled if headline_ready else still_missing).lower(),
+        "detail": "items=%s; filled=%s; project_legs=%d/60; project_cost_complete=%s" % (
+            " ".join(row["item"] for row in absolute), filled,
+            len(project_measured_keys), costs_complete),
     })
 
     index = {
@@ -316,7 +341,8 @@ def build():
                   "for the %d legs still missing from the four-molecule loop; zero new electronic structure"
                   % len(pending)),
         "measured": {
-            "legs": len(measured_keys),
+            "project_legs": len(project_measured_keys),
+            "registered_pilot_legs": len(pilot_measured_keys),
             "core_hours_total": round6(sum(all_measured)),
             "per_class": {name: stats(values) for name, values in sorted(per_class.items())},
         },
@@ -367,7 +393,8 @@ def build():
         "> 由 `scripts/wp_production/build_wp2_cost_scenarios.py` 生成；零新增电子结构计算，只汇总已登记台账。",
         "> 口径：`wall hours = core-hours / (workers x %d)`；core-hours 与并发无关。" % WORKER_CORES,
         "",
-        "## 已测作业（%d 条生产腿）" % len(measured_keys),
+        "## 已测作业（全项目 %d 条；其中注册 pilot %d/20 条）"
+        % (len(project_measured_keys), len(pilot_measured_keys)),
         "",
         "| 类别 | n | min | median | p90 | max | 单位 |",
         "| --- | --- | --- | --- | --- | --- | --- |",
@@ -434,10 +461,11 @@ def build():
            index["phase_split"]["opt_only"]["basis"] or "-"),
         "* 生产腿是 Opt + NumFreq 联合作业，Opt 与 Freq 无法从同一作业的墙上时间里拆分，本条如实登记而不估算。",
         "",
-        "## 绝对成本三项（四分子闭环后按实测台账现算；闭环前留空并标 MISSING）",
+        "## 绝对成本三项（项目 60 腿齐全且成本完整后填入；否则留空并标 MISSING）",
         "",
         "* 闭环状态：%s；绝对成本三项 %s。"
-        % ("四分子四态已齐备" if loop_closed else "尚未闭环",
+        % ("项目 60 腿与成本均齐备" if headline_ready else
+           "项目未闭环或存在明确 incomplete 成本",
            "已按实测台账填入" if filled else "留空并标 MISSING"),
         "",
         "| item | status | note |",

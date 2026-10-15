@@ -1,11 +1,11 @@
 ﻿# WP2 生产一键收口：重折已完成状态 -> 生成器 -> 抽样/系综派生 -> 闭环派生 -> 图 -> 镜像 -> 站点 -> 冻结门 -> 干净室 -> 各 --check -> pytest
-# 用法: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finalize_wp2.ps1 [-Commit]
-param([switch]$Commit)
+# 用法: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finalize_wp2.ps1 [-Commit] [-PythonPath <python>]
+param([switch]$Commit, [string]$PythonPath = "")
 [Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false)
 $env:PYTHONIOENCODING="utf-8"
 # 仓库根 = 本脚本所在目录的祖父目录（脚本位于 scripts/wp_production/）
 Set-Location (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent)
-$py = ".\.venv\Scripts\python.exe"
+$py = if ($PythonPath) { $PythonPath } else { ".\.venv\Scripts\python.exe" }
 $fail = @()
 function Step($name, $block) {
   $out = & $block 2>&1 | Out-String

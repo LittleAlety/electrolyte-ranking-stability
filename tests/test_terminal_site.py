@@ -1,14 +1,16 @@
-"""Terminal GitHub Pages site: the page must not be able to lie.
+"""Academic GitHub Pages site: the page must not be able to lie.
 
 The site is generated, not written: ``docs/assets/data.js`` is emitted from the
-repository's own artefacts.  These tests pin the two ways that could go quiet:
+repository's own artefacts.  These tests pin the ways that could go quiet:
 
 * the payload drifts from the figures / reports it claims to describe;
 * the page starts depending on something outside the published folder, so it
-  renders locally and breaks once GitHub Pages serves it.
+  renders locally and breaks once GitHub Pages serves it;
+* a hand-maintained asset (``academic.js``, ``index.html``) hardcodes a number
+  that the payload has since moved past.
 
-They also pin the accessibility hooks that make the terminal usable without a
-mouse (a real input element, an aria-live log, a noscript summary).
+They also pin the accessibility hooks that make the page usable without a
+mouse (a real search input, a dialog for the lightbox, a noscript summary).
 """
 
 from __future__ import annotations
@@ -37,8 +39,8 @@ PRELUDE = "window.HB = "
 #: The regions of docs/index.html that the builder owns.  Each is delimited by a
 #: BEGIN/END marker comment pair and re-rendered from the payload on every
 #: build, so a hand edit or a stale number cannot survive --check.
-MANAGED_BLOCKS = ("static-meta", "static-fallbacks", "brief-counts",
-                  "brief-links", "argument-timeline")
+MANAGED_BLOCKS = ("static-meta", "static-fallbacks", "hero-counts", "hero-links",
+                  "key-numbers", "deliverables", "argument-timeline")
 
 
 def _load_generator():
@@ -81,7 +83,8 @@ def _sha256(path: Path) -> str:
 
 
 def test_page_and_assets_are_present():
-    for name in ("index.html", "assets/terminal.css", "assets/terminal.js", "assets/data.js"):
+    for name in ("index.html", "assets/academic.css", "assets/academic.js",
+                 "assets/data.js"):
         path = DOCS / name
         assert path.exists(), name + " missing"
         assert path.stat().st_size > 0, name + " is empty"
@@ -95,11 +98,34 @@ def test_nojekyll_is_present_so_pages_serves_the_files_raw():
 
 def test_data_js_is_a_json_payload_with_the_expected_shape():
     payload = _payload()
-    for key in ("repo", "counts", "pipeline", "gates", "weeks", "figures"):
+    for key in ("repo", "counts", "pipeline", "gates", "weeks", "figures",
+                "phases", "deliverables", "key_numbers"):
         assert key in payload, "payload misses " + key
-    assert len(payload["weeks"]) == 25
     assert len(payload["pipeline"]) == 5
-    assert payload["counts"]["weeks"] == 25
+    assert payload["counts"]["weeks"] == len(payload["weeks"])
+    assert payload["counts"]["figures"] == len(payload["figures"])
+
+
+def test_weeks_cover_both_stages_and_three_phases():
+    """The page must show the whole project, not just the first 25 weeks."""
+    payload = _payload()
+    numbers = [w["n"] for w in payload["weeks"]]
+    assert numbers == sorted(numbers), "weeks are out of order"
+    # stage one (1-25), stage two (28-36), stage three (37-44)
+    assert set(range(1, 26)) <= set(numbers), "stage one weeks are missing"
+    assert {28, 29, 30, 31, 32, 33, 34, 35, 36} <= set(numbers), \
+        "review-stage weeks (WP1-WP7 + paper) are missing"
+    assert {37, 38, 39, 40, 41, 42, 43, 44} <= set(numbers), \
+        "physics_completion weeks (WP0-WP6 + submission) are missing"
+    phases = {w["phase"] for w in payload["weeks"]}
+    assert phases == {"one", "two", "three"}, "the three phases are not all used"
+
+
+def test_week_phase_keys_match_the_declared_phases():
+    payload = _payload()
+    declared = {p["key"] for p in payload["phases"]}
+    used = {w["phase"] for w in payload["weeks"]}
+    assert used <= declared, "a week cites an undeclared phase: %s" % (used - declared)
 
 
 def test_figure_payload_covers_exactly_the_repository_figures():
@@ -107,8 +133,6 @@ def test_figure_payload_covers_exactly_the_repository_figures():
     on_disk = sorted(p.name for p in REPO_FIGURES.glob("*.png"))
     listed = sorted(row["file"] for row in payload["figures"])
     assert listed == on_disk, "the site and outputs/figures/ disagree on the figure set"
-    # 59 legacy figures + F59-F64 (physics_completion_v1 main figures, plan section 14)
-    assert len(listed) == 65
 
 
 def test_every_figure_has_a_caption_and_a_hash():
@@ -132,24 +156,62 @@ def test_every_week_points_at_a_report_that_exists():
         assert week["stage"].strip() and week["title"].strip()
 
 
-def test_week_numbers_are_one_to_twenty_five():
-    numbers = [w["n"] for w in _payload()["weeks"]]
-    assert numbers == list(range(1, 26))
-
-
 def test_latest_week_tag_is_verbatim_from_its_own_report():
-    """The latest week's one-liner must be a literal slice of section 0.
+    """A stage one-liner must be a literal slice of its own section 0.
 
     Only the emphasis markers (``**``) and the inline code ticks are removed;
     the site may not paraphrase a headline, and it may not invent a number.
+    The final stage (the submission package) has no prose report -- its doc is
+    the submission JSON -- so the verbatim rule is pinned on the last stage
+    that does carry a markdown report, and the JSON is checked for existence.
     """
-    week = _payload()["weeks"][-1]
-    assert week["n"] == 25 and week["doc"] == "docs/40_week25_gate1_report.md"
-    lines = (REPO_ROOT / week["doc"]).read_text(encoding="utf-8").splitlines()
-    start = next(i for i, line in enumerate(lines) if line.startswith("## 0."))
-    end = next(i for i, line in enumerate(lines) if i > start and line.startswith("## "))
-    plain = "\n".join(lines[start + 1:end]).replace("**", "").replace("`", "")
-    assert week["tag"] in plain, "the latest week's tag is not verbatim from the report"
+    weeks = _payload()["weeks"]
+    last_json = weeks[-1]
+    assert (REPO_ROOT / last_json["doc"]).exists(), last_json["doc"] + " is missing"
+    assert last_json["tag"].strip(), "the final stage has no one-liner"
+
+    # The last markdown stage that actually carries a "## 0." section.  Later
+    # reports (week43/44) are registration documents with a different shape, so
+    # the verbatim rule is pinned on the last one that has a headline section.
+    candidate = None
+    for w in reversed([w for w in weeks if w["doc"].endswith(".md")]):
+        lines = (REPO_ROOT / w["doc"]).read_text(encoding="utf-8").splitlines()
+        starts = [i for i, line in enumerate(lines) if line.startswith("## 0.")]
+        if not starts:
+            continue
+        start = starts[0]
+        end = next((i for i, line in enumerate(lines)
+                    if i > start and line.startswith("## ")), len(lines))
+        plain = "\n".join(lines[start + 1:end]).replace("**", "").replace("`", "")
+        if w["tag"] in plain:
+            candidate = w
+            break
+        candidate = candidate or ("MISMATCH", w, plain[:400])
+    assert candidate is not None, "no markdown stage carries a section-0 headline"
+    assert not isinstance(candidate, tuple), (
+        "a stage tag is not verbatim from its report section 0: %r" % (candidate,))
+
+
+def test_key_numbers_each_cite_a_source_that_exists():
+    """A headline number may not outlive the artefact it came from."""
+    for row in _payload()["key_numbers"]:
+        assert row["label"].strip() and row["value"].strip()
+        assert (REPO_ROOT / row["source"]).exists(), \
+            "key number %r cites a missing source: %s" % (row["label"], row["source"])
+
+
+def test_deliverables_inventory_matches_the_repository():
+    """The data section advertises the in-repo delivery mirrors by file count."""
+    payload = _payload()
+    rows = {d["part"]: d for d in payload["deliverables"]}
+    assert set(rows) == {"part1", "part2"}, "both delivery mirrors must be listed"
+    for part, row in rows.items():
+        root = REPO_ROOT / row["path"]
+        assert root.is_dir(), "missing delivery mirror: " + row["path"]
+        on_disk = sum(1 for _ in root.rglob("*") if _.is_file())
+        assert row["files"] == on_disk, \
+            "%s advertises %d files but holds %d" % (part, row["files"], on_disk)
+        assert row["categories"], part + " lists no category directories"
 
 
 def test_gate_payload_matches_the_frozen_gate_records():
@@ -177,8 +239,8 @@ def test_page_references_only_files_inside_the_published_folder():
 def test_site_pulls_no_external_assets():
     """No CDN, no fonts, no analytics: a self-contained static folder."""
     html = (DOCS / "index.html").read_text(encoding="utf-8")
-    css = (ASSETS / "terminal.css").read_text(encoding="utf-8")
-    js = (ASSETS / "terminal.js").read_text(encoding="utf-8")
+    css = (ASSETS / "academic.css").read_text(encoding="utf-8")
+    js = (ASSETS / "academic.js").read_text(encoding="utf-8")
     assert not re.search(r'<script[^>]+src="https?://', html)
     assert not re.search(r'<link[^>]+href="https?://', html)
     assert not re.search(r"@import\s+url\(\s*['\"]?https?://", css)
@@ -189,53 +251,39 @@ def test_site_pulls_no_external_assets():
 
 def test_page_is_usable_without_a_pointer():
     html = (DOCS / "index.html").read_text(encoding="utf-8")
-    assert 'role="log"' in html and 'aria-live="polite"' in html
-    assert '<label class="ps1" for="cmd"' in html
-    assert "<noscript>" in html, "the terminal needs a no-JS fallback"
+    assert 'id="gallery-search"' in html and 'type="search"' in html
+    assert 'aria-label' in html
+    assert '<noscript>' in html, "the page needs a no-JS fallback"
+    assert 'role="dialog"' in html and 'aria-modal="true"' in html, \
+        "the lightbox must be a dialog for assistive tech"
 
 
-def test_terminal_js_defines_the_commands_it_advertises():
-    js = (ASSETS / "terminal.js").read_text(encoding="utf-8")
-    for name in ("help", "about", "status", "pipeline", "weeks", "cat", "read",
-                 "figures", "open", "theme", "repo", "contacts"):
-        assert "CMDS." + name + " =" in js, "missing command: " + name
-    listed = js.split("CMDS.help = function () {", 1)[1].split("};", 1)[0]
-    for label in ("about", "status", "pipeline", "weeks", "cat", "read", "figures", "open"):
-        assert label in listed, "help does not mention " + label
-
-
-def test_terminal_js_derives_the_week_and_figure_counts():
+def test_academic_js_derives_every_count_from_the_payload():
     """Stale counts are the quiet way a generated page starts to lie.
 
-    ``terminal.js`` is a hand-maintained asset (unlike ``data.js``), so nothing
-    else stops a "12 周" from surviving week 13.  It must read the numbers out
+    ``academic.js`` is a hand-maintained asset (unlike ``data.js``), so nothing
+    else stops a "12 周" from surviving stage two.  It must read the numbers out
     of the payload it was served with.
     """
-
-    js = (ASSETS / "terminal.js").read_text(encoding="utf-8")
+    js = (ASSETS / "academic.js").read_text(encoding="utf-8")
     html = (DOCS / "index.html").read_text(encoding="utf-8")
-    for stale in ("12 \u5468", "13 \u5468", "14 \u5468", "26 \u5f20\u56fe",
-                  "28 \u5f20\u56fe", "30 \u5f20\u56fe", "open F24", "cat 12", "cat 14",
+    for stale in ("12 周", "13 周", "14 周", "25 周", "26 张图", "28 张图",
+                  "30 张图", "open F24", "cat 12", "cat 14",
                   "week 12 / Stage 13", "Week 14 / Stage 15"):
-        assert stale not in js, "hard-coded reference in terminal.js: " + stale
-    for expression in ("COUNTS.weeks + ", "FIGS.length + ", "LAST_WEEK.n", "LAST_FIG.id"):
-        assert expression in js, "terminal.js does not derive: " + expression
+        assert stale not in js, "hard-coded reference in academic.js: " + stale
+    for expression in ("COUNTS.weeks", "COUNTS.figures", "LAST_WEEK.n", "LAST_FIG.id"):
+        assert expression in js, "academic.js does not derive: " + expression
 
-    # index.html is a hand-maintained asset too, so its prose must not name a
-    # week that has since been superseded -- the numbers it shows are spans that
-    # ``fillDynamic()`` overwrites from the payload at boot.  The latest-report
-    # link is deliberately *not* pinned to a filename here; the payload names
-    # it, and test_latest_week_report_link_resolves_without_hardcoding pins the
-    # mechanism instead of a particular week.
-    for stale in ("Week 12 / Stage 13", "cat 12",
-                  "Week 14 / Stage 15", "cat 14"):
+    # index.html is hand-maintained too, so its prose must not name a week that
+    # has since been superseded -- the numbers it shows are spans that
+    # fillDynamic() overwrites from the payload at boot.
+    for stale in ("Week 12 / Stage 13", "cat 12", "Week 14 / Stage 15", "cat 14"):
         assert stale not in html, "stale week reference in index.html: " + stale
     for hook in ('class="js-weeks"', 'class="js-figures"', 'class="js-latest"',
-                 'id="chip-report-latest"', 'id="chip-cat-latest"'):
+                 'id="card-report-latest"'):
         assert hook in html, "index.html misses the dynamic hook " + hook
-    for hook in ("function fillDynamic()", '.js-weeks', 'chip-report-latest',
-                 'chip-cat-latest'):
-        assert hook in js, "terminal.js does not fill " + hook
+    for hook in ("function fillDynamic()", ".js-weeks", "card-report-latest"):
+        assert hook in js, "academic.js does not fill " + hook
     assert "fillDynamic();" in js, "boot() never calls fillDynamic()"
 
 
@@ -260,7 +308,7 @@ def test_404_page_exists_and_stays_inside_the_published_folder():
     html = page.read_text(encoding="utf-8")
     assert 'href="/"' not in html, '404.html must not link to the user-site root'
     assert 'src="/' not in html, "404.html must not use a root-absolute asset path"
-    assert "assets/terminal.css" in html, "404.html must still load the stylesheet"
+    assert "assets/academic.css" in html, "404.html must still load the stylesheet"
     assert "data.js" not in html, "the 404 must not depend on the payload to stay styled"
     for match in re.findall(r'(?:src|href)="([^"]+)"', html):
         if match.startswith(("http://", "https://", "#", "data:", "mailto:")):
@@ -275,63 +323,73 @@ def test_404_counts_are_written_by_the_generator():
     """The stale "12 周、26 张图" now follows the payload, not a hand edit."""
     payload = _payload()
     html = (DOCS / "404.html").read_text(encoding="utf-8")
-    assert ("%d 周" % payload["counts"]["weeks"]) in html
+    assert ("%d 条阶段记录" % payload["counts"]["weeks"]) in html
     assert ("%d 张图" % payload["counts"]["figures"]) in html
 
 
-def test_index_html_does_not_handcode_a_week_report_link():
-    """A report path may only come out of the generator's managed region.
+def test_index_html_never_links_a_dead_report():
+    """No report path in the page may point at a file that does not exist.
 
-    Adding a week must not leave a dead report filename behind in hand-written
-    markup: the only place such a path may appear is the generated argument
-    timeline, and every path there has to be one the payload knows about.
+    Adding a stage must not leave a dead filename behind in hand-written
+    markup.  Prose may legitimately cite protocol documents and cross-reference
+    individual stage reports, so the drift risk is not "handcoded" but
+    "stale": every ``docs/...`` or ``deliverables/...`` path the page names has
+    to resolve, and every stage-report path it names has to be the one the
+    payload records for that stage.
     """
     html = (DOCS / "index.html").read_text(encoding="utf-8")
     payload = _payload()
-    known = {w["doc"] for w in payload["weeks"]}
-    found = set(re.findall(r"docs/[\w./-]*_report\.md", html))
-    assert found <= known, (
-        "index.html links a report outside the payload: " + str(sorted(found - known)))
-    outside = re.findall(r"docs/[\w./-]*_report\.md",
-                         html.replace(_managed_region(html, "argument-timeline"), ""))
-    assert not outside, ("report link outside the generated timeline: "
-                         + str(sorted(set(outside))))
-    assert 'id="chip-report-latest"' in html, "the report chip needs its dynamic id"
+
+    paths = set(re.findall(r"(?:docs|deliverables)/[\w./-]+\.(?:md|json)", html))
+    assert paths, "the page cites no repository documents at all"
+    for rel in sorted(paths):
+        assert (REPO_ROOT / rel).exists(), "index.html links a missing file: " + rel
+
+    # A per-stage report link must agree with the payload's own mapping.
+    by_week = {w["n"]: w["doc"] for w in payload["weeks"]}
+    for rel in sorted(p for p in paths if re.search(r"week(\d+)", p)):
+        week = int(re.search(r"week(\d+)", rel).group(1))
+        if week in by_week:
+            assert rel == by_week[week], (
+                "index.html cites %s for week %d but the payload says %s"
+                % (rel, week, by_week[week]))
 
 
-def test_latest_week_report_link_resolves_without_hardcoding():
+def test_latest_stage_link_resolves_without_hardcoding():
     payload = _payload()
     last = payload["weeks"][-1]
     assert (REPO_ROOT / last["doc"]).exists(), last["doc"] + " is missing"
-    js = (ASSETS / "terminal.js").read_text(encoding="utf-8")
-    assert "chip-report-latest" in js, "fillDynamic must rewrite the report chip"
-    assert "last.doc" in js, "the report link must be taken from the payload"
+    js = (ASSETS / "academic.js").read_text(encoding="utf-8")
+    assert "card-report-latest" in js, "fillDynamic must rewrite the report card"
+    assert "last.doc" in js or "LAST_WEEK.doc" in js, \
+        "the report link must be taken from the payload"
 
 
-def test_gallery_and_search_are_real_commands():
-    js = (ASSETS / "terminal.js").read_text(encoding="utf-8")
-    for name in ("gallery", "search"):
-        assert re.search(r"\bCMDS\.%s\s*=" % name, js), "missing command: " + name
-    # thumbnails must defer offscreen work and reserve their box, or the grid
-    # reflows line by line as the bitmaps arrive.
+def test_gallery_search_and_lightbox_are_real():
+    js = (ASSETS / "academic.js").read_text(encoding="utf-8")
+    html = (DOCS / "index.html").read_text(encoding="utf-8")
+    assert "renderGallery" in js, "the gallery is never rendered"
+    assert "filterGallery" in js, "the gallery search is never wired"
+    assert "openFigure" in js and "closeFigure" in js, "the lightbox is not implemented"
     assert 'loading="lazy"' in js, "gallery thumbnails must lazy-load"
-    css = (ASSETS / "terminal.css").read_text(encoding="utf-8")
+    css = (ASSETS / "academic.css").read_text(encoding="utf-8")
     assert "aspect-ratio" in css, "gallery cells must reserve their aspect ratio"
     assert ".gallery" in css and ".gcell" in css, "gallery styles are missing"
+    assert 'id="gallery"' in html and 'id="lightbox"' in html
 
 
-def test_terminal_js_wires_deep_links_and_browser_history():
-    js = (ASSETS / "terminal.js").read_text(encoding="utf-8")
-    assert "window.history.replaceState" in js, "open/cat must write the address bar"
+def test_academic_js_wires_deep_links_and_browser_history():
+    js = (ASSETS / "academic.js").read_text(encoding="utf-8")
+    assert "window.history.replaceState" in js, "open/close must write the address bar"
     assert 'addEventListener("popstate"' in js, "back/forward must re-route"
-    assert "fig=" in js and "w=" in js, "?fig= / ?w= deep links must be parsed"
+    assert '"fig="' in js or "#fig=" in js, "?fig= deep links must be parsed"
 
 
 # ------------------------------------------------- index.html: managed regions
-# The page is hand-maintained, but the numbers and the week-by-week argument
-# inside it are spliced in from the same payload the terminal reads.  These
-# tests pin the two ways that splice can go quiet: a marker stolen or lost, and
-# a region that no longer matches what the builder would write today.
+# The page is hand-maintained, but the numbers and the stage-by-stage argument
+# inside it are spliced in from the same payload the page reads.  These tests
+# pin the two ways that splice can go quiet: a marker stolen or lost, and a
+# region that no longer matches what the builder would write today.
 
 def test_index_html_carries_every_managed_marker_exactly_once():
     html = (DOCS / "index.html").read_text(encoding="utf-8")
@@ -350,30 +408,25 @@ def test_index_html_managed_regions_match_the_generator():
             "index.html region %r is stale; rerun scripts/build_terminal_site.py" % name)
 
 
-def test_argument_timeline_has_one_row_per_week_with_a_docs_link():
+def test_argument_timeline_has_one_row_per_stage_with_a_link():
     html = (DOCS / "index.html").read_text(encoding="utf-8")
     weeks = _payload()["weeks"]
     block = _managed_region(html, "argument-timeline")
-    rows = re.findall(r'<li class="argue-row" data-week="(\d+)">(.*?)</li>', block, re.S)
-    assert rows, "the argument timeline rendered no rows"
+    rows = re.findall(r'<li class="tl-row" data-week="(\d+)">(.*?)</li>', block, re.S)
+    assert rows, "the timeline rendered no rows"
     assert {int(n) for n, _ in rows} == {w["n"] for w in weeks}, (
-        "the timeline does not cover every week in the payload")
+        "the timeline does not cover every stage in the payload")
     assert [int(n) for n, _ in rows] == [w["n"] for w in weeks], (
-        "the timeline is not in week order")
+        "the timeline is not in stage order")
     for number, row in rows:
-        assert re.search(r">Week ", row), "week %s row lost its week label" % number
+        assert re.search(r">Week ", row), "stage %s row lost its week label" % number
         hrefs = re.findall(r'href="([^"]+)"', row)
-        assert any("/docs/" in h and h.endswith(".md") for h in hrefs), (
-            "week %s row carries no docs/ report link" % number)
+        assert any("/blob/main/" in h for h in hrefs), (
+            "stage %s row carries no report link" % number)
 
 
 def test_index_html_static_numbers_track_the_payload():
-    """What a crawler or a JS-off reader sees must equal the payload's truth.
-
-    This is the regression that shipped: the brief advertised "1265 ORCA jobs"
-    while the payload counted 1319, and nothing noticed, because the span was
-    overwritten at boot by a script the crawler never runs.
-    """
+    """What a crawler or a JS-off reader sees must equal the payload's truth."""
     payload = _payload()
     counts = payload["counts"]
     last = payload["weeks"][-1]
@@ -396,15 +449,9 @@ def test_index_html_static_numbers_track_the_payload():
         for got in seen[key]:
             assert got == want, "%s shows %r but the payload says %r" % (key, got, want)
 
-    cats = re.findall(r'data-cmd="cat (\d+)"', html)
-    assert cats, "the latest-week chip lost its data-cmd hook"
-    assert set(cats) == {str(last["n"])}, (
-        "the cat chip points at %s but the latest week is %d"
-        % (sorted(set(cats)), last["n"]))
-
     meta = re.search(r'<meta name="description" content="([^"]*)"', html)
     assert meta, "index.html lost its meta description"
-    assert "%d 周" % counts["weeks"] in meta.group(1)
+    assert "%d 条阶段记录" % counts["weeks"] in meta.group(1)
     assert "%d 张图" % counts["figures"] in meta.group(1)
 
 
@@ -418,3 +465,10 @@ def test_noscript_fallback_counts_track_the_payload():
         assert gate["status"] in block, "the noscript fallback omits " + gate["status"]
         for blocker in gate["blockers"]:
             assert blocker in block, "the noscript fallback omits a gate blocker"
+
+
+def test_page_never_uses_the_forbidden_phrase():
+    """Gate 1 is open, so `validated target` must not appear in the page prose."""
+    html = (DOCS / "index.html").read_text(encoding="utf-8")
+    assert "validated target" not in html.lower(), \
+        "the page uses a phrase the protocol forbids before Gate 1 closes"

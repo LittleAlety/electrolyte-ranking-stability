@@ -14,7 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "wp_production" / "build_plan_compliance.py"
 CSV_PATH = REPO_ROOT / "outputs" / "physics_completion" / "compliance" / "plan_compliance.csv"
 
-STATUSES = {"satisfied", "partial", "not_satisfied", "blocked_on_production"}
+STATUSES = {"satisfied", "partial", "not_satisfied", "blocked_on_production", "exempt"}
 
 
 def _module():
@@ -43,19 +43,144 @@ def test_statuses_come_from_the_frozen_vocabulary() -> None:
         assert row["item_id"] and row["requirement"] and row["evidence"], row
 
 
-def test_wp2_counts_are_read_back_from_the_closure_table() -> None:
-    """生产进度从闭环表读回，但项目分母必须来自 12 分子主集。"""
+def test_wp2_counts_separate_live_runtime_and_strict_scientific_progress() -> None:
+    """实时队列不能再由四分子闭环表代替，且科学分母固定为 48 主态。"""
     module = _module()
-    states = module.read_rows("outputs/physics_completion/closure/four_molecule_state_closure.csv")
-    produced = [r for r in states if r.get("register_status") == module.PRODUCED]
+    snapshot = module.wp2_progress.build_snapshot(REPO_ROOT)
+    row = next(r for r in module.build_rows() if r["item_id"] == "wp2_production_state_ledger")
+    assert "runtime_legs_computed=%d/60" % snapshot["runtime"]["computed"] in row["measured"]
+    assert "main_states_scientifically_accepted=%d/48" % snapshot["scientific"]["accepted"] in row["measured"]
+    assert "pilot_subset_legs=" in row["measured"]
+
+
+def test_compliance_has_runtime_science_snapshot_and_stale_metadata(tmp_path) -> None:
+    module = _module()
+    module.REPO = tmp_path
+    module.OUTDIR = tmp_path / "outputs/physics_completion/compliance"
+    rows = [{field: "x" for field in module.FIELDS}]
+    rows[0]["status"] = "partial"
+    snapshot = {
+        "runtime": {"computed": 48, "total": 60},
+        "main_runtime": {"computed": 39, "total": 48},
+        "scientific": {"accepted": 38, "total": 48},
+        "frozen": {"accepted": 16, "total": 48},
+        "runtime_input_sha256": "a" * 64,
+        "scientific_ledger_sha256": "b" * 64,
+        "stale": True,
+        "input_paths": ["work/wp2prod/**/<name>_<state>.json",
+                        "outputs/physics_completion/free_states/production_ledger.csv"],
+    }
+    generated = "2026-10-13T00:00:00Z"
+    module.write_outputs(rows, snapshot=snapshot, generated_at_utc=generated)
+    meta = json.loads((module.OUTDIR / module.META_NAME).read_text(encoding="utf-8"))
+    assert meta["generated_at_utc"] == generated
+    assert meta["stale"] is True
+    assert meta["runtime"] == {"computed": 48, "total": 60}
+    assert meta["scientific"] == {"accepted": 38, "total": 48}
+    md = (module.OUTDIR / module.MD_NAME).read_text(encoding="utf-8")
+    assert "运行进度：48/60" in md
+    assert "科学验收（四主态）：38/48" in md
+    assert "stale=true" in md
+
+
+def test_compliance_check_rejects_changed_inputs_and_preserves_generation_time(tmp_path, monkeypatch) -> None:
+    module = _module()
+    module.REPO = tmp_path
+    module.OUTDIR = tmp_path / "outputs/physics_completion/compliance"
+    rows = [{field: "x" for field in module.FIELDS}]
+    rows[0]["status"] = "partial"
+    old = {
+        "runtime": {"computed": 48, "total": 60}, "main_runtime": {"computed": 39, "total": 48},
+        "scientific": {"accepted": 38, "total": 48}, "frozen": {"accepted": 16, "total": 48},
+        "runtime_input_sha256": "a" * 64, "scientific_ledger_sha256": "b" * 64,
+        "stale": False, "input_paths": []}
+    module.write_outputs(rows, snapshot=old, generated_at_utc="2026-10-13T00:00:00Z")
+    current = dict(old, runtime_input_sha256="c" * 64)
+    failures = module.check(rows, current)
+    assert any("runtime input hash changed" in failure for failure in failures)
+    meta = json.loads((module.OUTDIR / module.META_NAME).read_text(encoding="utf-8"))
+    assert meta["generated_at_utc"] == "2026-10-13T00:00:00Z"
+
+
+def test_compliance_check_rejects_stale_true(tmp_path) -> None:
+    module = _module()
+    module.REPO = tmp_path
+    module.OUTDIR = tmp_path / "outputs/physics_completion/compliance"
+    rows = [{field: "x" for field in module.FIELDS}]
+    rows[0]["status"] = "partial"
+    snapshot = {"runtime": {"computed": 1, "total": 60},
+                "main_runtime": {"computed": 1, "total": 48},
+                "scientific": {"accepted": 1, "total": 48},
+                "frozen": {"accepted": 0, "total": 48},
+                "runtime_input_sha256": "a" * 64, "scientific_ledger_sha256": "b" * 64,
+                "stale": True, "input_paths": []}
+    module.write_outputs(rows, snapshot=snapshot, generated_at_utc="2026-10-13T00:00:00Z")
+    assert any("stale=true" in failure for failure in module.check(rows, snapshot))
+
+
+def test_project_closure_counts_come_from_strict_live_accepted_legs() -> None:
+    module = _module()
+    snapshot = module.wp2_progress.build_snapshot(REPO_ROOT)
     sample_rows = module.read_rows("data/metadata/physics_completion_set.csv")
-    main_ids = {r["mol_id"] for r in sample_rows if r.get("cohort") == "main"}
-    main_produced = [r for r in produced
-                     if r.get("mol_id") in main_ids and r.get("state") in module.MAIN_STATES]
-    row = next(r for r in _rows() if r["item_id"] == "wp2_production_state_ledger")
-    assert len(main_ids) == 12
-    assert "main_states_produced=%d/48" % len(main_produced) in row["measured"], row["measured"]
-    assert "pilot_subset_legs=%d/%d" % (len(produced), len(states)) in row["measured"]
+    main_ids = sorted({row["mol_id"] for row in sample_rows if row.get("cohort") == "main"})
+    accepted = set(snapshot["scientific"]["accepted_legs"])
+    counts = module.strict_main_counts(main_ids, accepted)
+    expected = {
+        "main4_ok": sum(all(f"{mol_id}|{state}" in accepted for state in module.MAIN_STATES)
+                        for mol_id in main_ids),
+        "li_pair_ok": sum(all(f"{mol_id}|{state}" in accepted
+                              for state in ("LiM_plus", "LiM_2plus"))
+                          for mol_id in main_ids),
+        "li_legs_done": sum(f"{mol_id}|{state}" in accepted for mol_id in main_ids
+                            for state in ("LiM_plus", "LiM_2plus")),
+    }
+    assert counts == expected
+    rows = {row["item_id"]: row for row in module.build_rows(snapshot)}
+    assert f"main_four_state_complete={expected['main4_ok']}/12" in rows["wp2_four_state_complete"]["measured"]
+    assert f"main_li_pair_complete={expected['li_pair_ok']}/12" in rows["wp2_four_state_complete"]["measured"]
+    assert f"main_li_legs_produced={expected['li_legs_done']}/24" in rows["wp2_li_legs"]["measured"]
+    assert f"main_four_state_complete={expected['main4_ok']}/12" in rows["plan_overall_complete"]["measured"]
+
+
+def test_project_closure_can_reach_48_of_48_without_pilot_table() -> None:
+    module = _module()
+    main_ids = ["C%02d" % index for index in range(1, 13)]
+    accepted = ["%s|%s" % (mol_id, state)
+                for mol_id in main_ids for state in module.MAIN_STATES]
+    assert module.strict_main_counts(main_ids, accepted) == {
+        "main4_ok": 12, "li_pair_ok": 12, "li_legs_done": 24}
+
+
+def test_reconciliation_breakdown_is_explicitly_pilot_only() -> None:
+    module = _module()
+    row = next(row for row in module.build_rows()
+               if row["item_id"] == "wp2_production_state_ledger")
+    assert "pilot_reconciliation_failed=" in row["note"]
+    assert "pilot_reconciliation_in_flight=" in row["note"]
+    assert "pilot_reconciliation_not_started=" in row["note"]
+    assert "不代表全 60 腿" in row["note"]
+
+
+def test_compliance_check_rejects_any_metadata_sidecar_tampering(tmp_path) -> None:
+    module = _module()
+    module.REPO = tmp_path
+    module.OUTDIR = tmp_path / "outputs/physics_completion/compliance"
+    rows = [{field: "x" for field in module.FIELDS}]
+    rows[0]["status"] = "partial"
+    snapshot = {"runtime": {"computed": 48, "total": 60},
+                "main_runtime": {"computed": 39, "total": 48},
+                "scientific": {"accepted": 38, "total": 48},
+                "frozen": {"accepted": 38, "total": 48},
+                "runtime_input_sha256": "a" * 64, "scientific_ledger_sha256": "b" * 64,
+                "stale": False, "input_paths": ["one", "two"]}
+    module.write_outputs(rows, snapshot=snapshot, generated_at_utc="2026-10-13T00:00:00Z")
+    meta_path = module.OUTDIR / module.META_NAME
+    tampered = json.loads(meta_path.read_text(encoding="utf-8"))
+    tampered["runtime"]["computed"] = 47
+    tampered["input_paths"] = ["forged"]
+    meta_path.write_text(json.dumps(tampered, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    failures = module.check(rows, snapshot)
+    assert any("differs plan_compliance_meta.json" in failure for failure in failures)
 
 
 def test_overall_row_derives_from_the_live_ledgers() -> None:
@@ -170,7 +295,20 @@ def test_explicit_ligand_zero_execution_is_blocked_not_partial() -> None:
     """§10：零执行要记成被闸门挡住，不能因为「登记完整」就给 partial。"""
     row = {r["item_id"]: r for r in _rows()}["wp6_explicit_ligand"]
     if "executed_jobs=0" in row["measured"]:
-        assert row["status"] == "blocked_on_production", row
+        expected = "not_satisfied" if "gate_ready=true" in row["measured"] else "blocked_on_production"
+        assert row["status"] == expected, row
+
+
+def test_wp6_promotion_gate_uses_both_frozen_thresholds() -> None:
+    module = _module()
+    assert not module.wp6_gate_ready(8, 48)
+    assert not module.wp6_gate_ready(9, 47)
+    assert module.wp6_gate_ready(9, 48)
+
+    row = {r["item_id"]: r for r in _rows()}["wp6_explicit_ligand"]
+    assert "required_li_pairs=9" in row["measured"]
+    assert "production_ensembles=" in row["measured"]
+    assert "gate_ready=" in row["measured"] and "scope=" in row["measured"]
 
 
 def test_ledger_distinguishes_failed_legs_from_not_started() -> None:
@@ -180,24 +318,35 @@ def test_ledger_distinguishes_failed_legs_from_not_started() -> None:
 
 
 def test_wp4_new_comparable_entries_reflects_an_executed_search() -> None:
-    """方案 §8(c) 的目标条目没找到时必须走 §6 停止规则：检索**已执行** + 可纳入 0 条 = partial。
+    """检索已执行且可纳入 0 条时，v1.1 将其冻结为永久 validation limitation。
 
-    既不能写成 satisfied（6-10 条条件可比条目确实没拿到），也不能还原成 not_satisfied（检索确实跑了）。
+    exempt 不表示找到条目；它只把客观不可得从可修复缺口中移除并保留证据链。
     """
     protocol = (REPO_ROOT / "data" / "references" / "anchor_retrieval_protocol.md").read_text(encoding="utf-8")
     record = REPO_ROOT / "data" / "references" / "anchor_retrieval_execution.md"
     assert "executed = true" in protocol, "the retrieval protocol must be marked as executed"
     assert record.is_file(), "the retrieval execution record must be on disk"
     row = next(r for r in _rows() if r["item_id"] == "wp4_new_comparable_entries")
-    assert row["status"] == "partial", row
+    assert row["status"] == "exempt", row
     assert "protocol_executed=true" in row["measured"] and "record=true" in row["measured"], row["measured"]
+    assert "permanent_validation_limitation=true" in row["measured"]
 
 
 def test_wp4_primary_text_check_records_the_reference_index_conflict() -> None:
     """两篇 Ue 正文仍未取得，且新发现的被引登记冲突不能从台账里消失。"""
     row = next(r for r in _rows() if r["item_id"] == "wp4_primary_text_check")
+    assert row["status"] == "exempt", row
     assert "attribution_conflict_open" in row["note"], row["note"]
     assert "transcription-only" in row["note"]
+
+
+def test_wp1_reduction_without_eligible_objects_is_an_evidenced_exemption() -> None:
+    row = next(r for r in _rows() if r["item_id"] == "wp1_reduction_state_checks")
+    if "has_reduced_leg=False" in row["measured"]:
+        assert row["status"] == "exempt", row
+        assert "eligible_reduction_objects=0" in row["measured"]
+        assert "exemption_reason=unbound_anion" in row["measured"]
+        assert "不代表检查通过" in row["note"]
 
 
 def test_pilot_cost_fields_do_not_turn_unknowns_into_zeroes() -> None:

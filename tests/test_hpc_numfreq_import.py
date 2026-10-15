@@ -1,5 +1,6 @@
 """Read-only validation and non-overwriting import regression tests."""
 import importlib.util
+import json
 from pathlib import Path
 import sys
 
@@ -65,8 +66,15 @@ def test_actual_old_mixed_restart_is_rejected(state):
 
 def test_actual_negative_frequency_is_not_computed():
     source = SCRIPTS.parents[1] / "work/hpc_results/3650157"
-    if not source.exists():
-        pytest.skip("external raw results unavailable")
+    target = SCRIPTS.parents[1] / "work/wp2prod/DEC/LiM_2plus"
+    required = [
+        source / "DEC_LiM_2plus.hpc.out",
+        target / "DEC_LiM_2plus.log.stdout.tmp",
+        target / "DEC_LiM_2plus.xyz",
+        target / "DEC_LiM_2plus.inp",
+    ]
+    if not all(path.exists() for path in required):
+        pytest.skip("external raw continuation fixture or its original local source is unavailable")
     row, _ = mod.validate(source, "DEC", "LiM_2plus", "C03")
     assert row["status"] == "failed"
     assert row["imaginary_modes"] == "1"
@@ -116,3 +124,58 @@ def test_cost_keeps_total_unknown_not_zero_or_hpc_only():
     assert result["wall_sec"] == result["local_wall_sec"] == ""
     assert result["hpc_wall_sec"] == "3723.004"
     assert result["cost_status"] == "incomplete"
+
+
+def test_apply_computed_leg_runs_finalize_without_commit(monkeypatch, tmp_path):
+    row = {"status": "computed", "record_id": "C03|M"}
+    monkeypatch.setattr(mod, "validate", lambda *args, **kwargs: (row, {}))
+    monkeypatch.setattr(mod, "apply_writes", lambda writes: None)
+    calls = []
+    monkeypatch.setattr(mod, "finalize_wp2", lambda **kwargs: calls.append(kwargs))
+    assert mod.main([str(tmp_path), "--state", "M", "--apply"]) == 0
+    assert calls == [{"python_executable": mod.sys.executable}]
+
+
+def test_apply_can_defer_finalize_for_batch(monkeypatch, tmp_path, capsys):
+    row = {"status": "computed", "record_id": "C03|M"}
+    monkeypatch.setattr(mod, "validate", lambda *args, **kwargs: (row, {}))
+    monkeypatch.setattr(mod, "apply_writes", lambda writes: None)
+    calls = []
+    monkeypatch.setattr(mod, "finalize_wp2", lambda **kwargs: calls.append(kwargs))
+    assert mod.main([str(tmp_path), "--state", "M", "--apply", "--defer-finalize"]) == 0
+    assert calls == []
+    assert json.loads(capsys.readouterr().out)["mode"] == "applied_deferred"
+
+
+def test_preview_and_failed_apply_do_not_finalize(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(mod, "finalize_wp2", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(mod, "apply_writes", lambda writes: None)
+    monkeypatch.setattr(mod, "validate", lambda *args, **kwargs: ({"status": "computed"}, {}))
+    assert mod.main([str(tmp_path), "--state", "M"]) == 0
+    monkeypatch.setattr(mod, "validate", lambda *args, **kwargs: ({"status": "failed"}, {}))
+    assert mod.main([str(tmp_path), "--state", "M", "--apply"]) == 0
+    assert calls == []
+
+
+def test_finalize_failure_is_propagated_after_import(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(mod, "validate", lambda *args, **kwargs: ({"status": "computed"}, {}))
+    monkeypatch.setattr(mod, "apply_writes", lambda writes: None)
+    monkeypatch.setattr(mod, "finalize_wp2", lambda **kwargs: (_ for _ in ()).throw(
+        mod.FinalizeError("收口 exit 9")))
+    assert mod.main([str(tmp_path), "--state", "M", "--apply"]) == 3
+    assert "import已写入但收口失败" in capsys.readouterr().out
+
+
+def test_finalize_command_uses_selected_python_and_never_commit(monkeypatch):
+    calls = []
+    monkeypatch.setattr(mod.shutil, "which", lambda name: "pwsh.exe" if name == "pwsh" else None)
+    class Result:
+        returncode = 0
+    monkeypatch.setattr(mod.subprocess, "run", lambda command, **kwargs:
+                        calls.append((command, kwargs)) or Result())
+    mod.finalize_wp2(python_executable="C:/safe/python.exe")
+    command, kwargs = calls[0]
+    assert "-Commit" not in command
+    assert command[-2:] == ["-PythonPath", "C:/safe/python.exe"]
+    assert kwargs["cwd"] == mod.prod.REPO and kwargs["check"] is False

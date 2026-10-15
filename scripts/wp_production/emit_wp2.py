@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from wp2_progress import main_molecules  # noqa: E402
 REPO = HERE.parents[1]
 GEN = REPO / "scripts" / "build_physics_completion_batch.py"
 OUT = REPO / "work" / "wp2prod"
@@ -43,13 +46,13 @@ def baseline_source() -> str:
     raise SystemExit("找不到未打补丁的生成器基线")
 
 
-MOLS = [("C01", "DMC"), ("C02", "EMC"), ("C13", "GBL"), ("C14", "SL")]
+MOLS = main_molecules(REPO)
 STATES = ["M", "M_plus", "LiM_plus", "LiM_2plus"]
 EXTRA_STATES = ["M_tzvpd"]
 H_EV = 27.211386245988
 
 CONST_PREFIX = '''# ---------------------------------------------------------------------------
-# 方案 6.1/6.2 —— WP2 生产首段（4 主集分子 x 4 主态）的真实 Opt/Freq 自由能标签
+# 方案 6.1/6.2 —— WP2 生产主集（12 分子 x 4 主态）的真实 Opt/Freq 自由能标签
 # 生产级别 wB97X-D4（ORCA 关键字，即 omegaB97X-D4）+ SMD(acetonitrile)：Opt NumFreq
 # TightOpt TightSCF SlowConv 在同一 ORCA 作业；中性态 def2-TZVP，带电/Li 态 def2-TZVPD（含弥散）。
 # 几何起点是各状态既有冻结的 r2SCAN-3c 结构（记录在每行 geometry_start）。
@@ -63,7 +66,7 @@ CONST_PREFIX = '''# ------------------------------------------------------------
 # 子集纪律：本表只登记已经跑完的状态；未完成的状态不出现在表里（缺值不写 0），
 # 进度由 production_progress 记录。
 # ---------------------------------------------------------------------------
-WP2_PRODUCTION_MOLECULES = ["C01", "C02", "C13", "C14"]
+WP2_PRODUCTION_MOLECULES = %s
 WP2_PRODUCTION_NAMES = %s
 WP2_PRODUCTION_STATES = ["M", "M_plus", "LiM_plus", "LiM_2plus"]
 WP2_PRODUCTION_EXTRA_STATES = %s
@@ -105,6 +108,35 @@ WP2_PRODUCTION_LI_STATES = ("LiM_plus", "LiM_2plus")
 WP2_PRODUCTION_LI_DONE = len([row for row in WP2_PRODUCTION_LEDGER
                               if row["state"] in WP2_PRODUCTION_LI_STATES])
 WP2_PRODUCTION_LI_TOTAL = len(WP2_PRODUCTION_MOLECULES) * len(WP2_PRODUCTION_LI_STATES)
+
+
+def _positive_number(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return False
+    return number > 0.0 and number != float("inf")
+
+
+def _wp2_cost_record_valid(row):
+    """A job has either a verifiable total or an explicit, entirely blank unknown total."""
+    if row.get("cost_status") == "complete":
+        return (all(_positive_number(row.get(field)) for field in ("wall_sec", "cores", "core_hours")))
+    if row.get("cost_status") == "incomplete":
+        return (not row.get("wall_sec") and not row.get("core_hours")
+                and _positive_number(row.get("cores")))
+    return False
+
+
+def _absolute_cost_gate_ok(cost_ledger, loop_closed, cost_complete):
+    absolute = [row for row in cost_ledger if row.get("kind") == "absolute"]
+    if len(absolute) != 3:
+        return False
+    ready = loop_closed and cost_complete
+    if ready:
+        return all(row.get("status") != "MISSING" and _positive_number(row.get("value"))
+                   for row in absolute)
+    return all(row.get("status") == "MISSING" and not row.get("value") for row in absolute)
 
 
 '''
@@ -159,6 +191,9 @@ PRODUCTION_BLOCK = '''    # 方案 6.1/6.2 —— 生产首段：已完成的分
             "hpc_core_hours": prod["hpc_core_hours"],
             "status": prod["status"],
         })
+    production_cost_complete_jobs = sum(row["cost_status"] == "complete" for row in production_cost)
+    production_cost_incomplete_jobs = sum(row["cost_status"] == "incomplete" for row in production_cost)
+    production_cost_invalid_jobs = sum(not _wp2_cost_record_valid(row) for row in production_cost)
 
     molecules_started = sorted({row["mol_id"] for row in production})
     molecules_complete = sorted(mol_id for mol_id in WP2_PRODUCTION_MOLECULES
@@ -285,9 +320,11 @@ CHECKS_BLOCK = '''        {"id": "wp2_production_states_terminated_without_imagi
                    % (sum(1 for r in production if r["state"] in ("LiM_plus", "LiM_2plus")),
                       sum(1 for r in production if r["identity_label"] == "bound"))},
         {"id": "wp2_production_cost_records_allocated_core_hours",
-         "description": "生产作业逐条记录 allocated core-hours（cores x wall clock）",
-         "ok": len(production_cost) == len(all_production) and production_core_hours > 0.0 and production_cost_unknown == 0,
-         "detail": "jobs=%d; known_subtotal=%.6f core-hours; unknown_jobs=%d" % (len(production_cost), production_core_hours, production_cost_unknown)},
+         "description": "生产作业逐行成本要么为可核的正 allocated core-hours，要么显式 incomplete 且总 wall/core-hours 留空（绝不补 0）",
+         "ok": len(production_cost) == len(all_production) and production_cost_invalid_jobs == 0,
+         "detail": "jobs=%d; complete=%d; explicit_incomplete=%d; invalid=%d; known_subtotal=%.6f core-hours" % (
+             len(production_cost), production_cost_complete_jobs, production_cost_incomplete_jobs,
+             production_cost_invalid_jobs, production_core_hours)},
 '''
 
 REDOX_CHECKS = '''        {"id": "wp2_production_redox_uses_basis_consistent_legs",
@@ -436,10 +473,10 @@ BULLET_EXTRA = '''        "- Gox_single 与配位位移在 production_redox.csv 
 BULLET_SAMPLING = '''        "- 生产首段每态只有**单一代表结构**（n_conformers = 1），不是方案 6.1 的多构象/多 motif 系综；6 kcal/mol 窗口与 3 结构上限仍是资源规则。",
 '''
 
-INTRO_BLOCK_NEW = '（WP1 的 161 个独立方法审计作业、WP2 的 12 分子四主态 pilot 与 4 分子 x 4 主态生产 Opt/Freq 单列，"\n        "原始日志留在仓库外，不入交付镜像）'
+INTRO_BLOCK_NEW = '（WP1 的 161 个独立方法审计作业、WP2 的 12 分子 x 4 主态生产 Opt/Freq 与同基组中性补腿单列，"\n        "原始日志留在仓库外，不入交付镜像）'
 
 LASTPARA_BLOCK = '''        "首轮已把 WP1 独立方法审计从「登记」推进到「128 格实测 + 方法轴认证」，并把 WP2 自由能标签从 1 行 pilot "
-        "推进到 4 分子 x 4 主态的真实 Opt+Freq（本次登记 %d/%d 个主态，另含 %d 条 def2-TZVPD 中性腿，其余在产）；"
+        "推进到 12 分子 x 4 主态的真实 Opt+Freq（本次登记 %d/%d 个主态，另含 %d 条 def2-TZVPD 中性腿，其余在产）；"
         "余下状态、多构象采样界限与外部锚点可比性仍待补，故完整翻转判定仍未闭合。"
         % (WP2_PRODUCTION_STATES_DONE, WP2_PRODUCTION_STATES_TOTAL, WP2_PRODUCTION_EXTRA_DONE),
 '''
@@ -458,7 +495,7 @@ ANCHOR_COST_NOTES = '''    {"item": "cpu_core_hours", "unit": "core-hour", "valu
 COST_NOTES_BLOCK = '''    {"item": "cpu_core_hours", "unit": "core-hour",
      "value": ABSOLUTE_CPU_CORE_HOURS if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "",
      "kind": "absolute", "status": "measured" if WP2_LOOP_CLOSED and ABSOLUTE_COST_COMPLETE else "MISSING",
-     "note": "项目级 allocated core-hours（不是 process CPU time）：四分子 %d/%d 条腿闭环后按现算填入，"
+     "note": "项目级 allocated core-hours（不是 process CPU time）：12 分子生产主集 %d/%d 条腿闭环后按现算填入，"
              "口径 = 方法审计 + pilot + 生产 + 靶向复核四个逐作业台账里 %d 条带 core-hours 记录的作业之和；"
              "闭环前留空，不拿已跑的那部分作业冒充 headline 数。"
              % (WP2_PRODUCTION_LEDGER_ROWS, WP2_PRODUCTION_EXPECTED_ROWS, len(ABSOLUTE_COST_JOBS_CORE_HOURS))},
@@ -477,9 +514,9 @@ ANCHOR_ABS_COST_CHECK = '''        {"id": "absolute_cost_missing_flagged", "desc
          "ok": sum(1 for item in COST_LEDGER if item["status"] == "MISSING") == 3,
          "detail": "MISSING=%d" % sum(1 for item in COST_LEDGER if item["status"] == "MISSING")},
 '''
-ABS_COST_CHECK_BLOCK = '''        {"id": "absolute_cost_tracks_the_four_molecule_loop",
-         "description": "绝对成本三项：四分子闭环后按实测台账现算填入，闭环前显式标 MISSING（不用部分作业当 headline 数）",
-         "ok": ABSOLUTE_COST_COMPLETE and ((sum(1 for item in COST_LEDGER if item["status"] == "MISSING") == 0) == WP2_LOOP_CLOSED),
+ABS_COST_CHECK_BLOCK = '''        {"id": "absolute_cost_tracks_the_main_production_loop",
+         "description": "绝对成本三项：12 分子生产主集闭环后按实测台账现算填入，闭环前显式标 MISSING（不用部分作业当 headline 数）",
+         "ok": _absolute_cost_gate_ok(COST_LEDGER, WP2_LOOP_CLOSED, ABSOLUTE_COST_COMPLETE),
          "detail": "loop_closed=%s MISSING=%d known_cost_jobs=%d"
                    % (WP2_LOOP_CLOSED,
                       sum(1 for item in COST_LEDGER if item["status"] == "MISSING"),
@@ -490,20 +527,20 @@ ANCHOR_COST_MD_LINE = '''        "- 成本账本：%d 项相对预算；**3 项�
         % len(COST_LEDGER),
 '''
 COST_MD_LINE_BLOCK = '''        "- 成本账本：%d 项相对预算；绝对成本三项 %s。"
-        % (len(COST_LEDGER), "已按实测台账现算填入（四分子闭环）" if WP2_LOOP_CLOSED
-           else "在四分子闭环前显式标 MISSING，只给相对预算、不给金额"),
+        % (len(COST_LEDGER), "已按实测台账现算填入（12 分子主集闭环）" if WP2_LOOP_CLOSED
+           else "在12 分子主集闭环前显式标 MISSING，只给相对预算、不给金额"),
 '''
 
 ANCHOR_COST_TABLE_ROW = '''        "| WP5 | week42 | Δ-learning + 成本账本 | 端点/泄漏防线冻结；成本 3 项 MISSING | 回放非盲预注册；绝对成本缺失 |",
 '''
 COST_TABLE_ROW_BLOCK = '''        "| WP5 | week42 | Δ-learning + 成本账本 | 端点/泄漏防线冻结；绝对成本 %s | 回放非盲预注册；绝对成本按闭环闸门填 |"
-        % ("已按实测台账现算（四分子闭环）" if WP2_LOOP_CLOSED else "3 项 MISSING（闭环前）"),
+        % ("已按实测台账现算（12 分子主集闭环）" if WP2_LOOP_CLOSED else "3 项 MISSING（闭环前）"),
 '''
 
 ANCHOR_COST_KEYNUM_BULLET = '''        "- WP5：shift 在 tau_b 上更好的格数与冻结表一致；成本账本 3 项 MISSING。",
 '''
 COST_KEYNUM_BULLET_BLOCK = '''        "- WP5：shift 在 tau_b 上更好的格数与冻结表一致；绝对成本三项%s。"
-        % ("已按实测台账填入（四分子闭环）" if WP2_LOOP_CLOSED else "在闭环前保持 MISSING"),
+        % ("已按实测台账填入（12 分子主集闭环）" if WP2_LOOP_CLOSED else "在闭环前保持 MISSING"),
 '''
 
 ANCHOR_CONST = "PILOT_RT_EH = 0.000944183\nPILOT_LN_VM = 3.197365\n"
@@ -898,6 +935,9 @@ def load_rows():
         row = json.loads(path.read_text(encoding="utf-8"))
         # 作业被中断/崩溃/未过 QC 时 JSON 仍会落盘（status=failed）。
         # 这类行不是“已完成”，既不能折入交付也不能当 0；跳过并如实记录原因。
+        if row.get("status") != "computed":
+            rejected.append("%s (status=%s)" % (row.get("record_id", path), row.get("status")))
+            return None
         if row["terminated"] != "true" or row["opt_converged"] != "true":
             rejected.append("%s (terminated=%s, opt=%s)" % (row["record_id"], row["terminated"],
                                                            row["opt_converged"]))
@@ -966,6 +1006,97 @@ def sub_once(src, anchor, replacement):
     if src.count(anchor) != 1:
         raise SystemExit("锚点不唯一 (%d 次): %r" % (src.count(anchor), anchor[:80]))
     return src.replace(anchor, replacement)
+
+
+def apply_v1_1_decisions(src):
+    """Keep the frozen v1.1 WP4/WP6 policy when rebuilding the generator."""
+    replacements = [
+        (
+            '"gate": "only after the key free->Li conclusion is resolvable; not part of the first mandatory loop",',
+            '"gate": "promote from optional to planned only when Li pairs complete >= 9/12 and production ensembles = 48/48; not part of the first mandatory loop before promotion",',
+        ),
+        (
+            '"detail": "只在关键 free->Li 结论可解析后做"},',
+            '"detail": "Li 配对 complete >= 9/12 且生产系综 = 48/48 时自动升级为计划内"},',
+        ),
+        (
+            '"purpose": "common-background explicit ligand check; only after the key free->Li conclusion is resolvable",',
+            '"purpose": "common-background explicit ligand check; promote only at >=9/12 complete Li pairs and 48/48 production ensembles",',
+        ),
+        (
+            '"**状态**：可选 WP6 的协议已登记；首轮不执行，待关键 free→Li 结论可解析后启用。",',
+            '"**状态**：可选 WP6 的协议已登记；Li 配对 complete >= 9/12 且生产系综 = 48/48 时自动升级为计划内。",',
+        ),
+        (
+            '"- **不**将 cluster 裸 G 跨化学计量 Boltzmann 平均；**不**模拟真实配位 population；不纳入首轮必需闭环。",',
+            '"- **不**将 cluster 裸 G 跨化学计量 Boltzmann 平均；**不**模拟真实配位 population；升级闸门前不纳入首轮必需闭环。",',
+        ),
+        (
+            '"| WP6 | week43 | 显式配体检查（可选） | R=DME 协议登记；不纳入首轮闭环 | 依赖关键 free→Li 结论先可解析 |",',
+            '"| WP6 | week43 | 显式配体检查（可选） | R=DME 协议登记；闸门前不纳入首轮闭环 | Li 配对 complete >= 9/12 且生产系综 = 48/48 时自动升级为计划内 |",',
+        ),
+        (
+            '"- WP4：7 个氧化锚点只做到 transcription 级，回原文页码 / 表号复核因本机网络不可达 + 主要候选源付费墙而处于**硬阻塞**。",',
+            '"- WP4：7 个氧化锚点只做到 transcription 级；已执行登记的二轮检索，但回原文页码 / 表号复核受付费墙与验证码页限制，"\n'
+            '        "未得到条件匹配的 tier_1 条目。该项按 v1.1 决断永久归入 `validation_limitation`，作为结题限制报告，"\n'
+            '        "不再计作可修复失败，也不宣称外部验证成功。",',
+        ),
+    ]
+    for old, new in replacements:
+        src = sub_once(src, old, new)
+    return src
+
+
+def apply_derivative_policy(src):
+    """Persist the v1.2 analytical-gradient/paired-AnFreq policy across rebuilds."""
+    config_anchor = (
+        '        "  note: \\"controlled embedding; NOT a real EC/DMC formulation\\"",\n'
+        '        "",\n'
+        '        "objective_direction:",'
+    )
+    config_replacement = (
+        '        "  note: \\"controlled embedding; NOT a real EC/DMC formulation\\"",\n'
+        '        "",\n'
+        '        "derivative_policy:",\n'
+        '        "  geometry_gradient: analytic",\n'
+        '        "  forbidden_first_derivative_keyword: NumGrad",\n'
+        '        "  frequency_keyword: NumFreq",\n'
+        '        "  frequency_hessian: \\"numerical finite difference of analytical gradients\\"",\n'
+        '        "  anfreq_audit: \\"paired diagnostic on identical converged geometries; never selectively mixed into the production ledger\\"",\n'
+        '        "  anfreq_adoption_gate: \\"ORCA 6.1.1 exact-target compatibility, complete SMD terms, full-mode and thermochemistry QC, then global protocol amendment and globally comparable recomputation\\"",\n'
+        '        "  new_geometry_optimization: VeryTightOpt",\n'
+        '        "  verytightopt_thresholds: {TolE_Eh: 2e-7, TolMaxG_Eh_per_Bohr: 3e-5, TolRMSG_Eh_per_Bohr: 8e-6, TolMaxD_Bohr: 2e-4, TolRMSD_Bohr: 1e-4}",\n'
+        '        "  legacy_tightopt_policy: \\"retain zero-imaginary-mode QC passes; reoptimize every imaginary, suspicious-low-mode or resubmitted leg with VeryTightOpt\\"",\n'
+        '        "  imaginary_mode_order: \\"VeryTightOpt from latest converged geometry -> NumFreq -> paired AnFreq -> mode displacement/independent conformer if still required\\"",\n'
+        '        "",\n'
+        '        "objective_direction:",'
+    )
+    protocol_anchor = (
+        '        "同一介质、同一几何、同一状态下比较 2 个泛函 × 2 个基组设定；还原必须使用含弥散函数的设定。",\n'
+        '        "",\n'
+        '        "停止规则（在结果产生前冻结，不按结果反推）：",'
+    )
+    protocol_replacement = (
+        '        "同一介质、同一几何、同一状态下比较 2 个泛函 × 2 个基组设定；还原必须使用含弥散函数的设定。",\n'
+        '        "",\n'
+        '        "导数政策：生产与救援几何优化必须使用解析一阶梯度，`NumGrad` 与 `%numgrad` 明确禁止。",\n'
+        '        "当前冻结的 `NumFreq` 是对解析梯度做有限差分以构造数值 Hessian，不能把它误称为数值梯度。",\n'
+        '        "另做同一收敛几何上的配对 `AnFreq` 审计：先用干净小体系和 TMP 失败态验证 ORCA 6.1.1 对完整",\n'
+        '        "wB97X-D4/目标基组/SMD 模型项的兼容性，再扩至全部可用收敛几何。审计结果单独登记，不按单腿",\n'
+        '        "挑选更好看的频率；只有完整模型项、3N 模式、热化学与几何哈希全部通过，才能以全局协议修订",\n'
+        '        "统一采用 `AnFreq` 并重建可比账本。",\n'
+        '        "`AnFreq` 不可断点续算且内存需求更高，因此先以小数组试算并用实测峰值内存决定后续并发。",\n'
+        '        "",\n'
+        '        "几何收敛修订：所有新生成或救援的生产腿使用解析梯度的 `Opt VeryTightOpt`。冻结阈值为",\n'
+        '        "`TolE=2e-7 Eh`、`TolMaxG=3e-5 Eh/Bohr`、`TolRMSG=8e-6 Eh/Bohr`、",\n'
+        '        "`TolMaxD=2e-4 Bohr`、`TolRMSD=1e-4 Bohr`。虚频腿必须先从最新收敛几何继续严优化，",\n'
+        '        "再在同一最终几何依次做 `NumFreq` 与配对 `AnFreq`；仍有显著虚频才进入模式扰动或独立构象。",\n'
+        '        "旧 `TightOpt` 零虚频且其余 QC 通过者保留；虚频、可疑低频或重提交腿不得绕过新闸门。",\n'
+        '        "",\n'
+        '        "停止规则（在结果产生前冻结，不按结果反推）：",'
+    )
+    src = sub_once(src, config_anchor, config_replacement)
+    return sub_once(src, protocol_anchor, protocol_replacement)
 
 
 # ---------------------------------------------------------------------------
@@ -1235,7 +1366,7 @@ MECH_CASES_MD_BLOCK = r'''
         '',
         '### 3. 配位变化 —— 部分（三例分子的单构象条件态 Li 腿 已具；多 motif / 生产系综 未具、待补；且非本例轴）',
         '',
-        '- 已有（原始产物支撑，三个案例分子都在四分子生产子集内）：',
+        '- 已有（原始产物支撑，三个案例分子都在 12 分子生产主集内）：',
         '  - `outputs/physics_completion/closure/four_molecule_state_closure.csv`：EMC/GBL/SL 的 LiM_plus、LiM_2plus 均 `register_status = produced_single_conformer`；Li–O 距离 `li_o_ang`：EMC 1.816 / 1.901，GBL 1.833 / 1.923，SL 2.053 / 2.439 Å；身份 bound/intact。',
         '  - `outputs/physics_completion/free_states/production_redox.csv`：Li 条件态 IP 与配位位移 `coordination_shift_e_ev` / `_g_ev`：EMC 0.446461 / 0.373529，GBL 0.880186 / 0.707681，SL 0.582285 / 0.558920 eV。',
         '  - `outputs/physics_completion/state_identity/state_identity_qc.csv`：Li–给体接触距离与 Mayer 键价（SL 的 LiM_plus 接触为 `O:2.0530;O:2.0545;S:2.5027`，valence 0.1491）。',
@@ -1303,8 +1434,9 @@ def main():
               % (row["record_id"], row["method"], row["g_single_ev"],
                  row["imaginary_modes"], row["wall_sec"]))
 
+    molecule_ids = json.dumps([mol_id for mol_id, _name in MOLS], ensure_ascii=False)
     names = json.dumps({mol_id: name for mol_id, name in MOLS}, ensure_ascii=False)
-    const_block = (CONST_PREFIX % (names, json.dumps(extras)) + literal(rows)
+    const_block = (CONST_PREFIX % (molecule_ids, names, json.dumps(extras)) + literal(rows)
                    + POST_CONST.replace(
                        "WP2_PRODUCTION_STATES_TOTAL = len(WP2_PRODUCTION_MOLECULES) * len(WP2_PRODUCTION_STATES)",
                        "WP2_PRODUCTION_STATES_TOTAL = len(WP2_PRODUCTION_MOLECULES) * len(WP2_PRODUCTION_STATES)"
@@ -1375,6 +1507,8 @@ def main():
     # §7.3 机制案例页六项覆盖（CSV 六列 + 逐项证据章节）。
     src = sub_once(src, ANCHOR_MECH_CASES_CSV, MECH_CASES_CSV_BLOCK)
     src = sub_once(src, ANCHOR_MECH_CASES_MD, MECH_CASES_MD_BLOCK)
+    src = apply_v1_1_decisions(src)
+    src = apply_derivative_policy(src)
     if GEN.exists():
         with GEN.open("r", encoding="utf-8", newline="") as f:
             _baseline_src = f.read()

@@ -6,7 +6,8 @@
 > 文中所有尚未产生的数值一律写「尚未计算」，不预填、不外推。
 >
 > 触发来源：合规台账 `outputs/physics_completion/compliance/plan_compliance.csv` 的
-> `wp1_reduction_state_checks` 行 = `not_satisfied`，`has_reduced_leg=False`。
+> `wp1_reduction_state_checks` 行 = `exempt`，`has_reduced_leg=False`，`eligible_reduction_objects=0`。
+> `exempt` 仅表示本批次按 `unbound_anion` 规则没有可执行对象、因此不计入未闭合项；它不表示三项检查通过。
 > 方案原话：「还原必须使用含弥散函数的设定，并检查电子空间扩展、脱附稳定性和波函数身份。
 > 有限基组能收敛不能证明束缚，旧 unbound 标记是历史 QC 决定，不是所有方法下的普适物理结论。」
 
@@ -134,5 +135,5 @@
 - 不主张任何分子在冻结方法下束缚或脱附稳定——**尚未计算**。
 - 不把旧 `unbound_anion` 或气相/无弥散结果当作普适物理结论。
 - 不修改、不覆写任何历史产物、阈值或结论。
-- 本文件登记的是**协议**，不是**结果**；`wp1_reduction_state_checks` 在还原腿产出并逐项复核前保持
-  `not_satisfied`。
+- 本文件登记的是**协议**，不是**结果**；当前批次因 `unbound_anion` 规则得到零个合格还原对象，
+  `wp1_reduction_state_checks` 记为 `exempt`。未来若纳入合格还原腿，该豁免自动失效，必须逐项复核后才能记为 `satisfied`。

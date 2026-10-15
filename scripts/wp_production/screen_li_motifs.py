@@ -8,8 +8,10 @@ state and the oxidised state must each keep their own low-energy structures, and
 one Li state must never be propagated into the other.  The rule that decides
 which motifs survive is registered, before any screen result existed, in
 outputs/physics_completion/li_motif_sampling/motif_plan.csv plus
-selection_rule.md.  Until this script ran the rule was registered but never
-executed: all 8 legs carried motif_screen_status = not_computed.
+selection_rule.md.  The registered plan covers the whole in_main cohort of
+data/metadata/physics_completion_set.csv (12 molecules x 2 Li states = 24 legs);
+this executor follows the plan, so widening the plan widens the screen without
+touching the enumeration rule.
 
 How the rule is executed here
 -----------------------------
@@ -74,12 +76,20 @@ TICK = chr(96)
 CSV_FIELDS = (
     "record_id", "mol_id", "name", "state", "charge", "multiplicity",
     "candidate_id", "placement", "donor_indices", "target_distance_a",
-    "parent_kind", "parent_path", "parent_sha256",
+    "parent_kind", "parent_naming", "parent_path", "parent_sha256",
     "status", "energy_eh", "energy_rel_kj",
     "n_donor_contacts", "contact_donor_indices", "li_min_distance_a",
     "parent_bonds_intact", "kept", "dedup_reason", "motif_id", "motif_path",
     "qc_flags", "seconds", "error",
 )
+
+#: The two on-disk names a leg's own converged production geometry can carry.
+#: ``exact``  = work/wp2prod/<NAME>/<STATE>/<NAME>_<STATE>.xyz  (locally finished legs)
+#: ``opt``    = work/wp2prod/<NAME>/<STATE>/<NAME>_<STATE>_opt.xyz (HPC-imported legs)
+#: Both are the same object -- this leg's own converged geometry -- and the naming
+#: is registered per candidate so the evidence chain stays traceable.
+PARENT_NAMING_EXACT = "exact"
+PARENT_NAMING_OPT = "opt"
 
 
 def load_frozen_rule():
@@ -142,11 +152,31 @@ def load_core_rows():
 
 
 def production_geometry(leg):
-    name = leg["name"] + "_" + leg["state"] + ".xyz"
-    path = PROD_ROOT / leg["name"] / leg["state"] / name
-    if not path.exists():
-        raise SystemExit("production geometry missing for " + leg["record_id"] + ": " + relative(path))
-    return path
+    """The leg's own production geometry, resolved per leg.
+
+    The plan now covers the whole in_main cohort (12 molecules x 2 Li states =
+    24 legs), and the legs do not all store their geometry under the same file
+    name: the locally finished legs carry ``<NAME>_<STATE>.xyz`` while the legs
+    imported from the HPC packages carry only ``<NAME>_<STATE>_opt.xyz`` (the
+    importer writes the converged geometry under that name).  Both are the same
+    object -- the converged production geometry of this exact leg -- so the
+    candidate list is ordered and every leg must resolve one of them.  A leg
+    that resolves nothing raises instead of silently borrowing another state's
+    or another molecule's geometry.
+
+    Returns ``(path, naming)`` where naming is ``exact`` or ``opt``; the naming
+    is registered per candidate so the evidence chain records which on-disk
+    convention this leg used.
+    """
+    stem = leg["name"] + "_" + leg["state"]
+    directory = PROD_ROOT / leg["name"] / leg["state"]
+    candidates = ((directory / (stem + ".xyz"), PARENT_NAMING_EXACT),
+                  (directory / (stem + "_opt.xyz"), PARENT_NAMING_OPT))
+    for path, naming in candidates:
+        if path.exists():
+            return path, naming
+    raise SystemExit("production geometry missing for " + leg["record_id"] + ": "
+                     + " and ".join(relative(path) for path, _ in candidates))
 
 
 def build_leg_context(leg, blm, core_rows):
@@ -154,7 +184,7 @@ def build_leg_context(leg, blm, core_rows):
     core = core_rows.get(leg["mol_id"])
     if core is None:
         raise SystemExit("mol_id not in core set: " + leg["mol_id"])
-    parent_path = production_geometry(leg)
+    parent_path, parent_naming = production_geometry(leg)
     symbols, coords = blm.read_xyz(parent_path)
     if "Li" not in symbols:
         raise SystemExit("production geometry carries no Li: " + relative(parent_path))
@@ -170,6 +200,7 @@ def build_leg_context(leg, blm, core_rows):
     return {
         "core": core,
         "parent_path": parent_path,
+        "parent_naming": parent_naming,
         "parent_sha256": sha256_file(parent_path),
         "parent_symbols": symbols,
         "parent_coords": np.asarray(coords, dtype=float),
@@ -246,6 +277,7 @@ def relax_candidate(leg, context, site, args, blm, executable, index):
         "candidate_id": candidate_id, "placement": site["placement"],
         "donor_indices": list(site["donors"]), "target_distance_a": site["target_distance"],
         "parent_kind": "state_own_production_geometry_minus_Li",
+        "parent_naming": context["parent_naming"],
         "parent_path": relative(context["parent_path"]),
         "parent_sha256": context["parent_sha256"],
         "kept": "false", "dedup_reason": "", "motif_id": "", "motif_path": "",
@@ -383,7 +415,7 @@ def run_leg(leg, args, blm, context, executable):
 
 def markdown(payload, leg_summaries):
     lines = [
-        "# 方案 6.1 第 3 步：四分子 Li 配位 motif 筛选（已执行）",
+        "# 方案 6.1 第 3 步：主集 Li 配位 motif 筛选（已执行）",
         "",
         "> 由 scripts/wp_production/screen_li_motifs.py 生成。筛选层是**气相 GFN2-xTB**，它只回答",
         "> 「每条腿保留哪几个独立 motif」，不是生产级自由能，也不是 wB97X-D4 + SMD。",
@@ -414,6 +446,8 @@ def markdown(payload, leg_summaries):
         "## 与登记规则的偏差（逐条显式记录）",
         "",
         "* 父几何用**该腿自己的生产几何去掉 Li**，不是共享的 week-3 中性几何：方案 6.1 要求每态从自己的连通性出发。",
+        "* 该腿自己的收敛几何在磁盘上有两种命名（`<NAME>_<STATE>.xyz` 与 `<NAME>_<STATE>_opt.xyz`，后者来自 HPC 导入）；",
+        "  两者是**同一个对象**，逐候选登记 `parent_naming`（exact / opt）以便追溯。",
         "* 电荷/多重度取自该腿（LiM_plus = 1/1，LiM_2plus = 2/2），2+ 腿绝不按 1+ 复合物弛豫。",
         "* 筛选仍是气相 GFN2-xTB，**不能**当作生产自由能，也不能替代 wB97X-D4 + SMD(acetonitrile)。",
         "",
@@ -458,11 +492,20 @@ def write_outputs(all_records, leg_summaries, args, executable, version, registe
     check("no_candidate_is_dropped_silently",
           all(record.get("status") == "ok" or record.get("error") or record.get("qc_flags") for record in all_records),
           "failed candidates keep a reason")
+    check("every_candidate_records_which_parent_naming_it_used",
+          all(record.get("parent_naming") in (PARENT_NAMING_EXACT, PARENT_NAMING_OPT)
+              for record in all_records),
+          "parent_naming is registered per candidate (exact vs opt): %s"
+          % ", ".join("%s=%d" % (naming, sum(1 for record in all_records
+                                             if record.get("parent_naming") == naming))
+                      for naming in (PARENT_NAMING_EXACT, PARENT_NAMING_OPT)))
 
     n_failed = sum(1 for entry in checks if not entry["ok"])
+    naming_counts = {naming: sum(1 for record in all_records if record.get("parent_naming") == naming)
+                     for naming in (PARENT_NAMING_EXACT, PARENT_NAMING_OPT)}
     payload = {
         "scope": ("plan 6.1 / execution step 3: execution of the registered Li coordination-motif screen "
-                  "for the four-molecule subcohort (DMC / EMC / GBL / SL x LiM_plus / LiM_2plus)"),
+                  "for the in_main cohort of data/metadata/physics_completion_set.csv (%d legs screened)" % len(leg_summaries)),
         "level": SCREEN_LEVEL,
         "is_a_screen_not_a_free_energy": True,
         "rule_source": relative(RULE_SOURCE) + " (frozen rule conformers_and_states.li_motif_generation)",
@@ -472,6 +515,13 @@ def write_outputs(all_records, leg_summaries, args, executable, version, registe
             "kind": "state_own_production_geometry_minus_Li",
             "why": ("plan 6.1 asks each Li state to be built from the state's own connectivity and forbids "
                     "propagating one Li state into the other, so each leg enumerates Li sites on its own leg geometry"),
+            "naming": {
+                "exact": "work/wp2prod/<NAME>/<STATE>/<NAME>_<STATE>.xyz (locally finished legs)",
+                "opt": "work/wp2prod/<NAME>/<STATE>/<NAME>_<STATE>_opt.xyz (HPC-imported converged geometry)",
+                "note": ("both names hold the same object: this leg's own converged production geometry. "
+                         "parent_naming is written on every candidate so the naming convention used is traceable"),
+            },
+            "parent_naming_counts": naming_counts,
         },
         "cutoffs": {"contact_a": CONTACT_CUTOFF_A, "duplicate_rmsd_a": DUPLICATE_RMSD_A,
                     "energy_window_kj": ENERGY_WINDOW_KJ, "max_keep": MAX_KEEP},
@@ -520,6 +570,7 @@ def run(args):
             "state": leg["state"], "charge": leg["charge"], "multiplicity": leg["multiplicity"],
             "screen_level": SCREEN_LEVEL,
             "parent_path": relative(context["parent_path"]), "parent_sha256": context["parent_sha256"],
+            "parent_naming": context["parent_naming"],
             "donors": list(context["donors"]), "donor_rule_check": context["rule_check"],
             "n_sites": len(records),
             "n_ok": sum(1 for record in records if record.get("status") == "ok"),

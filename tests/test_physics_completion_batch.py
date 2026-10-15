@@ -163,12 +163,12 @@ def test_wp2_free_state_pilot_ledger_and_cost() -> None:
 
     production = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/production_ledger.csv")
     progress = payload["free_state_production"]["progress"]
-    assert 1 <= len(production) <= 20
-    assert progress["states_total"] == 16
+    assert 1 <= len(production) <= 60
+    assert progress["states_total"] == 48
     master = [row for row in production if row["state"] in PB.FOUR_STATES]
     assert len(master) == progress["states_done"]
     assert {(row["mol_id"], row["state"]) for row in master} <= {
-        (mol_id, state) for mol_id in ("C01", "C02", "C13", "C14") for state in PB.FOUR_STATES}
+        (mol_id, state) for mol_id in batch.WP2_PRODUCTION_MOLECULES for state in PB.FOUR_STATES}
     assert {row["mol_id"] for row in master} == set(progress["molecules_started"])
     assert len(progress["molecules_complete"]) <= len(progress["molecules_started"])
     assert all(row["e_sp_eh"] and row["zpe_eh"] and row["g_single_eh"] for row in production)
@@ -185,7 +185,7 @@ def test_wp2_free_state_pilot_ledger_and_cost() -> None:
     assert all(row["terminated"] == "true" and row["opt_converged"] == "true"
                and row["imaginary_modes"] == "0" for row in qc)
     extra_legs = [row for row in production if row["state"] not in PB.FOUR_STATES]
-    assert all(row["mol_id"] in ("C01", "C02", "C13", "C14") for row in extra_legs)
+    assert all(row["mol_id"] in batch.WP2_PRODUCTION_MOLECULES for row in extra_legs)
     li_production = [row for row in production if row["state"] in ("LiM_plus", "LiM_2plus")]
     assert all(row["li_o_ang"] and row["nonli_components"] for row in li_production)
     cost_production = _read_csv(
@@ -193,10 +193,13 @@ def test_wp2_free_state_pilot_ledger_and_cost() -> None:
     # 成本表覆盖全部已登记状态（主态 + 额外 def2-TZVPD 中性腿）
     assert len(cost_production) == len(production)
     assert len(cost_production) >= len(master) + len(extra_legs)
-    assert all(float(row["core_hours"]) > 0 for row in cost_production)
+    assert all((row["cost_status"] == "complete" and float(row["core_hours"]) > 0
+                and float(row["wall_sec"]) > 0)
+               or (row["cost_status"] == "incomplete" and row["core_hours"] == ""
+                   and row["wall_sec"] == "") for row in cost_production)
     assert payload["free_state_production"]["totals"]["orca_jobs"] == len(cost_production)
     redox = _read_csv(REPO_ROOT / "outputs/physics_completion/free_states/production_redox.csv")
-    assert len(redox) == 4
+    assert len(redox) == 12
     assert all(row["basis"] == "def2-TZVPD" for row in redox)
     for row in redox:
         # 自由腿与 Li 腿分开登记：谁齐谁给数，未齐的腿必须留空（不能以 0 充数）
@@ -297,24 +300,22 @@ def test_anchor_coverage_is_computed_not_hardcoded() -> None:
         assert gas[species] == "false", species
 
 
-def test_wp5_cost_ledger_gates_absolute_costs_on_the_closed_loop() -> None:
-    """绝对成本三项要么在四分子闭环后按实测台账填入，要么闭环前留空标 MISSING；不允许第三种。"""
+def test_wp5_cost_ledger_gates_absolute_costs_on_project_completion() -> None:
+    """绝对成本只在 12x5 项目闭环且全部成本完整时填入。"""
     rows = _read_csv(REPO_ROOT / "outputs/physics_completion/cost/cost_ledger.csv")
     absolute = [row for row in rows if row.get("kind") == "absolute"]
     assert len(absolute) == 3, absolute
     missing = [row for row in absolute if row["status"] == "MISSING"]
     filled = [row for row in absolute if row["status"] != "MISSING" and row["value"] != ""]
     assert len(missing) == 3 or len(filled) == 3, absolute
-    closure = _read_csv(REPO_ROOT / "outputs/physics_completion/closure/four_molecule_state_closure.csv")
-    produced = [row for row in closure if row.get("register_status") == "produced_single_conformer"]
-    loop_closed = len(produced) == len(closure)
-    assert (len(filled) == 3) == loop_closed, (len(filled), loop_closed)
+    ready = batch.WP2_LOOP_CLOSED and batch.ABSOLUTE_COST_COMPLETE
+    assert (len(filled) == 3) == ready, (len(filled), ready)
     payload = json.loads((REPO_ROOT / "outputs/week42/wp5_delta_learning_active_query.json").read_text(encoding="utf-8"))
     assert "R3<=0.10" in payload["conventions"]["success_endpoint"]
 
 
 def test_wp5_absolute_cost_values_are_recomputed_and_gated() -> None:
-    """§11 绝对成本三项：值必须由四个实测台账现算，且只在四分子闭环后才写进 CSV。"""
+    """§11 绝对成本三项：项目闭环且所有成本完整后才写进 CSV。"""
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
@@ -333,7 +334,7 @@ def test_wp5_absolute_cost_values_are_recomputed_and_gated() -> None:
                            ("p90_job_cost", module.ABSOLUTE_P90_JOB_COST),
                            ("frequency_only_cost", module.ABSOLUTE_FREQ_ONLY_COST)):
         row = gated[item]
-        if module.WP2_LOOP_CLOSED:
+        if module.WP2_LOOP_CLOSED and module.ABSOLUTE_COST_COMPLETE:
             assert row["value"] == expected, (item, row)
         else:
             assert row["value"] == "" and row["status"] == "MISSING", (item, row)
