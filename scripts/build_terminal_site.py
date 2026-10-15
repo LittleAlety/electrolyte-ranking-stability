@@ -393,10 +393,14 @@ def gates():
 
 
 def counts():
-    orca_out = glob.glob(os.path.join(REPO, "outputs", "**", "*.out"), recursive=True)
-    orca_out = [p for p in orca_out if "orca" in p.replace("\\", "/")]
-    scripts = glob.glob(os.path.join(REPO, "scripts", "*.py"))
-    tests = glob.glob(os.path.join(REPO, "tests", "test_*.py"))
+    tracked = tracked_files()
+    orca_out = [p for p in tracked
+                if p.startswith("outputs/") and p.endswith(".out") and "orca" in p]
+    scripts = [p for p in tracked
+               if p.startswith("scripts/") and p.count("/") == 1 and p.endswith(".py")]
+    tests = [p for p in tracked
+             if p.startswith("tests/") and p.count("/") == 1
+             and os.path.basename(p).startswith("test_") and p.endswith(".py")]
     return {
         "weeks": len(WEEKS),
         "figures": len(FIGURES),
@@ -410,27 +414,43 @@ def counts():
     }
 
 
-def _tracked_count(rel):
-    """How many files git would publish under ``rel``.
+_TRACKED = None
 
-    Counting the *working tree* instead would include ``__pycache__`` and the
-    scratch that ``.gitignore`` keeps out of the repository: the page would
-    advertise a number nobody can reproduce from a clean clone, and ``--check``
-    would call the region stale the moment anyone runs pytest.  When git is not
-    available (a tarball, say) fall back to walking with the usual excludes.
+
+def tracked_files():
+    """Every path git publishes, as posix paths relative to the repository root.
+
+    The page must describe the *repository*, not this working tree: ``outputs/``
+    and ``work/`` carry gitignored scratch and raw ORCA logs, so counting what
+    happens to be on disk would advertise numbers that a clean clone cannot
+    reproduce -- and ``--check`` would then disagree with itself on the next
+    clone.  When git is unavailable (a tarball, say) fall back to a walk with
+    the usual excludes.
     """
-    try:
-        proc = subprocess.run(["git", "ls-files", "-z", "--", rel],
-                              cwd=REPO, capture_output=True, check=True)
-        names = [n for n in proc.stdout.decode("utf-8", "replace").split("\0") if n]
-        return len(names)
-    except (OSError, subprocess.SubprocessError):
-        root = os.path.join(REPO, rel)
-        total = 0
-        for dirpath, dirnames, files in os.walk(root):
-            dirnames[:] = [d for d in dirnames if d != "__pycache__"]
-            total += sum(1 for f in files if not f.endswith((".pyc", ".pyo")))
-        return total
+    global _TRACKED
+    if _TRACKED is None:
+        try:
+            proc = subprocess.run(["git", "ls-files", "-z"],
+                                  cwd=REPO, capture_output=True, check=True)
+            _TRACKED = [n for n in proc.stdout.decode("utf-8", "replace").split("\0") if n]
+        except (OSError, subprocess.SubprocessError):
+            found = []
+            for dirpath, dirnames, files in os.walk(REPO):
+                dirnames[:] = [d for d in dirnames
+                               if d not in ("__pycache__", ".git", ".venv")]
+                for f in files:
+                    if f.endswith((".pyc", ".pyo")):
+                        continue
+                    found.append(os.path.relpath(os.path.join(dirpath, f), REPO)
+                                 .replace("\\", "/"))
+            _TRACKED = found
+    return _TRACKED
+
+
+def _tracked_count(rel):
+    """How many published files live under ``rel``."""
+    prefix = rel.rstrip("/") + "/"
+    return sum(1 for p in tracked_files() if p.startswith(prefix))
 
 
 def repo_inventory():

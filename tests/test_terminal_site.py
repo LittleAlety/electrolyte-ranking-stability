@@ -312,6 +312,38 @@ def test_academic_js_derives_every_count_from_the_payload():
     assert "fillDynamic();" in js, "boot() never calls fillDynamic()"
 
 
+def test_counts_describe_the_repository_not_the_working_tree():
+    """A count that only holds on this disk is a lie on a clean clone.
+
+    ``outputs/`` and ``work/`` carry gitignored scratch and raw ORCA logs, so a
+    count taken from the working tree would advertise numbers the published
+    repository does not have -- and ``--check`` would then disagree with itself
+    the first time someone cloned and ran it.
+    """
+    payload = _payload()
+    counts = payload["counts"]
+    tracked = [p for p in subprocess.run(
+        ["git", "ls-files", "-z"], cwd=str(REPO_ROOT), capture_output=True,
+        check=True).stdout.decode("utf-8").split("\0") if p]
+
+    orca = [p for p in tracked
+            if p.startswith("outputs/") and p.endswith(".out") and "orca" in p]
+    scripts = [p for p in tracked
+               if p.startswith("scripts/") and p.count("/") == 1 and p.endswith(".py")]
+    tests = [p for p in tracked
+             if p.startswith("tests/") and p.count("/") == 1
+             and p.rsplit("/", 1)[-1].startswith("test_") and p.endswith(".py")]
+    assert counts["orca_out"] == len(orca), (
+        "orca_out counts the working tree (%d) rather than the published tree (%d)"
+        % (counts["orca_out"], len(orca)))
+    assert counts["scripts"] == len(scripts)
+    assert counts["test_files"] == len(tests)
+    # The working tree must not be able to satisfy the count by accident.
+    on_disk = sum(1 for p in (REPO_ROOT / "outputs").rglob("*.out")
+                  if "orca" in str(p).replace("\\", "/"))
+    assert on_disk >= counts["orca_out"], "sanity: tracked <= on-disk"
+
+
 def test_check_mode_reports_the_site_as_consistent():
     result = subprocess.run(
         [sys.executable, str(GENERATOR), "--check"],

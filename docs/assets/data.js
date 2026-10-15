@@ -5,7 +5,7 @@ window.HB = {
  "counts": {
   "weeks": 42,
   "figures": 65,
-  "orca_out": 1535,
+  "orca_out": 1282,
   "scripts": 166,
   "test_files": 101,
   "tests_passed": 1655
