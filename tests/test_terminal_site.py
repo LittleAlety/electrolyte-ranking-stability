@@ -201,7 +201,12 @@ def test_key_numbers_each_cite_a_source_that_exists():
 
 
 def test_repo_inventory_matches_the_repository():
-    """Every advertised directory must exist, with the file count it reports."""
+    """Every advertised directory must exist, with the file count it reports.
+
+    The advertised count is what git publishes, not what happens to be on this
+    disk: the working tree also holds ``__pycache__`` and ignored scratch, and a
+    page that counted those would advertise a number no clean clone reproduces.
+    """
     payload = _payload()
     rows = payload["repo_inventory"]
     assert rows, "the data section advertises no directories"
@@ -210,9 +215,14 @@ def test_repo_inventory_matches_the_repository():
     for row in rows:
         root = REPO_ROOT / row["path"]
         assert root.is_dir(), "missing advertised directory: " + row["path"]
-        on_disk = sum(1 for p in root.rglob("*") if p.is_file())
-        assert row["files"] == on_disk, \
-            "%s advertises %d files but holds %d" % (row["path"], row["files"], on_disk)
+        tracked = subprocess.run(
+            ["git", "ls-files", "--", row["path"]],
+            cwd=str(REPO_ROOT), capture_output=True, text=True,
+            encoding="utf-8", check=True,
+        ).stdout.splitlines()
+        assert row["files"] == len(tracked), \
+            "%s advertises %d files but git publishes %d" % (
+                row["path"], row["files"], len(tracked))
         assert row["note"].strip(), row["path"] + " has no description"
 
 
@@ -325,6 +335,12 @@ def test_404_page_exists_and_stays_inside_the_published_folder():
     assert 'src="/' not in html, "404.html must not use a root-absolute asset path"
     assert "assets/academic.css" in html, "404.html must still load the stylesheet"
     assert "data.js" not in html, "the 404 must not depend on the payload to stay styled"
+    # A project Pages site serves this file for any depth of missing path, so
+    # every relative URL needs a <base> pinning it to the site root.
+    base = re.search(r'<base href="([^"]+)">', html)
+    assert base, "404.html needs a <base> so a nested 404 still finds its assets"
+    assert base.group(1) == site.PAGES_URL, \
+        "404.html base should be the Pages root, got " + base.group(1)
     for match in re.findall(r'(?:src|href)="([^"]+)"', html):
         if match.startswith(("http://", "https://", "#", "data:", "mailto:")):
             continue
@@ -479,7 +495,11 @@ def test_noscript_fallback_counts_track_the_payload():
     for gate in payload["gates"]:
         assert gate["status"] in block, "the noscript fallback omits " + gate["status"]
         for blocker in gate["blockers"]:
-            assert blocker in block, "the noscript fallback omits a gate blocker"
+            # Blockers carry chemistry like "tau_b=0.4286 < 0.90" and are escaped
+            # for the markup, so compare against the escaped form.
+            escaped = (blocker.replace("&", "&amp;").replace("<", "&lt;")
+                       .replace(">", "&gt;"))
+            assert escaped in block, "the noscript fallback omits a gate blocker"
 
 
 def test_page_never_uses_the_forbidden_phrase():

@@ -25,6 +25,7 @@ import os
 import re
 import shutil
 import struct
+import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -409,13 +410,36 @@ def counts():
     }
 
 
-def repo_inventory():
-    """What actually lives in the repository, counted from the repository.
+def _tracked_count(rel):
+    """How many files git would publish under ``rel``.
 
-    Every row is derived by walking the tree, so a directory that is renamed or
-    removed cannot leave a stale row behind.  ``deliverables/`` is included only
-    when it is actually present: the page must not link to a path that is not
-    published, because that is a claim the reader cannot check.
+    Counting the *working tree* instead would include ``__pycache__`` and the
+    scratch that ``.gitignore`` keeps out of the repository: the page would
+    advertise a number nobody can reproduce from a clean clone, and ``--check``
+    would call the region stale the moment anyone runs pytest.  When git is not
+    available (a tarball, say) fall back to walking with the usual excludes.
+    """
+    try:
+        proc = subprocess.run(["git", "ls-files", "-z", "--", rel],
+                              cwd=REPO, capture_output=True, check=True)
+        names = [n for n in proc.stdout.decode("utf-8", "replace").split("\0") if n]
+        return len(names)
+    except (OSError, subprocess.SubprocessError):
+        root = os.path.join(REPO, rel)
+        total = 0
+        for dirpath, dirnames, files in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+            total += sum(1 for f in files if not f.endswith((".pyc", ".pyo")))
+        return total
+
+
+def repo_inventory():
+    """What actually lives in the repository, counted as git would publish it.
+
+    Every row is derived by walking the repository, so a directory that is
+    renamed or removed cannot leave a stale row behind.  ``deliverables/`` is
+    included only when it is present: the page must not link to a path that is
+    not published, because that is a claim the reader cannot check.
     """
     spec = [
         ("src/electrolyte_ranking", "可复用库：ORCA / xTB 驱动、不确定度、排序、稳健性、决策状态"),
@@ -433,8 +457,7 @@ def repo_inventory():
         root = os.path.join(REPO, rel)
         if not os.path.isdir(root):
             continue
-        n = sum(len(files) for _d, _s, files in os.walk(root))
-        rows.append({"path": rel, "note": note, "files": n})
+        rows.append({"path": rel, "note": note, "files": _tracked_count(rel)})
     return rows
 
 
@@ -469,9 +492,12 @@ def key_numbers_payload():
 def render_404(payload):
     """The GitHub Pages 404 page, baked from the payload at build time.
 
-    It deliberately does not load data.js: a missing asset must not take the
-    styling down with it, so the counts are written in here.  Every URL is
-    relative to the published folder, not the user-site root.
+    A project Pages site serves this file for *any* missing path, so it is
+    reached from URLs of arbitrary depth (``/repo/a/b/c``).  A bare relative
+    ``assets/academic.css`` would then resolve against ``/repo/a/b/`` and the
+    page would arrive unstyled; ``<base>`` pins every relative URL to the site
+    root instead.  The page deliberately does not load data.js: a missing asset
+    must not take the styling down with it, so the counts are written in here.
     """
     counts_ = payload.get("counts", {})
     weeks = counts_.get("weeks", 0)
@@ -481,6 +507,7 @@ def render_404(payload):
         '<html lang="zh-CN">\n'
         "<head>\n"
         '<meta charset="utf-8">\n'
+        '<base href="' + PAGES_URL + '">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         "<title>404 \u2014 hb-lab</title>\n"
         '<link rel="stylesheet" href="assets/academic.css">\n'
@@ -554,7 +581,9 @@ def gate_summary(payload):
                     for i, g in enumerate(payload["gates"]))
     blockers = [b for g in payload["gates"] for b in g["blockers"]]
     if blockers:
-        line += "（blocker：" + "；".join(blockers) + "）"
+        # Blockers quote the frozen record, which contains chemistry like
+        # "tau_b=0.4286 < 0.90"; escape it so the markup stays valid.
+        line += "（blocker：" + "；".join(esc(b) for b in blockers) + "）"
     return line
 
 
@@ -581,15 +610,15 @@ def render_noscript(payload):
             '<a href="%s/tree/main/docs">全部报告（docs/）</a></li>\n'
             '      <li>图目录：<a href="%s/tree/main/outputs/figures">outputs/figures</a>'
             "（%d 张）</li>\n"
-            '      <li>交付件（论文 v7 / 周报 / 图 / 载荷）由生成器输出到仓库外交付层，'
-            "仓库内可直接浏览的是 <code>docs/</code>、<code>outputs/</code> 与 <code>src/</code>。</li>\n"
+            '      <li>交付镜像：<a href="%s/tree/main/deliverables">deliverables/</a>'
+            "（按成果种类分组的 part1 / part2）</li>\n"
             '      <li>源码与全部文档：<a href="%s">GitHub 仓库</a></li>\n'
             "      <li>质检：<span class=\"js-tests\">%d</span> 个测试通过（pytest）</li>\n"
             "      <li>%s</li>\n"
             "    </ul>\n"
             "  </div>\n"
             "</noscript>"
-            % (c["weeks"], REPO_URL, REPO_URL, c["figures"], REPO_URL,
+            % (c["weeks"], REPO_URL, REPO_URL, c["figures"], REPO_URL, REPO_URL,
                c["tests_passed"], gate_summary(payload)))
 
 
