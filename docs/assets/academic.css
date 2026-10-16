@@ -151,35 +151,46 @@ p { margin: 0 0 1em; }
   background-size: 52px 52px;
   mask-image: linear-gradient(to bottom, #000, transparent 72%);
 }
-.hero .wrap { position: relative; }
+.hero .wrap {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(340px, .92fr);
+  column-gap: clamp(42px, 7vw, 108px);
+  align-items: start;
+}
+.hero > .wrap > .eyebrow { grid-column: 1 / -1; }
 .hero h1 {
+  grid-column: 1; grid-row: 2 / span 5;
   font-size: clamp(2.2rem, 6.2vw, 4.85rem);
-  margin: 0 0 20px; max-width: 16ch; letter-spacing: -0.035em;
+  margin: 0; max-width: 12ch; letter-spacing: -0.035em;
   text-wrap: balance;
 }
 .hero .sub {
+  grid-column: 2;
   font-size: clamp(1rem, 2vw, 1.22rem); color: var(--hero-soft);
-  max-width: 58ch; margin: 0 0 24px;
+  max-width: 46ch; margin: 8px 0 22px;
 }
 .hero .eyebrow { color: #7ed6a6; }
 .meta-line {
+  grid-column: 2;
   font-family: var(--mono); font-size: 0.78rem; color: var(--hero-soft);
   display: flex; gap: 8px 18px; flex-wrap: wrap; margin-bottom: 24px;
 }
 .meta-line b { color: var(--hero-ink); font-weight: 600; }
 .claim {
+  grid-column: 2;
   border-left: 3px solid #79d7a5; background: rgba(255,255,255,.07);
   padding: 17px 22px; border-radius: 0 var(--radius) var(--radius) 0;
   font-family: var(--serif); font-size: clamp(1.08rem, 2.3vw, 1.42rem);
   margin: 0 0 24px; max-width: 65ch;
 }
 .claim em { color: #8ae3b2; font-style: normal; font-weight: 600; }
-.hero .lead { color: var(--hero-soft); max-width: 76ch; }
-.hero .kv { color: var(--hero-soft); }
+.hero .lead { grid-column: 2; color: var(--hero-soft); max-width: 46ch; }
+.hero .kv { grid-column: 2; color: var(--hero-soft); }
 .hero .kv b { color: #8ae3b2; }
 .hero code { background: rgba(255,255,255,.09); }
 
-.hero-figure { margin: clamp(34px, 5vw, 58px) 0 0; }
+.hero-figure { grid-column: 1 / -1; margin: clamp(34px, 5vw, 58px) 0 0; }
 .hero-figure img {
   border-color: var(--hero-rule); border-radius: 2px;
   box-shadow: 0 30px 80px rgba(0,0,0,.24);
@@ -189,6 +200,7 @@ p { margin: 0 0 1em; }
 
 /* WP2: runtime completion and scientific acceptance must never collapse. */
 .production-status {
+  grid-column: 1 / -1;
   margin: clamp(36px, 5vw, 58px) 0 0;
   padding: 26px 0 24px;
   border-top: 1px solid var(--hero-rule);
@@ -232,6 +244,7 @@ p { margin: 0 0 1em; }
 .production-note strong { color: var(--hero-ink); }
 
 .hero-links {
+  grid-column: 1 / -1;
   display: grid; grid-template-columns: repeat(3, 1fr);
   margin-top: 38px; border-top: 1px solid var(--hero-rule);
 }
@@ -262,6 +275,21 @@ p { margin: 0 0 1em; }
 .hero .sub { animation-delay: .12s; }
 .hero .meta-line { animation-delay: .18s; }
 .hero .claim { animation-delay: .24s; }
+
+/* Long-form sections use a centered reading axis instead of hugging the
+   viewport's left edge on wide GitHub Pages layouts. */
+main > section:not(.hero) > .wrap > .eyebrow,
+main > section:not(.hero) > .wrap > h2,
+main > section:not(.hero) > .wrap > .lead,
+main > section:not(.hero) .prose {
+  width: min(100%, var(--measure));
+  margin-left: auto;
+  margin-right: auto;
+}
+main > section:not(.hero) > .wrap > .eyebrow { margin-bottom: 10px; }
+main > section:not(.hero) > .wrap > h2 { margin-bottom: 10px; }
+.phase { max-width: 920px; margin-left: auto; margin-right: auto; }
+.gallery-tools, .gallery, #gallery-empty { max-width: 1040px; margin-left: auto; margin-right: auto; }
 
 /* ---------------------------------------------------------------- cards */
 .grid { display: grid; gap: 14px; }
@@ -390,6 +418,13 @@ footer a { color: var(--ink-soft); }
 .reveal-ready { opacity: 0; transform: translateY(18px); transition: opacity .55s ease, transform .55s ease; }
 .reveal-ready.is-visible { opacity: 1; transform: none; }
 
+@media (max-width: 940px) {
+  /* The editorial split needs real breathing room. Collapse it before either
+     column becomes a narrow strip on tablets and small laptop windows. */
+  .hero .wrap { display: block; }
+  .hero h1 { max-width: 14ch; }
+  .hero .sub { margin-top: 20px; }
+}
 @media (max-width: 720px) {
   .navtoggle { display: block; }
   .nav { display: none; width: 100%; margin-left: 0; }
