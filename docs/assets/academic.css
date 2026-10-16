@@ -67,6 +67,12 @@ body {
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
 }
+body.site-locked { overflow: hidden; }
+body.site-locked > header,
+body.site-locked > main,
+body.site-locked > footer,
+body.site-locked > .lb,
+body.site-locked > noscript { visibility: hidden; }
 img { max-width: 100%; height: auto; }
 a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
 a:hover { text-decoration-thickness: 2px; }
@@ -117,6 +123,88 @@ code, kbd, samp {
   display: none; margin-left: auto;
   background: none; border: 1px solid var(--rule-strong); border-radius: 6px;
   color: var(--ink-soft); font: inherit; font-size: 0.82rem; padding: 4px 10px; cursor: pointer;
+}
+
+/* ---------------------------------------------------------- preview access */
+.access-gate {
+  position: fixed; z-index: 1000; inset: 0;
+  display: grid; place-items: center; min-height: 100svh;
+  padding: clamp(24px, 6vw, 72px);
+  color: var(--hero-ink);
+  background:
+    radial-gradient(circle at 78% 16%, rgba(95, 196, 140, .17), transparent 31rem),
+    linear-gradient(145deg, var(--hero-bg-deep), var(--hero-bg) 62%, #17362a);
+  transition: opacity .28s ease, visibility .28s ease;
+}
+.access-gate::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: linear-gradient(to bottom, #000, transparent 78%);
+}
+.site-unlocked .access-gate { opacity: 0; visibility: hidden; }
+.access-gate-inner {
+  position: relative; width: min(100%, 660px);
+  animation: gate-in .55s both cubic-bezier(.2,.8,.2,1);
+}
+.access-gate .eyebrow { color: #7ed6a6; }
+.access-mark {
+  position: absolute; right: 0; top: -78px; margin: 0;
+  color: rgba(126, 214, 166, .09);
+  font: 500 clamp(9rem, 25vw, 18rem)/1 var(--serif);
+  pointer-events: none; user-select: none;
+}
+.access-gate h1 {
+  position: relative; margin: 0; max-width: 10ch;
+  font: 600 clamp(2.8rem, 8vw, 5.6rem)/1.08 var(--serif);
+  letter-spacing: -.04em; text-wrap: balance;
+}
+.access-copy {
+  position: relative; max-width: 42ch; margin: 24px 0 34px;
+  color: var(--hero-soft); font-size: 1rem;
+}
+.access-form { position: relative; max-width: 540px; }
+.access-form label {
+  display: block; margin-bottom: 8px; color: var(--hero-soft);
+  font: .72rem/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+}
+.access-control { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.access-control input,
+.access-control button {
+  min-height: 48px; border: 1px solid var(--hero-rule); border-radius: 4px;
+  font: inherit;
+}
+.access-control input {
+  min-width: 0; padding: 10px 14px; color: var(--hero-ink);
+  background: rgba(255,255,255,.075); outline: none;
+}
+.access-control input:focus {
+  border-color: #79d7a5; box-shadow: 0 0 0 3px rgba(121,215,165,.14);
+}
+.access-control input[aria-invalid="true"] { border-color: #e0b264; }
+.access-control button {
+  padding: 10px 22px; color: #092116; background: #7ed6a6;
+  border-color: #7ed6a6; font-weight: 650; cursor: pointer;
+  transition: background .18s ease, transform .18s ease;
+}
+.access-control button:hover { background: #96e4b8; transform: translateY(-1px); }
+.access-control button:active { transform: translateY(0); }
+.access-error { margin: 10px 0 0; color: #f0c981; font-size: .86rem; }
+.access-note {
+  margin: 34px 0 0; padding-top: 14px; border-top: 1px solid var(--hero-rule);
+  color: var(--hero-soft); font: .7rem/1.5 var(--mono); letter-spacing: .04em;
+}
+.access-gate.denied .access-form { animation: gate-denied .28s ease; }
+@keyframes gate-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes gate-denied {
+  0%, 100% { transform: translateX(0); }
+  35% { transform: translateX(-7px); }
+  70% { transform: translateX(5px); }
 }
 
 /* ---------------------------------------------------------------- layout */
@@ -440,12 +528,18 @@ footer a { color: var(--ink-soft); }
   .hero-links { grid-template-columns: 1fr; }
   .hero-link, .hero-link:not(:nth-child(3n + 1)) { padding: 17px 34px 16px 0; }
   .hero-link:not(:nth-child(3n)) { border-right: 0; }
+  .access-gate { place-items: start center; overflow-y: auto; }
+  .access-gate-inner { margin: auto 0; }
+  .access-control { grid-template-columns: 1fr; }
+  .access-control button { width: 100%; }
+  .access-note { margin-top: 26px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .hero > .wrap > .eyebrow, .hero h1, .hero .sub, .hero .meta-line, .hero .claim,
   .production-track i { animation: none; }
   .reveal-ready { opacity: 1; transform: none; transition: none; }
+  .access-gate, .access-gate-inner, .access-gate.denied .access-form { animation: none; transition: none; }
 }
 @media print {
   .topbar, .gallery-tools, footer .noprint { display: none; }

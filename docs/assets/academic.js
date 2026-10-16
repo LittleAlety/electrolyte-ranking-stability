@@ -13,6 +13,8 @@
   var WEEKS = P.weeks || [];
   var LAST_WEEK = WEEKS.length ? WEEKS[WEEKS.length - 1] : { n: 0, stage: "", doc: "" };
   var LAST_FIG = FIGS.length ? FIGS[FIGS.length - 1] : { id: "", file: "" };
+  var ACCESS_SESSION_KEY = "hb-lab-preview-unlocked";
+  var ACCESS_PHRASE = "asdfghjkl";
 
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) {
@@ -21,6 +23,60 @@
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
       .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  /* ------------------------------------------------ preview access gate */
+  function rememberAccess() {
+    try { window.sessionStorage.setItem(ACCESS_SESSION_KEY, "1"); } catch (error) { /* optional */ }
+  }
+
+  function hasRememberedAccess() {
+    try { return window.sessionStorage.getItem(ACCESS_SESSION_KEY) === "1"; }
+    catch (error) { return false; }
+  }
+
+  function unlockAccess(gate, remember, immediate) {
+    if (remember) rememberAccess();
+    document.body.classList.remove("site-locked");
+    document.body.classList.add("site-unlocked");
+    gate.setAttribute("aria-hidden", "true");
+    if (immediate) gate.hidden = true;
+    else window.setTimeout(function () { gate.hidden = true; }, 320);
+  }
+
+  function wireAccessGate() {
+    var gate = $("#access-gate");
+    var form = $("#access-form");
+    var input = $("#access-password");
+    var error = $("#access-error");
+    if (!gate || !form || !input || !error) {
+      document.body.classList.remove("site-locked");
+      return;
+    }
+    if (hasRememberedAccess()) {
+      unlockAccess(gate, false, true);
+      return;
+    }
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (input.value === ACCESS_PHRASE) {
+        input.removeAttribute("aria-invalid");
+        error.hidden = true;
+        unlockAccess(gate, true, false);
+        return;
+      }
+      input.setAttribute("aria-invalid", "true");
+      error.hidden = false;
+      gate.classList.remove("denied");
+      void gate.offsetWidth;
+      gate.classList.add("denied");
+      input.select();
+    });
+    input.addEventListener("input", function () {
+      input.removeAttribute("aria-invalid");
+      error.hidden = true;
+    });
+    window.setTimeout(function () { input.focus(); }, 0);
   }
 
   /* ------------------------------------------------ dynamic numbers */
@@ -213,6 +269,7 @@
 
   /* ------------------------------------------------ boot */
   function boot() {
+    wireAccessGate();
     fillDynamic();
     renderGallery();
     wireNav();
@@ -232,6 +289,7 @@
     filterGallery: filterGallery,
     openFigure: openFigure,
     closeFigure: closeFigure,
-    wireScrollPresence: wireScrollPresence
+    wireScrollPresence: wireScrollPresence,
+    wireAccessGate: wireAccessGate
   };
 })();

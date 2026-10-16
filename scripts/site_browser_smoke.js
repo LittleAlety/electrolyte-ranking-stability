@@ -15,6 +15,19 @@ async function inspectPage(browser, baseURL, outputDir, name, viewport, mobile, 
   page.on("pageerror", (error) => errors.push(error.message));
 
   await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: 30000 });
+  const accessGate = page.locator("#access-gate");
+  if (!(await accessGate.isVisible())) throw new Error(`${name}: access gate is not visible`);
+  await page.waitForTimeout(650);
+  await page.screenshot({ path: path.join(outputDir, `${name}-access-gate.png`) });
+  await page.locator("#access-password").fill("incorrect");
+  await page.locator("#access-form").evaluate((form) => form.requestSubmit());
+  if (!(await page.locator("#access-error").isVisible())) {
+    throw new Error(`${name}: wrong password did not show an error`);
+  }
+  await page.locator("#access-password").fill("asdfghjkl");
+  await page.locator("#access-form").evaluate((form) => form.requestSubmit());
+  await page.locator("body.site-unlocked").waitFor({ state: "attached" });
+  await accessGate.waitFor({ state: "hidden" });
   await page.locator("#gallery .gcell").first().waitFor({ state: "attached" });
   // A static page with 65 lazy gallery images may never reach a stable load
   // event in headless mode; still attempt network-idle, then validate the DOM.
