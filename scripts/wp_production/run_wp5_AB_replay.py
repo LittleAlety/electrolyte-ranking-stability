@@ -502,8 +502,16 @@ def write_outputs(data: dict, repeats: int) -> None:
                              REPO / "outputs" / "week7" / "features_core.csv")},
         "contract": {
             "pool": ("target_pool_AB.csv holds all 12 molecules for audit, but the "
-                     "CONFIRMATORY replay admits only qc_complete_pair rows "
-                     "(task A: 6 molecules, task B: 5 molecules at 2026-10-20 labels)"),
+                     "CONFIRMATORY replay admits only qc_complete_pair rows (task "
+                     "A: 6 -> 8 today, task B: 5 -> 7 today as recovery released "
+                     "states; the stop budget is evaluated ON THIS SUBSET and "
+                     "must never be read as the full 12-molecule pool"),
+            "subset_sizes_at_write": {
+                "task_A_pool": len(_pool("A")[1]), "task_B_pool": len(_pool("B")[1]),
+                "frozen_target": 12,
+                "note": "derived from _pool() at write time; a stop point reached "
+                        "on a subset is a subset result by construction",
+            },
             "paired_initial_set": "shared by all four baselines per task+repeat",
             "stop_rule": ("JOINT success (v3.0 §13.4): the same batch of repeats "
                           "must succeed at BOTH consecutive non-exhausted points "

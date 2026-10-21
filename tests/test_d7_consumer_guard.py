@@ -56,11 +56,26 @@ def test_ab_endpoints_never_invent_a_stop_budget():
         assert r["mean_R_3_mean_ev"] not in ("", None), (r["task"], r["baseline"])
 
 
+
+
+def _pool_sizes(doc):
+    """(n_A, n_B) read from the endpoint rows the generator itself wrote."""
+    rows = _read(AB_ENDPOINTS)
+    n = {r["task"]: int(r["n_pool"]) for r in rows}
+    return n.get("A", 0), n.get("B", 0)
+
 def test_ab_index_does_not_claim_the_twelve_molecule_pool_was_replayed():
     doc = json.loads(AB_INDEX.read_text(encoding="utf-8"))
     pool = doc["contract"]["pool"]
     assert "qc_complete_pair" in pool
-    assert "6 molecules" in pool and "5 molecules" in pool
+    # the subset is DECLARED mechanically, not narrated: sizes come from _pool()
+    # at write time, so the assertion checks the declaration itself
+    subset = doc["contract"]["subset_sizes_at_write"]
+    n_a, n_b = _pool_sizes(doc)
+    assert subset["task_A_pool"] == n_a
+    assert subset["task_B_pool"] == n_b
+    assert subset["frozen_target"] == 12
+    assert "ON THIS SUBSET" in pool
     # the frozen stop rule must be the JOINT one
     assert "JOINT" in doc["contract"]["stop_rule"]
     assert "intersection" in doc["contract"]["stop_rule"]
