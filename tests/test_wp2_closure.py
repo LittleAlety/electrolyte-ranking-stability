@@ -58,12 +58,95 @@ def test_the_ladder_has_exactly_one_row_per_pair_and_rung():
 
 def test_computed_rungs_carry_a_value_and_uncomputed_ones_stay_empty():
     for row in _rows(FLIP):
+        if row["status"] in ("limited", "provisional"):
+            # v1.4.2 fourth state: a bounded-coverage R4 value (limited) or an
+            # unfinished pool (provisional).  Either way the rung may carry a
+            # number so the coverage gap stays visible, and it must say
+            # explicitly that it is NOT counted as computed.
+            assert row["delta_ev"] != "", row
+            assert "NOT counted as computed" in row["note"], row
+            continue
         filled = row["status"] in ("computed", "computed_screen_only")
         assert (row["delta_ev"] != "") == filled, row
         if filled:
             assert row["sign"] in ("positive", "negative"), row
         else:
             assert row["status"] == "not_computed" and row["sign"] == "" and row["delta_ev"] == "", row
+
+
+def test_r4_row_splits_on_every_legs_acceptance_status():
+    """The final-label rebuild: limited / provisional / absent legs never yield computed.
+
+    r4_row must check BOTH states (M_plus AND M) of BOTH molecules -- a limited
+    neutral leg is as blocking as a limited cation leg -- and must carry the
+    blocked leg's own limitation_reason verbatim instead of a generic phrase.
+    """
+    module = _module()
+
+    def label(status="accepted", reason="", eh="-1.0", n="2"):
+        return {"acceptance_status": status, "limitation_reason": reason,
+                "g_ensemble_eh": eh, "n_unique": n}
+
+    both_accepted = {
+        ("A", "M_plus"): label(), ("A", "M"): label(eh="-2.0"),
+        ("B", "M_plus"): label(eh="-1.5"), ("B", "M"): label(eh="-2.5"),
+    }
+
+    def with_leg(base, key, **overrides):
+        clone = dict(base)
+        clone[key] = label(**{**{"status": "accepted", "reason": "", "eh": "-1.0", "n": "2"},
+                              **overrides})
+        return clone
+
+    row = module.r4_row("A | B", "A", "B", both_accepted)
+    assert row["status"] == "computed", row
+    assert row["delta_ev"] != "" and row["sign"] in ("positive", "negative")
+
+    limited_cation = with_leg(both_accepted, ("A", "M_plus"),
+                              status="limited", reason="species_drift_unrecoverable")
+    row = module.r4_row("A | B", "A", "B", limited_cation)
+    assert row["status"] == "limited", row
+    assert "species_drift_unrecoverable" in row["note"], row
+    assert "NOT counted as computed" in row["note"], row
+
+    limited_neutral = with_leg(both_accepted, ("B", "M"),
+                               status="limited", reason="rescue_budget_exhausted", eh="-2.5")
+    row = module.r4_row("A | B", "A", "B", limited_neutral)
+    assert row["status"] == "limited", row
+    assert "B|M" in row["note"], row  # the blocked LEG is named, not just a molecule
+    assert "rescue_budget_exhausted" in row["note"], row
+
+    provisional_cation = with_leg(both_accepted, ("B", "M_plus"),
+                                  status="provisional", eh="-1.5")
+    row = module.r4_row("A | B", "A", "B", provisional_cation)
+    assert row["status"] == "provisional", row
+    assert "NOT counted as computed" in row["note"], row
+
+    missing_leg = dict(both_accepted)
+    missing_leg[("A", "M")] = {}
+    row = module.r4_row("A | B", "A", "B", missing_leg)
+    assert row["status"] == "not_computed", row
+    assert row["delta_ev"] == "" and row["sign"] == "", row
+    assert "A|M" in row["note"], row
+
+
+def test_r4_status_on_disk_matches_the_final_labels():
+    """Every on-disk R4 row must agree with the acceptance labels it cites.
+
+    This is the regression for the 2026-10-20 rebuild: the two R4 rungs are
+    limited because EMC|M_plus is limited (species_drift_unrecoverable) -- the
+    old note claimed 'rescue budget exhausted' for every limited rung, which is
+    the wrong cause for this leg.
+    """
+    module = _module()
+    labels = module.load_production_ensemble()
+    rows = [row for row in _rows(FLIP) if row["rung"] == "R4"]
+    assert rows, "the production R4 rung must be present"
+    for row in rows:
+        rebuilt = module.r4_row(row["pair"], row["i"], row["j"], labels)
+        assert rebuilt["status"] == row["status"], (row, rebuilt)
+        assert rebuilt["delta_ev"] == row["delta_ev"], (row, rebuilt)
+        assert rebuilt["note"] == row["note"], (row, rebuilt)
 
 
 def test_the_screen_rung_never_claims_the_production_label():
@@ -108,3 +191,64 @@ def test_the_method_consistency_gate_is_registered_and_green():
     gate = rows["r2_r3_legs_share_functional_basis_solvent_and_thermochemistry"]
     assert gate["ok"] == "true", gate
     assert "compared=" in gate["detail"]
+
+
+REPORT = CLOSURE / "wp3_rung_rebuild_report.md"
+
+
+def test_rung_rebuild_report_is_registered_and_honest():
+    """The rebuild report: 12 rung cells, the gap attribution, the Top-3 bound verdict.
+
+    The report never declares convergence and it counts limited/provisional
+    legs as non-computed -- the numbers below are recomputed from the frozen
+    labels inside the test, not copied from the report prose.
+    """
+    if not REPORT.is_file():
+        pytest.skip("the rebuild report is not registered yet")
+    text = REPORT.read_text(encoding="utf-8")
+    # 1. all twelve rung cells appear with their status
+    rows = _rows(FLIP)
+    assert len(rows) == 12
+    for row in rows:
+        assert row["rung"] in text, row["rung"]
+        assert row["status"] in text
+    # 2. every non-computed rung names the blocking leg's own reason
+    for row in rows:
+        if row["status"] == "limited":
+            assert "species_drift_unrecoverable" in text, "EMC|M_plus blocks both R4 rungs"
+    # 3. the Top-3 verdict matches an independent recomputation from the labels
+    module = _module()
+    labels = module.load_production_ensemble()
+    kcal_per_ev = 96.48533212331002 / 4.184
+    ranked = []
+    for name in sorted({key[0] for key in labels}):
+        m_plus, m = labels.get((name, "M_plus")), labels.get((name, "M"))
+        if not m_plus or not m or m_plus["acceptance_status"] != "accepted" \
+                or m["acceptance_status"] != "accepted":
+            continue
+        ranked.append((name, (float(m_plus["g_ensemble_eh"]) - float(m["g_ensemble_eh"]))
+                      * module.EH_PER_EV))
+    ranked.sort(key=lambda item: -item[1])
+    assert len(ranked) >= 3, "the accepted-only ranking needs at least 3 molecules"
+    top3 = [name for name, _ in ranked[:3]]
+    assert " > ".join(top3) in text, top3
+    # 4. the bound verdict: a contender whose interval crosses the accepted floor
+    floor = ranked[2][1]
+    crosses = []
+    for name in sorted({key[0] for key in labels}):
+        m_plus, m = labels.get((name, "M_plus")), labels.get((name, "M"))
+        if not m_plus or not m:
+            continue
+        if (m_plus["acceptance_status"], m["acceptance_status"]) == ("accepted", "accepted"):
+            continue
+        gap = (float(m_plus["g_ensemble_eh"]) - float(m["g_ensemble_eh"])) * module.EH_PER_EV
+        b_plus = float(m_plus.get("lowering_bound_rt_ln_n_kcal") or 0) / kcal_per_ev
+        b_m = float(m.get("lowering_bound_rt_ln_n_kcal") or 0) / kcal_per_ev
+        if gap + b_m > floor:
+            crosses.append(name)
+    if crosses:
+        assert "Top-3 未被 bound 覆盖" in text, crosses
+    else:
+        assert "Top-3 被 bound 覆盖" in text
+    # 5. the report never claims convergence
+    assert "不判排序收敛" in text

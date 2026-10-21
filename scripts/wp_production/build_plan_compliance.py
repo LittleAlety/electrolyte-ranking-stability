@@ -17,6 +17,7 @@ import io
 import json
 import re
 import sys
+import subprocess
 from collections import Counter
 from pathlib import Path
 
@@ -60,6 +61,23 @@ MAIN_STATES = ("M", "M_plus", "LiM_plus", "LiM_2plus")
 EXTRA_STATE = "M_tzvpd"
 LI_STATES = ("LiM_plus", "LiM_2plus")
 PRODUCED = "produced_single_conformer"
+
+
+def ensemble_key_errors(rows, expected):
+    keys = [(r.get('mol_id', ''), r.get('state', '')) for r in rows]
+    errors = []
+    if len(keys) != len(set(keys)):
+        errors.append('duplicate ensemble keys')
+    if set(keys) != expected:
+        errors.append('ensemble keys differ from frozen cohort')
+    return errors
+
+
+def ensemble_source_errors():
+    """Same read-only recomputation used by the producer; no stale gate opening."""
+    result = subprocess.run([sys.executable, str(HERE / 'build_production_ensemble_aggregator.py'), '--check'],
+                            cwd=REPO, capture_output=True, text=True, encoding='utf-8', errors='replace')
+    return [] if result.returncode == 0 else ['ensemble source check failed: ' + result.stdout.strip()[-1000:]]
 
 
 def read_rows(rel):
@@ -361,21 +379,45 @@ def build_rows(progress=None):
         "配位位移需要两个 Li 腿齐备，缺一即空。",
     ))
     prod_ens = read_rows("outputs/physics_completion/ensembles/production_ensemble_labels.csv")
-    prod_ens_keys = {(r.get("mol_id", ""), r.get("state", "")) for r in prod_ens
-                     if r.get("mol_id") in set_main and r.get("state") in MAIN_STATES
-                     and r.get("status") in ("computed", "ok")}
+    # v1.4.1 §2.2: a label row is NOT acceptance.  Only rows whose registered
+    # sampling is fully dispositioned (acceptance_status == accepted) may enter
+    # the formal denominator; provisional rows (pending/rescue-in-flight
+    # extras) must keep this item open.  Limited rows count with an explicit
+    # note.  Identity is (mol_id, state) against the frozen 12 x 4 cohort:
+    # missing keys, duplicate keys, wrong identity, and stale hashes all fail.
+    prod_ens_accepted, prod_ens_provisional, prod_ens_limited = set(), set(), set()
+    for r in prod_ens:
+        if r.get("mol_id") not in set_main or r.get("state") not in MAIN_STATES:
+            continue
+        acc = r.get("acceptance_status", "")
+        if acc == "accepted":
+            prod_ens_accepted.add((r.get("mol_id", ""), r.get("state", "")))
+        elif acc == "limited":
+            prod_ens_limited.add((r.get("mol_id", ""), r.get("state", "")))
+        elif acc == "provisional":
+            prod_ens_provisional.add((r.get("mol_id", ""), r.get("state", "")))
+    ensemble_errors = ensemble_key_errors(prod_ens, {(mol, state) for mol in set_main for state in MAIN_STATES})
+    ensemble_errors.extend(ensemble_source_errors())
+    dupes = bool(ensemble_errors)
+    if ensemble_errors:
+        prod_ens_accepted.clear()  # shared by ensemble, WP6 and overall gates
+    accepted_n = len(prod_ens_accepted)
     screen_ens = read_rows("outputs/physics_completion/ensembles/ensemble_free_energies.csv")
     out.append(item(
         "wp2_conformer_ensemble", "6",
         "12 x 4 主态的生产级同态构象/配位 motif 系综自由能 G_ensemble",
-        "satisfied" if len(prod_ens_keys) == main_expected_states else (
-            "partial" if prod_ens_keys else "not_satisfied"),
-        "production_ensemble_labels=%d/%d; screen_gfn2_rows=%d"
-        % (len(prod_ens_keys), main_expected_states, len(screen_ens)),
+        "satisfied" if (accepted_n == main_expected_states and not dupes) else (
+            "partial" if (prod_ens_accepted or prod_ens_limited or prod_ens_provisional) else "not_satisfied"),
+        "production_ensemble accepted=%d/%d; provisional=%d; limited=%d; screen_gfn2_rows=%d"
+        % (accepted_n, main_expected_states, len(prod_ens_provisional),
+           len(prod_ens_limited), len(screen_ens)),
         "outputs/physics_completion/ensembles/production_ensemble_labels.csv; "
         "outputs/physics_completion/ensembles/ensemble_free_energies.csv",
-        "只有 production_ensemble_labels.csv 中完成 QC 的 wB97X-D4/SMD 标签计入 48 态分母。"
-        "现有 ensemble_free_energies.csv 是气相 GFN2 screening，不能冒充生产 G_ensemble。",
+        "只计 acceptance_status=accepted 的 48 态标签（v1.4.1：provisional/"
+        "limited 不进入正式分母）；主集必须恰为冻结 12 分子 × 4 主态，缺键、"
+        "重复键、错身份、旧协议或失效哈希均不计。"
+        "ensemble_free_energies.csv 是气相 GFN2 screening，不能冒充生产 G_ensemble。"
+        + (' validation_errors=' + '; '.join(ensemble_errors) if ensemble_errors else ''),
     ))
     samp = read_rows("outputs/physics_completion/sampling/sampling_acceptance.csv")
     samp_escalation = read_rows("outputs/physics_completion/sampling/sampling_escalation.csv")
@@ -652,7 +694,8 @@ def build_rows(progress=None):
     lig_executed = (len([p for p in lig_dir.iterdir()
                          if p.is_file() and p.name != "explicit_ligand_plan.csv"])
                     if lig_dir.is_dir() else 0)
-    wp6_ready = wp6_gate_ready(li_pair_ok, len(prod_ens_keys))
+    # v1.4.1 §2.2: WP6's gate counts ACCEPTED production ensembles only.
+    wp6_ready = wp6_gate_ready(li_pair_ok, len(prod_ens_accepted))
     wp6_scope = "planned" if wp6_ready else "optional"
     out.append(item(
         "wp6_explicit_ligand", "10",
@@ -663,7 +706,7 @@ def build_rows(progress=None):
         "plan_rows=%d executed_jobs=%d li_pair_complete=%d/%d required_li_pairs=%d "
         "production_ensembles=%d/%d gate_ready=%s scope=%s" % (
             len(lig), lig_executed, li_pair_ok, len(set_main), WP6_REQUIRED_LI_PAIRS,
-            len(prod_ens_keys), WP6_REQUIRED_PRODUCTION_ENSEMBLES,
+            len(prod_ens_accepted), WP6_REQUIRED_PRODUCTION_ENSEMBLES,
             str(wp6_ready).lower(), wp6_scope),
         "outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv",
         "WP6 在 gate 前保持可选；当且仅当 Li 配对 complete >= 9/12 且生产系综 = 48/48 时，"
@@ -750,7 +793,7 @@ def build_rows(progress=None):
         and main4_ok == len(set_main)
         and free_ok == len(set_main)
         and li_ok == len(set_main)
-        and len(prod_ens_keys) == main_expected_states
+        and len(prod_ens_accepted) == main_expected_states
         and samp_extension_ok
         and bool(flip) and flip_done == len(flip)
     )
@@ -762,7 +805,7 @@ def build_rows(progress=None):
         "li_labels=%d/%d; production_ensembles=%d/%d; sampling_complete=%s; "
         "flip_rungs=%d/%d; pilot_subset=%d/%d"
         % (progress["scientific"]["accepted"], main_expected_states, main4_ok, len(set_main),
-           free_ok, len(set_main), li_ok, len(set_main), len(prod_ens_keys), main_expected_states,
+           free_ok, len(set_main), li_ok, len(set_main), len(prod_ens_accepted), main_expected_states,
            samp_extension_ok, flip_done, len(flip), len(produced), len(states)),
         "work/wp2prod/**/<name>_<state>.json; data/metadata/physics_completion_set.csv; "
         "outputs/physics_completion/closure/four_molecule_state_closure.csv; "

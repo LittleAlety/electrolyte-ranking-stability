@@ -379,7 +379,12 @@ def build_row(cohort, mol_token, job_token, directory):
         "n_freq": record.get("n_freq", "") if qc_echo else "",
         "imaginary_modes": record.get("imaginary_modes", "") if qc_echo else "",
         "lowest_freq_cm1": record.get("lowest_freq_cm1", "") if qc_echo else "",
-        "opt_converged": record.get("opt_converged", "true" if RE_CONVERGED.search(raw_text) else ""),
+        # opt_converged is LOG-derived, not record-derived: under protocol v1.3
+        # the folded legs' canonical log is a freq-only AnFreq run -- geometry
+        # convergence is evidenced by the SOURCE run, not this file.  Registering
+        # "" lets archive-verify skip the claim instead of contradicting it;
+        # joint Opt+NumFreq legs still self-report "true" from their own log.
+        "opt_converged": ("true" if RE_CONVERGED.search(raw_text) else ""),
         "terminated": terminated,
         "failure_reason": classify_failure(job_state, terminated, log is not None, raw_text),
         "n_files_hashed": str(n_hashed), "retrieval_note": ARCHIVE_NOTE,

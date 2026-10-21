@@ -12,8 +12,9 @@ spec.loader.exec_module(m)
 
 
 def test_input_matches_production():
+    """Protocol v1.3 (2026-10-17): the frozen Hessian keyword is AnFreq."""
     assert m.input_text("wB97X-D4 def2-TZVPD", 2, 2) == (
-        "! wB97X-D4 def2-TZVPD Opt NumFreq SMD(acetonitrile) VeryTightOpt TightSCF SlowConv\n"
+        "! wB97X-D4 def2-TZVPD Opt AnFreq SMD(acetonitrile) VeryTightOpt TightSCF SlowConv\n"
         "%maxcore 2000\n%pal nprocs 4 end\n%scf MaxIter 300 end\n* xyzfile 2 2 geom.xyz\n")
 
 
@@ -90,9 +91,14 @@ def test_manifest_and_split(tmp_path, monkeypatch):
     assert result["derivative_policy"] == {
         "geometry_gradient": "analytic",
         "forbidden_first_derivative_keyword": "NumGrad",
-        "frequency_hessian": "numerical_finite_difference_of_analytic_gradients",
-        "frequency_keyword": "NumFreq",
-        "anfreq_policy": "protocol_change_requires_recorded_compatibility_study",
+        "frequency_hessian": "analytical_hessian",
+        "frequency_keyword": "AnFreq",
+        "superseded_frequency_keyword": "NumFreq",
+        "superseded_frequency_hessian": "numerical_finite_difference_of_analytic_gradients",
+        "protocol_version": "1.3",
+        "anfreq_policy": ("adopted cohort-wide on 2026-10-17 after a 60/60 paired audit and a "
+                          "DX step-size probe showed the NumFreq imaginary modes were "
+                          "finite-difference noise"),
         "new_geometry_optimization": "VeryTightOpt",
         "legacy_tightopt_policy": "retain only if scientific QC has zero imaginary modes",
         "verytightopt_thresholds": {

@@ -43,25 +43,6 @@
 | SL|LiM_2plus | computed | true | true | true | false |
 | SL|M_tzvpd | computed | true | true | true | false |
 
-## 未正常结束的作业
-
-| job_id | state | failure_reason |
-| --- | --- | --- |
-| wp2prod/AN/LiM_2plus | LiM_2plus | qc_rejected_imaginary_mode |
-| wp2prod/DME/M_tzvpd | M_tzvpd | qc_rejected_imaginary_mode |
-| wp2prod/DOL/M_tzvpd | M_tzvpd | qc_rejected_imaginary_mode |
-| wp2prod/TMP/LiM_2plus | LiM_2plus | qc_rejected_imaginary_mode |
-| wp2prod/TMP/LiM_plus | LiM_plus | qc_rejected_imaginary_mode |
-| wp2prod/TMP/M_plus | M_plus | qc_rejected_imaginary_mode |
-| wp2prod/TMP/M_tzvpd | M_tzvpd | qc_rejected_imaginary_mode |
-
-* 分类只依据该作业自己 `.log` 里的字符串，不做外部推断。
-* `mpi_smpd_*`：Microsoft MPI 的 smpd 在作业期间不可用或失联（主机重启后需要重新拉起，队列器 `ensure_smpd()` 已处理）。
-* `orca_cannot_open_scratch_file`：ORCA 打不开自己的 scratch 文件。
-* `qc_rejected_imaginary_mode`：ORCA 正常结束，但频率段给出虚频——腿按 QC 判不合格记 `status=failed`、不进交付账本（这是物理结论：该几何不是极小点，需要换起点重优化，不是基础设施事故）。
-* `qc_rejected_unclassified`：ORCA 正常结束却被判 failed，但日志文本不足以指认具体 QC 项；如实标出，不猜。
-* 基础设施残骸不构成任何物理结论，也不替代缺失的腿；`qc_rejected_*` 则是真实的 QC 结论，同样不进主极小集合。
-
 ## 读法
 
 * `job_archive_manifest.csv`：逐作业的输入 / 起始几何 / 最终几何 / 原始输出路径与 sha256，

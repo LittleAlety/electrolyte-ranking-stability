@@ -8,24 +8,24 @@ window.HB = {
   "orca_out": 1282,
   "scripts": 166,
   "test_files": 101,
-  "tests_passed": 1656
+  "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-15T03:42:00Z",
+  "generated_at_utc": "2026-10-21T00:07:06Z",
   "runtime": {
-   "computed": 53,
+   "computed": 60,
    "total": 60
   },
   "main_runtime": {
-   "computed": 44,
+   "computed": 48,
    "total": 48
   },
   "scientific": {
-   "accepted": 43,
+   "accepted": 48,
    "total": 48
   },
   "frozen": {
-   "accepted": 43,
+   "accepted": 48,
    "total": 48
   },
   "stale": false,
@@ -905,7 +905,7 @@ window.HB = {
    "stage": "WP2 · 自由能标签",
    "phase": "three",
    "tag": "48 行生产模板中已登记 43/48 个主态的真实 Opt+Freq 账本行（缺值不写 0）",
-   "summary": "状态：账本与系综规则已冻结；48 行生产模板中已登记 43/48 个主态的真实 Opt+Freq 账本行（其余行热校正保持为空，缺值不写 0）。已另跑 12 主集自由态 + Li 配位态 pilot（新增计算，方案 15.5/15.6），见下节。",
+   "summary": "状态：账本与系综规则已冻结；48 行生产模板中已登记 48/48 个主态的真实 Opt+Freq 账本行（其余行热校正保持为空，缺值不写 0）。已另跑 12 主集自由态 + Li 配位态 pilot（新增计算，方案 15.5/15.6），见下节。",
    "sections": [
     "交付",
     "验收（23/23 通过）",
@@ -1599,7 +1599,7 @@ window.HB = {
    "id": "F61",
    "file": "F61_physics_completion_ladder.png",
    "week": 44,
-   "caption": "E -> G -> ensemble 台阶（方案 WP3）：只有垂直->绝热这一级是冻结的（n=12，逐分子位移箭头），三态判定 55/9/2；G_single 已有 43/48 个主态的真实 Opt+Freq 生产标签，G_ensemble 与其余主态仍需 WP2 生产，故 ROBUST_INVERSION 只是标签不是已认证翻转",
+   "caption": "E -> G -> ensemble 台阶（方案 WP3）：只有垂直->绝热这一级是冻结的（n=12，逐分子位移箭头），三态判定 55/9/2；G_single 已有 48/48 个主态的真实 Opt+Freq 生产标签，G_ensemble 与其余主态仍需 WP2 生产，故 ROBUST_INVERSION 只是标签不是已认证翻转",
    "sha": "4df2b2b204a557e3e608c8db5348fa134f5d5f901580af8f2e7ec3d007da8305",
    "bytes": 179055,
    "w": 2592,
@@ -1736,7 +1736,7 @@ window.HB = {
   },
   {
    "label": "WP2 主态登记",
-   "value": "43 / 48 个主态通过严格科学 QC（缺值保持为空，未写 0）",
+   "value": "48 / 48 个主态通过严格科学 QC（缺值保持为空，未写 0）",
    "source": "docs/60_week39_wp2_free_energy_labels.md"
   },
   {
@@ -1746,7 +1746,7 @@ window.HB = {
   },
   {
    "label": "方案合规运行进度",
-   "value": "53 / 60；科学验收（四主态）43 / 48；总体判定未闭环（blocked_on_production）",
+   "value": "60 / 60；科学验收（四主态）48 / 48；总体判定未闭环（blocked_on_production）",
    "source": "outputs/physics_completion/compliance/plan_compliance.md"
   },
   {

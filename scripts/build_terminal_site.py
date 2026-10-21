@@ -436,9 +436,9 @@ def counts():
         # Recorded, not measured: pytest cannot be run from the generator.  Bump
         # it in the same commit that adds or removes a test, otherwise the page
         # will advertise a number the suite no longer produces.  (Measured on
-        # 2026-10-15: 1656 passed, 8 skipped, 14 pre-existing ORCA-subprocess
-        # failures that the sandbox blocks.)
-        "tests_passed": 1656,
+        # 2026-10-19: 1753 collected -> 1732 passed, 8 skipped, 13 pre-existing
+        # ORCA-subprocess failures that the sandbox blocks.)
+        "tests_passed": 1732,
     }
 
 

@@ -36,6 +36,8 @@ ENSEMBLES = REPO / "outputs" / "physics_completion" / "ensembles"
 #: status so that it can never be mistaken for the production R4 rung.
 SCREEN_STATUS = "computed_screen_only"
 KJ_PER_EV = 96.48533212331002
+#: 1 Hartree in eV (CODATA 2018).  The production ensemble labels carry Hartree.
+EH_PER_EV = 27.211386245988
 
 FOUR = [("C01", "DMC"), ("C02", "EMC"), ("C13", "GBL"), ("C14", "SL")]
 MAIN_STATES = ("M", "M_plus", "LiM_plus", "LiM_2plus")
@@ -86,6 +88,14 @@ def load_screen_pairs():
             for item in payload.get("pair_state_agreement", [])}
 
 
+def load_production_ensemble():
+    """(name, state) -> production ensemble label row, if that layer is on disk."""
+    path = ENSEMBLES / "production_ensemble_labels.csv"
+    if not path.is_file():
+        return {}
+    return {(row["name"], row["state"]): row for row in read_csv(path)}
+
+
 def load():
     return {
         "screen": load_screen_pairs(),
@@ -97,6 +107,7 @@ def load():
         "axis": read_csv(AUDIT / "axis_sensitivity.csv"),
         "gaps": read_csv(AUDIT / "pair_gap_sensitivity.csv"),
         "cert": json.loads((AUDIT / "robust_inversion_certification.json").read_text(encoding="utf-8")),
+        "production_ensemble": load_production_ensemble(),
     }
 
 
@@ -234,6 +245,83 @@ def _nums(row, keys):
     return values
 
 
+def r4_row(pair, i_name, j_name, labels):
+    """Production R4 rung = the ensemble free energies, i.e. `G_ensemble` per state.
+
+    ``delta = G_ensemble(M_plus) - G_ensemble(M)`` in eV, the SAME definition as
+    R3 (``Gox_single``), so the rungs stay comparable.  The M slot is the
+    def2-TZVPD neutral leg by construction (the ensemble manifest maps it).
+
+    Honesty rules (final-acceptance-label rebuild, v1.4.2):
+    * all four legs (both molecules x {M_plus, M}) must exist and be numerically
+      available, else the rung stays ``not_computed`` with the missing legs named;
+    * the acceptance_status of BOTH states of BOTH molecules is checked -- a
+      ``limited`` or ``provisional`` label on any leg makes the rung
+      non-computed.  A value may still be printed, but it must never be counted
+      as ``computed`` for the flip-persistence rung count;
+    * the LIMITED note carries each blocked leg's own ``limitation_reason``
+      verbatim from the labels (rescue_budget_exhausted and
+      species_drift_unrecoverable are different causes and must not be conflated);
+    * ``provisional`` (sampling still in progress) keeps its own status so a
+      bounded pool and an unfinished pool are never conflated either.
+    """
+    legs = {"%s|%s" % (name, state): (labels.get((name, state)) or {})
+            for name in (i_name, j_name) for state in ("M_plus", "M")}
+    try:
+        i_gap = float(legs["%s|M_plus" % i_name]["g_ensemble_eh"]) - \
+            float(legs["%s|M" % i_name]["g_ensemble_eh"])
+        j_gap = float(legs["%s|M_plus" % j_name]["g_ensemble_eh"]) - \
+            float(legs["%s|M" % j_name]["g_ensemble_eh"])
+    except (KeyError, TypeError, ValueError):
+        missing = sorted(key for key, row in legs.items() if not row.get("g_ensemble_eh"))
+        return {
+            "pair": pair, "rung": "R4", "rung_kind": "conformer_ensemble",
+            "rung_detail": ("production ensemble: G_ensemble(M_plus) - G_ensemble(M), "
+                            "same definition as R3"),
+            "i": i_name, "j": j_name, "delta_ev": "", "n_values": "0", "sign": "",
+            "sign_stable_across_settings": "", "status": "not_computed",
+            "note": ("ensemble free energy unavailable for %s" % ", ".join(missing)
+                     if missing else "ensemble labels present but unparsable"),
+        }
+    value = (i_gap - j_gap) * EH_PER_EV
+    n_members = {name: (labels.get((name, "M_plus")) or {}).get("n_unique", "")
+                 for name in (i_name, j_name)}
+    limited = sorted(key for key, row in legs.items()
+                     if row.get("acceptance_status") == "limited")
+    provisional = sorted(key for key, row in legs.items()
+                         if row.get("acceptance_status") == "provisional")
+    note = ("delta = G_ensemble(M_plus) - G_ensemble(M), same definition as R3; "
+            "n_unique M_plus: %s" % ", ".join("%s=%s" % (n, n_members[n])
+                                              for n in (i_name, j_name)))
+    if limited:
+        reasons = ", ".join("%s (%s)" % (key, (legs[key].get("limitation_reason")
+                                               or "reason_unregistered"))
+                            for key in limited)
+        note += ("; LIMITED: %s -- bounded-coverage value, "
+                 "NOT counted as computed" % reasons)
+    if provisional:
+        note += ("; PROVISIONAL: %s -- sampling still in progress, "
+                 "NOT counted as computed" % ", ".join(provisional))
+    if limited:
+        status = "limited"
+    elif provisional:
+        status = "provisional"
+    else:
+        status = "computed"
+    return {
+        "pair": pair, "rung": "R4", "rung_kind": "conformer_ensemble",
+        "rung_detail": ("production ensemble: G_ensemble(M_plus) - G_ensemble(M), "
+                        "same definition as R3"),
+        "i": i_name, "j": j_name,
+        "delta_ev": "%.6f" % value,
+        "n_values": "1",
+        "sign": "positive" if value > 0 else "negative",
+        "sign_stable_across_settings": "n/a",
+        "status": status,
+        "note": note,
+    }
+
+
 def flip_ladder(data):
     gaps = {(row["i"], row["j"]): row for row in data["gaps"]}
     redox_by_name, production = mol_lookup(data)
@@ -289,14 +377,7 @@ def flip_ladder(data):
                 "note": ("delta = Eox(i) - Eox(j); " + "; ".join(missing)) if missing
                         else "delta = Eox(i) - Eox(j), single conformer",
             })
-        rows.append({
-            "pair": pair, "rung": "R4", "rung_kind": "conformer_ensemble",
-            "rung_detail": "conformational sampling (plan 6.1: up to 3 then 6 structures)",
-            "i": i_name, "j": j_name, "delta_ev": "", "n_values": "0", "sign": "",
-            "sign_stable_across_settings": "", "status": "not_computed",
-            "note": ("no PRODUCTION ensemble exists yet: every produced state still carries "
-                     "n_conformers=1; the screen-level ensemble is reported separately as R4_screen"),
-        })
+        rows.append(r4_row(pair, i_name, j_name, data.get("production_ensemble") or {}))
         screen = data.get("screen", {}).get((i_name, j_name)) or {}
         free_gap = screen.get("free_ionisation_gap_kj") or {}
         li_gap = screen.get("Li_conditioned_gap_kj") or {}
@@ -437,16 +518,21 @@ def acceptance(state_rows, label_rows, ladder_rows, summary, data):
         "ok": str(li_ok).lower(),
         "detail": "li_states_produced=%d" % n_li,
     })
-    filled = ("computed", SCREEN_STATUS)
+    # A printed value is allowed for "computed", the screen-level rung, the
+    # bounded-coverage "limited" rung and the "provisional" rung; the latter
+    # two are never counted as computed.
+    filled = ("computed", SCREEN_STATUS, "limited", "provisional")
     ladder_explicit = all((row["delta_ev"] != "") == (row["status"] in filled) for row in ladder_rows)
     rows.append({
         "check_id": "flip_ladder_marks_uncomputed_rungs",
-        "description": "翻转阶梯：未计算的一级显式标 not_computed、不推断符号；筛选层的值只准带 computed_screen_only",
+        "description": "翻转阶梯：未计算的一级显式标 not_computed、不推断符号；筛选层的值只准带 computed_screen_only；R4 按最终验收标签分流：救援预算耗尽/池受限只准带 limited、采样未完成只准带 provisional，且都必须写明 NOT counted as computed",
         "ok": str(ladder_explicit).lower(),
-        "detail": "rungs=%d computed=%d screen_only=%d" % (
+        "detail": "rungs=%d computed=%d screen_only=%d limited=%d provisional=%d" % (
             len(ladder_rows),
             sum(1 for row in ladder_rows if row["status"] == "computed"),
-            sum(1 for row in ladder_rows if row["status"] == SCREEN_STATUS)),
+            sum(1 for row in ladder_rows if row["status"] == SCREEN_STATUS),
+            sum(1 for row in ladder_rows if row["status"] == "limited"),
+            sum(1 for row in ladder_rows if row["status"] == "provisional")),
     })
     screen_rows = [row for row in ladder_rows if row["rung_kind"] == "screen_gfn2_ensemble"]
     screen_labelled = all(
@@ -523,6 +609,188 @@ def acceptance(state_rows, label_rows, ladder_rows, summary, data):
         "detail": "rows=%d" % len(label_rows),
     })
     return rows
+
+
+def rung_rebuild_report(ladder_rows, labels, data):
+    """The WP3 flip-ladder + ordering evidence rebuilt on the FINAL acceptance labels.
+
+    Answers, from the frozen artifacts only:
+    * the 12 rung cells (2 pairs x 6 rungs) with their current value and status;
+    * the exact attribution of every non-computed rung: which leg, which
+      acceptance_status, which limitation_reason;
+    * the accepted-only Top-3 on the oxidation axis `G_ensemble(M_plus) - G_ensemble(M)`
+      and the RT ln N bound sensitivity: if every limited/provisional state were
+      replaced by its true value, could the Top-3 change?  The bound column
+      `lowering_bound_rt_ln_n_kcal` is the maximum extra lowering a completed
+      pool could still add, so each molecule's gap lies inside
+      [gap - b(M_plus), gap + b(M)].  The report states differences and bounds
+      ONLY -- it never declares the ranking converged.
+    """
+    by_name = {}
+    for (name, state), row in (labels or {}).items():
+        by_name.setdefault(name, {})[state] = row
+    kcal_per_ev = KJ_PER_EV / 4.184
+    gap_rows = []
+    for name in sorted(by_name):
+        states = by_name[name]
+        m_plus, m = states.get("M_plus", {}), states.get("M", {})
+        if not m_plus.get("g_ensemble_eh") or not m.get("g_ensemble_eh"):
+            gap_rows.append({"name": name, "gap_ev": None, "lo_ev": None, "hi_ev": None,
+                             "m_plus_status": m_plus.get("acceptance_status", "absent"),
+                             "m_status": m.get("acceptance_status", "absent"),
+                             "m_plus_reason": m_plus.get("limitation_reason", ""),
+                             "m_reason": m.get("limitation_reason", ""),
+                             "both_accepted": False})
+            continue
+        gap = (float(m_plus["g_ensemble_eh"]) - float(m["g_ensemble_eh"])) * EH_PER_EV
+        b_plus = float(m_plus.get("lowering_bound_rt_ln_n_kcal") or 0) / kcal_per_ev
+        b_m = float(m.get("lowering_bound_rt_ln_n_kcal") or 0) / kcal_per_ev
+        both = (m_plus.get("acceptance_status") == "accepted"
+                and m.get("acceptance_status") == "accepted")
+        gap_rows.append({"name": name, "gap_ev": gap, "lo_ev": gap - b_plus, "hi_ev": gap + b_m,
+                         "m_plus_status": m_plus.get("acceptance_status", ""),
+                         "m_status": m.get("acceptance_status", ""),
+                         "m_plus_reason": m_plus.get("limitation_reason", ""),
+                         "m_reason": m.get("limitation_reason", ""),
+                         "both_accepted": both})
+    ranked = sorted((row for row in gap_rows if row["both_accepted"]),
+                    key=lambda row: -row["gap_ev"])
+    top3 = [row["name"] for row in ranked[:3]]
+    floor3 = ranked[2]["gap_ev"] if len(ranked) >= 3 else None
+
+    lines = [
+        "# WP3 翻转阶梯与排序证据：最终验收标签重建（derived）",
+        "",
+        "> 由 `scripts/wp_production/build_wp2_closure.py` 从冻结产物只读派生：",
+        "> `closure/flip_persistence.csv`（翻转阶梯本体）与",
+        "> `ensembles/production_ensemble_labels.csv`（最终验收标签 accepted/provisional/limited）。",
+        "> 零新增电子结构计算；limited/provisional 态的数值不冒充 computed；空值不是零。",
+        "> **本报告不判排序收敛**，只报差异与 bound。",
+        "",
+        "## 1. 翻转阶梯 12 格现值（2 对 x 6 级）",
+        "",
+        "| pair | rung | delta (eV) | sign | status | 缺口归因 |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in ladder_rows:
+        reason = ""
+        if row["status"] == "not_computed":
+            reason = row["note"]
+        elif row["status"] == "limited":
+            reason = "R4 腿含 limited 态（见 note 的逐腿归因）"
+        elif row["status"] == "provisional":
+            reason = "R4 腿含 provisional 态（采样未完成）"
+        elif row["status"] == SCREEN_STATUS:
+            reason = "筛选层（气相 GFN2），按纪律不计入 computed"
+        lines.append("| %s | %s | %s | %s | %s | %s |" % (
+            row["pair"], row["rung"],
+            row["delta_ev"] or "—", row["sign"] or "—", row["status"], reason or "—"))
+    n_computed = sum(1 for row in ladder_rows if row["status"] == "computed")
+    n_limited = sum(1 for row in ladder_rows if row["status"] == "limited")
+    n_prov = sum(1 for row in ladder_rows if row["status"] == "provisional")
+    n_screen = sum(1 for row in ladder_rows if row["status"] == SCREEN_STATUS)
+    n_nc = sum(1 for row in ladder_rows if row["status"] == "not_computed")
+    lines += [
+        "",
+        "计数：computed=%d / %d；limited=%d（有值但不计 computed）；provisional=%d；"
+        "computed_screen_only=%d（另一档，不计 computed）；not_computed=%d。" % (
+            n_computed, len(ladder_rows), n_limited, n_prov, n_screen, n_nc),
+        "",
+        "## 2. 四个非 computed 级的逐腿归因",
+        "",
+    ]
+    for row in ladder_rows:
+        if row["status"] == "computed":
+            continue
+        lines.append("### %s / %s（status=%s）" % (row["pair"], row["rung"], row["status"]))
+        lines.append("")
+        lines.append("note 原文：" + row["note"])
+        if row["rung"] == "R4":
+            lines.append("")
+            lines.append("逐腿验收状态（来自生产系综标签）：")
+            lines.append("")
+            lines.append("| 腿 | acceptance_status | limitation_reason | n_unique |")
+            lines.append("| --- | --- | --- | --- |")
+            for name in (row["i"], row["j"]):
+                for state in ("M_plus", "M"):
+                    leg = by_name.get(name, {}).get(state, {})
+                    lines.append("| %s&#124;%s | %s | %s | %s |" % (
+                        name, state, leg.get("acceptance_status", "absent"),
+                        leg.get("limitation_reason", "") or "—", leg.get("n_unique", "—")))
+        lines.append("")
+    lines += [
+        "## 3. accepted 标签下的氧化轴排序与 RT ln N bound 敏感性",
+        "",
+        "排序量 = `G_ensemble(M_plus) - G_ensemble(M)`（eV，与 R3/R4 同定义）；",
+        "两腿都 accepted 的分子才计入 computed 排序。对含 limited/provisional 腿的分子，",
+        "受限池漏掉的更低极小只会把 `G_ensemble` 再往下拉，所以其 gap 落在",
+        "`[gap - b(M_plus), gap + b(M)]`，`b = lowering_bound_rt_ln_n_kcal`（RT ln N 上限）。",
+        "",
+        "| 分子 | gap (eV) | M_plus 腿 | M 腿 | bound 区间 [lo, hi] |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for row in sorted(gap_rows, key=lambda item: -(item["gap_ev"] or -99)):
+        lines.append("| %s | %s | %s | %s | %s |" % (
+            row["name"],
+            "—" if row["gap_ev"] is None else "%.4f" % row["gap_ev"],
+            "%s%s" % (row["m_plus_status"], ("（%s）" % row["m_plus_reason"]) if row["m_plus_reason"] and row["m_plus_status"] != "accepted" else ""),
+            "%s%s" % (row["m_status"], ("（%s）" % row["m_reason"]) if row["m_reason"] and row["m_status"] != "accepted" else ""),
+            "—" if row["lo_ev"] is None else "[%.4f, %.4f]" % (row["lo_ev"], row["hi_ev"])))
+    lines += [
+        "",
+        "**accepted-only Top-3 = %s**（n=%d 个两腿 accepted 的分子）。" % (
+            " > ".join(top3) if top3 else "不可得", len(ranked)),
+    ]
+    if floor3 is not None:
+        floor_row = ranked[2]
+        contenders = sorted((row for row in gap_rows if not row["both_accepted"]),
+                            key=lambda row: -(row["hi_ev"] or -99))
+        can_flip = [row for row in contenders
+                    if row["hi_ev"] is not None and row["hi_ev"] > floor3]
+        lines += [
+            "",
+            "Top-3 地板 = %s 的 %.4f eV。若 11 个 limited 态全部换成真值（各分子在其 bound 区间内任意取值）：" % (
+                floor_row["name"], floor3),
+            "",
+            "| 分子 | 当前 gap | 区间上界 hi | 上界能否越过 Top-3 地板 |",
+            "| --- | --- | --- | --- |",
+        ]
+        for row in contenders:
+            if row["hi_ev"] is None:
+                continue
+            lines.append("| %s | %s | %.4f | %s |" % (
+                row["name"],
+                "—" if row["gap_ev"] is None else "%.4f" % row["gap_ev"],
+                row["hi_ev"],
+                "**能**" if row["hi_ev"] > floor3 else "不能"))
+        lines += [
+            "",
+        ]
+        zero_bound = [row["name"] for row in contenders
+                      if row["hi_ev"] is not None and row["hi_ev"] == row["lo_ev"]]
+        if zero_bound:
+            lines.append("注意：%s 的 RT ln N bound = 0（n_unique = 1，RT ln 1 = 0）。" % ", ".join(zero_bound))
+            lines.append("该界只覆盖**已计入池的 N 个成员**；limited 态漏掉的独立盆地不在 N 里，")
+            lines.append("所以这些分子的真值下降**可能超过**其 RT ln N 上界——上表对 bound=0 分子的")
+            lines.append("「不能」判定是**弱证据**（对 bound>0 分子才有约束力）。")
+            lines.append("")
+        if can_flip:
+            names = ", ".join(row["name"] for row in can_flip)
+            lines.append("**结论：Top-3 未被 bound 覆盖。** %s 的区间上界都越过 accepted Top-3 的地板，" % names)
+            lines.append("若 limited 态全部换成真值，Top-3 **可能**改写（当前值已越线者可直接改写；")
+            lines.append("仅上界越线者的改写依赖其真值落点）。差异与 bound 如上，**不判排序收敛**。")
+        else:
+            lines.append("**结论：Top-3 被 bound 覆盖**——所有非 accepted 分子的区间上界都不越过")
+            lines.append("accepted Top-3 的地板，即真值替换后 accepted Top-3 至少保持不变")
+            lines.append("（以 RT ln N 界为条件；bound=0 分子除外，见上）。")
+        lines += [
+            "",
+            "口径提醒：`lowering_bound_rt_ln_n_kcal = RT ln N` 是**已计入池采样完备时额外下降的数学上限**，",
+            "不是真值的点估计，也不覆盖未采到的独立盆地；bound 覆盖不等于排序收敛，",
+            "二者都不是收敛判据（按 2026-10-19 决定）。",
+            "",
+        ]
+    return "\n".join(lines)
 
 
 def build():
@@ -676,6 +944,8 @@ def build():
         "outputs/physics_completion/closure/closure_acceptance.csv":
             csv_text(ACC_FIELDS, acceptance_rows),
         "outputs/physics_completion/closure/closure_summary.md": "\n".join(md),
+        "outputs/physics_completion/closure/wp3_rung_rebuild_report.md":
+            rung_rebuild_report(ladder_rows, data.get("production_ensemble") or {}, data),
     }
 
 

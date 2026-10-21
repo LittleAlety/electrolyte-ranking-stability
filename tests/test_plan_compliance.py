@@ -208,8 +208,11 @@ def test_four_molecule_ledger_is_explicitly_a_pilot_subset() -> None:
 
 def test_production_ensemble_uses_the_48_state_denominator() -> None:
     row = {r["item_id"]: r for r in _rows()}["wp2_conformer_ensemble"]
-    assert "production_ensemble_labels=" in row["measured"]
+    # v1.4.1 §2.2: only acceptance_status=accepted rows enter the formal
+    # denominator; provisional/limited are reported but never counted.
+    assert "production_ensemble accepted=" in row["measured"]
     assert "/48" in row["measured"]
+    assert "provisional=" in row["measured"]
     assert "screen_gfn2_rows=" in row["measured"]
 
 

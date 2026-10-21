@@ -15,7 +15,7 @@
 | C04|LiM_plus | EC | LiM_plus | 10 | 10 | 1 | production_motif_within_1kj | monodentate_donor4 |
 | C04|LiM_2plus | EC | LiM_2plus | 10 | 9 | 1 | production_motif_within_1kj | monodentate_donor4 |
 | C05|LiM_plus | PC | LiM_plus | 10 | 10 | 1 | production_motif_within_1kj | monodentate_donor5 |
-| C05|LiM_2plus | PC | LiM_2plus | 10 | 10 | 1 | production_motif_within_1kj | monodentate_donor5 |
+| C05|LiM_2plus | PC | LiM_2plus | 10 | 9 | 1 | production_motif_within_1kj | monodentate_donor5 |
 | C08|LiM_plus | DME | LiM_plus | 7 | 7 | 1 | production_motif_is_lowest | bidentate_donors1_4 |
 | C08|LiM_2plus | DME | LiM_2plus | 7 | 7 | 1 | production_motif_within_1kj | bidentate_donors1_4 |
 | C09|LiM_plus | DOL | LiM_plus | 7 | 7 | 1 | production_motif_within_1kj | bidentate_donors2_4 |
@@ -47,7 +47,7 @@
 | C04|LiM_plus | 1 | 0.000 | monodentate_donor4 | 4 | 1.6593 | `work/limotif/C04_LiM_plus/C04_LiM_plus_c06/xtbopt.xyz` |
 | C04|LiM_2plus | 1 | 0.000 | monodentate_donor4 | 4 | 1.8486 | `work/limotif/C04_LiM_2plus/C04_LiM_2plus_c03/xtbopt.xyz` |
 | C05|LiM_plus | 1 | 0.000 | monodentate_donor5 | 5 | 1.6541 | `work/limotif/C05_LiM_plus/C05_LiM_plus_c01/xtbopt.xyz` |
-| C05|LiM_2plus | 1 | 0.000 | monodentate_donor5 | 5 | 1.7993 | `work/limotif/C05_LiM_2plus/C05_LiM_2plus_c05/xtbopt.xyz` |
+| C05|LiM_2plus | 1 | 0.000 | monodentate_donor5 | 5 | 1.7986 | `work/limotif/C05_LiM_2plus/C05_LiM_2plus_c04/xtbopt.xyz` |
 | C08|LiM_plus | 1 | 0.000 | bidentate_donors1_4 | 1,4 | 1.7978 | `work/limotif/C08_LiM_plus/C08_LiM_plus_c00/xtbopt.xyz` |
 | C08|LiM_2plus | 1 | 0.000 | bidentate_donors1_4 | 1,4 | 1.9288 | `work/limotif/C08_LiM_2plus/C08_LiM_2plus_c01/xtbopt.xyz` |
 | C09|LiM_plus | 1 | 0.000 | bidentate_donors2_4 | 2,4 | 1.9738 | `work/limotif/C09_LiM_plus/C09_LiM_plus_c02/xtbopt.xyz` |

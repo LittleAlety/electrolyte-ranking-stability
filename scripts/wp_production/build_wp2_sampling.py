@@ -42,6 +42,12 @@ WP2PROD = REPO / "work" / "wp2prod"
 RAW = WORK / "xtb_results.csv"
 OUTDIR = REPO / "outputs" / "physics_completion" / "sampling"
 
+#: Sibling generators also write into ``sampling/``; each prefix names its owner
+#: so this generator's ``--check`` never reports another generator's artifacts as
+#: stray.  ``sampling_audit*`` = build_sampling_audit_3to6.py,
+#: ``sampling_3to6_diff*`` = build_sampling_3to6_diff.py.
+SIBLING_ARTIFACT_PREFIXES = ("sampling_audit", "sampling_3to6_diff")
+
 XTB = Path(r"E:\orca_6_1_1\xtb-6.7.1pre\xtb.exe")
 HA_TO_KCAL = 627.5094740631
 N_CONFORMERS = 12
@@ -720,10 +726,15 @@ def main(argv=None):
             elif target.read_text(encoding="utf-8") != text:
                 failures.append("differs %s" % rel)
         if OUTDIR.is_dir():
+            # Only files this generator OWNS can be "stray": sampling/ is shared
+            # with other registered generators, and a generator must never flag a
+            # sibling generator's artifacts.  Each prefix names its owner:
+            #   sampling_audit*      -> build_sampling_audit_3to6.py
+            #   sampling_3to6_diff*  -> build_sampling_3to6_diff.py
             for path in sorted(OUTDIR.rglob("*")):
                 if path.is_file():
                     rel = path.relative_to(REPO).as_posix()
-                    if rel not in files:
+                    if rel not in files and not path.name.startswith(SIBLING_ARTIFACT_PREFIXES):
                         failures.append("stray %s" % rel)
         if failures:
             print("CHECK FAILED (%d)" % len(failures))

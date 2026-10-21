@@ -666,3 +666,29 @@ MAX step            0.0001500000            0.0002000000      YES
     assert result["max_gradient_Eh_per_Bohr"] == pytest.approx(2e-5)
     with pytest.raises(ValueError, match="final criterion not met"):
         mod.enforce_geometry_convergence(table.replace("0.0000200000", "0.0000400000"), inp)
+
+
+def test_verytight_first_point_convergence_without_energy_row():
+    """A leg already VeryTight-clean at its FIRST check never moves, so ORCA
+    prints no "Energy change" row.  The four geometry criteria must still be
+    enforced at frozen thresholds; a bad gradient still rejects, and a table
+    missing a geometry row is still rejected outright."""
+    inp = "! wB97X-D4 def2-TZVPD Opt NumFreq SMD(acetonitrile) VeryTightOpt TightSCF SlowConv\n"
+    table = """
+----------------------|Geometry convergence|-------------------------
+Item                value                   Tolerance       Converged
+RMS gradient        0.0000018688            0.0000080000      YES
+MAX gradient        0.0000060333            0.0000300000      YES
+RMS step            0.0000087907            0.0001000000      YES
+MAX step            0.0000208560            0.0002000000      YES
+"""
+    result = mod.enforce_geometry_convergence(table, inp)
+    assert result["tier"] == "verytight"
+    assert "energy_change_Eh" not in result
+    assert result["energy_change_absent"].startswith("first_point_convergence")
+    with pytest.raises(ValueError, match="final criterion not met"):
+        mod.enforce_geometry_convergence(
+            table.replace("0.0000018688", "0.0000900000"), inp)
+    with pytest.raises(ValueError, match="missing complete final geometry"):
+        mod.enforce_geometry_convergence(table.replace(
+            "RMS step            0.0000087907            0.0001000000      YES\n", ""), inp)

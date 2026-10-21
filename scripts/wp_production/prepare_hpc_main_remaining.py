@@ -18,7 +18,12 @@ def digest(data):
 
 
 def input_text(method, charge, mult):
-    text = (f"! {method} Opt NumFreq SMD(acetonitrile) VeryTightOpt TightSCF SlowConv\n"
+    """Frozen production grammar, protocol v1.3 (analytical Hessian).
+
+    The frequency keyword changed from ``NumFreq`` to ``AnFreq`` on 2026-10-17
+    cohort-wide; see ``orca_derivative_policy`` for the audit evidence.
+    """
+    text = (f"! {method} Opt AnFreq SMD(acetonitrile) VeryTightOpt TightSCF SlowConv\n"
             "%maxcore 2000\n%pal nprocs 4 end\n%scf MaxIter 300 end\n"
             f"* xyzfile {charge} {mult} geom.xyz\n")
     require_analytic_gradient(text, minimum_optimization_tier="verytight")

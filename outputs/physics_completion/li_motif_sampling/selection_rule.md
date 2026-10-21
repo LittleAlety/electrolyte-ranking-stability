@@ -79,7 +79,7 @@
 | C04|LiM_plus | 10 | 10 | 1 | production_motif_within_1kj | monodentate_donor4 |
 | C04|LiM_2plus | 10 | 9 | 1 | production_motif_within_1kj | monodentate_donor4 |
 | C05|LiM_plus | 10 | 10 | 1 | production_motif_within_1kj | monodentate_donor5 |
-| C05|LiM_2plus | 10 | 10 | 1 | production_motif_within_1kj | monodentate_donor5 |
+| C05|LiM_2plus | 10 | 9 | 1 | production_motif_within_1kj | monodentate_donor5 |
 | C08|LiM_plus | 7 | 7 | 1 | production_motif_is_lowest | bidentate_donors1_4 |
 | C08|LiM_2plus | 7 | 7 | 1 | production_motif_within_1kj | bidentate_donors1_4 |
 | C09|LiM_plus | 7 | 7 | 1 | production_motif_within_1kj | bidentate_donors2_4 |
@@ -99,7 +99,7 @@
 > 本次运行记录覆盖 24/24 条腿；其余 0 条腿保持 `not_computed`，等执行器重跑后补齐。
 
 
-## 验收（12/13 通过）
+## 验收（13/13 通过）
 
 | check | ok | detail |
 | --- | --- | --- |
@@ -114,7 +114,7 @@
 | budget_uses_the_measured_li_pilot_cost | PASS | 24 legs measured round-0 core-hours = 2.413335 (sum of cores x wall over the Li pilot single points); round-1 starts per leg = 16 |
 | screen_claims_match_the_run_record | PASS | run record present: 24/24 legs carry an outcome (23 computed, 1 unresolved); 0 leg(s) without a record stay not_computed; stray record legs: none |
 | sampling_index_does_not_claim_a_leg_this_layer_never_screened | PASS | all sampling_index computed claims are backed by a run-record leg |
-| screen_parent_geometries_are_current | FAIL | stale parent geometry for: C05|LiM_2plus |
+| screen_parent_geometries_are_current | PASS | all 24 screened parents unchanged |
 | uncomputed_legs_are_registered_as_uncomputed | PASS | 24/24 legs carry a run-record outcome; the remaining 0 stay not_computed (re-run scripts/wp_production/screen_li_motifs.py to close the gap) |
 
 ## 边界

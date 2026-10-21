@@ -16,6 +16,7 @@ import subprocess
 import sys
 
 import run_wp2_production as prod
+import orca_derivative_policy as derivative_policy
 from orca_derivative_policy import require_analytic_gradient
 
 
@@ -40,14 +41,23 @@ def finalize_wp2(python_executable=sys.executable):
 
 
 def validate_input(value, method, charge, mult, label):
-    """Accept only the frozen production grammar, never arbitrary ORCA blocks."""
+    """Accept only the frozen production grammar, never arbitrary ORCA blocks.
+
+    Protocol v1.3 moved the frequency keyword from ``NumFreq`` to ``AnFreq``
+    cohort-wide.  The superseded ``NumFreq`` grammar is still accepted for the
+    already-finished v1.2 legs (they remain readable as Hessian-method
+    sensitivity evidence), so this validator accepts either keyword and reports
+    which one the input used.
+    """
     require_analytic_gradient(value, require_opt=(label == "source"))
     lines = [line.strip() for line in value.splitlines() if line.strip()]
     keyword_lines = [line for line in lines if line.startswith("!")]
     if len(keyword_lines) != 1:
         raise ValueError(f"{label} requires exactly one keyword line")
     tokens = keyword_lines[0][1:].lower().split()
-    required = set((method + " NumFreq SMD(acetonitrile) TightSCF SlowConv").lower().split())
+    freq_keyword = derivative_policy.require_frequency_keyword(value, allow_superseded=True)
+    required = set((method + " SMD(acetonitrile) TightSCF SlowConv").lower().split())
+    required.add(freq_keyword)
     allowed_geometry = {"opt", "tightopt", "verytightopt"}
     if len(tokens) != len(set(tokens)) or not required <= set(tokens) or set(tokens) - required - allowed_geometry:
         raise ValueError(f"{label} method/keyword mismatch")
@@ -156,6 +166,11 @@ def validate(source, name, state, mol_id, root=prod.REPO):
     method, charge, mult = next((m, c, u) for s, m, c, u in prod.STATES if s == state)
     for label, value in (("HPC", inp), ("source", old_input)):
         validate_input(value, method, charge, mult, label)
+    # Report the keyword the HPC input actually used (AnFreq under v1.3, or the
+    # superseded NumFreq for v1.2 legs) so the ledger's level string never claims
+    # a Hessian algorithm the job did not run.
+    freq_label = "AnFreq" if derivative_policy.require_frequency_keyword(
+        inp, allow_superseded=True) == derivative_policy.PRODUCTION_FREQUENCY_KEYWORD else "NumFreq"
     for line in inp.splitlines():
         if line.strip() and line.strip() not in text:
             raise ValueError("HPC input not echoed in output")
@@ -202,7 +217,8 @@ def validate(source, name, state, mol_id, root=prod.REPO):
     positive = [x for x in freqs if x > 1.0]
     row = dict(fields, record_id=f"{mol_id}|{state}", mol_id=mol_id, name=name, state=state,
                charge=str(charge), multiplicity=str(mult), method=method,
-               solvent="SMD_acetonitrile", level=f"{method} SMD(acetonitrile) Opt NumFreq (qRRHO={fields['qrrho']})",
+               solvent="SMD_acetonitrile",
+               level=f"{method} SMD(acetonitrile) Opt {freq_label} (qRRHO={fields['qrrho']})",
                geometry_start=prod.repo_relative(paths["source_opt_geometry"]),
                geometry_start_level="HPC_continuation_from_converged_Opt",
                e_sp_eh=fields["electronic_eh"], std_state_corr_eh=f"{prod.STD_STATE_EH:.8f}",

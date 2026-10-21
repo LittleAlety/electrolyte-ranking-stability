@@ -107,7 +107,20 @@ RE_CONVERGENCE_ROW = re.compile(
 
 
 def final_geometry_convergence(text):
-    """Extract the last complete five-row ORCA geometry convergence table."""
+    """Extract the last complete ORCA geometry convergence table.
+
+    Complete means the four geometry criteria (gradient/step, 12 entries).  The
+    ``Energy change`` row (3 more) only appears once the optimizer has a previous
+    energy point to compare against: a leg whose start geometry is ALREADY
+    VeryTight-clean converges at the first check without ever moving an atom, so
+    ORCA prints no Delta-E row at all (v1.3 rescue runs do exactly this).
+    Demanding all 15 entries there would reject the legs that need no work.
+    An energy row, when printed, must still be complete -- see below.
+    """
+    geometry_keys = tuple(key for label in ("RMS gradient", "MAX gradient",
+                                            "RMS step", "MAX step")
+                          for key in CONVERGENCE_ITEMS[label])
+    energy_keys = CONVERGENCE_ITEMS["Energy change"]
     complete = []
     for block in text.split("|Geometry convergence|")[1:]:
         rows = {}
@@ -116,7 +129,10 @@ def final_geometry_convergence(text):
             rows[value_key] = abs(float(value))
             rows[tolerance_key] = float(tolerance)
             rows[value_key + "_printed_status"] = printed_status.lower()
-        if len(rows) == 15:
+        geom_ok = all(key in rows for key in geometry_keys)
+        energy_present = any(key in rows for key in energy_keys)
+        energy_ok = all(key in rows for key in energy_keys)
+        if geom_ok and (energy_ok or not energy_present):
             complete.append(rows)
     if not complete:
         raise ValueError("missing complete final geometry convergence table")
@@ -135,6 +151,15 @@ def enforce_geometry_convergence(text, input_text):
     if tier != "verytight":
         return result
     for _label, (value_key, tolerance_key) in CONVERGENCE_ITEMS.items():
+        if value_key not in values:
+            # Only reachable for "Energy change": first-point convergence means
+            # the geometry never moved, so Delta-E is identically zero and ORCA
+            # prints no row.  Record the gap instead of inventing a value.
+            if _label == "Energy change" and tolerance_key not in values:
+                result["energy_change_absent"] = (
+                    "first_point_convergence_geometry_never_moved")
+                continue
+            raise ValueError("incomplete convergence row for %s" % _label)
         frozen = float(derivative_policy.VERY_TIGHT_THRESHOLDS[tolerance_key])
         if not math.isclose(values[tolerance_key], frozen, rel_tol=0.0, abs_tol=5e-12):
             raise ValueError("VeryTightOpt tolerance mismatch for %s" % tolerance_key)
@@ -495,6 +520,10 @@ def validate(run_dir: Path, start_level: str, root=prod.REPO):
     inp = blobs["hpc_input"].decode("utf-8")
     method, charge, mult = ALL_STATES[state]
     validate_production_input(inp, method, charge, mult, start_level)
+    # Record which Hessian algorithm this leg actually ran (AnFreq under v1.3,
+    # NumFreq for superseded v1.2 legs) rather than assuming the current one.
+    freq_label = "AnFreq" if derivative_policy.require_frequency_keyword(
+        inp, allow_superseded=True) == derivative_policy.PRODUCTION_FREQUENCY_KEYWORD else "NumFreq"
     geometry_convergence = enforce_geometry_convergence(text, inp)
     tokens = {token.lower() for token in re.findall(r"\S+", inp.split("\n", 1)[0].lstrip("!"))}
     if "opt" not in tokens or not ({"tightopt", "verytightopt"} & tokens):
@@ -594,7 +623,7 @@ def validate(run_dir: Path, start_level: str, root=prod.REPO):
     row = dict(fields, record_id="%s|%s" % (mol_id, state), mol_id=mol_id, name=name, state=state,
                charge=str(charge), multiplicity=str(mult), method=method,
                solvent="SMD_acetonitrile",
-               level="%s SMD(acetonitrile) Opt NumFreq (qRRHO=%s)" % (method, fields["qrrho"]),
+               level="%s SMD(acetonitrile) Opt %s (qRRHO=%s)" % (method, freq_label, fields["qrrho"]),
                geometry_start=prod.repo_relative(paths["start_geometry"]),
                geometry_start_level=start_level,
                geometry_start_sha256=start_sha,

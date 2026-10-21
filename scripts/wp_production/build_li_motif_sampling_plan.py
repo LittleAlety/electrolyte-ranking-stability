@@ -93,6 +93,17 @@ SCREEN_OUTPUTS = (
     "outputs/physics_completion/li_motif_sampling/li_motif_screen.json",
     "outputs/physics_completion/li_motif_sampling/li_motif_screen.md",
 )
+#: Outputs owned by the ROUND-2 layers (`build_li_motif_plan_round2.py` and
+#: `run_li_motif_round2.py`).  This layer neither writes nor verifies them; they
+#: are listed so the stray check does not claim another layer's files (and so it
+#: never suggests deleting them).
+ROUND2_OUTPUTS = (
+    "outputs/physics_completion/li_motif_sampling/li_motif_plan_round2.csv",
+    "outputs/physics_completion/li_motif_sampling/li_motif_plan_round2_index.json",
+    "outputs/physics_completion/li_motif_sampling/li_motif_round2_exec.csv",
+    "outputs/physics_completion/li_motif_sampling/li_motif_round2_exec.md",
+    "outputs/physics_completion/li_motif_sampling/li_motif_round2_exec_index.json",
+)
 
 PLAN_FIELDS = ("record_id", "mol_id", "name", "state", "charge", "multiplicity",
                "screen_level", "round0_identity", "round0_donor_contacts", "round0_li_o_ang",
@@ -501,7 +512,8 @@ def main(argv=None):
             for path in sorted(OUT.rglob("*")):
                 if path.is_file():
                     rel = path.relative_to(REPO).as_posix()
-                    if rel not in files and rel not in SCREEN_OUTPUTS:
+                    if rel not in files and rel not in SCREEN_OUTPUTS \
+                            and rel not in ROUND2_OUTPUTS:
                         failures.append("stray %s" % rel)
         if failures:
             print("CHECK FAILED (%d)" % len(failures))

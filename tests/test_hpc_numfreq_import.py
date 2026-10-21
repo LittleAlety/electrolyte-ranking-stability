@@ -60,7 +60,13 @@ def test_actual_old_mixed_restart_is_rejected(state):
     source = SCRIPTS.parents[1] / "work/hpc_results/3650157"
     if not source.exists():
         pytest.skip("external raw results unavailable")
-    with pytest.raises(ValueError, match="mixed_geometry_gradients"):
+    # These legacy logs are freq-only NumFreq runs WITHOUT Opt.  Under protocol
+    # v1.3 the input gate fires FIRST (a production geometry input must request
+    # Opt), so the rejection reason moved from the geometry-stage
+    # mixed_geometry_gradients to the input-stage must-request-Opt.  Both are
+    # fail-closed rejections of the same legacy evidence; assert either.
+    with pytest.raises(ValueError,
+                       match="mixed_geometry_gradients|must request Opt"):
         mod.validate(source, "DEC", state, "C03")
 
 

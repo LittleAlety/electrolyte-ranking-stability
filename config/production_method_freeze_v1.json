@@ -1,8 +1,28 @@
 {
-  "schema_version": "1.2",
+  "schema_version": "1.3",
   "freeze_id": "physics_completion_v1_production_method",
   "batch_id": "physics_completion_v1",
   "status": "frozen",
+  "protocol_amendment": {
+    "amended_on": "2026-10-17",
+    "from_schema_version": "1.2",
+    "change": "frequency Hessian algorithm: NumFreq (numerical finite difference of analytical gradients) -> AnFreq (analytical Hessian)",
+    "authority": "plan v1.2 item 4: an amendment must be global and cohort-wide, never a per-leg selection; this change applies to the whole cohort",
+    "evidence": [
+      "outputs/physics_completion/method_audit/anfreq_paired_audit.md",
+      "60/60 legs paired on identical converged geometries: 54 agree, 6 disagree; every disagreement is a leg whose NumFreq imaginary mode vanishes or shrinks under AnFreq",
+      "DX step-size sensitivity probe (AN/LiM_2plus): NumFreq DX=0.005 -> -127.20 cm-1, DX=0.010 -> -57.21 cm-1, AnFreq -> 0; a real saddle does not halve its imaginary frequency when the difference step changes, so the NumFreq modes are finite-difference noise",
+      "AnFreq Hessian contains CPCM-Hessian and SMD-Hessian terms and the ORCA warnings block is empty (no missing model term)",
+      "Opt VeryTightOpt AnFreq keyword combination smoke-tested (optimisation converges, frequency block complete)",
+      "ORCA 6.0/6.1 manual: analytical Hessians are available for SCF/DFT; restrictions are double-hybrids and RI-JK, neither of which applies here"
+    ],
+    "unchanged_by_this_amendment": [
+      "geometry optimisation tier (VeryTightOpt) and its frozen thresholds",
+      "functional wB97X-D4, state-specific target basis, SMD(acetonitrile), qRRHO thermochemistry policy",
+      "the prohibition on numerical FIRST derivatives (NumGrad remains forbidden)"
+    ],
+    "recomputation_scope": "cohort-wide: every leg's frequency Hessian must come from AnFreq on its own converged geometry, so all labels stay mutually comparable"
+  },
   "functional": {
     "canonical_name": "wB97X-D4",
     "orca_keyword": "wB97X-D4",
@@ -10,15 +30,19 @@
   },
   "solvent": "SMD(acetonitrile)",
   "temperature_K": 298.15,
-  "geometry_and_frequency": "wB97X-D4 / state-specific target basis / SMD(acetonitrile), Opt VeryTightOpt NumFreq TightSCF SlowConv for all newly generated or rescued legs",
+  "geometry_and_frequency": "wB97X-D4 / state-specific target basis / SMD(acetonitrile), Opt VeryTightOpt AnFreq TightSCF SlowConv for all newly generated or rescued legs",
   "derivative_policy": {
     "geometry_gradient": "analytic",
     "forbidden_first_derivative_keyword": "NumGrad",
-    "frequency_keyword": "NumFreq",
-    "frequency_hessian": "numerical finite difference of analytical gradients",
+    "frequency_keyword": "AnFreq",
+    "frequency_hessian": "analytical Hessian",
     "terminology": "NumFreq is not NumGrad; AnFreq changes the Hessian algorithm, not the frozen first-derivative requirement",
-    "anfreq_audit": "run as a paired diagnostic on identical converged geometries",
-    "anfreq_adoption_gate": "require exact wB97X-D4/basis/SMD compatibility and complete model-term, full-mode, thermochemistry QC; if adopted, amend the protocol globally rather than selecting per-leg winners"
+    "superseded_frequency_keyword": "NumFreq",
+    "superseded_frequency_hessian": "numerical finite difference of analytical gradients",
+    "supersession_reason": "finite-difference Hessian produced spurious imaginary modes under SMD for the flexible/charged legs; the paired audit plus the DX step-size probe showed the modes are discretisation noise, not curvature",
+    "anfreq_audit": "completed cohort-wide (60/60 legs) on identical converged geometries; see outputs/physics_completion/method_audit/anfreq_paired_audit.md",
+    "anfreq_adoption_gate": "SATISFIED: exact wB97X-D4/basis/SMD compatibility, complete model terms (CPCM/SMD Hessian present, empty warnings block), full-mode and thermochemistry QC; adopted globally rather than per leg",
+    "legacy_numfreq_results_policy": "existing NumFreq legs are superseded for label purposes; they are retained as Hessian-method sensitivity evidence, not deleted, and must not be mixed with AnFreq labels in one comparison"
   },
   "geometry_convergence_policy": {
     "new_and_rescue_keyword": "VeryTightOpt",

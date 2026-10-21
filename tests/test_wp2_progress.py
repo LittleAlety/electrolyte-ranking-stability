@@ -99,8 +99,19 @@ def test_emitter_uses_frozen_twelve_molecule_main_cohort_and_strict_qc():
     assert all(row["status"] == "computed" for row in rows)
     assert all(row["terminated"] == "true" and row["opt_converged"] == "true"
                and row["imaginary_modes"] == "0" for row in rows)
-    # Current TMP|M payload says status=computed but has two imaginary modes.
-    assert not any(row["record_id"] == "C17|M" for row in rows)
+    # Strict QC admits exactly the legs with zero imaginary modes.  All formerly
+    # excluded legs are now PROVEN clean: the AnFreq paired audit (protocol v1.3)
+    # showed their NumFreq imaginary modes were finite-difference noise, and the
+    # last one -- C17|LiM_plus -- was rescued by job 3717952 (AnFreq 0 imaginary
+    # on the c04 continuation geometry).  The emitter must therefore carry the
+    # full 12 x 4 = 48 cohort, and every row must pass strict QC.
+    assert any(row["record_id"] == "C17|M" for row in rows)
+    assert any(row["record_id"] == "C17|LiM_plus" for row in rows)
+    # load_rows() returns the full production set (48 main states + 12 M_tzvpd
+    # neutral legs = 60); the MAIN cohort itself must be complete:
+    main = [r for r in rows if r["state"] in ("M", "M_plus", "LiM_plus", "LiM_2plus")]
+    assert len(main) == 48, "main cohort must be 12 molecules x 4 states = 48 rows"
+    assert all(row["imaginary_modes"] == "0" for row in rows)
     ids = json.dumps([mol_id for mol_id, _name in module.MOLS], ensure_ascii=False)
     names = json.dumps(dict(module.MOLS), ensure_ascii=False)
     generated_constants = module.CONST_PREFIX % (ids, names, json.dumps(["M_tzvpd"]))

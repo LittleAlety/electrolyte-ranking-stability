@@ -3,14 +3,14 @@
 > 由 `scripts/wp_production/build_wp2_cost_scenarios.py` 生成；零新增电子结构计算，只汇总已登记台账。
 > 口径：`wall hours = core-hours / (workers x 4)`；core-hours 与并发无关。
 
-## 已测作业（全项目 52 条；其中注册 pilot 20/20 条）
+## 已测作业（全项目 60 条；其中注册 pilot 20/20 条）
 
 | 类别 | n | min | median | p90 | max | 单位 |
 | --- | --- | --- | --- | --- | --- | --- |
-| free_cation_def2TZVPD | 10 | 1.364 | 11.416 | 17.597 | 18.406 | core-hour |
-| free_neutral_def2TZVP | 11 | 0.407 | 4.644 | 8.233 | 22.977 | core-hour |
-| free_neutral_def2TZVPD | 9 | 0.560 | 6.751 | 31.922 | 31.922 | core-hour |
-| li_complex_def2TZVPD | 20 | 0.835 | 10.300 | 15.140 | 23.932 | core-hour |
+| free_cation_def2TZVPD | 11 | 1.364 | 11.646 | 18.406 | 23.481 | core-hour |
+| free_neutral_def2TZVP | 12 | 0.407 | 4.571 | 8.233 | 22.977 | core-hour |
+| free_neutral_def2TZVPD | 12 | 0.560 | 6.805 | 15.213 | 31.922 | core-hour |
+| li_complex_def2TZVPD | 23 | 0.835 | 10.824 | 20.006 | 27.489 | core-hour |
 
 ## 待补 0 条腿的情景
 
@@ -40,7 +40,7 @@
 
 | item | status | note |
 | --- | --- | --- |
-| cpu_core_hours | MISSING | 项目级 allocated core-hours（不是 process CPU time）：12 分子生产主集 52/60 条腿闭环后按现算填入，口径 = 方法审计 + pilot + 生产 + 靶向复核四个逐作业台账里 344 条带 core-hours 记录的作业之和；闭环前留空，不拿已跑的那部分作业冒充 headline 数。 |
+| cpu_core_hours | MISSING | 项目级 allocated core-hours（不是 process CPU time）：12 分子生产主集 60/60 条腿闭环后按现算填入，口径 = 方法审计 + pilot + 生产 + 靶向复核四个逐作业台账里 352 条带 core-hours 记录的作业之和；闭环前留空，不拿已跑的那部分作业冒充 headline 数。 |
 | p90_job_cost | MISSING | 逐作业 core-hours 的最近秩 p90（小样本下等于最大值，不插值假装样本充足）；逐类中位 / p90 另见 outputs/physics_completion/cost/remaining_cost_scenarios.csv；闭环前留空。 |
 | frequency_only_cost | MISSING | 只做频率的作业（phase=orca_freq，1 条，C01|M|orca_freq = wB97X-D4/def2-TZVP SMD NumFreq）的中位 core-hours；闭环前留空。 |
 
