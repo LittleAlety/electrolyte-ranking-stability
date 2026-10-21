@@ -23,22 +23,31 @@ def test_acceptance_pools_are_the_qc_complete_subset():
     m = _m()
     XA, yA, nA, _ = m._pool("A")
     XB, yB, nB, _ = m._pool("B")
-    assert len(yA) == 6 and len(yB) == 5
+    # pools grow as recovery turns states accepted; only the
+    # containment and non-emptiness are invariant
+    assert len(yA) >= 6 and len(yB) >= 5
+    assert yB <= yA, "B must be a subset of A"
 
 
 def test_task_b_carries_the_free_label_cost():
-    """A B-query's cost must exceed an A-query's for the same molecule by
-    the free-label acquisition legs -- the plan's explicit rule.  v3.0 fix:
-    the free label comes from the M_tzvpd leg (the labels' basis), not the
-    legacy def2-TZVP M row."""
+    """B's free-label cost is paid ONCE as a full-pool prerequisite.
+
+    Plan item 6: "B若事先拥有全池12分子的free标签，就必须支付这12个free标签的
+    前置成本；不能只给后来查询的Li候选附带free成本."  So:
+      * the prerequisite covers all 12 molecules x (M_tzvpd + M_plus);
+      * a B query adds only its Li legs (A query = its free pair).
+    """
     m = _m()
-    basis_a, cost_a = m._query_cost("A", "EC")
+    legs, prereq = m.prerequisite_cost("B")
+    assert legs == 24 and prereq is not None and prereq > 0
     basis_b, cost_b = m._query_cost("B", "EC")
-    assert cost_a is not None and cost_b is not None
-    assert cost_b > cost_a
     li = m._leg_cost("EC", "LiM_plus") + m._leg_cost("EC", "LiM_2plus")
-    free = m._leg_cost("EC", "M_tzvpd") + m._leg_cost("EC", "M_plus")
-    assert abs(cost_b - (li + free)) < 1e-6
+    assert abs(cost_b - li) < 1e-6          # no free legs recharged per query
+    # the prerequisite is what makes B expensive -- not the per-query markup
+    free_all = 0.0
+    for name in {r["name"] for r in m._read(m.POOL) if r.get("task") == "B"}:
+        free_all += m._leg_cost(name, "M_tzvpd") + m._leg_cost(name, "M_plus")
+    assert abs(prereq - free_all) < 1e-6
 
 
 def test_cost_is_measured_never_assumed():

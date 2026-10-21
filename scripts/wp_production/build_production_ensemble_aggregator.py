@@ -602,9 +602,74 @@ def load_candidates():
     if not CANDIDATES.is_file():
         raise ValueError("registered candidate manifest missing")
     for r in csv.DictReader(CANDIDATES.open(encoding="utf-8")):
-        if r["member_role"] == "round1_extra":
+        # round1_extra  = the original round-1 extras (and their rescues)
+        # recovery_v1_start = a NEW independent minimum from the 2026-10-21
+        #   strict_recovery_v1 batch.  It is a first-class member: it counts
+        #   toward the state's acceptance AND toward the 3->6 ceiling
+        #   extension.  (Contrast round2_audit_extra, which is ceiling-only.)
+        if r["member_role"] in ("round1_extra", "recovery_v1_start"):
             regs.setdefault((r["name"], r["slot"]), []).append(r)
     return regs
+
+
+COVERAGE_REVIEWS = (REPO / "outputs" / "physics_completion" / "recovery"
+                    / "coverage_reviews.csv")
+
+
+def acceptance_decision(*, unresolved: int, n_limited: int, cov, kept_keys) -> tuple:
+    """(acceptance_status, sampling_status, cov_resolved, cov_id).
+
+    Pure function so the coverage-review mechanism is unit-testable without
+    building a whole ledger.  Semantics (2026-10-21 strict-recovery ruling):
+
+    * any unresolved work            -> provisional (nothing else matters);
+    * n_limited without a *resolved* -> limited (history keeps its counts);
+    * n_limited WITH resolved review -> accepted, but ONLY when the review's
+      evidence checks out against the kept pool (anti-cheat).  The evidence
+      shape depends on the route:
+
+      - ``multi_basin_coverage``: the claimed NEW minima must themselves be in
+        the kept pool (they survived dedup);
+      - ``single_basin_verified``: the claimed members are independent
+        REPRODUCTIONS of known minima, so they are exactly the rows dedup
+        excluded; the check falls to ``kept_pool_evidence``, the dedup targets
+        they reproduced (a reproduction of a non-kept structure certifies
+        nothing).
+
+    In both cases the review hands us kept-pool member keys, so the check stays
+    a single set-membership test.
+    """
+    cov_resolved = False
+    cov_id = ""
+    if cov and cov.get("verdict") == "resolved" and not unresolved:
+        if cov.get("route") == "single_basin_verified":
+            claimed = [m for m in (cov.get("kept_pool_evidence") or "").split(";") if m]
+        else:
+            claimed = [m for m in (cov.get("computed_new_members") or "").split(";") if m]
+        cov_resolved = bool(claimed) and all(c in kept_keys for c in claimed)
+        cov_id = cov.get("review_id", "") if cov_resolved else ""
+    if unresolved:
+        return "provisional", "in_progress", False, ""
+    if n_limited and not cov_resolved:
+        return "limited", "sampling_limited", False, ""
+    return "accepted", "complete", cov_resolved, cov_id
+
+
+def load_coverage_reviews():
+    """Coverage reviews (2026-10-21 strict-recovery ruling).
+
+    The ONLY sanctioned path from `limited` to `accepted`: a review that
+    certifies the historical gap is covered by a NEW independent minimum.
+    History keeps its counts -- we never clear n_limited.
+    """
+    out = {}
+    if not COVERAGE_REVIEWS.is_file():
+        return out
+    import csv as _csv
+    with COVERAGE_REVIEWS.open(encoding="utf-8") as fh:
+        for row in _csv.DictReader(fh):
+            out[(row.get("name"), row.get("state"))] = row
+    return out
 
 
 def load_dispositions():
@@ -621,7 +686,12 @@ def latest_attempt_per_member(rows):
     superseded evidence never contributes a second weight."""
     best = {}
     for r in rows:
-        if r["member_role"] != "round1_extra":
+        # EVERY first-class member role must be listed here.  A missing role is
+        # not a cosmetic omission: the member then never enters `latest`, the
+        # aggregator reads it as "registered but no result yet" (n_pending) and
+        # the state can never leave `limited` -- recovery_v1_start was missing
+        # exactly so, which silently blocked the whole acceptance path.
+        if r["member_role"] not in ("round1_extra", "recovery_v1_start"):
             continue
         key = r["member_key"]
         cur = best.get(key)
@@ -722,6 +792,7 @@ def main(argv=None) -> int:
     try:
         registered = load_candidates()
         dispositions = load_dispositions()
+        coverage = load_coverage_reviews()
     except ValueError as exc:
         print(f"REJECT: {exc}")
         return 2
@@ -750,13 +821,23 @@ def main(argv=None) -> int:
                                             # successor in flight: treat as pending
                 elif st == "technical_complete_qc_failed":
                     d = dispositions.get(mem['member_key'], {})
-                    matched = (d.get('disposition') in ('rescue_budget_exhausted',
-                                                        'species_drift_unrecoverable')
-                               and d.get('latest_attempt') == mem.get('attempt')
-                               and d.get('log_sha256') == mem.get('log_sha256')
-                               and d.get('failure_class') == mem.get('failure_class')
-                               and int(d.get('attempted_calculations') or 0) >= 2)
-                    if matched:
+                    # v3.0 discipline: species drift is TERMINAL from the first
+                    # attempt -- the >=2 budget gate exists only for
+                    # rescue_budget_exhausted (a budget needs two real
+                    # calculations to be "exhausted").  A drift verdict never
+                    # recovers by retrying, so it must not linger as
+                    # "rescue in flight" (D7 review: the follow-up queue is
+                    # empty; n_rescue was a factual misstatement).
+                    _drift_final = (d.get('disposition') == 'species_drift_unrecoverable'
+                                    and d.get('latest_attempt') == mem.get('attempt')
+                                    and d.get('log_sha256') == mem.get('log_sha256')
+                                    and d.get('failure_class') == mem.get('failure_class'))
+                    _budget_final = (d.get('disposition') == 'rescue_budget_exhausted'
+                                     and d.get('latest_attempt') == mem.get('attempt')
+                                     and d.get('log_sha256') == mem.get('log_sha256')
+                                     and d.get('failure_class') == mem.get('failure_class')
+                                     and int(d.get('attempted_calculations') or 0) >= 2)
+                    if _drift_final or _budget_final:
                         n_limited += 1
                         if d.get('disposition') == 'species_drift_unrecoverable':
                             n_drift += 1
@@ -832,15 +913,14 @@ def main(argv=None) -> int:
             # (missing final geometry) are NOT dispositioned: we cannot prove
             # they are unique, so they block acceptance.
             unresolved = n_pending + n_rescue + n_failed + n_geometry_blocked
-            if unresolved:
-                sampling_status = "in_progress"
-                acceptance_status = "provisional"
-            elif n_limited:
-                sampling_status = 'sampling_limited'
-                acceptance_status = 'limited'
-            else:
-                sampling_status = "complete"
-                acceptance_status = "accepted"
+            # 2026-10-21 strict-recovery ruling: a historical limitation is
+            # cleared ONLY by an explicit coverage review that certifies a new
+            # independent minimum -- never by emptying n_limited.  The review
+            # must name recovered members that are actually in `kept`.
+            cov = coverage.get((name, slot)) if coverage else None
+            acceptance_status, sampling_status, cov_resolved, cov_id = acceptance_decision(
+                unresolved=unresolved, n_limited=n_limited, cov=cov,
+                kept_keys={m["member_key"] for m in kept})
             limit_reason = ""
             # v1.4.2: a `limited` state must always say WHY it is limited --
             # an empty reason on a limited label is indistinguishable from a
@@ -853,7 +933,7 @@ def main(argv=None) -> int:
             #                                identity (EMC|M_plus|4 lesson);
             #   single_basin_pool         -> the frozen pool never offered
             #                                enough independent basins.
-            if n_limited:
+            if n_limited and not cov_resolved:
                 limit_reason = ("species_drift_unrecoverable" if n_drift
                                 else "rescue_budget_exhausted")
             elif len(kept) == 1:
@@ -884,6 +964,10 @@ def main(argv=None) -> int:
                 # Asserted here so a broken aggregate can never be published.
                 "lowering_kcal": "%.6f" % (min(g_vals) - g_ens),
                 "lowering_bound_rt_ln_n_kcal": "%.6f" % (R_KCAL * temps[0] * math.log(len(kept))),
+                "coverage_status": ("resolved_by_review" if cov_resolved
+                                    else ("review_" + str(cov.get("verdict"))
+                                          if cov else "not_reviewed")),
+                "coverage_review_id": cov_id,
                 "partition_sum_relative": "%.12f" % q_total,
                 "weight_sum": "%.12f" % sum(weights),
                 "temp_k": "%.2f" % temps[0],
@@ -917,6 +1001,7 @@ def main(argv=None) -> int:
             "n_members", "pool_limited", "limitation_reason",
             "g_min_kcal", "g_ensemble_kcal", "g_ensemble_eh",
             "lowering_kcal", "lowering_bound_rt_ln_n_kcal",
+            "coverage_status", "coverage_review_id",
             "partition_sum_relative", "weight_sum",
             "temp_k", "protocol", "protocol_version"], label_rows)
         index_obj = {

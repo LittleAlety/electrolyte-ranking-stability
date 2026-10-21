@@ -1,4 +1,4 @@
-"""Decision support for the 14 ensemble states not yet accepted.
+"""Decision support for the ensemble states not accepted yet (at most 14).
 
 Reads the frozen ledgers (labels / dispositions / structures / sampling audit /
 3->6 difference report / conformer pool / Li motif screen / Li round-2 exec)
@@ -234,10 +234,17 @@ def build_rows() -> tuple[list[dict], dict]:
         by_mol.setdefault(mol, {})[st] = r
     audit = {(r["name"], r["state"]): r for r in data["audit"]}
 
+    # The scope is "every state not accepted yet" -- a number that SHRINKS as
+    # recovery succeeds, so it must never be hard-coded.  The invariant is that
+    # each open state gets exactly one row, and the scope never exceeds the
+    # frozen 14-state baseline.
     gaps = [(m, s) for (m, s), r in sorted(labels.items())
             if r["acceptance_status"] != "accepted"]
-    if len(gaps) != 14:
-        raise SystemExit("REJECT: expected 14 non-accepted states, found %d" % len(gaps))
+    if len(set(gaps)) != len(gaps):
+        raise SystemExit("REJECT: duplicate open states in the gap scope")
+    if len(gaps) > 14:
+        raise SystemExit("REJECT: %d open states exceeds the frozen 14 baseline"
+                         % len(gaps))
 
     base_vals = axis_values(by_mol, {})
     base_order = [full_order(base_vals, i) for i in range(2)]
@@ -368,7 +375,7 @@ def render_md(rows: list[dict], joint: dict) -> str:
         by_mol.setdefault(r["mol_id"], {})["gap_" + r["state"]] = True
     lines = []
     ap = lines.append
-    ap("# 14 个未 accepted 系综态：决策支持（v1.4.2 缺口分诊）")
+    ap("# 未 accepted 系综态：决策支持（v1.4.2 缺口分诊；上限 14，随恢复递减）")
     ap("")
     ap("> 生成器：`scripts/wp_production/build_gap_decision_support.py`（`--check` 完全只读）。")
     ap("> 只读冻结证据：48 态生产标签、成员处置、结构账本（round1_extra **与 round2_audit_extra**）、")

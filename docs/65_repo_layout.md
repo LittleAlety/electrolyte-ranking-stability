@@ -94,7 +94,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**57** 个跟踪文件：51 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**73** 个跟踪文件：67 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -115,6 +115,8 @@ week36 与 week44 只存在于 part2 镜像。
 | `ensemble_hpc_io.py` | 经受策略保护的 WHU HPC 命令桥核验终态 Slurm 作业，逐文件远端/本地 SHA256 对账后保存不可变快照、收据与来源指针；不在本机运行 ORCA/xtB，也不把技术完成当 QC 通过 | 远端数组任务 `run` / `attempts` → `work/hpc_production_ensemble_r1_*/tasks/**/snapshots/**` |
 | `build_production_ensemble_aggregator.py` | **生产级 48 态系综聚合器**：只读 QC 结构账本；每 molecule×slot 只收 computed 成员、primary 恒在（N=1 记 pool_limited）；DFT 后去重（连接/Li 齿数/RMSD 0.35Å/扭转）；log-sum-exp 数值稳定实现 G_ensemble 公式（298.15K、gᵢ=1、温度一致、权重和=1）；输出权重表/去重表/48 行标签/索引（含输入哈希与 stale 检测） | `production_ensemble_structures.csv` → `production_ensemble_{weights,dedup,labels}.csv` + `production_ensemble_index.json` |
 | `build_sampling_audit_3to6.py` | **3→6 采样审计计划**（§6.1/v1.4 §5.2）：四审计分子×四主态逐态统计池内 6 kcal/mol 窗口的独立极小真实数，判定 `executable` / `executable_partial` / `sampling_limited`；不足 6 只登记真实上限不凑数；Li 态标记需第二轮 motif 搜索；产出 CSV+MD+索引，`--check` 只读 | 冻结池 + 结构账本 → `sampling/sampling_audit_3to6.csv` + `.md` + `sampling_audit_index.json` |
+| `build_tolerance_preregistration.py` | 采样容差预注册稿：三条候选依据 + 所需证据，不选数值（由用户裁决）；当前差异仅作参考 | `sampling/tolerance_preregistration_draft.md` |
+| `build_sampling_ceiling_classification.py` | ceiling 缺口四分类（容差未冻结，只描述差异；跨账本矛盾 WARNING） | `sampling/sampling_ceiling_classification.{csv,md}` |
 | `build_sampling_3to6_diff.py` | **3→6 采样差异报告**（§6.1 / v1.4.2 第 4 条；按用户 2026-10-19 决定**只报差异、不判采样收敛**）：预注册四审计分子×四主态的比较量与口径（`G_ensemble`、氧化轴 `G(M_plus)−G(M)`、Li 条件轴 `G(LiM_2plus)−G(LiM_plus)`、审计集 Top-k 与 selection regret，主 k=2、辅助 k=1/3——审计集只有 4 个分子），round-1 侧从生产系综标签填，ceiling 侧在无生产 DFT 腿时**留空并写原因（绝不补零）**；GFN2 1.00 kcal/mol 只作筛选阈值；产出 CSV×3 + MD + 索引，`--check` 只读 | `ensembles/production_ensemble_labels.csv` + `sampling/sampling_audit_3to6.csv` + `ensembles/production_ensemble_manifest.json` → `sampling/sampling_3to6_diff{,_axes,_selection}.csv` + `.md` + `sampling_3to6_diff_index.json` |
 | `run_wp2_production.py` | 生产级 Opt+NumFreq 驱动（`M` / `M_plus` / `LiM_plus` / `LiM_2plus`） | 起始几何 → ORCA 输入/日志/几何（`work/wp2prod/`） |
 | `run_wp2_extra.py` | 与带电腿**基组一致**的中性腿 `M_tzvpd`（def2-TZVPD）驱动 | 中性几何 → ORCA 现场（`work/wp2prod/`） |
@@ -141,6 +143,19 @@ week36 与 week44 只存在于 part2 镜像。
 | `build_descriptor_analysis.py` | 方案 §7.3 描述符层（派生层，零新增计算）：donor type / chelation / flexibility / functionalization / 廉价 ESP 报**全部**检验（含不显著），Holm 与 BH 并列，TPSA 仅探索性；n=12 不拟合多参数模型 | 冻结产物 → `outputs/physics_completion/pair_evidence/descriptor_analysis.{csv,md}` |
 | `build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） | 结构登记 → `outputs/physics_completion/li_motif_sampling/**` |
 | `build_li_motif_plan_round2.py` | **第二轮 Li motif 搜索预注册**（v1.4.2 项 5）：第一轮已对单一父几何穷举全部配位规则，8 个审计 Li 态仍只 1–2 个独立极小；第二轮空间＝同一冻结规则 × **冻结自由态构象池的其他中性盆地做替代父几何**（EMC 2/DEC 4/DME 6/TMP 3 盆地，sha256 磁盘核验）；登记 round-1 kept + 已核验父数＝诚实上界（去重可能合并，真实数只能执行后测）；零新增计算，执行为显式独立步骤 | 冻结池 + 第一轮 screen → `li_motif_sampling/li_motif_plan_round2.{csv,_index.json}` |
+| `frontier_fmopop.py` | **ORCA `! FMOPop` 输出解析器**（Mulliken+Löwdin 双口径前沿布居）：解析每 operator 块（UHF 有 OP=0/1 两块）的原子行（`0-C 0.207071 0.189913 ...` 四列＝HOMO/LUMO 的 Mulliken/Loewdin），强制校验每列布居和≈1、块必须以闭合线结束、缺 operator 即 raise（fail-closed，绝不产出部分权重表）。`frontier_populations()` 输出 Li/给体的四列正式布居 | 库模块；产物列在 frontier_localization.csv |
+| `frontier_lowdin.py` | **Löwdin 轨道原子权重**（按计划算法）：从 AO 重叠矩阵做对称正交化，population=|S^(1/2)c|^2 后按原子求和；强制校验 AO 维度一致性/原子映射/有限性/Hermitian/正定谱/MO 归一化/布居和为 1，任何违反直接 raise（不静默回退到 |c|² 捷径） | 库模块 |
+| `build_recovery_budget_accounting.py` | **恢复包预算核算与终局报告**：按包实测 core-hours（从验证快照的 started/normal_termination 时间戳推、4 核/腿）、主账本合计、9 个 limited 态的终局原因分组（历史保留）、下一轮授权须知（预算余量、漂移态不可再算、预算尽态需另立版本） | `recovery/recovery_budget_accounting.md` + `_index.json` |
+| `strict_readiness.py` + `strict_readiness_wiring.py` | **严格总闸门（逐项证据检查）**：`strict_readiness(labels, expected_keys, checks)` 按计划实现——不只数 48 个标签，而是检查六项必需要求（覆盖复核有效/电子身份全成员完整/采样审计完成/WP3 证据完整/WP5 全池评估/成本溯源完整）＋WP6 与扩样"触发后才检查"的条件；返回 `{complete, blocked_by}`，把缺口逐项列出而非一个布尔。wiring 层从磁盘产物**机械推导**每个布尔（缺失/不可解析/不完整一律 False，fail-closed），不接收任何手设标志 | 不写文件（库模块；wiring 打印 JSON） |
+| `run_second_search_emc.py` | **已执行的第二轮换方法搜索（仅 EMC\|M_plus）**：GFN2-xTB + ALPB(乙腈)、256 个 ETKDGv3 起点（首轮 64）、seed 20261022，`--opt tight`。预注册四要素写在模块文档里（方法改动轴、成本上限、停止规则、不回填旧池）。**结论：真新盆地 0**（两条与已有极小 RMSD 0.0102 / 0.1181）→ `search_method_exhausted`；且该态真实限制是 `species_drift_unrecoverable`（键图改变），换方法本就无效 | `recovery/strict_recovery_v2_emc_pool.csv` + `_index.json` |
+| `build_strict_recovery_report.py` | **恢复批次结果报告（只报告不改判）**：逐态列出系综状态、覆盖复核 verdict、搜索结论、注册起点数、每条恢复腿的**已用/允许尝试次数**与终局状态；另列「本轮无法恢复的态」与「尝试预算已用尽的腿（保留原因，不再自动重试）」。明确不把失败改写成通过、不清空 n_limited、不放宽阈值 | `recovery/strict_recovery_v1_report.md` + `_index.json` |
+| `build_second_search_preregistration.py` | 第二轮搜索方法预注册稿：本批恢复不了的 6 态 + 候选方法变更 + 预注册四要素（不选方法） | `recovery/second_search_preregistration_draft.md` |
+| `build_strict_recovery_manifest.py` | strict_recovery_v1 恢复批次登记：14 态、≤2 起点/态、28 腿上限、实测成本依据、停止条件；盆地双拼写规范化 | `recovery/strict_recovery_v1_manifest.{csv,md}` |
+| `build_frontier_localization.py` | frontier 定域分析：解析 Molden 出 HOMO/LUMO 组成与 frontier_class（阈值先冻结）；缺文件/解析失败如实登记 | `frontier/frontier_localization.csv` |
+| `build_frontier_legs.py` | frontier/电子身份腿清单：73 个计入系综成员、几何按 final_geometry_sha256 精确匹配、单点+Molden 输出（分析独立成步） | `frontier/frontier_legs.csv` |
+| `run_strict_recovery_search.py` | 恢复批次独立盆地搜索（本地 GFN2 筛选，Kabsch RMSD 去重，零结果也登记） | `recovery/strict_recovery_v1_search_pool.csv` |
+| `build_coverage_reviews.py` | 覆盖复核：limited→accepted 的唯一证据通道（派生 verdict，不重写历史失败，不清空 n_limited） | `recovery/coverage_reviews.csv` |
+| `build_d6_preregistration_draft.py` | D6 预注册稿（草案）：四敏感态 Top-3 威胁、预注册四要素、默认限制报告分支；index 确定性 | `ensembles/d6_ranking_sensitive_preregistration_draft.{md,_index.json}` |
 | `run_wp5_AB_replay.py` | WP5 A/B 验收回放：12 分子池四策略配对种子、16/20 停止预算、实测成本台账（B 携带 free 成本） | `active_learning/blind_replay/AB_*` |
 | `build_wp5_target_pool.py` | WP5 A/B 验收目标池：最终 labels 派生的 12+12 行 free 氧化 / Li 条件移位目标，带 acceptance provenance；与 legacy demo 池分开 | `active_learning/blind_replay/target_pool_AB.{csv,_index.json}` |
 | `wp5_replay_contract.py` | WP5 盲回放 v2 契约：sha256 稳定种子、配对初始集、16/20 逐点停止预算（排除耗尽池平凡解）、描述统计与停止预算分离 | 被 run_wp5_blind_replay.py 导入，无独立输出 |

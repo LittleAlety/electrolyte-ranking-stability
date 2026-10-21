@@ -694,6 +694,13 @@ def parse_args(argv=None):
     parser.add_argument("--timeout", type=float, default=900.0)
     parser.add_argument("--skip-esp", action="store_true",
                         help="skip the electrostatic-potential supplement (probe only)")
+    parser.add_argument("--plan", default=None,
+                        help="override the registered plan CSV (strict_recovery_v1 round 3)")
+    parser.add_argument("--out-prefix", default=None,
+                        help="override the output basenames (default li_motif_round2); "
+                             "round-2 evidence is never overwritten by a recovery run")
+    parser.add_argument("--scratch", default=None,
+                        help="override the scratch root (default work/limotif_r2)")
     parser.add_argument("--check", action="store_true",
                         help="verify the registered round-2 run record instead of executing")
     return parser.parse_args(argv)
@@ -701,6 +708,18 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args = parse_args(argv)
+    if getattr(args, "plan", None):
+        global PLAN_PATH
+        PLAN_PATH = Path(args.plan)
+    if getattr(args, "out_prefix", None):
+        global CSV_NAME, INDEX_NAME, MD_NAME
+        prefix = args.out_prefix
+        CSV_NAME = prefix + ".csv"
+        INDEX_NAME = prefix + "_index.json"
+        MD_NAME = prefix + ".md"
+    if getattr(args, "scratch", None):
+        global SCRATCH
+        SCRATCH = Path(args.scratch)
     if args.check:
         return check_existing()
     payload, _ = run(args)

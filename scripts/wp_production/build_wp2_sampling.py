@@ -46,7 +46,9 @@ OUTDIR = REPO / "outputs" / "physics_completion" / "sampling"
 #: so this generator's ``--check`` never reports another generator's artifacts as
 #: stray.  ``sampling_audit*`` = build_sampling_audit_3to6.py,
 #: ``sampling_3to6_diff*`` = build_sampling_3to6_diff.py.
-SIBLING_ARTIFACT_PREFIXES = ("sampling_audit", "sampling_3to6_diff")
+SIBLING_ARTIFACT_PREFIXES = ("sampling_audit", "sampling_3to6_diff",
+                           "sampling_ceiling_classification",
+                           "tolerance_preregistration_draft")
 
 XTB = Path(r"E:\orca_6_1_1\xtb-6.7.1pre\xtb.exe")
 HA_TO_KCAL = 627.5094740631

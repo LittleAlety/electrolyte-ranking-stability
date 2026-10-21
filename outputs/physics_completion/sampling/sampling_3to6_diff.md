@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | round-1 `G_ensemble` | 16/16 态已填 | 直接取自生产系综标签，可复算 |
 | 氧化轴 / Li 条件轴（round-1 侧） | 已填 | `G(M_plus)-G(M)`、`G(LiM_2plus)-G(LiM_plus)`，单位 eV |
-| ceiling 侧（扩到池内上限） | 13/16 态 not_computed | 定义为**round-1 极小 + 已登记且 QC 通过的第二轮成员**（同一 DFT 级去重规则），缺口就留空：**空格是诚实状态，不是 0** |
+| ceiling 侧（扩到池内上限） | 8/16 态 not_computed | 定义为**round-1 极小 + 已登记且 QC 通过的第二轮成员**（同一 DFT 级去重规则），缺口就留空：**空格是诚实状态，不是 0** |
 | Top-k 重叠 / selection regret | not_computed | 依赖 ceiling 侧排序，只登记 round-1 基线集合 |
 | 采样收敛判定 | **不做** | 独立生产级容差尚未冻结，不得据本轮结果倒推 |
 
@@ -32,18 +32,18 @@
 | EMC | M_plus | free_conformer | 2 | 2 | sampling_limited | limited | 2 | -240226.173237 | — | — |
 | EMC | LiM_plus | li_motif_round2_measured | 2 | 4 | executable_partial | accepted | 3 | -245090.677606 | — | — |
 | EMC | LiM_2plus | li_motif_round2_measured | 1 | 2 | executable_partial | accepted | 1 | -244894.595300 | — | — |
-| DEC | M | free_conformer | 3 | 3 | sampling_limited | limited | 2 | -265093.249150 | — | — |
+| DEC | M | free_conformer | 3 | 3 | sampling_limited | accepted | 3 | -265093.802909 | — | — |
 | DEC | M_plus | free_conformer | 3 | 4 | executable_partial | accepted | 3 | -264925.087287 | — | — |
 | DEC | LiM_plus | li_motif_round2_measured | 2 | 4 | executable_partial | accepted | 2 | -269770.880754 | — | — |
 | DEC | LiM_2plus | li_motif_round2_measured | 1 | 2 | executable_partial | accepted | 1 | -269576.059314 | — | — |
 | DME | M | free_conformer | 3 | 6 | executable | accepted | 3 | -193896.607798 | — | — |
-| DME | M_plus | free_conformer | 3 | 4 | executable_partial | limited | 2 | -193744.395670 | — | — |
+| DME | M_plus | free_conformer | 3 | 4 | executable_partial | accepted | 3 | -193744.466828 | — | — |
 | DME | LiM_plus | li_motif_round2_measured | 1 | 1 | sampling_limited | accepted | 1 | -198585.253686 | — | — |
-| DME | LiM_2plus | li_motif_round2_measured | 1 | 3 | executable_partial | provisional | 1 | -198406.200773 | — | — |
+| DME | LiM_2plus | li_motif_round2_measured | 1 | 3 | executable_partial | accepted | 2 | -198409.511357 | — | — |
 | TMP | M | free_conformer | 2 | 2 | sampling_limited | accepted | 2 | -478370.212791 | — | — |
 | TMP | M_plus | free_conformer | 3 | 3 | sampling_limited | limited | 2 | -478186.998219 | — | — |
-| TMP | LiM_plus | li_motif_round2_measured | 2 | 5 | executable_partial | provisional | 1 | -483045.245173 | — | — |
-| TMP | LiM_2plus | li_motif_round2_measured | 2 | 3 | executable_partial | limited | 2 | -482856.018875 | — | — |
+| TMP | LiM_plus | li_motif_round2_measured | 2 | 5 | executable_partial | limited | 1 | -483045.245173 | — | — |
+| TMP | LiM_2plus | li_motif_round2_measured | 2 | 3 | executable_partial | accepted | 3 | -482856.455592 | — | — |
 
 ## 氧化轴与 Li 条件轴（round-1 侧，eV）
 
@@ -51,12 +51,12 @@
 | --- | --- | --- | --- | --- | --- |
 | EMC | oxidation (M_plus - M) | 8.107566437 | — | — | round1_only |
 | EMC | Li-conditioned (LiM_2plus - LiM_plus) | 8.502933565 | — | — | round1_only |
-| DEC | oxidation (M_plus - M) | 7.292188556 | — | — | round1_only |
+| DEC | oxidation (M_plus - M) | 7.316201841 | — | — | complete |
 | DEC | Li-conditioned (LiM_2plus - LiM_plus) | 8.448257218 | — | — | round1_only |
-| DME | oxidation (M_plus - M) | 6.600542594 | — | — | round1_only |
-| DME | Li-conditioned (LiM_2plus - LiM_plus) | 7.764469196 | — | — | round1_only |
+| DME | oxidation (M_plus - M) | 6.597456875 | — | — | complete |
+| DME | Li-conditioned (LiM_2plus - LiM_plus) | 7.620908682 | — | — | round1_only |
 | TMP | oxidation (M_plus - M) | 7.944935827 | — | — | round1_only |
-| TMP | Li-conditioned (LiM_2plus - LiM_plus) | 8.205628883 | — | — | round1_only |
+| TMP | Li-conditioned (LiM_2plus - LiM_plus) | 8.186691056 | — | — | round1_only |
 
 ## Top-k 与 selection regret（预注册口径，本轮只登记基线）
 

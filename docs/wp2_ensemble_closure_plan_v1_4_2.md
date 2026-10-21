@@ -318,6 +318,259 @@
 | 5 | 端到端验证 + 联合成功/有限值校验 | ✅ | 配对种子、注入泄漏负向、16 交集反例、池耗尽排除、成本缺失不假设、重复记录拒绝（--check 篡改检测）——§19.1 要求的 9 类测试逐一核对通过 |
 
 **§19.1 测试清单逐项核对结果（8 项脚本化验证）**：B 任务恒等式 ✓、RT 跨模块 ✓、regret 反例（[10,9,8,0]→R=2.667 vs 旧=0）✓、同 repeat 四策略共享初始集 ✓、隐藏标签注入必失败 ✓、两点各 16 交集 12 → None ✓、池耗尽轮排除 ✓、成本缺失不冒充实测 ✓（外加 --check 篡改即红的重复记录拒绝）。§19.1 全部关账。
+
+### ⑧ D6 预注册稿落地（2026-10-21，v3.0 D6 顺序项）
+
+新脚本 `build_d6_preregistration_draft.py`（5 测试全过）——四个排序敏感 M_plus 态（AN/DMC/EMC/TMP）的新池预注册**草案**（未启动）：
+
+* **量化威胁（全部派生）**：四态 M_plus gap 全部已越 accepted Top-3 地板（7.7506 eV）——AN 9.06 / DMC 8.30 / EMC 8.11 / TMP 7.94；「已越地板」判定由 gap>floor 逐态算出，不硬编码。
+* **预注册四要素**（若启动才生效）：① 搜索动作与独立性（新一轮独立构象/motif 搜索、不回填旧池、GFN2 筛选与生产 DFT 分层）；② 成本上限（M_plus 腿实测均值 11.75 core-hours，每态新盆地上限与总 core-hours 上限超限即停）；③ 候选选择（DFT 级 dedup + 身份门前置 + **排序敏感判据搜索前冻结**）；④ 停止条件（每态 ≤2 独立起点、两败即登记 sampling_limited）。
+* **默认分支=限制报告**（用户裁决）：本轮不启动，四态维持 limited 及既有原因；「现有池不能认证 Top-3」作为独立事实登记。启动需用户逐态点名。
+* index 无 wall-clock（输入哈希 provenance——应用 ⑥ 节的教训）；`--check` 过；四处登记完成（计数 57/51→**58/52**）；收口链 48→**50 步**（d6-prereg + check-d6-prereg 进链），**50/50 OFFLINE CLOSURE GREEN**。
+
+**v3.0 D1-D6 顺序表现状**：D1-D5 已全部完成（前几轮）；D6 本次以「预注册稿 + 限制报告」双分支落地——限制报告为生效分支（默认），预注册稿备而未用。剩余 D7（阶段报告/发布候选）属下一工作段。
+
+### ⑨ strict_recovery_v1：14 态严格补算批次（2026-10-21 起，进行中）
+
+用户裁决：从 D7 报告转入新一轮**有预算、独立起点、明确验收条件**的补算，**14 个未 accepted 的态**全部排入（每态 ≤2 个新独立起点、总上限 28 条、恢复包 600 + 储备 300 core-hours）。当时这 14 个都记 `limited`；候选登记后状态改为反映实际进度——**8 个 `provisional`（恢复腿在飞）+ 6 个 `limited`（搜索耗尽）**，分母仍是 14。
+
+**① 冻结 manifest**（`build_strict_recovery_manifest.py`）：14 态 × ≤2 起点 = 28 腿硬校验；成本依据实测合计 399.6 core-hours；3 态有未用冻结池盆地（DEC/M r2_c23、DME/M_plus c07、TMP/M_plus c10，经**盆地双拼写规范化**从缺口表裸数字映射）；11 态登记为需版本化新搜索。
+
+**② 覆盖复核机制**（`build_coverage_reviews.py` + 聚合器 `acceptance_decision()`）：limited→accepted 的**唯一证据通道**——verdict=resolved 需「新起点已 computed 且经 dedup 进入 kept、态内 ≥2 独立极小、无 pending 恢复成员」，且**复核声称的成员必须全部真在 kept 池**（防作弊）；**`n_limited` 永不清空**，`coverage_status` 列单记 verdict。8 项单测钉死含 DEC/M 真实场景与全部防作弊分支。
+
+**③ P0 独立搜索实测（本轮最重要的科学结论）**：本地 GFN2 `--opt tight`、每态 64 起点、登记 seed、重原子 Kabsch RMSD 0.35 Å 去重 —— **AN/DMC/EMC 的 M_plus 全部 64 起点塌缩到已有单一极小（RMSD 0.0000）**，即这三个 Top-3 边界态在筛选层**无第二构象极小**（物理事实，非预算失败）；只有 TMP/M_plus 找到 2 个新独立极小（RMSD 0.54 Å、rel 0.00 kcal）。故 P0 首批由计划的 8 腿缩为 2 腿。
+
+**④ Li round-3 恢复搜索**：8 腿 122 候选、**10 个新独立盆地**（DME/LiM_2plus 2、SL/LiM_2plus 3、TMP/LiM_2plus 1、TMP/LiM_plus 3、DMSO/LiM_plus 1）；**DMC/EC/DOL 的 LiM_2plus 零新盆地**（→ search_exhausted，保持 limited）。`legs_above_registered_bound=3` 属已知的「启发式上界不是数学上界」，登记偏差不改预注册值。
+
+**⑤ 三个生产批次**：
+
+| 批次 | 内容 | 状态 |
+|---|---|---|
+| 1 | 4 腿（DEC/M、DME/M_plus、TMP/M_plus×2） | Job **3738029**；DEC/M 与 DME/M_plus **已完成且均 0 虚频**（最低实频 63.12 / 52.57 cm⁻¹）；TMP 两条运行中 |
+| 2 | 8 条 Li 配位腿 | 已打包 + 远端 8/8 sha 校验，待提交 |
+| 3 | 73 个计入系综成员的 frontier 单点（Molden 输出） | 已打包 5 批（18×4+1）、73/73 sha 校验，待提交 |
+
+**⑥ 电子身份管线**：`build_frontier_legs.py`（cohort = `production_ensemble_weights.csv` 全部 73 个有 Boltzmann 权重的成员，几何按登记 `final_geometry_sha256` 递归精确匹配 → **73/73 命中**）+ `build_frontier_localization.py`（解析 Molden 出 HOMO/LUMO 组成与 frontier_class；**阈值读结果前冻结**：weight 0.50 / Li 0.25；缺文件记 not_computed、解析失败记 parse_failed，绝不静默写 0）。
+
+**⑦ 采样审计**：`build_sampling_ceiling_classification.py` 把 16 态分成 complete 3 / registered_candidates_qc_pending 7 / pool_has_no_independent_structure 6（+ 0 塌缩 / 0 真缺失）；`build_tolerance_preregistration.py` 出**容差预注册稿**（三条候选依据 + 所需证据，**不选数值**，当前差异明确标注仅作参考、绝不是容差依据）。
+
+**本轮抓到的四个真实缺陷（都已修 + 测试钉死）**：
+
+1. **恢复腿会被静默丢弃**：`_is_round2_package()` 不认恢复包名 → 导入循环打印 「UNKNOWN task not in candidates」后 `continue`，4 条腿跑完全部消失。
+2. **幻影 pending**：把「已登记但未计算」的恢复候选写进 manifest 会让聚合器算成 `n_pending`，limited 全部变 provisional（14→6），链立刻红 → 改为结果入账后才登记。
+3. **用户裁决被 rebuild 静默回滚**：EMC 的 3 个 Li 盆地曾只在派生 JSON 里注册，生成器仍列 `DEFERRED_AUDIT_MOLECULES=("EMC",)` → 重建后 EMC/LiM_plus 从 complete 退回 not_computed。**裁决必须编码进生成器**。
+4. **stray 白名单漏登记 ×4**（round-3 Li 产物、frontier legs、ceiling 分类、容差稿）：往别人拥有的输出目录写新文件，必须同步登记那一层白名单。
+
+**收口链 63 步全绿**；计数 65 个跟踪文件 / 59 `*.py`。
+
+**尚未完成**：批次 2/3 提交与回收、导入后覆盖复核重判、WP3/WP5 重跑、合规重建、WP6（需 48/48）。
+
+### ⑩ strict_recovery_v1 批次 1 收官与天花板（2026-10-21 下午）
+
+**批次 1（Job 3738029，4 腿）全部收尾——4 条都是合法 QC 失败，没有一条是拼写错误或脚本问题**：
+
+| 腿 | 失败类 | 判据 | 补救 |
+|---|---|---|---|
+| DEC\|M\|r2_c23 | `verytight_convergence` | rms_step 1.72e-4 > 1e-4（TolRMSD） | reopt1（Job 3738937） |
+| DME\|M_plus\|c07 | `verytight_convergence` | energy_change 9.44e-7 > 2e-7（TolE） | reopt1（同上） |
+| TMP\|M_plus\|r3_c42 | `max_cycles_exhausted` | 51 圈撞顶、无 CONVERGED | cont1（Job 3739147） |
+| TMP\|M_plus\|c10 | `max_cycles_exhausted` | 51 圈撞顶 | cont2（Job 3739236） |
+
+**两类失败的机制区别（已用日志原文确认）**：
+* `verytight_convergence` = ORCA 走 **close-enough 路径**——原文「The gradient convergence is overachieved with reasonable convergence on the displacements / Convergence will therefore be signaled now」：梯度超额达标、位移判据未达，ORCA 自行宣布收敛；补救是从**该收敛末几何**严格重优化（驻点重启首圈步长≈0，通常一圈即全绿）。
+* `max_cycles_exhausted` = 优化器撞圈数上限、**从未收敛**，没有收敛末几何可用；补救是从**轨迹最低能帧**续算且只加恰好一行 `%geom MaxIter 200 end`。
+* ORCA 收敛表的 Tolerance 列**正好等于项目冻结阈值**（2e-7 / 8e-6 / 3e-5 / 1e-4 / 2e-4），所以不存在「项目比 ORCA 严」的错配；但**「ORCA 说 CONVERGED」≠「过五阈值」**，必须看逐项 YES/NO。
+
+**状态口径（候选登记之后）**：34 accepted / **8 provisional** / **6 limited**——`provisional` 表示该态有登记过的补救腿在飞（reopt/continue 或批次 2 在跑），`limited` 表示首轮搜索已耗尽。两者都计入「未 accepted 的 14 态」，分母不缩。
+
+**本轮的科学天花板＝42/48（不是 48/48）**：当前 34 accepted + 本轮有注册起点的 8 态 = 42；另 6 态是本轮换方法也解决不了的（首轮搜索无果）：AN/DMC/EMC 的 M_plus（64 起点全塌缩）与 DMC/DOL/EC 的 LiM_2plus（motif 零新盆地）。**故 WP6 闸门（需 48/48）本轮结束后仍 blocked**，`plan_overall_complete` 同样继续 blocked。这 6 态的第二轮换方法预注册稿已备（`recovery/second_search_preregistration_draft.md`），**是否启动由用户裁决**。
+
+**成本**（实测，非估算）：批次 1 四腿 ≈ 33 core-hours（3.1 / 5.3 / 12.2 / 12.2）；恢复批次累计 ≈ 55 core-hours = 恢复包 600 的 9%；风险储备 300 未动用。按首批实测，28 腿全跑完约 120–200 core-hours，**预算充足**。
+
+**本阶段抓到的 9 个「跑得通但结果错/白烧算力」缺陷**（全部已修 + 测试钉死）：
+
+| # | 缺陷 | 会造成什么 |
+|---|---|---|
+| 1 | `_is_round2_package` 不认恢复包 | 恢复腿跑完被静默丢弃 |
+| 2 | `import_ensemble_structures --fetch` 已废弃 | 取回失败/空操作 |
+| 3 | `qc_task` 期望 `run/` 而 sbatch 写 `attempts/` | 导入成功但零结果 |
+| 4 | 把未计算候选写进 manifest | 幻影 pending，limited→provisional |
+| 5 | 用户裁决只存在派生 JSON | rebuild 静默回滚 EMC 注册 |
+| 6 | sbatch 硬编码 `batch_1.txt` + 模板参数顺序 | 批次跑到错任务 |
+| 7 | 覆盖复核↔聚合器互为输入只跑一轮 | 复核永久滞后 |
+| 8 | `_cont<N>` 未被 `pkg_attempt` 识别 | attempt 序号错 → supersede 与预算统计错 |
+| 9 | `submission_journal.json` 不算已提交 | 已提交包的成员不被保护 → **重复排产白烧算力** |
+
+**工程状态**：收口链 **67 步全绿**；全量 pytest 全绿（排除 4 个预存 ORCA fake-binary 环境失败）；计数 66 个跟踪文件 / 60 `*.py`。
+
+**在跑/排队**：批次 2（8 条 Li 配位腿，Job 3738645 —— 4 跑 4 排队）+ reopt1(3738937) + cont1(3739147) + cont2(3739236)。
+
+### ⑪ 三项用户裁决的落地与一次自我纠错（2026-10-21 傍晚）
+
+**用户裁决（本轮回传）**：① 只对 `EMC|M_plus` 做换方法搜索；② 3→6 容差按依据 B 冻结为 **0.10 kcal/mol**；③ 接受 WP5 的 B 任务全池 free 标签前置成本口径。
+
+**②的落地**：敏感性表显示 `0.05–0.25` 区间内三态显著性判定完全一致，故 0.10 不改变任何已有结论；稿内明确「依据是事先声明的实用分辨率，不是把观测差异倒推成阈值」。冻结发生在评价新批次之前。
+
+**③的落地**：实测 B 前置 **24 腿 / 244.440 core-hours**（`measured_cost_ledger`），含前置的总成本 351.063 core-hours；生成器把该口径写死并注明已获用户接受。
+
+**①的落地与结论——这是一次必须记录的自我纠错**：
+
+第二轮方法（唯一改动轴：隐式溶剂 + 样本量）：GFN2-xTB + **ALPB(乙腈)**、**256** 个 ETKDGv3 起点（首轮 64）、seed 20261022、`--opt tight`；**256/256 全部收敛**。
+
+| 第二轮盆地 | rel (kcal/mol) | 与已有极小的 RMSD | 判定 |
+|---|---|---|---|
+| v2_c042 | 0.000 | 0.0102 Å | 同一盆地 |
+| v2_c117 | 2.046 | 0.1181 Å | 同一盆地 |
+
+**真新盆地 = 0** → 触发停止规则 `search_method_exhausted`。
+
+**两处判断错误（均已纠正并写进工具）**：
+
+1. **误判该态「缺盆地」**。实际 `EMC|M_plus` 的 `n_unique=2`、`limitation_reason=species_drift_unrecoverable`，结构表显示 `EMC|M_plus|4` 是 `candidate_bond_graph_changed`——该盆地在生产级优化时**键图改变、重排成别的物种**，冻结协议对身份改变明令「直接判失败、不重试」。**换任何搜索方法都补不上它**，因为它不缺盆地。
+2. **搜索脚本的假阳性**：首版基线只读首轮搜索池，而该态首轮搜索没有 `minima` 行 → 基线为空 → `best=inf` → **把两个旧盆地误报为「2 个全新盆地」**。改用权威基线（`sampling_conformer_set.csv` 里的两个已有极小）后真相是 0 个新盆地。**规则已固化：无基线必须判 `unknown`，绝不能默认「新」。**
+
+**核对后的分类（6 个 search_exhausted 态其实分两类）**：
+
+| 类别 | 态 | n_unique | 限制原因 | 换方法是否有用 |
+|---|---|---|---|---|
+| 漂移类 | EMC\|M_plus | 2 | `species_drift_unrecoverable` | **否（已实测排除）** |
+| 真单盆地 | AN\|M_plus、DMC\|M_plus、DMC/EC/DOL 的 LiM_2plus | 1 | `rescue_budget_exhausted` | 未知，需更高描述层级才可能找到第二盆地 |
+
+**后果**：WP3 的 R4 阶梯那 2 对（EMC vs GBL、EMC vs SL）**永久停在 limited**，**R4 上限就是 8/12 computed**——这是化学结论，不是预算或方法问题。
+
+**工程状态**：计数 68 个跟踪文件 / 62 `*.py`；收口链 69 步全绿；全量 pytest 全绿（排除 4 个预存 ORCA fake-binary 环境失败）。
+
+### ⑫ 覆盖复核首次放行：36/48 与三个机制级缺陷修复（2026-10-21）
+
+**里程碑：系综首次从 34/48 推进到 36/48。** 两个态经覆盖复核机制从 `limited` 释放为 `accepted`：`DEC|M` 与 `DME|M_plus`。
+
+**① 机制：从各自收敛末几何严格重优化（strict reoptimisation）**。两条腿的 ORCA 都在 **CYCLE 1** 收敛、四项几何判据全过、且**无 close-enough 路径**（两份 job.log 均无 "Convergence will therefore be signaled" 字样）。实测收敛值：
+
+| 腿 | RMS gradient | MAX gradient | RMS step | MAX step | 虚频 | 最低实频 |
+|---|---|---|---|---|---|---|
+| DEC\|M\|r2_c23 | 8.289e-7（阈值 8e-6） | 2.419e-6（3e-5） | 2.422e-5（1e-4） | 1.073e-4（2e-4） | 0 | 63.13 cm⁻¹ |
+| DME\|M_plus\|c07 | 3.137e-6（8e-6） | 9.027e-6（3e-5） | 4.701e-5（1e-4） | 1.327e-4（2e-4） | 0 | 52.60 cm⁻¹ |
+
+两例的收敛表都**没有 "Energy change" 行**——这是已记录的 ORCA 行为：起点几何本身已 VeryTight-clean 的腿在首次检查即收敛、未移动任何原子，故不打印 delta-E 行。导入器只要求四项几何判据、能量行为可选，因此这两条腿合法有效。
+
+**② 这验证了两步恢复设计**：第一次尝试从池盆地出发只能收敛到判据边缘（典型 3–4/5 项）被判 close-enough；第二次从该收敛几何出发时已位于驻点，首步 ≈0、一圈全过。「每成员至多两次真实计算」的预算正对应这个两阶段流程，不是浪费。
+
+**③ 验收未清空历史**：两态仍带 `n_qc_failed = 1`、`coverage_status = resolved_by_review`，即「历史保留、凭复核释放」。系综值：DEC\|M `g_ensemble` = −422.453865468 Eh、DME\|M_plus = −308.751460903 Eh，各 `n_unique = 3`。证据路径：`work/hpc_production_ensemble_strict_recovery_v1_reopt1/tasks/DEC/M__r2_c23/snapshots/3738937_0/job.log`、`.../DME/M_plus__c07/snapshots/3738937_1/job.log`、`outputs/physics_completion/recovery/coverage_reviews.csv`、`outputs/physics_completion/ensembles/production_ensemble_labels.csv`。
+
+**④ 导入上述结果时发现并修复的同族缺陷三个**：
+
+| # | 缺陷 | 后果 | 修复 |
+|---|---|---|---|
+| 14 | `latest_attempt_per_member()` 只认 `round1_extra` 角色 | `recovery_v1_start` 行永不进池；聚合器读成「已登记无结果」（n_pending），态永远出不了 `limited`——整条验收路径的最后一个阻塞点 | 角色集扩为 `("round1_extra", "recovery_v1_start")` |
+| 15 | `build_coverage_reviews.py` 用 `r.get("state")` 过滤，而结构表该列名为 `slot` | `members` 永远为空——这就是 `unresolved` 判定在整个项目史上一次都没出现过的原因 | 改读 `r.get("slot")` |
+| 机制 | 覆盖复核文件只给尚未 accepted 的态发行 | 态被 accepted 后其复核行消失，聚合器找不到复核又把它落回 `limited`——**振荡而非不动点** | 作用域扩为「未 accepted 的态 ∪ 已有复核行的态」，行持久化 |
+
+**⑤ 由此的口径变更**：多个工具原先硬编码「14 个非 accepted 态」「28 条登记腿」。这两个数是**上限（CAP）而非期望计数**——开放态集合只随恢复成功而缩小，故断言改为上界、计数改为派生。原先钉死恢复前分布的测试（14 开放态、WP5 池 A=6/B=5）改为断言不变量：「经复核释放的 accepted 态必须带 review id 且保留历史 n_limited」（`test_no_state_leaves_limited_without_a_resolved_review`）、「B 是 A 的子集」（`test_acceptance_pools_are_the_qc_complete_subset`，现 A≥6/B≥5）、「缺口表恰好覆盖开放态」（`test_every_non_accepted_state_is_covered_exactly_once`，计数从标签文件派生）。`build_strict_recovery_manifest.py` 的 `MAX_LEGS=28` 注释同步写明是冻结预算上限。相关测试 20 项实测全绿。
+
+**当前状态**：accepted **36** / provisional **6** / limited **6**（分母 48）；覆盖复核 **2 resolved + 6 pending + 6 search_exhausted**；收口链 69 步全绿；全量 pytest 全绿（排除 4 个预存 ORCA fake-binary 环境失败）。
+
+
+### ⑬ 电子身份：全系综成员的前沿轨道组成（2026-10-21 晚）
+
+计划项（4）要求覆盖**所有实际计入系综的成员**，不是仅 48 个 primary。本轮的 cohort 是 `production_ensemble_weights.csv` 的**全部加权成员**（当前 77 个），成员清单与几何按登记哈希定位，报告与 CSV 同源生成（`--check` 字节校验）。
+
+**管线曾经完全不通，现已打通**（三次失败后定案）：ORCA 6.1.1 **不支持** `%output Print[P_Molden]` 的任何写法（单行/块/带内空格都被 `qcscan1.cpp line 84: Invalid assignment in OUTPUT block` 拒绝）。正解是**用捆绑的转换器**：单点跑完写出 `job.gbw`，再 `orca_2mkl job -molden` 得到 `job.molden.input`。侦察式单发（1 任务探针）先验证，再放整批——此前已白烧两批 16 个提交位。
+
+**已解析 45/77，三个非平凡发现**：
+
+| 指标 | HOMO 侧 | LUMO 侧 |
+|---|---|---|
+| Li 权重最大值 | **0.002363** | **0.310619** |
+| 分类分布 | ligand 21 / donor 24 | ligand 25 / donor 14 / delocalized 5 / **li_localized 1** |
+
+1. **Li 在 HOMO 中实质不参与**（最大权重 2.4e-03，远低于 0.25 的 Li 定域阈值）——支持「Li⁺ 氧化还原沉默」。
+2. **但 Li 在 LUMO 中可以定域**：唯一一条 `li_localized` 是 `DMSO|LiM_plus|primary`（Li_LUMO = 0.3106，给体_LUMO = 0.3537）。该态的还原过程**涉及 Li 本身**，与一般规律相反。它是**结论的边界，不是噪声**——报告一般规律时必须同时报告例外。
+3. **HOMO 与 LUMO 的分类并不一致**（早期 32 条样本里达 12/32）：如 `AN|LiM_plus` 是 ligand→donor、`DEC|LiM_plus|c09` 是 donor→delocalized。**只问 HOMO 会得出错误答案**，因此两个前沿分别落列（`frontier_class_homo` / `frontier_class_lumo`），阈值（weight 0.50 / Li 0.25）在读任何结果之前冻结。
+
+**产物**：`outputs/physics_completion/frontier/frontier_localization.{csv,md}` + `_index.json`。报告的结构刻意把「两个前沿并不一致」和「Li 定域的例外」单独成节——一张只列分类的表会把例外藏起来。
+
+**口径**：本项只描述轨道组成，**不改变任何验收判定**；覆盖率本身即「并行补电子身份」的进度。
+
+**⑬ 续：正式口径（Löwdin）推翻早期 AO 系数结论（2026-10-21 深夜）**
+
+按计划第三优先级的要求，正式布居改用 ORCA 6.1 原生 `! FMOPop` 输出（Mulliken 与 Löwdin
+双口径，均考虑基组重叠）。两种口径的对照揭示了量级差异：
+
+| 口径 | Li_LUMO 最大 | ≥0.25（Li 定域阈值）成员数 |
+|---|---|---|
+| AO 系数平方（忽略重叠，旧口径） | 0.31 | 1 条 |
+| **Löwdin（正式口径，FMOPop）** | **0.9126** | **32 条 / 77 全解析** |
+
+最戏剧性的单例：`DOL|LiM_2plus|c05` —— AO 口径 0.0002，Löwdin **0.8373**，差 **4000 倍**。
+`AN|LiM_plus|primary` 差 30 倍（0.0299 → 0.9126）。
+
+**正式结论（取代早期基于 AO 口径的判断）**：
+
+* HOMO 侧（氧化）：Li 全部 < 0.01 ——「Li 沉默」**仅对氧化侧成立**；
+  64 个已解析成员中 ligand 32 / donor 32 / li_localized **0**。
+* LUMO 侧（还原）：**Li 主导**——li_localized **32 条**（ligand 40 / donor 5；LiM_plus 17 + LiM_2plus 15），
+  最高 0.9126（AN/LiM_plus），EC 0.8520、DMC 0.8408、EMC 0.8385、DOL 0.8373、DEC 0.8373。
+
+> **Li 配位体系的氧化发生在配体/给体，还原发生在 Li 中心。**
+> 「Li⁺ 氧化还原沉默」这一早期表述只对了氧化半边；还原半边在正式布居下完全不沉默。
+> **普适性**：77 个成员全部解析后，全部 12 个溶剂分子的 Li 配位态（LiM_plus 17 条 +
+> LiM_2plus 15 条）都出现 Li 主导 LUMO（0.65–0.91）——这是 12 分子体系的共同规律。
+
+**方法学登记（供最终报告引用）**：
+
+* Mulliken 布居在基组重叠下可产生非物理值（实测 AN/M__34 的 Mulliken LUMO 列含
+  −1.227606 与 2.736070，而同块 Löwdin 列良态）——分类一律用 Löwdin，Mulliken 值
+  原样保留仅作展示，校验也只查 Löwdin 列；
+* 闭壳层 FMOPop 块无 `OPERATOR` 前缀且原子表无闭合线（与 unrestricted 格式不同），
+  解析器两种格式都接受；
+* 旧 AO 口径列保留为 `ao_class_*` 与 `li_weight_*`（方法学对照），正式列
+  `frontier_class_*` / `fmo_*` 只在有 FMOPop 数据时填——**不跨口径重归属任何数字**。
+
+### ⑭ 冻结证据保留与 ceiling 注册守卫修正：8/16 与三个新显著差异（2026-10-21 深夜）
+
+按计划第一、第四优先级的两处遗留缺口收尾。
+
+**① 冻结 manifest 保留放行态（计划原文：「保留原14态冻结manifest，避免成功态从冻结证据中消失」）**
+
+此前态一旦 accepted 就从 manifest 开放 scope 消失，其注册起点随之不可读——ceiling 的注册集读不到
+starts，`TMP|LiM_2plus` 报「登记 1 ≠ QC 通过 2」后被逐出 complete 集。修法与复核层的持久化同型：
+manifest 新增 `released` 列，5 个放行态以**冻结证据行**保留（starts 从 resolved 复核行的
+`registered_starts` 与 `computed_new_members` 重建——member key 的 seed 段即 basin id；
+`max_new_starts=0`，不再有新预算）。过程中抓到两个新缺陷：**note 自增**（marker 每轮追加，永不收敛，
+改幂等追加）与 **prior 坏数据回写**（带前缀的旧 released 行被沿用，需清一次强制从复核重取）。
+
+**② ceiling 注册守卫改子集语义（计划原文：「按成员键、角色和最新 attempt 形成集合，避免已有结果被
+错误阻塞」）**
+
+旧守卫要求「注册数 == QC 通过数」——双向都错：一条合法失败的注册腿（预算尽/漂移/等价极小）会阻塞
+全部已通过成员；而真正必须拦的反向违规（QC 通过但无注册出处）反而没被检查。修法：**子集检查**——
+每个 QC 通过成员的 seed 段必须在注册集；失败注册成员记注不阻塞。两个实现细节：member key 是
+`name|slot|seed` 而注册表是裸 seed（**比较 seed 段**）；无身份键的 legacy 注册项（manifest.json
+只有 path+sha256）**中性化**。哈希校验保留在更深层（fail-closed 层级接住了测试里的假哈希）。
+
+**③ 效果：ceiling 4/16 → 8/16，冻结容差 0.10 kcal/mol 下的正式判定**
+
+| 态 | Δ (kcal/mol) | 判定 |
+|---|---|---|
+| DEC\|LiM_plus | **-0.999288** | **显著（新最大差异）** |
+| EMC\|LiM_plus | -0.534816 | 显著 |
+| DME\|M | **-0.450569** | **显著** |
+| DME\|M_plus | -0.050917 | 不显著 |
+| DME\|LiM_2plus | -0.000370 | 不显著 |
+| TMP\|LiM_2plus | -0.000049 | 不显著 |
+| DEC\|M | -0.000027 | 不显著 |
+| DEC\|M_plus | -0.000027 | 不显著 |
+
+4 个被旧守卫错误阻塞的态全部解锁；其中两个的差异大到显著——**旧守卫不只是技术问题，它在掩盖
+真实的科学信号**。
+
+**④ WP5 目标池随放行态扩大后的诚实结果**：SL 放行后 B 池 6→7 分子。停止规则（同批 ≥16 repeat
+在两个非耗尽相邻点同时成功）在 7 分子池上更难满足：B/uncertainty 与 ranking_aware 达到 n_T=5
+停止，**B/random 与 diversity 没有达到**——按计划第五优先级的口径，这是**有效结论**而非失败
+（「AL 不优于随机、没有达到停止预算，均可作为有效结论」）。
+
+**⑤ strict_readiness 当前只剩一个缺口**：`ensemble_not_48_accepted`（39/48）。
+电子身份（77/77）与成本溯源等五项证据全部就位。
 ## 未完成的审查和发布条件
 
 - 2026-10-18 在 batch3 仍为 4 RUNNING + 14 PENDING 时执行不带 `-Commit` 的 `finalize_wp2.ps1`：生成器 75/75、归档账本 300 处比对零失配、全部只读 `--check`、页面校验与链内离线 pytest 退出码均为 0；三个会启动真实本机 ORCA/xtB 的集成节点按 HPC-only 规则排除。此为当时快照的技术闭合，不是 48/48 系综科学验收。

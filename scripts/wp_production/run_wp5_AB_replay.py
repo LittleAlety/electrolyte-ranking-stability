@@ -3,7 +3,7 @@
 The contract (v2, plan 2026-10-20 night):
 
 * pools come from ``build_wp5_target_pool.py`` -- the FINAL production
-  ensemble labels, 12 molecules x {A: free oxidation shift, B: Li shift};
+  ensemble labels (12 registered, qc-complete admission A=6/B=5) x {A: free oxidation shift, B: coordination shift};
 * the four baselines share the paired initial four labels per task+repeat;
 * the stop rule is per-repeat counting at non-exhausted budget points
   (>=16/20 at two consecutive points), never a round-mean comparison;
@@ -146,6 +146,39 @@ def _leg_cost(name: str, state: str) -> float | None:
     return cache.get((name, state))
 
 
+def prerequisite_cost(task: str) -> tuple[int, float | None]:
+    """Fixed cost paid BEFORE any query, per task.
+
+    Task A's label IS the free pair, so there is no separate prerequisite.
+
+    Task B predicts ``shift = li - free`` and restores ``li = free + shift``.
+    Establishing that decomposition for the WHOLE pool requires the free label
+    of every molecule up front -- the plan is explicit: "B若事先拥有全池12分子
+    的free标签，就必须支付这12个free标签的前置成本；不能只给后来查询的Li候选
+    附带free成本".  So B carries the full 12-molecule free-label cost once,
+    and per-query cost adds only the Li legs.
+
+    Returns ``(n_legs_paid, core_hours | None)``; ``None`` = MISSING (a leg has
+    no measured value), never 0.
+    """
+    if task != "B":
+        return 0, 0.0
+    names = sorted({r["name"] for r in _read(POOL) if r.get("task") == "B"})
+    total: float | None = 0.0
+    missing: list[str] = []
+    for name in names:
+        for state in ("M_tzvpd", "M_plus"):
+            v = _leg_cost(name, state)
+            if v is None:
+                missing.append("%s|%s" % (name, state))
+                total = None
+            elif total is not None:
+                total += v
+    if total is None:
+        return len(names) * 2, None
+    return len(names) * 2, total
+
+
 def _query_cost(task: str, name: str) -> tuple[str, float | None]:
     """Traceable per-query cost basis + value; value None = MISSING.
 
@@ -160,7 +193,9 @@ def _query_cost(task: str, name: str) -> tuple[str, float | None]:
     if task == "A":
         legs = ("M_tzvpd", "M_plus")
     else:
-        legs = ("LiM_plus", "LiM_2plus", "M_tzvpd", "M_plus")
+        # the free-label acquisition is charged ONCE as the prerequisite
+        # (see prerequisite_cost); a query adds only its Li legs
+        legs = ("LiM_plus", "LiM_2plus")
     total, miss, missing_legs = 0.0, False, []
     for state in legs:
         v = _leg_cost(name, state)
@@ -342,6 +377,13 @@ def replay_one(task, baseline, repeat):
                     cum_missing.add(nm)
                 elif total_cost is not None:
                     total_cost += val
+        prereq_legs, prereq_hours = prerequisite_cost(task)
+        if prereq_hours is None:
+            total_with_prereq: float | None = None
+        elif total_cost is None:
+            total_with_prereq = None
+        else:
+            total_with_prereq = prereq_hours + total_cost
         sum_rows.append({
             "task": task, "baseline": baseline, "repeat": str(repeat),
             "n_T": str(len(visible)), "n_pool": str(n),
@@ -353,8 +395,18 @@ def replay_one(task, baseline, repeat):
                                                if total_cost is not None else ""),
             "cumulative_cost_status": ("MISSING" if total_cost is None
                                        else "measured_cost_ledger"),
+            "prerequisite_legs_paid": str(prereq_legs),
+            "prerequisite_core_hours": ("%.3f" % prereq_hours
+                                        if prereq_hours is not None else ""),
+            "prerequisite_status": ("not_applicable" if prereq_legs == 0
+                                    else ("MISSING" if prereq_hours is None
+                                          else "measured_cost_ledger")),
+            "total_core_hours_incl_prerequisite": ("%.3f" % total_with_prereq
+                                                   if total_with_prereq is not None else ""),
             "cost_basis_note": ("task B carries the free-label acquisition cost "
-                                "(M + M_plus legs) per the plan"
+                                "(M + M_plus legs) per the plan; the user ACCEPTED this "
+                                "caliber on 2026-10-21, so the B cost is reported "
+                                "inclusive, never truncated"
                                 if task == "B" else ""),
             "endpoint_status": ("pass" if (o3 >= O3_THRESHOLD
                                             and r3 <= R3_THRESHOLD_EV)
@@ -449,14 +501,18 @@ def write_outputs(data: dict, repeats: int) -> None:
                    for p in (POOL, COST,
                              REPO / "outputs" / "week7" / "features_core.csv")},
         "contract": {
-            "pool": "target_pool_AB.csv (12 molecules, final production labels)",
+            "pool": ("target_pool_AB.csv holds all 12 molecules for audit, but the "
+                     "CONFIRMATORY replay admits only qc_complete_pair rows "
+                     "(task A: 6 molecules, task B: 5 molecules at 2026-10-20 labels)"),
             "paired_initial_set": "shared by all four baselines per task+repeat",
-            "stop_rule": "per-repeat; O_3>=2/3 and R_3<=0.10 eV at two "
-                         "consecutive non-exhausted points, >=16/20 each",
-            "cost": "measured_cost_ledger per query (task B carries the "
-                    "M+M_plus free-label cost); MISSING when a leg has no "
-                    "measured value; the 0.6/yr ASSUMED_CONSTANT scenario "
-                    "stays in the legacy replay only",
+            "stop_rule": ("JOINT success (v3.0 §13.4): the same batch of repeats "
+                          "must succeed at BOTH consecutive non-exhausted points "
+                          "(set intersection >= 16/20), never per-point counts"),
+            "cost": ("measured_cost_ledger; task B pays the FULL-POOL free-label "
+                     "prerequisite once (12 molecules x M_tzvpd+M_plus) and then "
+                     "only Li legs per query; task A pays its free pair per query; "
+                     "MISSING when a leg has no measured value; the 0.6/yr "
+                     "ASSUMED_CONSTANT scenario stays in the legacy replay only"),
             "blindness": "Acquirer never receives the full label vector",
         },
         "rows": {"AB_candidate_rounds": len(data["candidates"]),

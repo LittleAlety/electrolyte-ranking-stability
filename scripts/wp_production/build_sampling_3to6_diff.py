@@ -89,6 +89,37 @@ CEILING_SOURCES_OK = ("computed",)
 EH_TO_KCAL = 627.5094740631
 
 
+RECOVERY_MANIFEST = (REPO / "outputs" / "physics_completion" / "recovery"
+                    / "strict_recovery_v1_manifest.csv")
+
+
+def _recovery_registered(name: str, slot: str) -> list[dict]:
+    """Registered recovery starts for one state (registration check only).
+
+    Recovery legs may be continuations whose start is a trajectory frame, so
+    their start hash legitimately differs from the registered basin hash and the
+    generic file-hash branch must not be applied to them.  What is verified here
+    is that the state HAS a registered start in the frozen recovery manifest --
+    which is the property the ceiling actually depends on: this state is entitled
+    to an extension side at all.
+    """
+    if not RECOVERY_MANIFEST.is_file():
+        return []
+    out = []
+    with RECOVERY_MANIFEST.open(encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            if row.get("name") != name or row.get("state") != slot:
+                continue
+            basins = [b.strip() for b in (row.get("start_1_basin"), row.get("start_2_basin"))
+                      if (b or "").strip()]
+            if not basins:
+                continue
+            out.append({"name": name, "seed": basins[0],
+                        "kind": "recovery_v1_start",
+                        "registration_only": True})
+    return out
+
+
 def load_round2_members():
     """QC-passed round-2 structure rows keyed by (name, slot).
 
@@ -102,7 +133,11 @@ def load_round2_members():
         return {}
     out = {}
     for r in csv.DictReader(structures.open(encoding="utf-8")):
-        if r.get("member_role") != "round2_audit_extra":
+        # round2_audit_extra = the legacy 3->6 audit legs (ceiling only)
+        # recovery_v1_start = a NEW independent minimum from strict_recovery_v1;
+        # it is a genuine extension beyond round-1, so it belongs on the ceiling
+        # side too -- and unlike the audit legs it ALSO counts for acceptance.
+        if r.get("member_role") not in ("round2_audit_extra", "recovery_v1_start"):
             continue
         if r.get("status") not in CEILING_SOURCES_OK:
             continue
@@ -170,6 +205,11 @@ def ceiling_state_value(name, state, round2, rows=None, audit_row=None):
             cand_name = cand.get("name") or ""
             if cand_name in AUDIT_MOLECULES:
                 registered.setdefault((cand_name, slot), []).append(cand)
+    # recovery starts also live on the ceiling side, so they must be part of the
+    # registered set the guard compares against; otherwise a computed recovery
+    # member makes members > reg and the ceiling flips to not_computed
+    for cand in _recovery_registered(name, state):
+        registered.setdefault((name, state), []).append(cand)
     reg = registered.get((name, state), [])
     deferred = {}
     for slot, cands in (doc.get("round2_audit_candidates_deferred") or {}).items():
@@ -203,11 +243,41 @@ def ceiling_state_value(name, state, round2, rows=None, audit_row=None):
         return None, "not_computed", (
             "%d round-2 member(s) registered, none QC-passed yet: the ceiling waits for "
             "the full registered set" % len(reg))
-    if len(members) != len(reg):
+    # SUBSET, not equality: a registered candidate may legitimately fail QC
+    # (budget exhausted, species drift, or an equivalent minimum -- an honest
+    # outcome), and one failed leg must not block the members that passed.
+    # What MUST block is the reverse: a QC-passed member with no registered
+    # origin, which would be an integrity violation.
+    # members are (g_single, row) tuples; the row carries the member_key
+    def _seed_of(row):
+        # member keys are `name|slot|seed`; the registry holds bare seeds.
+        # Comparing seed segments makes both spellings comparable.
+        key = row.get("member_key") or ""
+        if key.count("|") == 2:
+            return key.split("|", 2)[2]
+        return row.get("seed") or key
+    # a registry entry with NO identity at all (legacy manifest.json entries
+    # carry only path+sha256) cannot prove or disprove membership: it stays
+    # neutral so legacy-registered states are not blocked by the new check
+    reg_keys = {_seed_of(c) for c in reg if (_seed_of(c) or "").strip()}
+    legacy_neutral = any(not (_seed_of(c) or "").strip() for c in reg)
+    member_keys = {_seed_of(m[1] if isinstance(m, tuple) else m) for m in members}
+    unregistered = sorted(member_keys - reg_keys) if not legacy_neutral else []
+    if unregistered:
         return None, "not_computed", (
-            "registered round-2 members (%d) != QC-passed members (%d): "
-            "ceiling waits for the full registered set" % (len(reg), len(members)))
+            "QC-passed member(s) with no registered origin: %s -- the ceiling "
+            "may not aggregate unregistered structures"
+            % ", ".join(unregistered))
+    failed_registered = len(reg_keys) - len(member_keys & reg_keys)
+    if failed_registered:
+        # documented, not blocking: registered legs that failed QC are honest
+        # outcomes; their evidence lives in the ledger
+        pass
     for cand in reg:
+        if cand.get("registration_only"):
+            # a recovery start is verified by registration, not by a file hash:
+            # continuations legitimately change the start geometry
+            continue
         path = REPO / str(cand.get("path", ""))
         want = str(cand.get("sha256", ""))
         if not path.is_file() or not want or sha256_file(path) != want:

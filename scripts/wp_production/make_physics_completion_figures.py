@@ -52,6 +52,12 @@ MECH_GEOM = REPO_ROOT / "outputs" / "physics_completion" / "pair_evidence" / "me
 IDENTITY = REPO_ROOT / "outputs" / "state_identity" / "state_identity_stratification.csv"
 BUDGET_CURVES = REPO_ROOT / "outputs" / "week33" / "budget_curves.csv"
 LADDER = REPO_ROOT / "outputs" / "physics_completion" / "pair_evidence" / "frozen_rung_ladder.csv"
+#: v3.0 A/B confirmatory replay endpoints (2026-10-21) -- F64 must show the
+#: CURRENT sample sizes and blocking verdicts, not only the legacy curves.
+AB_ENDPOINTS = (REPO_ROOT / "outputs" / "physics_completion" / "active_learning"
+                / "blind_replay" / "AB_axis_endpoint.csv")
+#: WP3 production rung status (8/12 computed; limited and screen-only kept apart)
+WP3_RUNG_STATUS = "computed=8/12 (2 limited + 2 screen-only do NOT enter computed)"
 
 INK = "#111827"
 MUTED = "#6b7280"
@@ -278,12 +284,16 @@ def figure_ladder(path: Path):
     ax_c.set_xticklabels(rung_order, fontsize=7.5, rotation=30, ha="right")
     ax_c.set_ylabel("Kendall tau_b of the rung")
     ax_c.set_ylim(-0.62, 1.06)
-    ax_c.legend(fontsize=8, frameon=False, loc="lower left")
-    ax_c.set_title("(c) Frozen 5-rung ladder (frozen aggregates)", fontsize=9.5, color=INK)
+    ax_c.legend(fontsize=8, frameon=False, loc="lower right")
+    ax_c.set_title("(c) Frozen 5-rung proxy ladder", fontsize=9.5, color=INK)
+    ax_c.text(0.02, 0.03, "production R4 rung (not drawn here):\n" + WP3_RUNG_STATUS,
+              transform=ax_c.transAxes, fontsize=6.8, color=RED, va="bottom", ha="left",
+              bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor=RED, alpha=0.85))
 
-    fig.suptitle("F61  E -> G -> ensemble ladder: the frozen evidence stops at the electronic-energy "
-                 "and geometry rungs (plan WP3; ROBUST_INVERSION is a label, not a certified flip)",
-                 fontsize=10.5, color=INK)
+    fig.suptitle("F61  E -> G -> ensemble ladder: panels (a)-(b) are the frozen proxy rungs; panel (c) "
+                 "separates the PRODUCTION rung (8/12 computed) from limited and screen-only values "
+                 "(plan WP3; ROBUST_INVERSION is a label, not a certified flip)",
+                 fontsize=9.6, color=INK)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     return finish(fig, path)
 
@@ -438,8 +448,32 @@ def figure_budget(path: Path):
     ax_b.legend(fontsize=8, frameon=False, loc="lower right")
     ax_b.set_title("(b) Same replay against the frozen success endpoint", fontsize=9.5, color=INK)
 
-    fig.suptitle("F64  cumulative cost -> selection recovery (plan WP5): frozen in-pool replay, "
-                 "not a blind pre-registration", fontsize=10.5, color=INK)
+    # v3.0 D7: the curves above are the LEGACY C/M/E demo (old k-grid, per-point
+    # success counts).  The current A/B confirmatory replay is reported as a
+    # status box -- sample size and the honest blocking verdict -- so the figure
+    # can never be read as "the new protocol passed".
+    ab_status = "unavailable"
+    try:
+        ab_rows = load_csv(AB_ENDPOINTS)
+        by_task = {}
+        for row in ab_rows:
+            by_task.setdefault(row["task"], []).append(row)
+        parts = []
+        for task in sorted(by_task):
+            rows_t = by_task[task]
+            n_pool = rows_t[0]["n_pool"]
+            verdicts = sorted({r["stop_budget_status"] for r in rows_t})
+            parts.append("task %s: %s molecules x %d strategies -> %s"
+                         % (task, n_pool, len(rows_t), "/".join(verdicts)))
+        ab_status = " | ".join(parts)
+    except Exception:  # figure must still render if the A/B table is absent
+        pass
+    ax_b.text(0.02, 0.03, "current A/B confirmatory replay:\n" + ab_status.replace(" | ", "\n"),
+              transform=ax_b.transAxes, fontsize=6.6, color=RED, va="bottom", ha="left",
+              bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor=RED, alpha=0.85))
+    fig.suptitle("F64  cumulative cost -> selection recovery: curves are the LEGACY C/M/E demo "
+                 "(legacy_method_demo, NOT the v3 A/B protocol); current A/B status boxed below",
+                 fontsize=9.6, color=INK)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     return finish(fig, path)
 

@@ -7,11 +7,11 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 101,
+  "test_files": 117,
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-21T00:07:06Z",
+  "generated_at_utc": "2026-10-21T22:13:48Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -1600,8 +1600,8 @@ window.HB = {
    "file": "F61_physics_completion_ladder.png",
    "week": 44,
    "caption": "E -> G -> ensemble 台阶（方案 WP3）：只有垂直->绝热这一级是冻结的（n=12，逐分子位移箭头），三态判定 55/9/2；G_single 已有 48/48 个主态的真实 Opt+Freq 生产标签，G_ensemble 与其余主态仍需 WP2 生产，故 ROBUST_INVERSION 只是标签不是已认证翻转",
-   "sha": "4df2b2b204a557e3e608c8db5348fa134f5d5f901580af8f2e7ec3d007da8305",
-   "bytes": 179055,
+   "sha": "d481fcdf682721b15e02b684d22951d0d2bc495f630fbfb39ae48b718055fbc5",
+   "bytes": 193627,
    "w": 2592,
    "h": 832
   },
@@ -1630,8 +1630,8 @@ window.HB = {
    "file": "F64_physics_completion_budget_curve.png",
    "week": 44,
    "caption": "累计成本 -> 选集恢复曲线（方案 WP5）：冻结的 20 种子池内回放，tau_b 与 Top-3 重叠随已查询标签数 n_T 的曲线与端点线；这是已知数据的回放，不是盲预注册",
-   "sha": "9ac732cae4ecf9d54313f661ea11bfcc79b35345d9f9f95cbc2b86cd2f727a84",
-   "bytes": 150393,
+   "sha": "612a4d9e0ef178c4c99a9e66439a6198858551a38a7e19f626ab11a976804f8b",
+   "bytes": 177681,
    "w": 1856,
    "h": 832
   }
@@ -1645,7 +1645,7 @@ window.HB = {
   {
    "path": "scripts",
    "note": "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）",
-   "files": 213
+   "files": 228
   },
   {
    "path": "config",
@@ -1665,17 +1665,17 @@ window.HB = {
   {
    "path": "outputs",
    "note": "全部产物：逐阶段载荷、physics_completion/、figures/、溯源与合规",
-   "files": 7537
+   "files": 7575
   },
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 104
+   "files": 120
   },
   {
    "path": "docs",
    "note": "技术报告与周报（NN_*.md）、协议、结题报告、站点",
-   "files": 147
+   "files": 149
   },
   {
    "path": "deliverables",

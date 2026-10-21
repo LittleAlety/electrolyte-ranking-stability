@@ -93,7 +93,15 @@ AUDIT_MOLECULES = ("EMC", "DEC", "DME", "TMP")
 #: been approved, so registering would make the 3->6 ceiling wait on legs that
 #: nobody scheduled.  Their measured pool stays in the round-2 run record and
 #: drives the audit's pool size; registration happens when a batch is approved.
-DEFERRED_AUDIT_MOLECULES = ("EMC",)
+#:
+#: 2026-10-20 user ruling: EMC's three measured Li basins WERE approved for a
+#: production batch and moved from deferred to registered.  That decision is
+#: encoded here (not only in the derived JSON), because the JSON is regenerated:
+#: a rebuild that still listed EMC as deferred silently reverted the ruling and
+#: turned EMC/LiM_plus from `complete` back into `not_computed`.
+DEFERRED_AUDIT_MOLECULES = ()
+#: molecules whose Li round-2 basins are explicitly approved for production
+APPROVED_LI_BATCHES = ("EMC",)
 PROTOCOL = "wB97X-D4 def2-TZVPD Opt VeryTightOpt AnFreq SMD(acetonitrile) TightSCF SlowConv"
 #: Slot -> (charge, multiplicity); method basis is always def2-TZVPD per v1.3 mapping.
 SLOT_QM = {"M": (0, 1), "M_plus": (1, 2), "LiM_plus": (1, 1), "LiM_2plus": (2, 2)}
@@ -349,11 +357,109 @@ def build_members():
     return slot_members, round2_info
 
 
+#: name -> mol_id (rb.MOL_LOOKUP is keyed by mol_id)
+_MOL_ID_BY_NAME = {m[1]: m[0] for m in rb.MOLS}
+
+RECOVERY = REPO / "outputs" / "physics_completion" / "recovery"
+RECOVERY_MANIFEST = RECOVERY / "strict_recovery_v1_manifest.csv"
+RECOVERY_SEARCH = RECOVERY / "strict_recovery_v1_search_pool.csv"
+LI_RECOVERY_EXEC = (REPO / "outputs" / "physics_completion" / "li_motif_sampling"
+                    / "li_motif_round3_recovery.csv")
+
+
+def _recovery_start_geometry(name, slot, basin):
+    """Registered geometry + sha for one recovery start (pool / search / motif)."""
+    import csv as _csv
+    if (name, slot) and basin:
+        # 1) frozen conformer pool
+        if SAMPLING.is_file():
+            with SAMPLING.open(encoding="utf-8") as fh:
+                for r in _csv.DictReader(fh):
+                    if r.get("name") != name or r.get("state") != slot:
+                        continue
+                    rel = r.get("geometry_relpath", "")
+                    leaf = rel.replace("\\", "/").rstrip("/").split("/")[-2] \
+                        if rel.endswith(".xyz") and len(rel.split("/")) >= 2 else ""
+                    if leaf == basin:
+                        return rel, r.get("geometry_sha256", ""), r.get("rel_kcal", "")
+        # 2) recovery search pool (free/cation)
+        if RECOVERY_SEARCH.is_file():
+            with RECOVERY_SEARCH.open(encoding="utf-8") as fh:
+                for r in _csv.DictReader(fh):
+                    if (r.get("name") == name and r.get("state") == slot
+                            and r.get("basin_id") == basin):
+                        return (r.get("geometry_relpath", ""),
+                                r.get("geometry_sha256", ""), "")
+        # 3) recovery Li motif exec
+        if "Li" in slot and LI_RECOVERY_EXEC.is_file():
+            with LI_RECOVERY_EXEC.open(encoding="utf-8") as fh:
+                for r in _csv.DictReader(fh):
+                    leg = r.get("leg_id", "")
+                    lname, _, lstate = leg.partition("|")
+                    if lname != name or lstate != slot:
+                        continue
+                    if str(r.get("kept", "")).lower() != "true":
+                        continue
+                    raw = r.get("candidate_id") or r.get("motif_id") or ""
+                    label = "r3m_" + "".join(
+                        ch if ch.isalnum() else "_" for ch in raw)[:24]
+                    if label == basin:
+                        return r.get("motif_path", ""), "", ""
+    return "", "", ""
+
+
+def recovery_candidate_rows():
+    """strict_recovery_v1 starts as first-class candidate rows.
+
+    ``member_role=recovery_v1_start``: a NEW independent minimum that counts
+    toward the state's acceptance AND toward the 3->6 ceiling extension
+    (unlike ``round2_audit_extra``, which is ceiling-only).
+    """
+    import csv as _csv
+    if not RECOVERY_MANIFEST.is_file():
+        return []
+    out = []
+    with RECOVERY_MANIFEST.open(encoding="utf-8") as fh:
+        for r in _csv.DictReader(fh):
+            name, slot = r.get("name", ""), r.get("state", "")
+            for key in ("start_1_basin", "start_2_basin"):
+                basin = r.get(key, "")
+                if not basin:
+                    continue
+                geom, sha, rel = _recovery_start_geometry(name, slot, basin)
+                if not geom:
+                    continue        # unverifiable start never becomes a candidate
+                if not sha:
+                    # the Li motif executor registers the geometry path; the hash
+                    # is computed here so every candidate row carries one
+                    src_path = REPO / geom
+                    if not src_path.is_file():
+                        continue
+                    import hashlib as _hl
+                    sha = _hl.sha256(src_path.read_bytes()).hexdigest()
+                charge, mult = SLOT_QM[slot]
+                out.append({
+                    "slot": slot, "mol_id": _MOL_ID_BY_NAME.get(name, ""),
+                    "name": name, "member_role": "recovery_v1_start",
+                    "seed": basin, "source_kind": "strict_recovery_v1_start",
+                    "geometry": geom, "sha256": sha, "rel_kcal": rel,
+                    "denticity": "", "duplicate_of": "",
+                    "charge": charge, "multiplicity": mult,
+                    "status": "planned",
+                    "note": "independent start registered by strict_recovery_v1",
+                })
+    return out
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--build-packages", metavar="DIR", default="",
                     help="write HPC chunk packages under DIR (work/)")
     ap.add_argument("--chunk", type=int, default=18, help="tasks per array package (<=18)")
+    ap.add_argument("--register-recovery", action="store_true",
+                    help="also register strict_recovery_v1 starts as candidates "
+                         "(only AFTER their results exist: registering a planned "
+                         "member would turn the state provisional)")
     args = ap.parse_args(argv)
 
     slot_members, round2 = build_members()
@@ -415,12 +521,22 @@ def main(argv=None) -> int:
             "round1_extra_rows": extras_total,
             "primary_ready": sum(1 for r in rows if r["member_role"] == "primary" and r["status"] == "ready"),
             "primary_pending": sum(1 for r in rows if r["member_role"] == "primary" and r["status"] != "ready"),
+            "recovery_v1_start_rows": sum(1 for r in rows
+                                          if r["member_role"] == "recovery_v1_start"),
         },
         "round2_audit_candidates": {slot: round2[slot] for slot in round2 if round2[slot]},
         "round2_audit_candidates_deferred": {slot: entries for slot, entries
                                              in deferred_li_round2_basins().items() if entries},
         "outputs": {"candidates_csv": str(csv_path.relative_to(REPO).as_posix())},
     }
+    recovery_rows = recovery_candidate_rows() if args.register_recovery else []
+    if recovery_rows:
+        rows.extend(recovery_rows)
+        # keep the CSV schema order stable: re-dump with the same field order
+        with csv_path.open("w", encoding="utf-8", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()), lineterminator="\n")
+            w.writeheader()
+            w.writerows(rows)
     (OUT / "production_ensemble_manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 

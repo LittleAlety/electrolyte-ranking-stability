@@ -67,17 +67,23 @@ OUT_CSV = OUT_DIR / "li_motif_plan_round2.csv"
 OUT_INDEX = OUT_DIR / "li_motif_plan_round2_index.json"
 
 
+
 def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def load_pool():
-    """(name, state) -> [alternative parent candidates], best-energy first."""
+def load_pool(allowed=None):
+    """(name, state) -> [alternative parent candidates], best-energy first.
+
+    ``allowed`` lets the strict-recovery plan cover molecules outside the
+    original audit set; the default keeps the round-2 plan byte-identical.
+    """
+    allowed = set(AUDIT_MOLECULES) if allowed is None else set(allowed)
     if not POOL.is_file():
         raise SystemExit("frozen conformer pool missing: " + str(POOL))
     by_key: dict = {}
     for r in csv.DictReader(POOL.open(encoding="utf-8")):
-        if r["name"] not in AUDIT_MOLECULES:
+        if r["name"] not in allowed:
             continue
         # The Li-free alternative parent must be a NEUTRAL basin of the same
         # molecule: the M (charge 0) pool entries.
@@ -92,6 +98,11 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--check", action="store_true",
                     help="READ-ONLY: recompute and compare, never write")
+    ap.add_argument("--states", default="",
+                    help="comma list NAME:STATE to plan instead of the round-2 audit set "
+                         "(used by strict_recovery_v1)")
+    ap.add_argument("--out", default="",
+                    help="output basename (default li_motif_plan_round2); *.csv/_index.json follow")
     args = ap.parse_args(argv)
 
     screen = json.loads(SCREEN_JSON.read_text(encoding="utf-8")) if SCREEN_JSON.is_file() else {}
@@ -100,14 +111,26 @@ def main(argv=None) -> int:
         if leg.get("name") in AUDIT_MOLECULES and leg.get("state") in LI_STATES:
             round1_kept[(leg["name"], leg["state"])] = len(leg.get("kept", []))
 
-    pool = load_pool()
     rows = []
-    for name in AUDIT_MOLECULES:
+    if args.states:
+        wanted_pairs = [tuple(s.split(":")) for s in args.states.split(",") if s.strip()]
+        molecule_order = []
+        for name, _state in wanted_pairs:
+            if name not in molecule_order:
+                molecule_order.append(name)
+        state_map = {}
+        for name, state in wanted_pairs:
+            state_map.setdefault(name, []).append(state)
+    else:
+        molecule_order = list(AUDIT_MOLECULES)
+        state_map = {n: list(LI_STATES) for n in molecule_order}
+    pool = load_pool(molecule_order)
+    for name in molecule_order:
         # Alternative parents are shared per molecule (neutral M basins),
         # listed once per Li state with the state's own charge for reference.
         basins = pool.get((name, "M"), [])
         basins.sort(key=lambda r: (float(r["rel_kcal"]), int(r["source_index"])))
-        for state in LI_STATES:
+        for state in state_map[name]:
             kept_r1 = round1_kept.get((name, state), "")
             parents = []
             for r in basins:
@@ -188,8 +211,12 @@ def main(argv=None) -> int:
         return 0 if ok else 1
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    OUT_CSV.write_text(render_csv(), encoding="utf-8", newline="\n")
-    OUT_INDEX.write_text(render_index(), encoding="utf-8", newline="\n")
+    # --out redirects BOTH files; without it the round-2 artifacts are written
+    # exactly as before (the default path must never be collateral damage)
+    csv_path = (OUT_DIR / (args.out + ".csv")) if args.out else OUT_CSV
+    idx_path = (OUT_DIR / (args.out + "_index.json")) if args.out else OUT_INDEX
+    csv_path.write_text(render_csv(), encoding="utf-8", newline="\n")
+    idx_path.write_text(render_index(), encoding="utf-8", newline="\n")
     print("round2 plan: legs=%d ceilings=%s" % (
         len(rows), {f"{r['name']}|{r['state']}": r["round2_ceiling_upper_bound"] for r in rows}))
     return 0

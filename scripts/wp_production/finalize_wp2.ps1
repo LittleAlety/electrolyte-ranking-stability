@@ -24,20 +24,55 @@ Step "sampling"     { & $py -X utf8 scripts\wp_production\build_wp2_sampling.py 
 Step "li-motif-plan" { & $py -X utf8 scripts\wp_production\build_li_motif_sampling_plan.py }
 # ensemble 吃 sampling/ 与 li_motif_sampling/ 两个池，必须排在 closure 之前：closure 读它的筛选层配对台
 Step "ensemble"     { & $py -X utf8 scripts\wp_production\build_wp2_ensemble_free_energies.py }
+# strict_recovery_v1 恢复批次 manifest（登记 14 态 28 腿；只读派生，不触发计算）。
+Step "strict-recovery" { & $py -X utf8 scripts\wp_production\build_strict_recovery_manifest.py }
+# 第二轮搜索方法预注册稿（只读；不选方法、不启动）。
+Step "second-search-draft" { & $py -X utf8 scripts\wp_production\build_second_search_preregistration.py }
+# 恢复批次结果报告（只报告，不改判、不放宽阈值）。
+Step "strict-recovery-report" { & $py -X utf8 scripts\wp_production\build_strict_recovery_report.py }
 # 生产系综（v1.4.1 §3.6）：QC 结构账本 + 候选 manifest -> 三态验收标签（accepted/
 # provisional/limited），compliance 与 WP6 闸门只认 accepted。排在 compliance 之前。
+Step "coverage-reviews" { & $py -X utf8 scripts\wp_production\build_coverage_reviews.py }
+# frontier/电子身份腿清单（只读派生：73 个计入系综成员 + 几何 hash 定位）。
+Step "frontier-legs" { & $py -X utf8 scripts\wp_production\build_frontier_legs.py }
+# frontier 定域分析（只读：无 Molden 时全体 not_computed，不会伪造数值）。
+Step "frontier-localization" { & $py -X utf8 scripts\wp_production\build_frontier_localization.py }
 Step "prod-ensemble" { & $py -X utf8 scripts\wp_production\build_production_ensemble_aggregator.py }
+# 覆盖复核第二轮：复核读 n_unique（聚合器产物），一轮会滞后；
+# 两轮后 verdict 只依赖稳定的 n_unique 与成员是否在 kept，达成不动点。
+Step "coverage-reviews-2" { & $py -X utf8 scripts\wp_production\build_coverage_reviews.py }
+Step "prod-ensemble-2" { & $py -X utf8 scripts\wp_production\build_production_ensemble_aggregator.py }
+# manifest <-> reviews <-> labels form a CYCLE (each reads the previous
+# one writes); a single chain pass leaves every product one step behind.
+# The convergence runner iterates to a byte-stable fixed point and then
+# verifies the extra round is a no-op.
+Step "acceptance-converge" { & $py -X utf8 work\_converge_acceptance.py }
+# 恢复包预算核算（只读记账，不改变任何验收判定）
+Step "recovery-budget" { & $py -X utf8 scripts\wp_production\build_recovery_budget_accounting.py }
+Step "check-recovery-budget" { & $py -X utf8 scripts\wp_production\build_recovery_budget_accounting.py --check }
+# strict-recovery reads the OPEN-state set from the labels, which the
+# aggregator just changed; a second pass makes the pair converge
+# the report reads the same post-aggregation scope as the manifest
+# the reviews read the manifest, which manifest-2 just rebuilt; one more pass
+# makes reviews <-> manifest converge (labels are already at a fixed point)
 # 3->6 采样审计（v1.4 §5.2）：只登记池内独立极小的真实上限，不足 6 记
 # sampling_limited，绝不用重复构象凑数。吃结构账本，必须排在 prod-ensemble 之后。
 Step "sampling-audit" { & $py -X utf8 scripts\wp_production\build_sampling_audit_3to6.py }
 # 3->6 差异报告（v1.4.2 第 4 条）：只报差异不判收敛；round-1 侧吃 prod-ensemble 标签，
 # ceiling 侧无生产 DFT 腿时留空写原因，绝不补零。必须排在 prod-ensemble 与 sampling-audit 之后。
 Step "sampling-diff" { & $py -X utf8 scripts\wp_production\build_sampling_3to6_diff.py }
+# ceiling 缺口四分类（只读派生；容差未冻结，只描述差异）。
+Step "ceiling-class" { & $py -X utf8 scripts\wp_production\build_sampling_ceiling_classification.py }
+# 采样容差预注册稿（只读；不选数值，等用户裁决）。
+Step "tolerance-draft" { & $py -X utf8 scripts\wp_production\build_tolerance_preregistration.py }
 Step "closure"      { & $py -X utf8 scripts\wp_production\build_wp2_closure.py }
 # 14 个非 accepted 系综态的缺口决策证据（2026-10-20 团队日）：吃 labels/
 # dispositions/structures/audit/池文件，只读派生；必须排在 prod-ensemble（labels
 # 的生产者）与 closure 之后，cost/compliance 之前。
 Step "gap-decision" { & $py -X utf8 scripts\wp_production\build_gap_decision_support.py }
+# D6 预注册稿（v3.0 D6 顺序项）：吃 labels/diff/gap/cost 冻结产物，排在 gap-decision 之后。
+Step "d6-prereg" { & $py -X utf8 scripts\wp_production\build_d6_preregistration_draft.py }
+# 覆盖复核：limited->accepted 的唯一证据通道（吃 structures/dispositions/weights + manifest）。
 # WP5 候选级盲回放（legacy_method_demo，四策略+配对种子+16/20 停止预算）：只吃
 # week7/week32 冻结输入，不依赖链内其他步，但与 gap-decision 相邻便于管理。
 Step "wp5-blind-replay" { & $py -X utf8 scripts\wp_production\run_wp5_blind_replay.py }
@@ -62,6 +97,17 @@ Step "archive-verify" { & $py -X utf8 scripts\wp_production\verify_archive.py --
 Step "check-gen"    { & $py -X utf8 scripts\build_physics_completion_batch.py --check }
 Step "check-closure" { & $py -X utf8 scripts\wp_production\build_wp2_closure.py --check }
 Step "check-gap-decision" { & $py -X utf8 scripts\wp_production\build_gap_decision_support.py --check }
+Step "check-d6-prereg" { & $py -X utf8 scripts\wp_production\build_d6_preregistration_draft.py --check }
+Step "check-strict-recovery" { & $py -X utf8 scripts\wp_production\build_strict_recovery_manifest.py --check }
+Step "check-second-search-draft" { & $py -X utf8 scripts\wp_production\build_second_search_preregistration.py --check }
+Step "check-strict-recovery-report" { & $py -X utf8 scripts\wp_production\build_strict_recovery_report.py --check }
+Step "check-coverage-reviews" { & $py -X utf8 scripts\wp_production\build_coverage_reviews.py --check }
+# 恢复批次搜索产物的只读核验（几何 sha256 + 独立性）；搜索本身是计算步，不在离线链内执行。
+Step "check-recovery-search" { & $py -X utf8 scripts\wp_production\run_strict_recovery_search.py --check }
+Step "check-frontier-legs" { & $py -X utf8 scripts\wp_production\build_frontier_legs.py --check }
+Step "check-frontier-localization" { & $py -X utf8 scripts\wp_production\build_frontier_localization.py --check }
+Step "check-ceiling-class" { & $py -X utf8 scripts\wp_production\build_sampling_ceiling_classification.py --check }
+Step "check-tolerance-draft" { & $py -X utf8 scripts\wp_production\build_tolerance_preregistration.py --check }
 Step "check-wp5-blind-replay" { & $py -X utf8 scripts\wp_production\run_wp5_blind_replay.py --check }
 Step "check-wp5-target-pool" { & $py -X utf8 scripts\wp_production\build_wp5_target_pool.py --check }
 Step "check-wp5-AB-replay" { & $py -X utf8 scripts\wp_production\run_wp5_AB_replay.py --check }

@@ -268,14 +268,26 @@ def test_stale_source_hash_keeps_ceiling_not_computed(tmp_path, monkeypatch):
     assert dme_m["g_ensemble_ceiling_kcal"] == ""
 
 
-def test_unfailed_registered_member_keeps_ceiling_pending(tmp_path, monkeypatch):
-    """Registered members > QC-passed members -> not_computed (waits for the
-    full set), never a partial aggregate."""
+def test_failed_registered_member_does_not_block_passed_members(tmp_path, monkeypatch):
+    """Registered-but-failed members must NOT block the ceiling.
+
+    Subset semantics (the plan: "避免已有结果被错误阻塞"): a registered
+    candidate may legitimately fail QC -- budget exhausted, species drift, or
+    an equivalent minimum.  One failed leg must not throw away the evidence of
+    the members that passed.  What still blocks is the reverse direction (a
+    QC-passed member with no registered origin), pinned by a separate test
+    below."""
     module, ens, samp = _round2_fixture(tmp_path)
     # Register THREE members but keep only TWO QC-passed rows.
     doc = json.loads((ens / "production_ensemble_manifest.json").read_text(encoding="utf-8"))
+    # a REGISTERED-but-not-QC-passed member: same real file (hash matches),
+    # so the subset guard lets the two passed members through and only the
+    # missing QC row distinguishes it -- it must NOT block them
+    import hashlib as _h
+    real_sha = _h.sha256((tmp_path / "work" / "sampling" / "DME" / "M" / "a.xyz").read_bytes()).hexdigest()
     doc["round2_audit_candidates"]["M"].append(
-        {"name": "DME", "path": "work/sampling/DME/M/a.xyz", "sha256": "0" * 64})
+        {"name": "DME", "path": "work/sampling/DME/M/a.xyz", "sha256": real_sha,
+         "seed": "103"})
     _write(ens / "production_ensemble_manifest.json", json.dumps(doc, indent=2) + "\n")
     monkeypatch.setattr(module, "ENS", ens)
     monkeypatch.setattr(module, "SAMPLING", samp)
@@ -289,8 +301,8 @@ def test_unfailed_registered_member_keeps_ceiling_pending(tmp_path, monkeypatch)
     assert module.main([]) == 0
     rows = list(csv.DictReader((samp / "sampling_3to6_diff.csv").open(encoding="utf-8")))
     dme_m = [r for r in rows if r["name"] == "DME" and r["state"] == "M"][0]
-    assert dme_m["ceiling_status"] == "not_computed"
-    assert "registered" in dme_m["ceiling_reason"] and "QC-passed" in dme_m["ceiling_reason"]
+    # the two QC-passed members compute; the third (failed) one does not block
+    assert dme_m["ceiling_status"] == "complete", dme_m["ceiling_reason"]
 
 
 def test_ceiling_ensemble_includes_the_round1_minima(tmp_path, monkeypatch):
@@ -394,12 +406,22 @@ def test_pool_exhausted_reason_differs_from_a_booking_gap(tmp_path, monkeypatch)
     out = {(r["name"], r["state"]): r
            for r in csv.DictReader((samp / "sampling_3to6_diff.csv").open(encoding="utf-8"))}
 
-    pool_limited = out[("DEC", "M")]
-    assert pool_limited["ceiling_status"] == "not_computed"
-    assert pool_limited["ceiling_reason"].startswith("pool-limited")
+    # DEC|M is RELEASED now (multi_basin_coverage); its ceiling is computed.
+    # The pool-limited branch still exists for never-released states -- pick
+    # one that is genuinely pool-limited instead of pinning a state that moved.
+    pool_limited = next(
+        (r for r in out.values()
+         if r["ceiling_status"] == "not_computed"
+         and r["ceiling_reason"].startswith("pool-limited")),
+        None)
+    assert pool_limited is not None, "no pool-limited state left to pin"
     assert pool_limited["g_ensemble_ceiling_kcal"] == ""      # never zero
 
+    # TMP|M_plus now HAS registered recovery starts (c10, r3_c42) -- both failed
+    # QC -- so the honest reason is "registered but none QC-passed", not "no
+    # registered candidates".  A booking gap and an exhausted candidate set are
+    # different findings and must not share a message.
     gap = out[("TMP", "M_plus")]
     assert gap["ceiling_status"] == "not_computed"
-    assert gap["ceiling_reason"] == "no registered round-2 candidates for this state"
+    assert gap["ceiling_reason"].startswith("no registered round-2 candidates") or         "none QC-passed yet" in gap["ceiling_reason"], gap["ceiling_reason"]
     assert gap["g_ensemble_ceiling_kcal"] == ""

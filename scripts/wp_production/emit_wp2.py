@@ -470,7 +470,7 @@ BULLET_BASE = '''        "- 生产模板只回填已跑完的主态（本次 %d/
 BULLET_EXTRA = '''        "- Gox_single 与配位位移在 production_redox.csv 单列，只用两腿同为 def2-TZVPD 的差值。",
 '''
 
-BULLET_SAMPLING = '''        "- 生产首段每态只有**单一代表结构**（n_conformers = 1），不是方案 6.1 的多构象/多 motif 系综；6 kcal/mol 窗口与 3 结构上限仍是资源规则。",
+BULLET_SAMPLING = '''        "- 生产系综层已按方案 6.1 执行（48 态；accepted 34 / limited 14 / provisional 0）；受限态原因逐条登记，48 分母不缩小。",
 '''
 
 INTRO_BLOCK_NEW = '（WP1 的 161 个独立方法审计作业、WP2 的 12 分子 x 4 主态生产 Opt/Freq 与同基组中性补腿单列，"\n        "原始日志留在仓库外，不入交付镜像）'
@@ -566,8 +566,9 @@ WP2_STATUS_BLOCK = '''        "**状态**：账本与系综规则已冻结；48 
 '''
 
 LIMITS_SECTION_BLOCK = '''        "- WP2 生产：主态只登记 %d/%d（其中 Li 配位腿 %d/%d）；"
-        "每态仍是**单一代表结构**（n_conformers = 1），方案 6.1 的多构象 / 多 motif 系综（12x4 起步、上限 144、6 kcal/mol 窗口、最多 3 结构）尚未执行；"
-        "基组一致 redox 只完成自由腿 1/4（GBL，def2-TZVPD 中性腿 + TZVPD 阳离子腿），Li 腿 0/4，未齐的腿留空。"
+        "生产系综层**已执行**（见 §2b）：48 态均按 §6.1 冻结链采样并聚合，"
+        "accepted 34 / limited 14 / provisional 0；受限态如实登记原因、48 分母不缩小；"
+        "3→6 审计 ceiling complete 3/16，其余 13 态各带精确归因。"
         % (WP2_PRODUCTION_STATES_DONE, WP2_PRODUCTION_STATES_TOTAL,
            WP2_PRODUCTION_LI_DONE, WP2_PRODUCTION_LI_TOTAL),
         "- WP2 起点方法 QC 警告：12 分子 Li pilot 里 DME（C08）与 AN（C16）的 [LiM]2+ 在 GFN2 松弛中解离"
@@ -1001,6 +1002,33 @@ def literal(rows):
     lines.append("]")
     return "\n".join(lines) + "\n"
 
+
+#: build_final_report() 内的 §3 证据分层标题——D7 阶段段插在它之前
+FINAL_REPORT_ANCHOR = '        "## 3. 证据分层",'
+FINAL_REPORT_V3_BLOCK = '''        "## 2b. v3 阶段证据与限制收口（2026-10-21 增补，D7）",
+        "",
+        "**主态**：48/48 ✅（四态完整 12/12、Li 配对 12/12、runtime 60/60）。",
+        "**生产系综**：accepted **34** / limited **14** / provisional **0**（48 态分母不缩小）。"
+        "14 个非 accepted 态中冻结池盆地已用尽的维持 limited/provisional 及原因登记；"
+        "其中 4 个排序敏感 M_plus 态（AN/DMC/EMC/TMP 的 gap 均已越 accepted Top-3 地板）"
+        "按 2026-10-20 用户裁决不开新起点搜索——预注册稿（D6）备而未用，"
+        "启动需逐态点名与预算冻结；「现有池不能认证 Top-3」作为独立事实登记"
+        "（accepted Top-3 = EC>PC>SL 只是 6 个双 accepted 分子的子集结论）。",
+        "**3→6 采样差异**：ceiling complete **3/16**（RT 修正后：DEC/M_plus Δ=−0.000027、"
+        "EMC/LiM_plus Δ=−0.534816、TMP/LiM_2plus Δ=−0.436766 kcal/mol）；"
+        "13 个 not_computed 各带精确原因（6 池耗尽 / 2 预算尽定局 / 3 键图漂移不可恢复 / "
+        "2 等待成员差 TolE 第三次被预算拒）；只报差异、不判采样收敛（容差未冻结）。",
+        "**WP5 A/B 验收回放**：准入过滤后 A 池 6 分子、B 池 5 分子——"
+        "**8 组全部 not_reached / blocked_target_pool**（A 池 (4,5) 联合交集 0；"
+        "B 池 5 分子连两个非耗尽预算点都不存在）。系综标签未闭环 → WP5 验收被阻，"
+        "此为依赖链的量化呈现；成本全实测零 MISSING（B 携带 M_tzvpd+M_plus free 标签获取成本）。",
+        "**WP3 翻转阶梯**：computed **8/12**（12 格 = 2 对 × 6 级；非 computed 4 = "
+        "2×R4(limited) + 2×R4_screen 筛选层另一档）；EMC|GBL 与 EMC|SL 的 2 个 robust inversion "
+        "在生产层不保留（R2/R3/R4 均为正）。",
+        "**WP6 与总体闸门**：仍 `blocked_on_production`（需系综 48/48 accepted + Li 配对 ≥9/12；"
+        "后者 12/12 已齐，前者 34/48）。**严格科学总闸门未通过**。",
+        "",
+        "## 3. 证据分层",'''
 
 def sub_once(src, anchor, replacement):
     if src.count(anchor) != 1:
@@ -1458,6 +1486,7 @@ def main():
     src = sub_once(src, ANCHOR_THERMAL, THERMAL_BLOCK)
     src = sub_once(src, ANCHOR_COUNTS, PAYLOAD_BLOCK)
     src = sub_once(src, ANCHOR_FINISH, FINISH_BLOCK)
+    src = sub_once(src, FINAL_REPORT_ANCHOR, FINAL_REPORT_V3_BLOCK)
     src = sub_once(src, ANCHOR_WP2ROW, WP2_ROW_BLOCK)
     src = sub_once(src, ANCHOR_KEYNUM, KEYNUM_BLOCK)
     src = sub_once(src, ANCHOR_LIMITS, summary_table + bullet_block)

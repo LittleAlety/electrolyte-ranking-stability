@@ -36,9 +36,16 @@ def test_unused_basins_is_a_real_set_difference():
 def test_every_non_accepted_state_is_covered_exactly_once():
     m = _m()
     rows, _ = m.build_rows() if isinstance(m.build_rows(), tuple) else (m.build_rows(), None)
-    assert len(rows) == 14
+    import csv as _csv
+    labels = list(_csv.DictReader(
+        (REPO / "outputs" / "physics_completion" / "ensembles"
+         / "production_ensemble_labels.csv").open(encoding="utf-8")))
+    open_states = sum(1 for r in labels if r["acceptance_status"] != "accepted")
+    # the gap table must cover exactly the states that are still open; that count
+    # SHRINKS as recovery succeeds, so it is derived, never pinned
+    assert len(rows) == open_states, (len(rows), open_states)
     seen = [(r["name"], r["state"]) for r in rows]
-    assert len(set(seen)) == 14
+    assert len(set(seen)) == len(rows), "each open state exactly once"
 
 
 def test_bound_is_rt_ln_and_zero_means_weak_evidence():

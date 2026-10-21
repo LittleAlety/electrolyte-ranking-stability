@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -150,7 +151,11 @@ WP2 = REPO / "work" / "wp2prod"
 #: r1_* = the round-1 extras + their rescue generations; r2_audit = the round-2
 #: 3->6 audit extension legs (member_role=round2_audit_extra, the only role the
 #: ceiling channel of build_sampling_3to6_diff aggregates).
-PACKAGES = "work/hpc_production_ensemble_r*_*"
+PACKAGES = ("work/hpc_production_ensemble_r*_*",
+            "work/hpc_production_ensemble_strict_recovery_v1*")
+#: the 2026-10-21 strict_recovery_v1 batches (batch 1 = free/cation starts,
+#: batch _b2 = Li coordination starts).  Same importer, distinct role.
+RECOVERY_PACKAGE_GLOB = "work/hpc_production_ensemble_strict_recovery_v1*"
 #: The single ledger role the 3->6 ceiling channel may aggregate.
 ROUND2_LEDGER_ROLE = "round2_audit_extra"
 SSH_KEY = str(Path.home() / ".ssh" / "id_ed25519_whu")
@@ -273,6 +278,243 @@ def lowest_energy_trajectory_frame(text: str):
         if best is None or energy < best[1] - 1e-12:
             best = (index, energy, syms, coords)
     return best
+
+
+RECOVERY_REOPT_BASE = "hpc_production_ensemble_strict_recovery_v1_reopt"
+
+
+def build_recovery_strict_reopt_package() -> int:
+    """Strict re-optimisation for recovery legs that missed a frozen threshold.
+
+    A ``verytight_convergence`` / ``strict_reopt_required`` member CONVERGED and
+    printed complete frequencies -- it only missed one of the five frozen
+    VeryTightOpt criteria.  The frozen remedy is a strict re-optimisation
+    **from its own converged final geometry** (never from an earlier start,
+    never a new basin): starting that close, one cycle normally suffices.
+
+    Role stays ``recovery_v1_start``.  The earlier attempt remains in the ledger
+    as ``superseded``; this is attempt N+1 for the same member.
+    """
+    if not OUT.is_file():
+        print("REJECT: run the importer once before --build-recovery-strict-reopt")
+        return 2
+    rows = list(csv.DictReader(OUT.open(encoding="utf-8")))
+    latest = {}
+    attempted = {}
+    for row in rows:
+        if row.get("member_role") != "recovery_v1_start":
+            continue
+        if row.get("log_sha256"):
+            attempted.setdefault(row["member_key"], set()).add(
+                (row.get("attempt"), row["log_sha256"]))
+        old = latest.get(row["member_key"])
+        if old is None or int(row.get("attempt") or 0) > int(old.get("attempt") or 0):
+            latest[row["member_key"]] = row
+    targets = [r for r in latest.values()
+               if r["status"] == "technical_complete_qc_failed"
+               and r["failure_class"] in ("verytight_convergence", "strict_reopt_required")
+               and len(attempted.get(r["member_key"], set())) < 2
+               and r.get("final_geometry_sha256")]
+    if not targets:
+        print("recovery strict reopt: no verytight_convergence recovery members")
+        return 0
+
+    number = 1
+    while (REPO / "work" / ("%s%d" % (RECOVERY_REOPT_BASE, number))).exists():
+        number += 1
+    pkg = REPO / "work" / ("%s%d" % (RECOVERY_REOPT_BASE, number))
+    flight = members_in_flight(pkg, rows)
+    targets = [r for r in targets if r["member_key"] not in flight]
+    if not targets:
+        print("recovery strict reopt: all targets already in flight")
+        return 0
+
+    task_lines, members = [], []
+    for row in targets:
+        name, slot, seed = row["member_key"].split("|")
+        # the converged final geometry of that very leg
+        geom_src = _final_geometry_of(row)
+        if geom_src is None:
+            print("SKIP %s: converged final geometry not found" % row["member_key"])
+            continue
+        charge, mult = manifest.SLOT_QM[slot]
+        text = prep.input_text("wB97X-D4 def2-TZVPD", charge, mult)
+        task = pkg / "tasks" / name / ("%s__%s" % (slot, seed))
+        task.mkdir(parents=True)
+        (task / "geom.xyz").write_bytes(geom_src.read_bytes())
+        (task / "job.inp").write_text(text, encoding="utf-8", newline="\n")
+        (task / "inputs.sha256").write_text(
+            "%s  geom.xyz\n%s  job.inp\n"
+            % (sha256_bytes((task / "geom.xyz").read_bytes()),
+               sha256_bytes((task / "job.inp").read_bytes())),
+            encoding="utf-8", newline="\n")
+        (task / "import_level.txt").write_text(
+            "verytight_reopt_from_converged_final_geometry\n",
+            encoding="utf-8", newline="\n")
+        members.append({
+            "member_key": row["member_key"], "slot": slot, "name": name, "seed": seed,
+            "member_role": "recovery_v1_start",
+            "source_geometry": row.get("final_geometry_sha256", ""),
+            "charge": charge, "multiplicity": mult,
+            "batch_id": "strict_recovery_v1",
+            "reopt_reason": row.get("convergence_note", "")[:120],
+        })
+        task_lines.append("tasks/%s/%s__%s" % (name, slot, seed))
+    if not task_lines:
+        print("recovery strict reopt: nothing packageable")
+        return 0
+    pkg.mkdir(parents=True, exist_ok=True)
+    for fname in ("tasks.txt", "batch_1.txt"):
+        (pkg / fname).write_text("\n".join(task_lines) + "\n",
+                                 encoding="utf-8", newline="\n")
+    for fname in ("batch_1.sbatch", "ensemble.sbatch"):
+        (pkg / fname).write_text(manifest._SBATCH % (len(task_lines) - 1),
+                                 encoding="utf-8", newline="\n")
+    (pkg / "manifest.json").write_text(json.dumps({
+        "package": pkg.name,
+        "batches": [{"batch": 1, "count": len(task_lines)}],
+        "purpose": "strict_recovery_v1 strict re-optimisation from converged final geometries",
+        "rule": ("only members that CONVERGED and printed complete frequencies but missed "
+                 "one frozen VeryTightOpt criterion; restart from that leg's own final "
+                 "geometry; role stays recovery_v1_start"),
+        "tasks": len(task_lines), "members": members,
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    print("recovery strict reopt package: %s tasks=%d" % (pkg.name, len(task_lines)))
+    for m in members:
+        print("  %-22s %s" % (m["member_key"], m["reopt_reason"][:60]))
+    return 0
+
+
+def _final_geometry_of(row):
+    """The converged final geometry file of a ledger row (by registered hash)."""
+    want = row.get("final_geometry_sha256", "")
+    task_rel = row.get("task_relpath", "")
+    if not task_rel:
+        return None
+    root = REPO / task_rel
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for fn in filenames:
+            if fn.endswith(".xyz"):
+                cand = Path(dirpath) / fn
+                try:
+                    if want and sha256_bytes(cand.read_bytes()) == want:
+                        return cand
+                except OSError:
+                    continue
+    return None
+
+
+RECOVERY_CONT_BASE = "hpc_production_ensemble_strict_recovery_v1_cont"
+
+
+def build_recovery_continuation_package() -> int:
+    """Continuation for recovery legs that exhausted the optimizer cycles.
+
+    A ``max_cycles_exhausted`` recovery member never converged, so there is no
+    converged geometry to strict-reoptimise from; the frozen remedy is a
+    continuation from the trajectory's reproducibly-selected lowest-energy
+    frame with ``%geom MaxIter 200 end`` (exactly one such directive).
+
+    The member keeps ``member_role=recovery_v1_start`` so it remains a
+    first-class candidate (acceptance + ceiling).  If the continuation also
+    exhausts cycles the member registers as an independent limitation -- there
+    is no automatic retry loop.
+    """
+    import re as _re
+    if not OUT.is_file():
+        print("REJECT: run the importer once before --build-recovery-continuation")
+        return 2
+    rows = list(csv.DictReader(OUT.open(encoding="utf-8")))
+    latest = {}
+    attempted = {}
+    for row in rows:
+        if row.get("member_role") != "recovery_v1_start":
+            continue
+        if row.get("log_sha256"):
+            attempted.setdefault(row["member_key"], set()).add(
+                (row.get("attempt"), row["log_sha256"]))
+        old = latest.get(row["member_key"])
+        if old is None or int(row.get("attempt") or 0) > int(old.get("attempt") or 0):
+            latest[row["member_key"]] = row
+    targets = [r for r in latest.values()
+               if r["status"] == "technical_complete_qc_failed"
+               and r["failure_class"] == "max_cycles_exhausted"
+               and len(attempted.get(r["member_key"], set())) < 2
+               and r["log_path"] and r["task_relpath"]]
+    if not targets:
+        print("recovery continuation: no max_cycles_exhausted recovery members")
+        return 0
+
+    number = 1
+    while (REPO / "work" / ("%s%d" % (RECOVERY_CONT_BASE, number))).exists():
+        number += 1
+    pkg = REPO / "work" / ("%s%d" % (RECOVERY_CONT_BASE, number))
+    flight = members_in_flight(pkg, rows)
+    targets = [r for r in targets if r["member_key"] not in flight]
+    if not targets:
+        print("recovery continuation: all targets already in flight")
+        return 0
+
+    task_lines, members = [], []
+    for row in targets:
+        name, slot, seed = row["member_key"].split("|")
+        log_path = REPO / row["log_path"]
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+        frame = lowest_energy_trajectory_frame(text)
+        if frame is None:
+            print("SKIP %s: no usable trajectory frame" % row["member_key"])
+            continue
+        _frame_index, _frame_energy, symbols, coords = frame
+        geom_text = "%d\n%s\n" % (len(symbols), row["member_key"]) + "".join(
+            "%-2s %14.9f %14.9f %14.9f\n" % (s, x, y, z)
+            for s, (x, y, z) in zip(symbols, coords))
+        charge, mult = manifest.SLOT_QM[slot]
+        base_input = prep.input_text("wB97X-D4 def2-TZVPD", charge, mult)
+        # exactly one continuation directive, immediately after the keywords
+        lines = base_input.splitlines()
+        text_out = "\n".join([lines[0], "%geom MaxIter 200 end"] + lines[1:]) + "\n"
+        task = pkg / "tasks" / name / ("%s__%s" % (slot, seed))
+        task.mkdir(parents=True)
+        (task / "geom.xyz").write_text(geom_text, encoding="utf-8", newline="\n")
+        (task / "job.inp").write_text(text_out, encoding="utf-8", newline="\n")
+        (task / "inputs.sha256").write_text(
+            "%s  geom.xyz\n%s  job.inp\n"
+            % (sha256_bytes((task / "geom.xyz").read_bytes()),
+               sha256_bytes((task / "job.inp").read_bytes())),
+            encoding="utf-8", newline="\n")
+        (task / "import_level.txt").write_text(
+            "continuation_from_lowest_energy_trajectory_frame\n",
+            encoding="utf-8", newline="\n")
+        members.append({
+            "member_key": row["member_key"], "slot": slot, "name": name, "seed": seed,
+            "member_role": "recovery_v1_start",
+            "source_geometry": row.get("task_relpath", ""),
+            "charge": charge, "multiplicity": mult,
+            "batch_id": "strict_recovery_v1", "continuation_from": row.get("log_sha256", ""),
+        })
+        task_lines.append("tasks/%s/%s__%s" % (name, slot, seed))
+    if not task_lines:
+        print("recovery continuation: nothing packageable")
+        return 0
+    pkg.mkdir(parents=True, exist_ok=True)
+    (pkg / "tasks.txt").write_text("\n".join(task_lines) + "\n",
+                                   encoding="utf-8", newline="\n")
+    (pkg / "batch_1.txt").write_text("\n".join(task_lines) + "\n",
+                                     encoding="utf-8", newline="\n")
+    (pkg / "batch_1.sbatch").write_text(manifest._SBATCH % (len(task_lines) - 1),
+                                        encoding="utf-8", newline="\n")
+    (pkg / "ensemble.sbatch").write_text(manifest._SBATCH % (len(task_lines) - 1),
+                                        encoding="utf-8", newline="\n")
+    (pkg / "manifest.json").write_text(json.dumps({
+        "package": pkg.name,
+        "batches": [{"batch": 1, "count": len(task_lines)}],
+        "purpose": "strict_recovery_v1 continuation for max_cycles_exhausted members",
+        "rule": ("one continuation from the trajectory's lowest-energy frame with "
+                 "exactly one '%geom MaxIter 200 end'; role stays recovery_v1_start"),
+        "tasks": len(task_lines), "members": members,
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    print("recovery continuation package: %s tasks=%d" % (pkg.name, len(task_lines)))
+    return 0
 
 
 def build_dol_continuation_package() -> int:
@@ -982,6 +1224,22 @@ def build_reopt_packages() -> int:
     return 0
 
 
+def iter_packages():
+    """Every production/ensemble package directory, both naming families.
+
+    ``PACKAGES`` is a pattern or a sequence of patterns; accepting both keeps the
+    existing tests (which monkeypatch a single string) valid while the real
+    module enumerates the recovery batches as well.
+    """
+    patterns = (PACKAGES,) if isinstance(PACKAGES, str) else tuple(PACKAGES)
+    seen = set()
+    for pattern in patterns:
+        for p in sorted(REPO.glob(pattern)):
+            if p.is_dir() and p.name not in seen:
+                seen.add(p.name)
+                yield p
+
+
 def pkg_attempt(name: str) -> int:
     """Attempt index encoded in the package name (r1 -> 0, reopt/continuation -> 1...)."""
     numbered = re.search(r"_reopt(\d+)(?:_|$)", name)
@@ -990,7 +1248,13 @@ def pkg_attempt(name: str) -> int:
     continuation = re.search(r'_continuation(\d+)(?:_|$)', name)
     if continuation:
         return int(continuation.group(1))
-    if "_reopt" in name or "_continuation" in name:
+    # the recovery builders use the short ``_cont<N>`` spelling; it means the
+    # same thing (a second real calculation of the same member) and must not
+    # silently resolve to attempt 0, or supersede/预算 accounting is wrong.
+    short_cont = re.search(r'_cont(\d+)(?:_|$)', name)
+    if short_cont:
+        return int(short_cont.group(1))
+    if "_reopt" in name or "_continuation" in name or "_cont" in name:
         return 1
     return 0
 
@@ -1021,13 +1285,18 @@ def members_in_flight(exclude: Path, rows: list) -> set:
     has been accounted for, so a later package is a legitimate next attempt.
     Base round-1 batch packages are not rescue packages and own nothing here.
     """
+    # every ledger role that can own an attempt must be listed here -- a missing
+    # role makes its members look permanently "in flight" and blocks the next
+    # (legitimate) attempt package.  recovery_v1_start was missing exactly so.
     covered = {(r['member_key'], int(r['attempt'] or 0))
-               for r in rows if r.get('member_role') in ('round1_extra', ROUND2_LEDGER_ROLE)}
+               for r in rows if r.get('member_role') in
+               ('round1_extra', ROUND2_LEDGER_ROLE, 'recovery_v1_start')}
     flight = set()
-    for pkg in sorted(p for p in REPO.glob(PACKAGES) if p.is_dir()):
+    for pkg in iter_packages():
         if pkg == exclude or not (pkg / 'tasks.txt').is_file():
             continue
-        if pkg_attempt(pkg.name) < 1:
+        is_recovery = pkg.name.startswith("hpc_production_ensemble_strict_recovery")
+        if not is_recovery and pkg_attempt(pkg.name) < 1:
             continue
         if not rescue_package_is_active(pkg):
             continue
@@ -1060,8 +1329,16 @@ def members_in_flight(exclude: Path, rows: list) -> set:
 
 
 def rescue_package_is_active(pkg: Path) -> bool:
-    """An unsubmitted rescue plan must not supersede the last real QC result."""
-    if pkg_attempt(pkg.name) == 0 or (pkg / 'submission.json').is_file():
+    """An unsubmitted rescue plan must not supersede the last real QC result.
+
+    A SUBMITTED package is active by definition.  The protected submitter writes
+    ``submission_journal.json`` (not ``submission.json``); checking only the
+    latter made every submitted recovery follow-up look inactive, so its members
+    were not counted as in flight and a second package could duplicate them.
+    """
+    if pkg_attempt(pkg.name) == 0:
+        return True
+    if (pkg / 'submission.json').is_file() or (pkg / 'submission_journal.json').is_file():
         return True
     for task in (line.strip() for line in (pkg / 'tasks.txt').read_text(encoding='utf-8').splitlines()):
         if not task:
@@ -1217,6 +1494,174 @@ def read_plain_xyz(path: Path):
             break
         syms.append(parts[0])
     return syms, coords
+
+
+RECOVERY_PKG = REPO / "work" / "hpc_production_ensemble_strict_recovery_v1"
+RECOVERY_BATCH = 1
+
+
+def build_strict_recovery_package() -> int:
+    """Production legs for the strict_recovery_v1 manifest (2026-10-21).
+
+    Only states that hold a REGISTERED independent start go in: either an
+    unused frozen-pool basin or a minimum discovered by the registered
+    recovery search.  States whose search found nothing (``no_new_minimum_found``)
+    are skipped -- nothing is invented, no threshold is relaxed.
+
+    Each member is a FRESH leg (the frozen v1.3 grammar, no MaxIter patch) and
+    carries ``member_role=recovery_v1_start`` so the importer records it as a
+    new independent minimum rather than a rescue of an old one.  Start
+    geometries are byte-verified against the manifest/search sha256 BEFORE
+    packaging; a stale hash aborts that member (never the whole batch).
+    """
+    man_csv = (REPO / "outputs" / "physics_completion" / "recovery"
+               / "strict_recovery_v1_manifest.csv")
+    if not man_csv.is_file():
+        print("REJECT: strict_recovery_v1 manifest missing; run "
+              "build_strict_recovery_manifest.py first")
+        return 2
+    import csv as _csv
+    with man_csv.open(encoding="utf-8") as fh:
+        rows = list(_csv.DictReader(fh))
+
+    pkg = (RECOVERY_PKG if RECOVERY_BATCH == 1
+           else RECOVERY_PKG.parent / (RECOVERY_PKG.name + "_b%d" % RECOVERY_BATCH))
+    if pkg.exists():
+        print(f"REJECT: {pkg.name} already exists (one package per recovery batch)")
+        return 2
+
+    wanted = []
+    for r in rows:
+        starts = [s for s in (r.get("start_1_basin", ""), r.get("start_2_basin", "")) if s]
+        if not starts:
+            continue
+        is_li = "Li" in r.get("state", "")
+        if (RECOVERY_BATCH == 1 and is_li) or (RECOVERY_BATCH == 2 and not is_li):
+            continue
+        shas = [r.get("start_1_source_sha256", ""), r.get("start_2_source_sha256", "")]
+        for basin, sha in zip(
+                [s for s in (r.get("start_1_basin", ""), r.get("start_2_basin", "")) if s],
+                [s for s, t in zip(shas, [r.get("start_1_basin", ""), r.get("start_2_basin", "")]) if t]):
+            wanted.append((r["name"], r["state"], basin, sha))
+    if not wanted:
+        print("strict-recovery: no registered independent start yet (run the search)")
+        return 0
+
+    task_lines, members, skipped = [], [], []
+    for name, slot, basin, sha in wanted:
+        path = _recovery_source_for(name, slot, basin)
+        if path is None:
+            skipped.append("%s|%s|%s: no geometry for basin" % (name, slot, basin))
+            continue
+        src = REPO / path
+        if not src.is_file():
+            skipped.append("%s|%s|%s: source missing %s" % (name, slot, basin, path))
+            continue
+        if sha and sha256_bytes(src.read_bytes()) != sha:
+            skipped.append("%s|%s|%s: source hash stale" % (name, slot, basin))
+            continue
+        charge, mult = manifest.SLOT_QM[slot]
+        text = prep.input_text("wB97X-D4 def2-TZVPD", charge, mult)
+        leaf = str(basin).replace("/", "_")
+        task = pkg / "tasks" / name / ("%s__%s" % (slot, leaf))
+        task.mkdir(parents=True)
+        geom = src.read_bytes()
+        inp = text.encode()
+        (task / "geom.xyz").write_bytes(geom)
+        (task / "job.inp").write_bytes(inp)
+        (task / "inputs.sha256").write_text(
+            "%s  geom.xyz\n%s  job.inp\n" % (sha256_bytes(geom), sha256_bytes(inp)),
+            encoding="utf-8", newline="\n")
+        (task / "import_level.txt").write_text(
+            "strict_recovery_independent_start\n", encoding="utf-8", newline="\n")
+        members.append({
+            "member_key": "%s|%s|%s" % (name, slot, leaf),
+            "slot": slot, "name": name, "seed": leaf,
+            "member_role": "recovery_v1_start",
+            "source_geometry": path,
+            "source_geometry_sha256": sha or sha256_bytes(geom),
+            "charge": charge, "multiplicity": mult,
+            "protocol_version": "1.3",
+            "batch_id": "strict_recovery_v1",
+        })
+        task_lines.append("tasks/%s/%s__%s" % (name, slot, leaf))
+
+    if skipped:
+        print("strict-recovery: %d member(s) skipped:" % len(skipped))
+        for s in skipped:
+            print("  " + s)
+    if not task_lines:
+        print("strict-recovery: nothing packageable (all starts failed verification)")
+        return 0
+
+    pkg.mkdir(parents=True, exist_ok=True)
+    (pkg / "tasks.txt").write_text("\n".join(task_lines) + "\n", encoding="utf-8", newline="\n")
+    # submit_hpc_batch.py contract: batch_1.sbatch + batch_1.txt + manifest.batches
+    (pkg / "batch_1.sbatch").write_text(
+        manifest._SBATCH % (len(task_lines) - 1,), encoding="utf-8", newline="\n")
+    (pkg / "ensemble.sbatch").write_text(
+        manifest._SBATCH % (len(task_lines) - 1,), encoding="utf-8", newline="\n")
+    (pkg / "batch_1.txt").write_text("\n".join(task_lines) + "\n",
+                                     encoding="utf-8", newline="\n")
+    (pkg / "manifest.json").write_text(json.dumps({
+        "package": pkg.name,
+        "batches": [{"batch": 1, "count": len(task_lines)}],
+        "purpose": "strict_recovery_v1 independent-start production legs",
+        "rule": ("only registered independent starts (unused frozen basin or a "
+                 "search-discovered minimum); states whose search found nothing "
+                 "are skipped -- no structure is invented, no threshold relaxed"),
+        "protocol": "wB97X-D4 def2-TZVPD Opt AnFreq SMD(acetonitrile) VeryTightOpt TightSCF SlowConv",
+        "cores_per_task": 4, "time_limit": "24:00:00",
+        "tasks": len(task_lines), "members": members,
+        "skipped": skipped,
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    print("strict-recovery package: %s tasks=%d" % (pkg.name, len(task_lines)))
+    for m in members:
+        print("  %-34s charge=%s mult=%s" % (m["member_key"], m["charge"], m["multiplicity"]))
+    return 0
+
+
+def _recovery_source_for(name: str, slot: str, basin: str):
+    """Registered geometry path for one recovery start (pool or search pool)."""
+    import csv as _csv
+    pool = (REPO / "outputs" / "physics_completion" / "sampling"
+            / "sampling_conformer_set.csv")
+    if pool.is_file():
+        with pool.open(encoding="utf-8") as fh:
+            for r in _csv.DictReader(fh):
+                if r.get("name") == name and r.get("state") == slot:
+                    rel = r.get("geometry_relpath", "")
+                    leaf = rel.replace("\\", "/").rstrip("/").split("/")[-2] \
+                        if rel.endswith(".xyz") and len(rel.split("/")) >= 2 else ""
+                    if leaf == basin:
+                        return rel
+    search = (REPO / "outputs" / "physics_completion" / "recovery"
+              / "strict_recovery_v1_search_pool.csv")
+    if search.is_file():
+        with search.open(encoding="utf-8") as fh:
+            for r in _csv.DictReader(fh):
+                if (r.get("name") == name and r.get("state") == slot
+                        and r.get("basin_id") == basin):
+                    return r.get("geometry_relpath", "")
+    # Li states: the recovery motif executor labels its new basins r3m_<candidate>
+    if "Li" in slot:
+        li = (REPO / "outputs" / "physics_completion" / "li_motif_sampling"
+              / "li_motif_round3_recovery.csv")
+        if li.is_file():
+            with li.open(encoding="utf-8") as fh:
+                for r in _csv.DictReader(fh):
+                    leg = r.get("leg_id", "")
+                    lname, _, lstate = leg.partition("|")
+                    if lname != name or lstate != slot:
+                        continue
+                    if str(r.get("kept", "")).lower() != "true":
+                        continue
+                    raw = r.get("candidate_id") or r.get("motif_id") or ""
+                    label = "r3m_" + "".join(
+                        ch if ch.isalnum() else "_" for ch in raw)[:24]
+                    if label == basin:
+                        return r.get("motif_path", "")
+    return None
 
 
 def build_round2_followup_package() -> int:
@@ -1561,7 +2006,13 @@ def _is_round2_package(pkg: Path) -> bool:
     ``r2_audit_li``       -- round-2 audit legs on the Li motif basins (Li states)
     ``r2_audit_li_emc``   -- EMC-only batch of Li motif basins (3 tasks, user approved)
     ``r2_reopt<N>``       -- follow-up round N (strict reopt / continuation / technical retry)
+    ``strict_recovery_v1``-- the 2026-10-21 recovery batches (``_b2`` = Li starts);
+                             members carry ``member_role=recovery_v1_start`` and
+                             are FIRST-CLASS (acceptance + ceiling), unlike the
+                             ceiling-only audit legs.
     """
+    if "hpc_production_ensemble_strict_recovery" in pkg.name:
+        return True
     return (pkg.name.endswith("r2_audit") or pkg.name.endswith("r2_audit_li")
             or pkg.name.endswith("r2_audit_li_emc")
             or re.search(r"_r2_reopt\d*$", pkg.name) is not None)
@@ -1599,6 +2050,14 @@ def main(argv=None) -> int:
                     help="write the round-2 audit extension package for the 3->6 ceiling side")
     ap.add_argument("--build-r2-followup", action="store_true",
                     help="write the round-2 follow-up package (strict reopt + technical retry)")
+    ap.add_argument("--build-recovery-strict-reopt", action="store_true",
+                    help="strict reopt for recovery members that converged but missed a threshold")
+    ap.add_argument("--build-recovery-continuation", action="store_true",
+                    help="continuation package for max_cycles_exhausted recovery members")
+    ap.add_argument("--build-strict-recovery", action="store_true",
+                    help="package strict_recovery_v1 independent-start production legs")
+    ap.add_argument("--recovery-batch", type=int, default=1, choices=(1, 2),
+                    help="1 = free/cation starts (already submitted), 2 = Li coordination starts")
     ap.add_argument("--build-li-round2-legs", action="store_true",
                     help="write the production-leg package for the round-2 Li motif basins")
     args = ap.parse_args(argv)
@@ -1611,6 +2070,17 @@ def main(argv=None) -> int:
         return build_round2_audit_package()
     if args.build_r2_followup:
         return build_round2_followup_package()
+    if args.build_recovery_strict_reopt:
+        return build_recovery_strict_reopt_package()
+
+    if args.build_recovery_continuation:
+        return build_recovery_continuation_package()
+
+    if args.build_strict_recovery:
+        global RECOVERY_BATCH
+        RECOVERY_BATCH = args.recovery_batch
+        return build_strict_recovery_package()
+
     if args.build_li_round2_legs:
         return build_li_round2_audit_package()
 
@@ -1621,7 +2091,7 @@ def main(argv=None) -> int:
     extras = {f"{r['name']}|{r['slot']}|{r['seed']}": r
               for r in cand_rows if r["member_role"] == "round1_extra"}
 
-    packages = sorted(p for p in REPO.glob(PACKAGES) if p.is_dir() and (p / 'tasks.txt').is_file())
+    packages = [p for p in iter_packages() if (p / 'tasks.txt').is_file()]
     if args.fetch:
         for pkg in packages:
             fetch_package(pkg)
@@ -1686,11 +2156,19 @@ def main(argv=None) -> int:
         if len(member_rows) < 2:
             continue
         member_rows.sort(key=lambda r: int(r["attempt"] or 0))
-        for earlier in member_rows[:-1]:
+        # Only an attempt that ACTUALLY RAN can supersede an earlier one.  A
+        # planned/pending follow-up row must never demote completed evidence:
+        # the plan requires that a historical failure keeps its original state
+        # until a real successor result exists.
+        with_evidence = [r for r in member_rows if r.get("log_sha256")]
+        if len(with_evidence) < 2:
+            continue
+        newest = with_evidence[-1]
+        for earlier in with_evidence[:-1]:
             if earlier["status"] in ("technical_complete_qc_failed", "failed"):
                 earlier["status"] = "superseded"
                 earlier["note"] = ((earlier["note"] + ";") if earlier["note"] else "") + \
-                    "superseded_by_attempt=%s" % member_rows[-1]["attempt"]
+                    "superseded_by_attempt=%s" % newest["attempt"]
 
     rows = primary_rows() + extra_rows
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -1706,7 +2184,15 @@ def main(argv=None) -> int:
                           'attempted_calculations', 'disposition', 'failure_class',
                           'log_sha256', 'reason')
     dispositions = []
-    for key in sorted(extras):
+    # EVERY extra role needs a disposition row, not just round1_extra.  A role
+    # without one falls through to `n_rescue` ("remedy in flight") in the
+    # aggregator even after its attempt budget is exhausted -- reporting work in
+    # flight when there is none is the factual misstatement the D7 review
+    # flagged.  recovery_v1_start was missing exactly so.
+    disposition_keys = set(extras) | {
+        r['member_key'] for r in extra_rows
+        if r.get('member_role') in (ROUND2_LEDGER_ROLE, 'recovery_v1_start')}
+    for key in sorted(disposition_keys):
         history = [r for r in extra_rows if r['member_key'] == key]
         newest = max(history, key=lambda r: int(r.get('attempt') or 0))
         counts = {(r.get('attempt'), r['log_sha256']) for r in history if r.get('log_sha256')}

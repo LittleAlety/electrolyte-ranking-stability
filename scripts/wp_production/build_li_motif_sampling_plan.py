@@ -103,6 +103,13 @@ ROUND2_OUTPUTS = (
     "outputs/physics_completion/li_motif_sampling/li_motif_round2_exec.csv",
     "outputs/physics_completion/li_motif_sampling/li_motif_round2_exec.md",
     "outputs/physics_completion/li_motif_sampling/li_motif_round2_exec_index.json",
+    # recovery round-3 outputs (strict_recovery_v1, 2026-10-21): owned by the same
+    # two layer modules run with --plan/--out-prefix; never this layer's to verify
+    "outputs/physics_completion/li_motif_sampling/li_motif_plan_round3_recovery.csv",
+    "outputs/physics_completion/li_motif_sampling/li_motif_plan_round3_recovery_index.json",
+    "outputs/physics_completion/li_motif_sampling/li_motif_round3_recovery.csv",
+    "outputs/physics_completion/li_motif_sampling/li_motif_round3_recovery.md",
+    "outputs/physics_completion/li_motif_sampling/li_motif_round3_recovery_index.json",
 )
 
 PLAN_FIELDS = ("record_id", "mol_id", "name", "state", "charge", "multiplicity",
