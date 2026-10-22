@@ -230,6 +230,8 @@ class Acquirer:
         self.y_vis = list(y_vis)
         self.baseline = baseline
         self.rng = rng
+        # the acquirer states what drives it; it is NOT the executed model
+        self.acquisition_model = acquisition_identity(baseline, "unset")[0]
         self._assert_blind()
 
     def _assert_blind(self):
@@ -394,6 +396,36 @@ def _predict_formal(features, y, visible, n, model):
     return preds
 
 
+
+#: What actually chooses the next candidate, per baseline.  Declared here so the
+#: products can never imply that the executed model drove the acquisition.
+ACQUISITION_IDENTITY = {
+    "random": ("none_label_free", None),
+    "diversity": ("none_label_free", None),
+    "uncertainty": ("internal_knn_k3_v1", None),
+    "ranking_aware": ("internal_knn_k3_v1", None),
+}
+
+
+def acquisition_identity(baseline: str, model: str) -> tuple[str, str, str]:
+    """(acquisition_model, acquisition_uses_executed_model, note).
+
+    Pure: the answer is a property of the baseline's implementation, not of the
+    data, so it can be asserted without running a replay.
+    """
+    name, _ = ACQUISITION_IDENTITY.get(baseline, ("unknown", None))
+    used = name == "executed_model_predictions"
+    if name == "none_label_free":
+        note = ("baseline is label-free: it never consumes any model's "
+                "predictions, so the executed model cannot affect which "
+                "candidate is queried")
+    else:
+        note = ("acquisition scores candidates from its own k-nearest-neighbour "
+                "spread over the visible labels (an internal proxy), NOT from "
+                "the executed model's predictions -- measured identical queried "
+                "sequences across all four executed models")
+    return name, "true" if used else "false", note
+
 def replay_one(task, baseline, repeat, model=LEGACY_MODEL):
     X, y, names, _ = _pool(task)
     n = len(y)
@@ -448,8 +480,13 @@ def replay_one(task, baseline, repeat, model=LEGACY_MODEL):
             "prerequisite_status": ("not_applicable" if prereq_legs == 0
                                     else ("MISSING" if prereq_hours is None
                                           else "measured_cost_ledger")),
-            "total_core_hours_incl_prerequisite": ("%.3f" % total_with_prereq
-                                                   if total_with_prereq is not None else ""),
+            # the printed total is derived from the two PRINTED components, so a
+            # reader can add the columns by hand and get the published total
+            # (independent rounding made 756 rows differ by 0.001).
+            "total_core_hours_incl_prerequisite": (
+                ("%.3f" % (float("%.3f" % prereq_hours)
+                           + float("%.3f" % total_cost)))
+                if (total_cost is not None and prereq_hours is not None) else ""),
             "cost_basis_note": ("task B carries the free-label acquisition cost "
                                 "(M + M_plus legs) per the plan; the user ACCEPTED this "
                                 "caliber on 2026-10-21, so the B cost is reported "
@@ -487,10 +524,14 @@ def build(repeats: int, models=MODELS) -> dict:
                     cand, srows = replay_one(task, baseline, repeat, model)
                     # every row names its executor: a baseline run can never be
                     # read as a formal-model run
-                    for r in cand:
+                    acq_name, acq_used, acq_note = acquisition_identity(
+                        baseline, model)
+                    for r in cand + srows:
                         r["executed_model"] = model
-                    for r in srows:
-                        r["executed_model"] = model
+                        r["prediction_model"] = model
+                        r["acquisition_model"] = acq_name
+                        r["acquisition_uses_executed_model"] = acq_used
+                        r["acquisition_note"] = acq_note
                     all_cand.extend(cand)
                     all_sum.extend(srows)
                     non = [r for r in srows if int(r["n_T"]) < int(r["n_pool"])]
@@ -514,6 +555,9 @@ def build(repeats: int, models=MODELS) -> dict:
                 endpoints.append({
                     "task": task, "baseline": baseline, "repeats": str(repeats),
                     "executed_model": model,
+                    "prediction_model": model,
+                    "acquisition_model": acq_name,
+                    "acquisition_uses_executed_model": acq_used,
                     "model_is": ("baseline_not_formal" if model == LEGACY_MODEL
                                  else "formal_frozen_predictor"),
                     "pool_label": "wp5_AB_acceptance_replay",
@@ -606,6 +650,23 @@ def write_outputs(data: dict, repeats: int,
                     if m == LEGACY_MODEL else _contract(m, _n_features))
                 for m in models_at_write
             },
+            # NEXT_ACTIONS item 2: the acquisition identity is declared, and the
+            # ONE honest thing to say about it today is that it is NOT the model
+            "acquisition_identity": {
+                b: acquisition_identity(b, "unset")[0]
+                for b in BASELINES
+            },
+            "acquisition_uses_executed_model": {
+                b: acquisition_identity(b, "unset")[1] for b in BASELINES
+            },
+            "acquisition_open_decision": (
+                "wiring the acquisition to the executed model WOULD CHANGE every "
+                "reported number, so it is a plan-level decision and has NOT been "
+                "done here.  Until it is, the A/B comparison varies the EVALUATION "
+                "model and holds the ACQUISITION fixed; the four models therefore "
+                "share one queried sequence per (task, baseline, repeat).  "
+                "Measured evidence: tests/test_wp5_model_axis_invariants.py pins "
+                "the identical sequences."),
             "model_comparison_rule": (
                 "the formal comparison runs every declared model on the SAME "
                 "split, features and acquisition budgets; a baseline winning on "

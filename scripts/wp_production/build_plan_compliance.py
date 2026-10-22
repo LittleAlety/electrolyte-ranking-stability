@@ -620,6 +620,15 @@ def build_rows(progress=None):
     ))
 
     # ---------------- §9 WP5 ----------------
+    # The formal A/B replay is consumed BY ITS OWN PATH; the legacy replay keeps
+    # its own namespace and every number taken from it carries a `legacy_`
+    # prefix.  Without this split a reader cannot tell which experiment a number
+    # describes, and the formal run could change without moving this table.
+    formal_ab = read_rows(
+        "outputs/physics_completion/active_learning/blind_replay/AB_axis_endpoint.csv")
+    formal_statuses = Counter(r.get("stop_budget_status", "") for r in formal_ab)
+    formal_models = sorted({r.get("executed_model", "") for r in formal_ab if r})
+    formal_invalid = formal_statuses.get("invalid_input", 0)
     sb = read_rows("outputs/physics_completion/active_learning/success_budget.csv")
     rounds = read_rows("outputs/physics_completion/active_learning/round_diagnostics.csv")
     sb_cols = {c.lower() for c in (sb[0].keys() if sb else [])}
@@ -639,17 +648,49 @@ def build_rows(progress=None):
         "wp5_new_endpoint_in_budget", "9",
         "新端点 O_3>=2/3 且 R_3<=0.10 eV 真的用于算预算",
         "partial" if (has_o3 and fixed_r3) else "not_satisfied",
-        "rounds=%d O_3_field=%s fixed_R_3_0.10=%s computed=%d blocked=%d" % (
-            len(rounds), has_o3, fixed_r3, endpoint_statuses["computed"], endpoint_statuses["blocked"]),
+        "legacy_rounds=%d O_3_field=%s fixed_R_3_0.10=%s legacy_computed=%d "
+        "legacy_blocked=%d; source_kind=legacy_round_diagnostics" % (
+            len(rounds), has_o3, fixed_r3, endpoint_statuses["computed"],
+            endpoint_statuses["blocked"]),
         "outputs/physics_completion/active_learning/round_diagnostics.csv; outputs/physics_completion/active_learning/success_budget.csv",
         "固定端点已逐轮登记；旧池只有 C 轴的 30% 指标严格等于 k=3，E/M 轴缺候选级预测，机器可读 blocked，不用百分比近似冒充 O_3/R_3。",
+    ))
+    out.append(item(
+        "wp5_formal_ab_source_consumed", "9",
+        "正式严格目标 A/B 回放（blind_replay/AB_*）按自身路径被消费，"
+        "行集合完整且不含结构非法的停止预算行",
+        "satisfied" if (formal_ab and formal_models
+                        and formal_invalid == 0) else "not_satisfied",
+        "formal_rows=%d models=%s invalid=%d identity_fields=%s" % (
+            len(formal_ab), ",".join(formal_models) or "none", formal_invalid,
+            "executed_model,prediction_model,acquisition_model"),
+        "outputs/physics_completion/active_learning/blind_replay/AB_axis_endpoint.csv; "
+        "outputs/physics_completion/active_learning/blind_replay/AB_index.json",
+        "本项只问「正式源被正确消费」：行集合完整、模型身份齐全、"
+        "**没有 invalid_input**（坏输入不是「没达到」）。"
+        "是否真的达到停止预算是另一项，不得混为一谈；"
+        "legacy 数字单独加 legacy_ 前缀，二者不得混淆。",
+    ))
+    formal_reached = formal_statuses.get("computed", 0)
+    out.append(item(
+        "wp5_formal_ab_stop_budget_reached", "9",
+        "正式 A/B 回放里真正达到相邻两点联合停止预算的组合数（子池口径）",
+        "partial" if formal_reached else "not_satisfied",
+        "reached=%d of %d rows; stop_status=%s; pool_note=A/B pools are "
+        "subsets of the frozen 12, so a reached budget is a SUBSET result" % (
+            formal_reached, len(formal_ab), dict(formal_statuses)),
+        "outputs/physics_completion/active_learning/blind_replay/AB_axis_endpoint.csv",
+        "computed = 同批 repeats 在两个相邻非耗尽预算点联合达标（交集 ≥16/20）；"
+        "not_reached_within_pool = 池内未走到；invalid_input = 批次非法，"
+        "三者语义不同，不得互相替代。子池达标不升级为完整 12 分子验收。",
     ))
     out.append(item(
         "wp5_two_consecutive_points", "9",
         "至少 16/20 回放在两个连续预算点达标才报经验停止预算；12 标签池回放",
         "partial" if sb and all(r.get("required_consecutive_budget_points") == "2" for r in sb) else "not_satisfied",
-        "rule=16/20 for 2 consecutive points; computed=%d blocked=%d; replay_pool=legacy_18_not_blind" % (
-            endpoint_statuses["computed"], endpoint_statuses["blocked"]),
+        "rule=16/20 for 2 consecutive points; legacy_computed=%d legacy_blocked=%d; "
+        "replay_pool=legacy_18_not_blind; source_kind=legacy_success_budget"
+        % (endpoint_statuses["computed"], endpoint_statuses["blocked"]),
         "outputs/physics_completion/active_learning/success_budget.csv; outputs/physics_completion/active_learning/round_diagnostics.csv",
         "连续两点判据已实现；能严格恢复固定 k=3 的场景给结果，其余场景显式 blocked。旧回放仍非盲，不能冒充新 12 标签池。",
     ))
@@ -684,7 +725,8 @@ def build_rows(progress=None):
         "wp5_remaining_unqueried_error", "9",
         "§9.2 每轮报告 n_T->tau_b、O_3、R_3、remaining_unqueried_error 与累计 core-hours",
         "partial" if rounds else "not_satisfied",
-        "rounds=%d remaining_error_MISSING=%d cumulative_core_hours_MISSING=%d" % (
+        "legacy_rounds=%d remaining_error_MISSING=%d cumulative_core_hours_MISSING=%d; "
+        "source_kind=legacy_round_diagnostics" % (
             len(rounds), missing_unq, missing_cost),
         "outputs/physics_completion/active_learning/round_diagnostics.csv",
         "逐轮字段已落盘；旧回放未保存候选级预测与逐查询成本映射，因此两列留空并附机器可读 MISSING 原因，不用其他台账或旧端点冒充。",

@@ -1297,6 +1297,23 @@ AL_ROUND_FIELDS = [
 BUDGET_EXTRA_FIELDS = ["O_3_threshold", "R_3_threshold_ev", "required_success_repeats",
                        "required_total_repeats", "required_consecutive_budget_points",
                        "new_endpoint_status"]
+#: This module BUILDS the legacy AL tables.  They are NOT the formal strict-target
+#: replay: that lives in `outputs/physics_completion/active_learning/blind_replay/`
+#: (`AB_*`, carrying executed_model / prediction_model / acquisition_model and
+#: stop_budget_status).  Formal consumers must read the blind_replay source by its
+#: own path; a consumer that reads a path listed here is reading LEGACY and must
+#: say so (see build_plan_compliance: `legacy_` prefixes + `source_kind`).
+LEGACY_AL_TABLES: tuple[str, ...] = (
+    "outputs/physics_completion/active_learning/success_budget.csv",
+    "outputs/physics_completion/active_learning/round_diagnostics.csv",
+)
+#: and the formal counterpart, spelled out so the two can never be confused
+FORMAL_AB_TABLES: tuple[str, ...] = (
+    "outputs/physics_completion/active_learning/blind_replay/AB_axis_endpoint.csv",
+    "outputs/physics_completion/active_learning/blind_replay/AB_round_summary.csv",
+    "outputs/physics_completion/active_learning/blind_replay/AB_candidate_rounds.csv",
+)
+
 AL_BUDGET_ANCHOR = '''    local["outputs/physics_completion/active_learning/success_budget.csv"] = csv_text(
         ["task", "axis", "baseline", "n_T_median_tau080", "n_T_majority_tau080",
          "n_T_majority_combined", "median_overstates_majority", "regret_tolerance_ev"], endpoint_rows)

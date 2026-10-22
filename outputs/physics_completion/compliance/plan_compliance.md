@@ -2,7 +2,7 @@
 
 > 由 `scripts/wp_production/build_plan_compliance.py` 从 `outputs/physics_completion/**`、`outputs/week7/`、`data/references/anchor_primary_audit.csv`
 > 只读现算；本文件不写死任何状态或数字，生产腿每落地一批重跑即更新。
-> generated_at_utc=2026-10-22T13:44:24Z; runtime_input_sha256=bcd4d833ae0b7b950406104b59d5807f046e6a66006357e377e2ee689e4f1798; scientific_ledger_sha256=1fa06256a6e760b72f2703ab3e215dbb76c33bcf0aecd5515763147c1688fcda; stale=false
+> generated_at_utc=2026-10-22T15:58:49Z; runtime_input_sha256=bcd4d833ae0b7b950406104b59d5807f046e6a66006357e377e2ee689e4f1798; scientific_ledger_sha256=1fa06256a6e760b72f2703ab3e215dbb76c33bcf0aecd5515763147c1688fcda; stale=false
 > **运行进度：60/60**；**主态运行完成：48/48**；**科学验收（四主态）：48/48**；**固化交付主态：48/48**。QC 失败、partial、missing、running 均不计入科学验收。
 
 | item_id | 方案节 | 要求 | 状态 | 实测 | 证据 |
@@ -32,11 +32,13 @@
 | `wp4_primary_text_check` | §8 WP4 外部锚点复核与可比性审计 | 回原始文献页码/表号复核（而非二级转抄） | exempt | transcription_only=14/87 permanent_validation_limitation=true | data/anchors/primary_source_verification.csv; docs/62_week41_wp4_anchor_comparability.md |
 | `wp4_new_comparable_entries` | §8 WP4 外部锚点复核与可比性审计 | 按明确检索协议再找 6-10 条条件可比条目 | exempt | protocol_executed=true record=true tier_1_condition_matched=0 permanent_validation_limitation=true | data/references/anchor_retrieval_execution.md; data/references/anchor_retrieval_protocol.md |
 | `wp5_task_separation` | §9 WP5 delta-learning 与成本感知主动查询 | 任务 A（预测 free Gox）与任务 B（预测配位位移）分开，C 特征集不出现 X2 | satisfied | ml_rows=48 budget_rows=24 | outputs/physics_completion/ml/; outputs/physics_completion/active_learning/ |
-| `wp5_new_endpoint_in_budget` | §9 WP5 delta-learning 与成本感知主动查询 | 新端点 O_3>=2/3 且 R_3<=0.10 eV 真的用于算预算 | partial | rounds=296 O_3_field=True fixed_R_3_0.10=True computed=8 blocked=16 | outputs/physics_completion/active_learning/round_diagnostics.csv; outputs/physics_completion/active_learning/success_budget.csv |
-| `wp5_two_consecutive_points` | §9 WP5 delta-learning 与成本感知主动查询 | 至少 16/20 回放在两个连续预算点达标才报经验停止预算；12 标签池回放 | partial | rule=16/20 for 2 consecutive points; computed=8 blocked=16; replay_pool=legacy_18_not_blind | outputs/physics_completion/active_learning/success_budget.csv; outputs/physics_completion/active_learning/round_diagnostics.csv |
+| `wp5_new_endpoint_in_budget` | §9 WP5 delta-learning 与成本感知主动查询 | 新端点 O_3>=2/3 且 R_3<=0.10 eV 真的用于算预算 | partial | legacy_rounds=296 O_3_field=True fixed_R_3_0.10=True legacy_computed=8 legacy_blocked=16; source_kind=legacy_round_diagnostics | outputs/physics_completion/active_learning/round_diagnostics.csv; outputs/physics_completion/active_learning/success_budget.csv |
+| `wp5_formal_ab_source_consumed` | §9 WP5 delta-learning 与成本感知主动查询 | 正式严格目标 A/B 回放（blind_replay/AB_*）按自身路径被消费，行集合完整且不含结构非法的停止预算行 | satisfied | formal_rows=32 models=gpr_rbf,knn_baseline,krr_rbf,ridge_std invalid=0 identity_fields=executed_model,prediction_model,acquisition_model | outputs/physics_completion/active_learning/blind_replay/AB_axis_endpoint.csv; outputs/physics_completion/active_learning/blind_replay/AB_index.json |
+| `wp5_formal_ab_stop_budget_reached` | §9 WP5 delta-learning 与成本感知主动查询 | 正式 A/B 回放里真正达到相邻两点联合停止预算的组合数（子池口径） | partial | reached=19 of 32 rows; stop_status={'computed': 19, 'not_reached_within_pool': 13}; pool_note=A/B pools are subsets of the frozen 12, so a reached budget is a SUBSET result | outputs/physics_completion/active_learning/blind_replay/AB_axis_endpoint.csv |
+| `wp5_two_consecutive_points` | §9 WP5 delta-learning 与成本感知主动查询 | 至少 16/20 回放在两个连续预算点达标才报经验停止预算；12 标签池回放 | partial | rule=16/20 for 2 consecutive points; legacy_computed=8 legacy_blocked=16; replay_pool=legacy_18_not_blind; source_kind=legacy_success_budget | outputs/physics_completion/active_learning/success_budget.csv; outputs/physics_completion/active_learning/round_diagnostics.csv |
 | `wp5_absolute_cost_ledger` | §11 停止规则 | 绝对成本三项：cpu_core_hours / p90_job_cost / frequency_only_cost | partial | cost_rows=10 MISSING=3 | outputs/physics_completion/cost/cost_ledger.csv |
 | `wp5_model_family_restriction` | §9 WP5 delta-learning 与成本感知主动查询 | §9.1 主模型只用岭回归/核岭与 GPR 两类（direct/shift 同特征、同外层 split、同调参预算） | satisfied | frozen_model_family=ridge,krr,gpr; ml_rows=48 | src/electrolyte_ranking/pc_batch.py; outputs/physics_completion/ml/frozen_family_view.csv |
-| `wp5_remaining_unqueried_error` | §9 WP5 delta-learning 与成本感知主动查询 | §9.2 每轮报告 n_T->tau_b、O_3、R_3、remaining_unqueried_error 与累计 core-hours | partial | rounds=296 remaining_error_MISSING=296 cumulative_core_hours_MISSING=296 | outputs/physics_completion/active_learning/round_diagnostics.csv |
+| `wp5_remaining_unqueried_error` | §9 WP5 delta-learning 与成本感知主动查询 | §9.2 每轮报告 n_T->tau_b、O_3、R_3、remaining_unqueried_error 与累计 core-hours | partial | legacy_rounds=296 remaining_error_MISSING=296 cumulative_core_hours_MISSING=296; source_kind=legacy_round_diagnostics | outputs/physics_completion/active_learning/round_diagnostics.csv |
 | `wp5_pool_extension` | §9 WP5 delta-learning 与成本感知主动查询 | §9.3 扩样触发：目标池扩到约 20-24（先加 8-12 个，含一个方法审计未覆盖的家族），先冻结再计算 | not_satisfied | extension_rows=0; replay_pool=legacy_pool_not_blind | data/metadata/physics_completion_set.csv; outputs/physics_completion/ml/frozen_family_view.csv |
 | `wp6_explicit_ligand` | §10 WP6 显式配体检查（可选） | 可选 WP6：固定 R=DME 的共同背景显式配体检查 | blocked_on_production | plan_rows=4 executed_jobs=0 li_pair_complete=12/12 required_li_pairs=9 production_ensembles=44/48 gate_ready=false scope=optional | outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv |
 | `stop_rules_registered` | §11 停止规则 | 停止规则（unresolved / sampling_limited / identity outcome / validation limitation） | partial | stop_rules_in_config=True; li_motif_screen_computed=23/24 | config/physics_completion_v1.yaml; docs/physics_completion_protocol.md |
@@ -47,7 +49,7 @@
 | `plan_landing_paths` | §13 推荐仓库落点 | §13 推荐落点：协议 / 样本集 / 锚点 / 新批次产物 / docs 逐条落地 | satisfied | checked=16 present=16 missing=none | config/physics_completion_v1.yaml; data/metadata/physics_completion_set.csv; data/references/anchor_primary_audit.csv; docs/physics_completion_final_report.md |
 | `plan_main_figures_six` | §14 最终图与论文主线 | §14 主图控制为 6 张：模型与条件态定义 / 独立方法审计 / E->G->ensemble 决策变化 / pair 证据与身份 outcome / 机制案例 / 累计成本-选集恢复曲线 | satisfied | figures=6 present=6 missing=none | docs/assets/figures/F59_physics_completion_definition.png ... docs/assets/figures/F64_physics_completion_budget_curve.png |
 
-**状态合计**：satisfied=21; partial=12; not_satisfied=1; blocked_on_production=2; exempt=3
-**未闭合项（不含 exempt）**：15；exempt 仅表示经证据支持的范围豁免/永久限制，不表示科学检查通过。
+**状态合计**：satisfied=22; partial=13; not_satisfied=1; blocked_on_production=2; exempt=3
+**未闭合项（不含 exempt）**：16；exempt 仅表示经证据支持的范围豁免/永久限制，不表示科学检查通过。
 
 **总体判定**：未闭环 -- 见 `plan_overall_complete` 行
