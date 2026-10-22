@@ -7,11 +7,11 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 152,
+  "test_files": 155,
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-22T15:58:49Z",
+  "generated_at_utc": "2026-10-22T16:29:05Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -1723,7 +1723,7 @@ window.HB = {
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 155
+   "files": 158
   },
   {
    "path": "docs",

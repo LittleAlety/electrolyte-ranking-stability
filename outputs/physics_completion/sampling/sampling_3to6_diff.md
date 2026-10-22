@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | round-1 `G_ensemble` | 16/16 态已填 | 直接取自生产系综标签，可复算 |
 | 氧化轴 / Li 条件轴（round-1 侧） | 已填 | `G(M_plus)-G(M)`、`G(LiM_2plus)-G(LiM_plus)`，单位 eV |
-| ceiling 侧（扩到池内上限） | 8/16 态 not_computed | 定义为**round-1 极小 + 已登记且 QC 通过的第二轮成员**（同一 DFT 级去重规则），缺口就留空：**空格是诚实状态，不是 0** |
+| ceiling 侧（扩到池内上限） | 6/16 态 not_computed | 定义为**round-1 极小 + 已登记且 QC 通过的第二轮成员**（同一 DFT 级去重规则），缺口就留空：**空格是诚实状态，不是 0** |
 | Top-k 重叠 / selection regret | not_computed | 依赖 ceiling 侧排序，只登记 round-1 基线集合 |
 | 采样收敛判定 | **不做** | 独立生产级容差尚未冻结，不得据本轮结果倒推 |
 
@@ -56,7 +56,7 @@
 | DME | oxidation (M_plus - M) | 6.597456875 | — | — | complete |
 | DME | Li-conditioned (LiM_2plus - LiM_plus) | 7.620908682 | — | — | round1_only |
 | TMP | oxidation (M_plus - M) | 7.944934595 | — | — | round1_only |
-| TMP | Li-conditioned (LiM_2plus - LiM_plus) | 8.536326990 | — | — | round1_only |
+| TMP | Li-conditioned (LiM_2plus - LiM_plus) | 8.536326990 | — | — | complete |
 
 ## Top-k 与 selection regret（预注册口径，本轮只登记基线）
 

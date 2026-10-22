@@ -114,9 +114,15 @@ def _recovery_registered(name: str, slot: str) -> list[dict]:
                       if (b or "").strip()]
             if not basins:
                 continue
-            out.append({"name": name, "seed": basins[0],
-                        "kind": "recovery_v1_start",
-                        "registration_only": True})
+            # BOTH registered starts, not just the first: a state may register
+            # two, and dropping start_2 made its second member look
+            # "unregistered" (measured: TMP/M_plus r3_c42, TMP/LiM_plus r3m_c08)
+            # -- the ceiling then refused to aggregate a legitimately registered
+            # structure and reported it as an integrity violation.
+            for basin in basins:
+                out.append({"name": name, "seed": basin,
+                            "kind": "recovery_v1_start",
+                            "registration_only": True})
     return out
 
 

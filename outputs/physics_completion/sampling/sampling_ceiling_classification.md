@@ -7,10 +7,9 @@
 
 | 类别 | 态数 |
 |---|---|
-| `complete` | 8 |
+| `complete` | 10 |
 | `registered_candidates_qc_pending` | 2 |
 | `pool_has_no_independent_structure` | 4 |
-| `unclassified` | 2 |
 
 ## 逐态
 
@@ -29,8 +28,8 @@
 | DME\|LiM_plus | not_computed | `pool_has_no_independent_structure` | 0 | 0 | — | — | — |
 | DME\|LiM_2plus | complete | `complete` | 0 | 0 | — | r3m_c05 | — |
 | TMP\|M | not_computed | `pool_has_no_independent_structure` | 0 | 0 | — | — | — |
-| TMP\|M_plus | not_computed | `unclassified` | 0 | 0 | — | c10;r3_c42 | strict_recovery_v1 has registered start(s) addressing this state |
-| TMP\|LiM_plus | not_computed | `unclassified` | 0 | 0 | — | r3m_c05;r3m_c08 | strict_recovery_v1 has registered start(s) addressing this state |
+| TMP\|M_plus | complete | `complete` | 0 | 0 | — | c10;r3_c42 | — |
+| TMP\|LiM_plus | complete | `complete` | 0 | 0 | — | r3m_c05;r3m_c08 | — |
 | TMP\|LiM_2plus | complete | `complete` | 0 | 0 | — | r3m_c00 | — |
 
 ## 四类的含义（不可互换）

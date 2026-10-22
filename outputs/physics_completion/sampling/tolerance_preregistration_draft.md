@@ -26,6 +26,8 @@
 | DME\|M_plus | -0.050917 |
 | DME\|LiM_2plus | -0.000370 |
 | TMP\|LiM_2plus | -0.000049 |
+| TMP\|M_plus | -0.000048 |
+| TMP\|LiM_plus | -0.000048 |
 | DEC\|M | -0.000027 |
 | DEC\|M_plus | -0.000027 |
 
@@ -61,11 +63,11 @@
 
 | 容差 (kcal/mol) | 会被判为「显著」的差异 | 会被判为「不显著」的差异 |
 |---|---|---|
-| 0.05 | DEC\|LiM_plus (-0.9993)<br>EMC\|LiM_plus (-0.5348)<br>DME\|M (-0.4506)<br>DME\|M_plus (-0.0509) | DME\|LiM_2plus (-0.0004)<br>TMP\|LiM_2plus (-0.0000)<br>DEC\|M (-0.0000)<br>DEC\|M_plus (-0.0000) |
-| 0.10 | DEC\|LiM_plus (-0.9993)<br>EMC\|LiM_plus (-0.5348)<br>DME\|M (-0.4506) | DME\|M_plus (-0.0509)<br>DME\|LiM_2plus (-0.0004)<br>TMP\|LiM_2plus (-0.0000)<br>DEC\|M (-0.0000)<br>DEC\|M_plus (-0.0000) |
-| 0.25 | DEC\|LiM_plus (-0.9993)<br>EMC\|LiM_plus (-0.5348)<br>DME\|M (-0.4506) | DME\|M_plus (-0.0509)<br>DME\|LiM_2plus (-0.0004)<br>TMP\|LiM_2plus (-0.0000)<br>DEC\|M (-0.0000)<br>DEC\|M_plus (-0.0000) |
-| 0.50 | DEC\|LiM_plus (-0.9993)<br>EMC\|LiM_plus (-0.5348) | DME\|M (-0.4506)<br>DME\|M_plus (-0.0509)<br>DME\|LiM_2plus (-0.0004)<br>TMP\|LiM_2plus (-0.0000)<br>DEC\|M (-0.0000)<br>DEC\|M_plus (-0.0000) |
-| 1.00 | （无） | DEC\|LiM_plus (-0.9993)<br>EMC\|LiM_plus (-0.5348)<br>DME\|M (-0.4506)<br>DME\|M_plus (-0.0509)<br>DME\|LiM_2plus (-0.0004)<br>TMP\|LiM_2plus (-0.0000)<br>DEC\|M (-0.0000)<br>DEC\|M_plus (-0.0000) |
+| 0.05 | DEC\|LiM_plus (-0.9993)<br>EMC\|LiM_plus (-0.5348)<br>DME\|M (-0.4506)<br>DME\|M_plus (-0.0509) | DME\|LiM_2plus (-0.0004)<br>TMP\|LiM_2plus (-0.0000)<br>TMP\|M_plus (-0.0000)<br>TMP\|LiM_plus (-0.0000)<br>DEC\|M (-0.0000)<br>DEC\|M_plus (-0.0000) |
+| 0.10 | DEC\|LiM_plus (-0.9993)<br>EMC\|LiM_plus (-0.5348)<br>DME\|M (-0.4506) | DME\|M_plus (-0.0509)<br>DME\|LiM_2plus (-0.0004)<br>TMP\|LiM_2plus (-0.0000)<br>TMP\|M_plus (-0.0000)<br>TMP\|LiM_plus (-0.0000)<br>DEC\|M (-0.0000)<br>DEC\|M_plus (-0.0000) |
+| 0.25 | DEC\|LiM_plus (-0.9993)<br>EMC\|LiM_plus (-0.5348)<br>DME\|M (-0.4506) | DME\|M_plus (-0.0509)<br>DME\|LiM_2plus (-0.0004)<br>TMP\|LiM_2plus (-0.0000)<br>TMP\|M_plus (-0.0000)<br>TMP\|LiM_plus (-0.0000)<br>DEC\|M (-0.0000)<br>DEC\|M_plus (-0.0000) |
+| 0.50 | DEC\|LiM_plus (-0.9993)<br>EMC\|LiM_plus (-0.5348) | DME\|M (-0.4506)<br>DME\|M_plus (-0.0509)<br>DME\|LiM_2plus (-0.0004)<br>TMP\|LiM_2plus (-0.0000)<br>TMP\|M_plus (-0.0000)<br>TMP\|LiM_plus (-0.0000)<br>DEC\|M (-0.0000)<br>DEC\|M_plus (-0.0000) |
+| 1.00 | （无） | DEC\|LiM_plus (-0.9993)<br>EMC\|LiM_plus (-0.5348)<br>DME\|M (-0.4506)<br>DME\|M_plus (-0.0509)<br>DME\|LiM_2plus (-0.0004)<br>TMP\|LiM_2plus (-0.0000)<br>TMP\|M_plus (-0.0000)<br>TMP\|LiM_plus (-0.0000)<br>DEC\|M (-0.0000)<br>DEC\|M_plus (-0.0000) |
 
 读法：容差越小，越容易把观测到的差异判为「真实采样效应」；容差越大，越容易判为「噪声内」。
 **但哪一种才是对的，不能由这张表决定**——它只能说明选择的后果，依据仍须来自
@@ -84,6 +86,8 @@
 | DME\|M_plus | -0.050917 | 不显著（噪声内） |
 | DME\|LiM_2plus | -0.000370 | 不显著（噪声内） |
 | TMP\|LiM_2plus | -0.000049 | 不显著（噪声内） |
+| TMP\|M_plus | -0.000048 | 不显著（噪声内） |
+| TMP\|LiM_plus | -0.000048 | 不显著（噪声内） |
 | DEC\|M | -0.000027 | 不显著（噪声内） |
 | DEC\|M_plus | -0.000027 | 不显著（噪声内） |
 
