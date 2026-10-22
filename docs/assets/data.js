@@ -7,7 +7,7 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 143,
+  "test_files": 144,
   "tests_passed": 1732
  },
  "wp2_progress": {
@@ -71,6 +71,23 @@ window.HB = {
    "source": "outputs/physics_completion/ensembles/production_ensemble_labels.csv",
    "overall_status": "blocked_on_production",
    "compliance_source": "outputs/physics_completion/compliance/plan_compliance.csv"
+  },
+  "frontier": {
+   "available": true,
+   "parsed": 80,
+   "registered_verified": 80,
+   "total": 80,
+   "sources": {
+    "weights": "outputs/physics_completion/ensembles/production_ensemble_weights.csv",
+    "frontier": "outputs/physics_completion/frontier/frontier_localization.csv",
+    "evidence": "outputs/physics_completion/frontier/frontier_identity_evidence.csv"
+   },
+   "source_sha256": {
+    "outputs/physics_completion/ensembles/production_ensemble_weights.csv": "82d280dab2c203459b7dba53d4850a52559151cacad72985d1f5ebe91a7f1766",
+    "outputs/physics_completion/frontier/frontier_localization.csv": "ae6d6f6ae4326e8981053e675c9fba64849be5f1635d90fe61bcc603d81bbedc",
+    "outputs/physics_completion/frontier/frontier_identity_evidence.csv": "fe28a320274a8ebef42e4522ebbcc7ca52ca3fcd50831783132568428edc9ae0"
+   },
+   "error": ""
   }
  },
  "pipeline": [
@@ -1687,7 +1704,7 @@ window.HB = {
   {
    "path": "scripts",
    "note": "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）",
-   "files": 251
+   "files": 252
   },
   {
    "path": "config",
@@ -1712,12 +1729,12 @@ window.HB = {
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 146
+   "files": 147
   },
   {
    "path": "docs",
    "note": "技术报告与周报（NN_*.md）、协议、结题报告、站点",
-   "files": 150
+   "files": 151
   },
   {
    "path": "deliverables",

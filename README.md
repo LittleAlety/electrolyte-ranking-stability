@@ -10,11 +10,14 @@
 
 | 验收层 | 当前快照 | 权威来源 |
 | --- | --- | --- |
-| 主态科学验收 | 48/48 | [主态账本](outputs/physics_completion/free_states/production_ledger.csv) |
+| primary 优化 / 频率 QC | 48/48（全成员身份另列） | [主态账本](outputs/physics_completion/free_states/production_ledger.csv) |
 | 生产系综 | **accepted 43/48** · provisional 0 · limited 5 | [系综标签](outputs/physics_completion/ensembles/production_ensemble_labels.csv) |
-| 严格核心目标 | **blocked_on_production**（工程检查通过不等于科学完成） | [合规台账](outputs/physics_completion/compliance/plan_compliance.md) |
+| 全成员前沿 / 身份登记 | 解析 80/80 · 证据表标记 verified 80/80；不代表独立完整科学身份 QC | [前沿报告](outputs/physics_completion/frontier/frontier_localization.md) · [证据表](outputs/physics_completion/frontier/frontier_identity_evidence.csv) |
+| 现有合规总体项 | **blocked_on_production**（不是完整 v3 严格目标证书） | [合规台账](outputs/physics_completion/compliance/plan_compliance.md) |
 
 未 accepted：`AN/M_plus`、`DMC/M_plus`、`DMC/LiM_2plus`、`DOL/LiM_2plus`、`EC/LiM_2plus`。
+
+工程检查通过不等于科学完成；完整身份、正式 WP5 与触发后的 WP6 仍须单独核验。覆盖探针修复：错误第二批 3747724 已取消；旧 11 个探针仅发生刚体变化，不计独立新构象。真正片段扭转预检仅 DMC/LiM_2plus 一条通过，已提交 **3748336**；EC 两条因中心双键拒绝。[修复与证据记录](docs/hpc_batch2_repair_20261022.md)。已提交不代表新盆地或验收通过。
 
 **先读**：[项目导航 / 下一步 / 核心代码](docs/PROJECT_GUIDE.md) · [当前恢复报告](outputs/physics_completion/recovery/strict_recovery_v1_report.md) · [科学协议](docs/physics_completion_protocol.md) · [目录地图](docs/65_repo_layout.md)
 

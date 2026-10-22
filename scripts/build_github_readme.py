@@ -21,6 +21,7 @@ import argparse
 import csv
 from collections import Counter
 import hashlib
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -734,18 +735,36 @@ def current_progress_block() -> "list[str]":
     remaining = "、".join(f"`{r['name']}/{r['state']}`" for r in rows
                          if r["acceptance_status"] != "accepted") or "无"
     scientific = meta["scientific"]
+    # Share the publication-only validation contract with Pages. This does not
+    # import or execute scientific builders or infer scientific identity QC.
+    spec = importlib.util.spec_from_file_location("readme_site_snapshot", REPO / "scripts/build_terminal_site.py")
+    site = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(site)
+    frontier = site._frontier_progress(REPO)
+    frontier_value = (
+        f"解析 {frontier['parsed']}/{frontier['total']} · 证据表标记 verified "
+        f"{frontier['registered_verified']}/{frontier['total']}"
+        if frontier["available"] else "来源缺失或成员集不一致；不可认证"
+    )
     return [
         "## 当前工作入口（与历史阶段分开）", "",
         "本阶段：12 分子 × 4 主态，wB97X-D4/def2-TZVPD + SMD；解析梯度优化 / AnFreq。"
         "以下读自版本化产物，不代表实时超算队列。", "",
         "| 验收层 | 当前快照 | 权威来源 |", "| --- | --- | --- |",
-        f"| 主态科学验收 | {scientific['accepted']}/{scientific['total']} | "
+        f"| primary 优化 / 频率 QC | {scientific['accepted']}/{scientific['total']}（全成员身份另列） | "
         "[主态账本](outputs/physics_completion/free_states/production_ledger.csv) |",
         f"| 生产系综 | **accepted {counts['accepted']}/48** · provisional {counts['provisional']} · limited {counts['limited']} | "
         f"[系综标签]({label_path}) |",
-        f"| 严格核心目标 | **{overall}**（工程检查通过不等于科学完成） | "
+        f"| 全成员前沿 / 身份登记 | {frontier_value}；不代表独立完整科学身份 QC | "
+        "[前沿报告](outputs/physics_completion/frontier/frontier_localization.md) · "
+        "[证据表](outputs/physics_completion/frontier/frontier_identity_evidence.csv) |",
+        f"| 现有合规总体项 | **{overall}**（不是完整 v3 严格目标证书） | "
         "[合规台账](outputs/physics_completion/compliance/plan_compliance.md) |", "",
         f"未 accepted：{remaining}。", "",
+        "工程检查通过不等于科学完成；完整身份、正式 WP5 与触发后的 WP6 仍须单独核验。"
+        "覆盖探针修复：错误第二批 3747724 已取消；旧 11 个探针仅发生刚体变化，不计独立新构象。"
+        "真正片段扭转预检仅 DMC/LiM_2plus 一条通过，已提交 **3748336**；EC 两条因中心双键拒绝。"
+        "[修复与证据记录](docs/hpc_batch2_repair_20261022.md)。已提交不代表新盆地或验收通过。", "",
         "**先读**：[项目导航 / 下一步 / 核心代码](docs/PROJECT_GUIDE.md) · "
         "[当前恢复报告](outputs/physics_completion/recovery/strict_recovery_v1_report.md) · "
         "[科学协议](docs/physics_completion_protocol.md) · [目录地图](docs/65_repo_layout.md)", "",

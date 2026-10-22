@@ -10,6 +10,12 @@
 
 新读者先看 [PROJECT_GUIDE.md](PROJECT_GUIDE.md)：权威账本、后续安排、核心实现和网页维护入口。
 根 README 与 Pages 当前进度由生成器读取账本；历史周报与当前生产不混为同一验收快照。
+发布层将 primary、系综 accepted、前沿解析与身份证据登记分层展示；前沿分母由当前
+`production_ensemble_weights.csv` 的成员集推导，并与 `frontier_localization.csv`、
+`frontier_identity_evidence.csv` 交叉核对及登记源字节哈希。`verified` 仅是证据表标记，
+不是发布生成器独立认证的完整科学身份 QC。下方职责表中的历史计数和“未启动”描述不作为实时队列依据。
+[2026-10-22 批次/片段修复记录](hpc_batch2_repair_20261022.md) 保存已授权范围、拒绝任务、非敏感来源哈希与新作业身份；
+核心片段旋转/分批映射的回归位于 `tests/test_build_torsion_probe_package.py`，不把预检通过视为新盆地验收。
 
 | 路径 | 职责 | 是否入交付 |
 | --- | --- | --- |
@@ -147,7 +153,7 @@ week36 与 week44 只存在于 part2 镜像。
 | `build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） | 结构登记 → `outputs/physics_completion/li_motif_sampling/**` |
 | `build_li_motif_plan_round2.py` | **第二轮 Li motif 搜索预注册**（v1.4.2 项 5）：第一轮已对单一父几何穷举全部配位规则，8 个审计 Li 态仍只 1–2 个独立极小；第二轮空间＝同一冻结规则 × **冻结自由态构象池的其他中性盆地做替代父几何**（EMC 2/DEC 4/DME 6/TMP 3 盆地，sha256 磁盘核验）；登记 round-1 kept + 已核验父数＝诚实上界（去重可能合并，真实数只能执行后测）；零新增计算，执行为显式独立步骤 | 冻结池 + 第一轮 screen → `li_motif_sampling/li_motif_plan_round2.{csv,_index.json}` |
 | `build_frontier_identity_evidence.py` | **身份证据链装配（v3.1 第 2 项）**：每成员验证同一次执行的input/log/geometry/molden 四文件存在且记原始哈希；方法(wB97X-D4/def2-TZVPD)/SCF(TightSCF)/正常终止/电荷多重度与登记一致；自旋通道与声明波函数一致 → identity_qc_status=pending→verified；缺本地文件记 awaiting（不等于需重算） | `frontier/frontier_identity_evidence.csv` + `_index.json` |
-| `build_torsion_probe_package.py` | **扭转探针包构建（v3.1 第 4 项执行）**：从扭转登记表取每态≤3 个登记二面角，从收敛 primary 极小绕 b-c 轴 Rodrigues 旋转 +60° 生成起点；完整生产级 Opt+AnFreq；冻结停止规则（每点一次、零新盆地→production_torsion_scan_exhausted） | `work/hpc_torsion_probe_v1/`（11 腿 2 批，Job 3747714/3747724） |
+| `build_torsion_probe_package.py` | **片段扭转与分批修复**：核实中心单键，只旋转其一侧共价片段；全原子拓扑保持等价映射 + proper Kabsch 拒绝刚体/对称等价。每批独立清单、任务分区无重复无缺失；修复包只纳入获批原候选，双键拒绝不替补。旧 11 起点不计独立新构象证据 | [修复记录](hpc_batch2_repair_20261022.md)；新 Job 3748336；`tests/test_build_torsion_probe_package.py` |
 | `build_torsion_registry.py` | **扭转自由度登记表（v3.1 第 4 项预检）**：从生产几何按共价半径邻接推导键/二面角；可旋转判据＝B-C 键不在 ≤7 元环内（环变形须另行登记，不等同扭转）；每条登记带源几何哈希。实测：AN 3 / DMC 10 / DMC_Li 12 / **DOL 0（五元环全刚性）** / EC 2 | `recovery/torsion_freedom_registry.csv` + `_index.json` |
 | `build_probe_routes.py` | **五态实测路由（v3.1 第 4 项的派生输出）**：probe_route 的六输入全部从数据推导（primary 登记行不算在途）；当前五态全部 preflight_required（池内无未用构象、无新独立 motif、无扭转自由度登记表）——下一步是候选/身份/对称去重/起点哈希预检，不是直接提交计算 | `recovery/probe_routes.csv` + `_index.json` |
 | `probe_route.py` | **五态逐态路由（v3.1 第 4 项，草案 B）**：在途→等待；身份未验→先验身份；预检三要素 None→preflight_required；优先级 unused_starts > new_li_motifs > eligible_torsions > independent_reproductions；全零→limited_no_registered_executable_probe（零=本次预检范围内无可执行候选，**不表示物理上不存在其他极小**） | 库模块（draft_* 仍须登记候选预算授权） |

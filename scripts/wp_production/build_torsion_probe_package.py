@@ -12,27 +12,28 @@ exactly what the plan's shared gate requires BEFORE any calculation:
                      another start of the same state is dropped (C-H threefold
                      rotations of a methyl are one probe, not three);
 * budget          -- scan points x ~12 core-hours, capped per state;
-* stop rule       -- every scan point optimises at production level; a point
-                     whose optimised geometry survives dedup into a NEW basin
-                     enters the normal coverage-review machinery; zero new
-                     basins upgrades the finding to ``production_torsion_scan_-
-                     exhausted`` (a MUCH stronger statement than GFN2 collapse,
-                     still not "all methods fail").
+* stop rule       -- only qualified, submitted points may run at production
+                     level. Completed points still require scientific QC and
+                     production dedup before entering coverage review. Rejected
+                     or rigid-equivalent starts cannot establish exhaustion;
+                     this builder does not upgrade scientific acceptance.
 
-The scan geometry is produced by rotating the a-b-c-d dihedral by a FIXED
-+60 degrees about the b-c axis (heavy-atom dihedrals in these molecules have
-3-fold or 2-fold periodicity; +60 samples the nearest non-equivalent basin
-without inventing a full relaxation scan).  All atoms are kept -- identity is
-preserved by construction, verified downstream by the usual QC.
+The scan geometry rotates one covalently connected fragment by a FIXED +60
+degrees about a verified single b-c bond. This is a bounded starting-geometry
+probe, not proof of another basin or of exhaustive sampling. Preflight rejects
+rigid and symmetry-equivalent starts; downstream QC must still verify identity.
 """
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import csv
 import hashlib
 import json
 import math
 from pathlib import Path
+
+import numpy as np
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -68,19 +69,22 @@ def _read_xyz(path: Path):
     return syms, coords, lines[1]
 
 
-def _rotate_about_axis(coords, b_idx: int, c_idx: int, deg: float):
+def _rotate_about_axis(coords, b_idx: int, c_idx: int, deg: float, *, moving_indices):
     """Rotate the b-side fragment about the b->c axis by `deg` degrees."""
-    import copy
     out = [list(p) for p in coords]
     # axis unit vector
     axis = [coords[c_idx][k] - coords[b_idx][k] for k in range(3)]
     norm = math.sqrt(sum(a * a for a in axis))
+    if norm < 1e-10:
+        raise ValueError("degenerate rotation axis")
     axis = [a / norm for a in axis]
     th = math.radians(deg)
     cos_t, sin_t = math.cos(th), math.sin(th)
     # Rodrigues rotation about the axis through atom b
     bx, by, bz = coords[b_idx]
     for i, p in enumerate(out):
+        if i not in moving_indices:
+            continue
         # translate so b is origin
         x, y, z = p[0] - bx, p[1] - by, p[2] - bz
         # rotate
@@ -94,6 +98,239 @@ def _rotate_about_axis(coords, b_idx: int, c_idx: int, deg: float):
             z * cos_t + cz * sin_t + axis[2] * dot * (1 - cos_t) + bz,
         ]
     return out
+
+
+def validate_batch_partition(tasks, chunks):
+    flat = [task for chunk in chunks for task in chunk]
+    if (not tasks or any(not chunk for chunk in chunks)
+            or len(tasks) != len(set(tasks)) or Counter(flat) != Counter(tasks)):
+        raise ValueError("batch tasks overlap, are missing, or are duplicated")
+
+
+def render_batch_script(template, batch, count):
+    if type(batch) is not int or batch < 1 or type(count) is not int or not 1 <= count <= 8:
+        raise ValueError("invalid batch index/count")
+    script = template % (count - 1)
+    token = 'p" tasks.txt)'
+    if script.count(token) != 1:
+        raise ValueError("batch template task lookup is unknown")
+    return script.replace(token, 'p" batch_%d.txt)' % batch)
+
+
+def _topology_for_member(name, symbols):
+    """Use registered bond orders, not distance-only guesses (C=O is not a rotor).
+
+    Explicit-H SMILES atom order must match the source geometry exactly. Li is
+    a separate coordination partner, never silently added as a covalent bond.
+    """
+    from rdkit import Chem
+    import run_batch as rb
+    matches = [entry for entry in rb.MOLS if entry[1] == name]
+    if len(matches) != 1:
+        raise ValueError("unknown registered molecule")
+    mol = Chem.AddHs(Chem.MolFromSmiles(matches[0][2]))
+    expected = [atom.GetSymbol() for atom in mol.GetAtoms()]
+    if list(symbols) not in (expected, expected + ["Li"]):
+        raise ValueError("registered SMILES/geometry atom order mismatch")
+    adj = [set() for _ in symbols]
+    singles = set()
+    for bond in mol.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        adj[i].add(j)
+        adj[j].add(i)
+        if bond.GetBondType() == Chem.BondType.SINGLE and not bond.GetIsAromatic():
+            singles.add(tuple(sorted((i, j))))
+    return adj, singles
+
+
+def rotate_fragment(coords, dihedral, adjacency, *, single_bonds, degrees):
+    """Rotate ONLY the a/b-side of a verified single bridge bond.
+
+    Reject rings, a linear/undefined dihedral, accidental rigid transformations,
+    bond distortion and obvious new clashes. No geometry optimization is run.
+    """
+    xyz = np.asarray(coords, dtype=float)
+    a, b, c, d = dihedral
+    n = len(xyz)
+    if (xyz.shape != (n, 3) or not np.isfinite(xyz).all()
+            or len(adjacency) != n or len(set(dihedral)) != 4
+            or any(type(i) is not int or not 0 <= i < n for i in dihedral)
+            or not math.isfinite(degrees)):
+        raise ValueError("invalid dihedral/coordinates")
+    if tuple(sorted((b, c))) not in single_bonds:
+        raise ValueError("central bond is not a verified single bond")
+    if any(j not in adjacency[i] for i, j in ((a, b), (b, c))):
+        raise ValueError("dihedral is not connected on the moving side")
+    # d may be a registered Li coordination partner; it must remain outside
+    # the covalent moving component, not be invented as a covalent bond.
+    moving, stack = {b}, [b]
+    while stack:
+        i = stack.pop()
+        for j in adjacency[i]:
+            if {i, j} == {b, c}:
+                continue
+            if j not in moving:
+                moving.add(j)
+                stack.append(j)
+    if c in moving:
+        raise ValueError("central bond belongs to a ring")
+    if a not in moving or d in moving:
+        raise ValueError("dihedral endpoints do not straddle the cut")
+    axis = xyz[c] - xyz[b]
+    if np.linalg.norm(axis) < 1e-10:
+        raise ValueError("degenerate axis")
+    for flank in (xyz[a] - xyz[b], xyz[d] - xyz[c]):
+        scale = np.linalg.norm(axis) * np.linalg.norm(flank)
+        if scale < 1e-12 or np.linalg.norm(np.cross(axis, flank)) / scale < 1e-4:
+            raise ValueError("degenerate/linear dihedral")
+    rotated = np.asarray(_rotate_about_axis(xyz, b, c, degrees, moving_indices=moving))
+    before = np.linalg.norm(xyz[:, None] - xyz[None, :], axis=2)
+    after = np.linalg.norm(rotated[:, None] - rotated[None, :], axis=2)
+    change = float(np.max(np.abs(before - after)))
+    if change <= 1e-5:
+        raise ValueError("probe is only a rigid transformation")
+    for i in range(n):
+        for j in range(i + 1, n):
+            if j in adjacency[i] and abs(before[i, j] - after[i, j]) > 1e-8:
+                raise ValueError("covalent bond length changed")
+            if j not in adjacency[i] and after[i, j] < 0.6:
+                raise ValueError("probe has an obvious atomic clash")
+    return rotated, {"moving_indices": sorted(moving), "pair_distance_change_a": change,
+                     "rotation_degrees": degrees, "contract": "fragment_bridge_v1"}
+
+
+def equivalent_start(symbols, first, second, adjacency):
+    """All-atom, topology-preserving proper-rotation duplicate test for starts.
+
+    This 1e-4 A identity tolerance is NOT the production-minimum 0.35 A rule.
+    No claim about optimized basins is made before DFT/QC.
+    """
+    x = np.asarray(first, dtype=float)
+    y = np.asarray(second, dtype=float)
+    n = len(symbols)
+    if (x.shape != (n, 3) or y.shape != (n, 3) or len(adjacency) != n
+            or not np.isfinite(x).all() or not np.isfinite(y).all()):
+        raise ValueError("invalid all-atom duplicate input")
+    x = x - x.mean(axis=0)
+    # The production heavy-atom matcher deliberately prunes terminal-H
+    # permutations. That is NOT valid for this all-atom start comparison.
+    colours = [(symbols[i], len(adjacency[i]),
+                tuple(sorted(symbols[j] for j in adjacency[i]))) for i in range(n)]
+    candidates = [[j for j in range(n) if colours[i] == colours[j]] for i in range(n)]
+    order = sorted(range(n), key=lambda i: (len(candidates[i]), -len(adjacency[i]), i))
+    mapping, used = {}, set()
+    nodes = 0
+
+    def search(depth):
+        nonlocal nodes
+        nodes += 1
+        if nodes > 100000:
+            raise ValueError("all-atom start mapping unresolved")
+        if depth < n:
+            i = order[depth]
+            for j in candidates[i]:
+                if j in used or any((k in adjacency[i]) != (v in adjacency[j])
+                                    for k, v in mapping.items()):
+                    continue
+                mapping[i] = j
+                used.add(j)
+                if search(depth + 1):
+                    return True
+                used.remove(j)
+                del mapping[i]
+            return False
+        target = y[[mapping[i] for i in range(n)]]
+        target = target - target.mean(axis=0)
+        u, _, vt = np.linalg.svd(x.T @ target)
+        correction = np.eye(3)
+        correction[-1, -1] = 1 if np.linalg.det(u @ vt) >= 0 else -1
+        rotation = u @ correction @ vt
+        rmsd = float(np.sqrt(np.mean(np.sum((x @ rotation - target) ** 2, axis=1))))
+        return rmsd <= 1e-4
+
+    return search(0)
+
+
+def _repair_member(source_package, member, kept):
+    from orca_derivative_policy import require_analytic_gradient, require_frequency_keyword
+    source = REPO / member["source_geometry"]
+    if _sha(source.read_bytes()) != member["source_sha256"]:
+        raise ValueError("registered source geometry hash changed")
+    symbols, coords, _ = _read_xyz(source)
+    adjacency, singles = _topology_for_member(member["name"], symbols)
+    dihedral = tuple(int(v) for v in member["dihedral"].split("-"))
+    rotated, audit = rotate_fragment(coords, dihedral, adjacency,
+                                     single_bonds=singles, degrees=member["scan_offset_deg"])
+    if equivalent_start(symbols, coords, rotated, adjacency):
+        raise ValueError("probe is symmetrically equivalent to its source")
+    for prior in kept:
+        if ((prior["member"]["name"], prior["member"]["slot"])
+                == (member["name"], member["slot"])):
+            if equivalent_start(symbols, prior["coords"], rotated, adjacency):
+                raise ValueError("probe duplicates an already selected start")
+    old_task = source_package / "tasks" / member["name"] / (member["slot"] + "__" + member["seed"])
+    inp = (old_task / "job.inp").read_text(encoding="utf-8")
+    require_analytic_gradient(inp, minimum_optimization_tier="verytight")
+    require_frequency_keyword(inp)
+    geometry = "%d\nfragmentfix %s\n" % (len(symbols), member["member_key"]) + "".join(
+        "%-2s %14.9f %14.9f %14.9f\n" % (s, p[0], p[1], p[2])
+        for s, p in zip(symbols, rotated))
+    audit.update(source_geometry_sha256=member["source_sha256"],
+                 previous_probe_sha256=_sha((old_task / "geom.xyz").read_bytes()))
+    return {"member": dict(member), "geometry": geometry, "input": inp,
+            "audit": audit, "coords": rotated}
+
+
+def build_repair_package(source_package, output_package, *, batch=2):
+    """Immutable new package, limited to the user-approved original batch."""
+    source_package, output_package = Path(source_package), Path(output_package)
+    if output_package.exists():
+        raise ValueError("repair output already exists; refusing overwrite/retry")
+    manifest_bytes = (source_package / "manifest.json").read_bytes()
+    original = json.loads(manifest_bytes)
+    requested = (source_package / ("batch_%d.txt" % batch)).read_text(encoding="utf-8").splitlines()
+    lookup = {"tasks/%s/%s__%s" % (m["name"], m["slot"], m["seed"]): m
+              for m in original["members"]}
+    if not requested or len(set(requested)) != len(requested) or any(p not in lookup for p in requested):
+        raise ValueError("original batch list is missing, duplicated or unregistered")
+    kept, rejected = [], []
+    for path in requested:
+        member = lookup[path]
+        try:
+            kept.append(_repair_member(source_package, member, kept))
+        except ValueError as exc:
+            rejected.append({"member_key": member["member_key"], "reason": str(exc)})
+    output_package.mkdir(parents=True)
+    task_lines = []
+    for record in kept:
+        member = record["member"]
+        line = "tasks/%s/%s__%s" % (member["name"], member["slot"], member["seed"])
+        task = output_package / line
+        task.mkdir(parents=True)
+        (task / "geom.xyz").write_text(record["geometry"], encoding="utf-8", newline="\n")
+        (task / "job.inp").write_text(record["input"], encoding="utf-8", newline="\n")
+        (task / "inputs.sha256").write_text(
+            "%s  geom.xyz\n%s  job.inp\n" % (_sha((task / "geom.xyz").read_bytes()),
+                                              _sha((task / "job.inp").read_bytes())),
+            encoding="utf-8", newline="\n")
+        record["audit"]["repaired_geometry_sha256"] = _sha((task / "geom.xyz").read_bytes())
+        task_lines.append(line)
+    manifest = {"package": output_package.name, "purpose": "approved batch mapping/fragment repair",
+                "source_manifest_sha256": _sha(manifest_bytes), "source_batch": batch,
+                "replaces_cancelled_job": "3747724", "requested_tasks": requested,
+                "tasks": len(kept), "batches": [], "members": [r["member"] for r in kept],
+                "preflight": [r["audit"] for r in kept], "rejected": rejected}
+    if kept:
+        from import_ensemble_structures import manifest as ens_manifest
+        validate_batch_partition(task_lines, [task_lines])
+        for name in ("tasks.txt", "batch_1.txt"):
+            (output_package / name).write_text("\n".join(task_lines) + "\n", encoding="utf-8", newline="\n")
+        (output_package / "batch_1.sbatch").write_text(
+            render_batch_script(ens_manifest._SBATCH, 1, len(kept)), encoding="utf-8", newline="\n")
+        manifest["batches"] = [{"batch": 1, "count": len(kept)}]
+    (output_package / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+                                                 encoding="utf-8", newline="\n")
+    return manifest
 
 
 def _registry_torsions(name: str, state: str) -> list[dict]:
@@ -130,9 +367,21 @@ def _build_state(name: str, state: str, charge: int, mult: int) -> list[dict]:
         return []
     syms, coords, comment = _read_xyz(geom_path)
     members = []
+    adjacency, singles = _topology_for_member(name, syms)
+    selected = []
     for t in torsions:
         a, b, c, d = (int(x) for x in t["detail"].split(" ")[0].split("-"))
-        rotated = _rotate_about_axis(coords, b, c, SCAN_OFFSET_DEG)
+        try:
+            rotated, _ = rotate_fragment(coords, (a, b, c, d), adjacency,
+                                          single_bonds=singles, degrees=SCAN_OFFSET_DEG)
+            if equivalent_start(syms, coords, rotated, adjacency) or any(
+                    equivalent_start(syms, old, rotated, adjacency) for old in selected):
+                print("REJECT %s|%s: duplicate start" % (name, state))
+                continue
+        except ValueError as exc:
+            print("REJECT %s|%s: %s" % (name, state, exc))
+            continue
+        selected.append(rotated)
         seed = "tors_%d_%d_%d_%d" % (a, b, c, d)
         task = OUT_PKG / "tasks" / name / ("%s__%s" % (state, seed))
         task.mkdir(parents=True, exist_ok=True)
@@ -175,6 +424,20 @@ def main(argv=None) -> int:
     sys.path.insert(0, str(HERE))
     from import_ensemble_structures import manifest as ens_manifest
 
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--repair-original-batch", type=int)
+    ap.add_argument("--source-package", type=Path, default=OUT_PKG)
+    ap.add_argument("--out-package", type=Path)
+    args = ap.parse_args(argv)
+    if args.repair_original_batch is not None:
+        if args.out_package is None:
+            ap.error("repair requires a new --out-package")
+        result = build_repair_package(args.source_package, args.out_package, batch=args.repair_original_batch)
+        print(json.dumps({"tasks": result["tasks"], "rejected": result["rejected"]}, ensure_ascii=False))
+        return 0
+    if OUT_PKG.exists():
+        raise ValueError("package already exists; preserve submitted inputs and use an explicit repair package")
+
     all_members = []
     task_lines = []
     for name, state in STATES:
@@ -191,12 +454,13 @@ def main(argv=None) -> int:
                                        encoding="utf-8", newline="\n")
     # one batch per <=8 tasks (frozen queue discipline)
     n_batches = (len(task_lines) + 7) // 8
+    validate_batch_partition(task_lines, [task_lines[i * 8:(i + 1) * 8] for i in range(n_batches)])
     for i in range(n_batches):
         chunk = task_lines[i * 8:(i + 1) * 8]
         (OUT_PKG / ("batch_%d.txt" % (i + 1))).write_text(
             "\n".join(chunk) + "\n", encoding="utf-8", newline="\n")
         (OUT_PKG / ("batch_%d.sbatch" % (i + 1))).write_text(
-            ens_manifest._SBATCH % (len(chunk) - 1),
+            render_batch_script(ens_manifest._SBATCH, i + 1, len(chunk)),
             encoding="utf-8", newline="\n")
     (OUT_PKG / "manifest.json").write_text(json.dumps({
         "package": OUT_PKG.name,

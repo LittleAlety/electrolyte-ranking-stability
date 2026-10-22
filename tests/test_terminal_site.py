@@ -177,6 +177,80 @@ def test_readme_and_pages_share_the_current_acceptance_count():
     assert readme.index("当前工作入口") < readme.index("历史研究与证据")
 
 
+def test_frontier_snapshot_is_registration_not_scientific_identity_completion():
+    frontier = site._frontier_progress()
+    assert frontier["available"]
+    assert frontier["total"] > 0
+    assert frontier["parsed"] <= frontier["total"]
+    assert frontier["registered_verified"] <= frontier["total"]
+    assert len(frontier["source_sha256"]) == 3
+    assert all(re.fullmatch(r"[a-f0-9]{64}", h)
+               for h in frontier["source_sha256"].values())
+    block = site.render_production_status(site.build_payload())
+    assert "证据表标记 verified" in block
+    assert "不代表独立完整科学身份 QC" in block
+    assert "现有合规总体项" in block
+    assert "primary 优化 / 频率 QC；全成员身份另列" in block
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"解析 {frontier['parsed']}/{frontier['total']}" in readme
+    assert f"verified {frontier['registered_verified']}/{frontier['total']}" in readme
+
+
+@pytest.mark.parametrize("bad_case", ["missing_source", "missing_member", "duplicate", "extra", "bad_hash"])
+def test_frontier_member_sets_and_evidence_fail_closed(monkeypatch, tmp_path, bad_case):
+    weights = "outputs/physics_completion/ensembles/production_ensemble_weights.csv"
+    frontier = "outputs/physics_completion/frontier/frontier_localization.csv"
+    evidence = "outputs/physics_completion/frontier/frontier_identity_evidence.csv"
+    fixtures = {
+        weights: [{"member_key": "A|M|primary"}],
+        frontier: [{"member_key": "A|M|primary", "status": "computed",
+                    "molden_status": "parsed", "fmopop_status": "parsed",
+                    "identity_qc_status": "verified"}],
+        evidence: [{"member_key": "A|M|primary", "identity_qc_status": "verified",
+                    "missing_artifacts": "", "failed_checks": "",
+                    **{k: "a" * 64 for k in ("sha256_job_inp", "sha256_geom_xyz",
+                                             "sha256_job_log", "sha256_job_molden_input")}}],
+    }
+    if bad_case == "missing_member":
+        fixtures[frontier] = []
+    elif bad_case == "duplicate":
+        fixtures[weights] *= 2
+    elif bad_case == "extra":
+        fixtures[evidence].append({**fixtures[evidence][0], "member_key": "unknown"})
+    elif bad_case == "bad_hash":
+        fixtures[evidence][0]["sha256_job_log"] = "invalid"
+    for rel, rows in fixtures.items():
+        if bad_case == "missing_source" and rel == evidence:
+            continue
+        path = tmp_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(rows[0]) if rows else ["member_key"])
+            writer.writeheader()
+            writer.writerows(rows)
+    monkeypatch.setattr(site, "REPO", str(tmp_path))
+    result = site._frontier_progress()
+    assert not result["available"]
+    assert result["parsed"] == result["registered_verified"] == 0
+
+
+def test_frontier_provenance_changes_on_raw_byte_changes(monkeypatch, tmp_path):
+    original = site._frontier_progress()
+    for rel in original["sources"].values():
+        path = tmp_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((REPO_ROOT / rel).read_bytes())
+    monkeypatch.setattr(site, "REPO", str(tmp_path))
+    before = site._frontier_progress()
+    rel = before["sources"]["evidence"]
+    path = tmp_path / rel
+    path.write_bytes(path.read_bytes() + b"\n")
+    after = site._frontier_progress()
+    assert before["available"] and after["available"]
+    assert before["parsed"] == after["parsed"]
+    assert before["source_sha256"][rel] != after["source_sha256"][rel]
+
+
 def test_guide_links_resolve_to_repository_files():
     guide = (DOCS / "PROJECT_GUIDE.md").read_text(encoding="utf-8")
     for link in re.findall(r"\]\(([^)#]+)(?:#[^)]*)?\)", guide):
@@ -617,3 +691,9 @@ def test_page_never_uses_the_forbidden_phrase():
     html = (DOCS / "index.html").read_text(encoding="utf-8")
     assert "validated target" not in html.lower(), \
         "the page uses a phrase the protocol forbids before Gate 1 closes"
+
+
+def test_long_document_paths_can_wrap_on_narrow_screens():
+    css = (ASSETS / "academic.css").read_text(encoding="utf-8")
+    rule = re.search(r"code, kbd, samp\s*\{([^}]+)\}", css)
+    assert rule and "overflow-wrap: anywhere" in rule.group(1)

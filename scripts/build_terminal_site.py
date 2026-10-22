@@ -20,6 +20,7 @@ verify the on-disk site still matches the repository.
 import argparse
 import csv
 import glob
+import hashlib
 import io
 import json
 import os
@@ -39,6 +40,57 @@ DELIVERABLES = os.path.join(REPO, "deliverables")
 
 REPO_URL = "https://github.com/LittleAlety/electrolyte-ranking-stability"
 PAGES_URL = "https://littlealety.github.io/electrolyte-ranking-stability/"
+
+
+def _frontier_progress(repo=None):
+    """Publication projection, not a replacement for scientific identity QC.
+
+    All three sources must have exactly the current weighted member set. Hashes
+    identify source bytes; verified is the evidence table's label, not our
+    independent certification of the orbital-selection/population algorithm.
+    """
+    root = REPO if repo is None else os.fspath(repo)
+    sources = {
+        "weights": "outputs/physics_completion/ensembles/production_ensemble_weights.csv",
+        "frontier": "outputs/physics_completion/frontier/frontier_localization.csv",
+        "evidence": "outputs/physics_completion/frontier/frontier_identity_evidence.csv",
+    }
+    result = dict(available=False, parsed=0, registered_verified=0, total=0,
+                  sources=sources, source_sha256={}, error="source unavailable")
+    try:
+        tables = {}
+        for key, rel in sources.items():
+            with open(os.path.join(root, rel), "rb") as handle:
+                raw = handle.read()
+            result["source_sha256"][rel] = hashlib.sha256(raw).hexdigest()
+            rows = list(csv.DictReader(io.StringIO(raw.decode("utf-8-sig"))))
+            members = [row["member_key"] for row in rows]
+            if not members or any(not m for m in members) or len(set(members)) != len(members):
+                raise ValueError("empty or duplicate member set: " + key)
+            tables[key] = {row["member_key"]: row for row in rows}
+        expected = set(tables["weights"])
+        result["total"] = len(expected)
+        if any(set(rows) != expected for rows in tables.values()):
+            raise ValueError("member sets differ from current weights")
+        parsed = verified = 0
+        for member in sorted(expected):
+            row, ev = tables["frontier"][member], tables["evidence"][member]
+            if row["identity_qc_status"] != ev["identity_qc_status"]:
+                raise ValueError("identity registration disagrees: " + member)
+            is_parsed = (row["status"] == "computed" and row["molden_status"] == "parsed"
+                         and row["fmopop_status"] == "parsed")
+            if ev["identity_qc_status"] == "verified":
+                hash_fields = ("sha256_job_inp", "sha256_geom_xyz", "sha256_job_log",
+                               "sha256_job_molden_input")
+                if (not is_parsed or ev["missing_artifacts"] or ev["failed_checks"]
+                        or any(not re.fullmatch(r"[a-f0-9]{64}", ev[k]) for k in hash_fields)):
+                    raise ValueError("invalid verified registration: " + member)
+                verified += 1
+            parsed += int(is_parsed)
+        result.update(available=True, parsed=parsed, registered_verified=verified, error="")
+    except (OSError, UnicodeError, KeyError, ValueError, TypeError) as exc:
+        result["error"] = str(exc)
+    return result
 
 
 def _ensemble_progress():
@@ -109,6 +161,7 @@ def _wp2_progress():
             "stale": bool(raw["stale"]),
             "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
             "ensemble": _ensemble_progress(),
+            "frontier": _frontier_progress(),
         }
     except (OSError, KeyError, ValueError, TypeError):
         return {
@@ -120,6 +173,7 @@ def _wp2_progress():
             "stale": True,
             "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
             "ensemble": _ensemble_progress(),
+            "frontier": _frontier_progress(),
         }
 
 
@@ -756,13 +810,16 @@ def _progress_percent(done, total):
 def render_production_status(payload):
     p = payload["wp2_progress"]
     ensemble = p["ensemble"]
+    frontier = p["frontier"]
     metrics = (
         ("运行完成", p["runtime"]["computed"], p["runtime"]["total"],
          "60 条登记腿；不含实时队列"),
         ("主态科学验收", p["scientific"]["accepted"], p["scientific"]["total"],
-         "primary：收敛 + 频率 + 身份 QC"),
+         "primary 优化 / 频率 QC；全成员身份另列"),
         ("生产系综 accepted", ensemble["accepted"], ensemble["total"],
          "独立于 primary；仅计 accepted" if ensemble["available"] else "缺少有效标签，不能验收"),
+        ("全成员前沿解析", frontier["parsed"], frontier["total"],
+         "Molden 与 FMOPop 解析；非身份结论" if frontier["available"] else "来源缺失或成员集不一致，不能认证"),
     )
     rows = []
     for label, done, total, note in metrics:
@@ -779,11 +836,14 @@ def render_production_status(payload):
             % (esc(label), done, total, esc(label), total, done, pct, esc(note)))
     freshness = "账本已同步" if not p["stale"] else "账本需重建"
     freshness_class = "fresh" if not p["stale"] else "stale"
-    outstanding = " · ".join(esc(r["name"] + "/" + r["state"]) for r in ensemble["remaining"])
+    outstanding = "".join(
+        '<li><strong>%s/%s</strong><span>%s</span><small>%s</small></li>'
+        % (esc(r["name"]), esc(r["state"]), esc(r["status"]), esc(r["reason"] or "未登记限制原因"))
+        for r in ensemble["remaining"])
     if not ensemble["available"]:
-        outstanding = "系综数据不可用，需先重建并核验"
+        outstanding = "<li>系综数据不可用，需先重建并核验</li>"
     elif not outstanding:
-        outstanding = "无未 accepted 态；其余核心闸门仍须单独核验"
+        outstanding = "<li>无未 accepted 态；其余核心闸门仍须单独核验</li>"
     return (
         '    <div class="production-status" id="production">\n'
         '      <div class="production-head">\n'
@@ -793,18 +853,25 @@ def render_production_status(payload):
         '      </div>\n'
         '      <div class="production-grid">\n%s\n      </div>\n'
         '      <p class="production-note">正常终止不等于科学闭环；主态固化交付 <strong>%d/%d</strong>，'
-        '系综 provisional=%d、limited=%d。严格结题闸门：<strong>%s</strong>。</p>\n'
-        '      <p class="production-remaining"><span>未 accepted</span> %s</p>\n'
+        '系综 provisional=%d、limited=%d。现有合规总体项：<strong>%s</strong>。</p>\n'
+        '      <p class="production-note">前沿解析 %d/%d；证据表标记 verified %d/%d。'
+        '<strong>不代表独立完整科学身份 QC</strong>；自旋、轨道选择和布居口径仍需复核。'
+        '现有合规总体项也不是完整 v3 严格目标证书；身份、WP5 与触发后的 WP6 必须另验。</p>\n'
+        '      <details class="production-remaining"><summary>查看 %d 个未 accepted 态及限制原因</summary><ul>%s</ul></details>\n'
         '      <div class="production-evidence"><a href="%s/blob/main/%s">系综标签 ↗</a>'
         '<a href="%s/blob/main/%s">核心方案合规台账 ↗</a>'
-        '<a href="%s/blob/main/outputs/physics_completion/recovery/strict_recovery_v1_report.md">救援证据 ↗</a></div>\n'
+        '<a href="%s/blob/main/outputs/physics_completion/recovery/strict_recovery_v1_report.md">救援证据 ↗</a>'
+        '<a href="%s/blob/main/%s">前沿 / 身份登记 ↗</a>'
+        '<a href="%s/blob/main/docs/hpc_batch2_repair_20261022.md">探针修复记录 ↗</a></div>\n'
         '      <p class="snapshot-note">以上为已提交产物快照，不是实时 Slurm 队列；更新时间仅对应主态账本。</p>\n'
         '    </div>'
         % (freshness_class, REPO_URL, p["source"], esc(freshness),
            esc(p["generated_at_utc"]), "\n".join(rows),
            p["frozen"]["accepted"], p["frozen"]["total"], ensemble["provisional"], ensemble["limited"],
-           esc(ensemble["overall_status"]), outstanding, REPO_URL, ensemble["source"],
-           REPO_URL, ensemble["compliance_source"], REPO_URL)
+           esc(ensemble["overall_status"]), frontier["parsed"], frontier["total"],
+           frontier["registered_verified"], frontier["total"], len(ensemble["remaining"]),
+           outstanding, REPO_URL, ensemble["source"], REPO_URL,
+           ensemble["compliance_source"], REPO_URL, REPO_URL, frontier["sources"]["evidence"], REPO_URL)
     )
 
 
