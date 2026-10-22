@@ -29,7 +29,7 @@
 .\.venv\Scripts\python.exe -B docs/handoffs/four_state_recovery_20261023/preflight.py --ledger docs/handoffs/four_state_recovery_20261023/attempt_ledger.template.json
 ```
 
-自测使用临时合成数据，既不读私人 `work/` 夹具，也不改正式账本。本包位于可版本管理目录，但当前**没有 commit/push**；独立目录的测试不会自动成为正式流水线验收。后续集成时必须迁移/登记共用实现与生产入口测试，不能只在文档目录测试通过就宣称生产已覆盖。
+自测使用临时合成数据，既不读私人 `work/` 夹具，也不改正式账本。本包位于可版本管理目录；创建者没有执行 commit/push，但共享会话在 `db34809` 中纳入了主体文件，后续复核补充仍需单独核对提交状态。详见 [VALIDATION.md](VALIDATION.md)。独立目录的测试不会自动成为正式流水线验收。后续集成时必须迁移/登记共用实现与生产入口测试，不能只在文档目录测试通过就宣称生产已覆盖。
 
 ## 能做与不能做
 

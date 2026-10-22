@@ -201,6 +201,16 @@ class PreparationTests(unittest.TestCase):
             with self.subTest(version=version), self.assertRaises((ValueError, KeyError)):
                 m.validate_slots(data)
 
+    def test_optional_account_capacity_is_null_or_a_positive_integer(self):
+        for value in (True, 20.0, "20", 0, -1):
+            c, freeze = self.contract_fixture()
+            c["budget"]["account_cpu_capacity"] = value
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                m.validate_contract(c, freeze)
+        c, freeze = self.contract_fixture()
+        c["budget"]["account_cpu_capacity"] = 20
+        m.validate_contract(c, freeze)
+
     def test_slot_identity_fields_are_actual_integers(self):
         for field in ("charge", "multiplicity"):
             for value in (True, 1.0 if field == "charge" else 2.0):
