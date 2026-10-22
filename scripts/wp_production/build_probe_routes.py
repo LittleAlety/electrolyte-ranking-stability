@@ -35,6 +35,7 @@ RECOVERY = REPO / "outputs" / "physics_completion" / "recovery"
 FRONTIER = REPO / "outputs" / "physics_completion" / "frontier"
 POOL = REPO / "outputs" / "physics_completion" / "sampling" / "sampling_conformer_set.csv"
 
+REGISTRY = RECOVERY / "torsion_freedom_registry.csv"
 OUT_CSV = RECOVERY / "probe_routes.csv"
 OUT_INDEX = RECOVERY / "probe_routes_index.json"
 
@@ -87,22 +88,27 @@ def state_inputs(name: str, state: str) -> dict:
             continue
         unused.append(r.get("geometry_relpath", ""))
 
-    # eligible torsions: no torsion registry exists today -- None, which the
-    # router reads as preflight_required (honest: not yet preflighted)
-    eligible_torsions = None
+    # eligible torsions from the REGISTERED registry (build_torsion_registry);
+    # ring deformation is deliberately NOT here -- it is a separate probe kind
+    # and DOL's all-ring topology correctly yields zero torsions
+    registry = _rows(REGISTRY)
+    eligible_torsions = [r["detail"] for r in registry
+                         if r.get("name") == name and r.get("state") == state
+                         and r.get("detail", "").count("-") >= 3]
 
-    # new Li motifs: only Li states have a motif search index
+    # new Li motifs: the round-3 motif search IS the preflight -- its measured
+    # zero (all candidates collapsed onto known basins) is a RESULT, not a
+    # missing preflight, so the router gets [] (checked, empty) not None
     if "Li" in state:
         exec_idx = (REPO / "outputs" / "physics_completion" / "li_motif_sampling"
                     / "li_motif_round3_recovery.csv")
-        motifs = []
+        new_li_motifs = []
         for r in _rows(exec_idx):
             leg = r.get("leg_id", "")
             if not leg.startswith(name + "|") or not leg.endswith("|" + state):
                 continue
             if r.get("new_vs_round1") == "true" and r.get("kept") == "true":
-                motifs.append(r.get("motif_path", leg))
-        new_li_motifs = motifs or None if "Li" in state else []
+                new_li_motifs.append(r.get("motif_path", leg))
     else:
         new_li_motifs = []
 
