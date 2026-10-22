@@ -7,11 +7,11 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 144,
+  "test_files": 146,
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-22T09:14:57Z",
+  "generated_at_utc": "2026-10-22T09:48:29Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -1689,8 +1689,8 @@ window.HB = {
    "file": "F64_physics_completion_budget_curve.png",
    "week": 44,
    "caption": "累计成本 -> 选集恢复曲线（方案 WP5）：冻结的 20 种子池内回放，tau_b 与 Top-3 重叠随已查询标签数 n_T 的曲线与端点线；这是已知数据的回放，不是盲预注册",
-   "sha": "1f95dbfa3022759e24873c76977c613727a161277bae56e73840866cf5c5b246",
-   "bytes": 177919,
+   "sha": "830058deb657714d2f09fc42900bda8734f9b4d870ef7ca5484148fb9e3d4703",
+   "bytes": 179133,
    "w": 1856,
    "h": 832
   }
@@ -1704,7 +1704,7 @@ window.HB = {
   {
    "path": "scripts",
    "note": "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）",
-   "files": 252
+   "files": 254
   },
   {
    "path": "config",
@@ -1724,12 +1724,12 @@ window.HB = {
   {
    "path": "outputs",
    "note": "全部产物：逐阶段载荷、physics_completion/、figures/、溯源与合规",
-   "files": 7616
+   "files": 7617
   },
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 147
+   "files": 149
   },
   {
    "path": "docs",

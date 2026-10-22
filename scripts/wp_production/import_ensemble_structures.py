@@ -1248,6 +1248,11 @@ def pkg_attempt(name: str) -> int:
     # NEW VERSION lineages (user-authorised reopt_v2): base 10 so the fresh
     # numbering clears every index the same member already carries and
     # "highest attempt wins" keeps meaning "newest lineage wins"
+    # a *_fragmentfix_* package is a REPAIR of a cancelled/mis-built attempt:
+    # it must sort after the family it repairs, or the dead row shadows it
+    repair = re.search(r"_fragmentfix_(\d+)$", name)
+    if repair:
+        return 5
     new_lineage = re.search(r"_reopt_v(\d+)(?:_|$)", name)
     if new_lineage:
         return 10 + int(new_lineage.group(1)) - 1

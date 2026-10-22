@@ -41,6 +41,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from wp5_formal_models import PREDICTORS as _FORMAL, model_contract as _contract
+
 from wp5_replay_contract import (
     descriptive_mean, empirical_stop_budget, initial_visible, stable_seed,
 )
@@ -55,6 +59,13 @@ OUT_INDEX = BLIND / "AB_index.json"
 
 INITIAL_SEED_SIZE = 4
 BASELINES = ("random", "diversity", "uncertainty", "ranking_aware")
+
+#: The executed model is an explicit axis.  ``knn_baseline`` is the
+#: previous neighbour-mean predictor, kept under its own name -- it is a
+#: BASELINE and must never be presented as one of the formal models.
+LEGACY_MODEL = "knn_baseline"
+FORMAL_MODELS = ("ridge_std", "krr_rbf", "gpr_rbf")
+MODELS = (LEGACY_MODEL,) + FORMAL_MODELS
 K_TOP = 3
 O3_THRESHOLD = 2.0 / 3.0
 R3_THRESHOLD_EV = 0.10
@@ -328,7 +339,15 @@ class Evaluator:
         return max(errs), sum(errs) / len(errs)
 
 
-def _predict(features, y, visible, n):
+def _predict(features, y, visible, n, model=LEGACY_MODEL):
+    """Predict unseen members with the chosen executor.
+
+    ``knn_baseline`` is the historical neighbour mean (kept verbatim so old
+    results stay reproducible); the formal models are the frozen predictors
+    from ``wp5_formal_models`` -- same features, same visible set, no lookahead.
+    """
+    if model != LEGACY_MODEL:
+        return _predict_formal(features, y, visible, n, model)
     if len(visible) <= INITIAL_SEED_SIZE:
         mean = statistics.fmean(y[i] for i in visible)
         return [mean] * n
@@ -347,7 +366,30 @@ def _predict(features, y, visible, n):
     return preds
 
 
-def replay_one(task, baseline, repeat):
+def _predict_formal(features, y, visible, n, model):
+    """Bridge to wp5_formal_models: same contract as the baseline path.
+
+    * the model sees ONLY the visible rows (no lookahead);
+    * already-visible members return their own label (as in the baseline);
+    * the model is refit from scratch on every acquisition step, exactly like
+      the baseline -- no warm start that could leak a previous step's view.
+    """
+    import numpy as _np
+    fn = _FORMAL[model]
+    X = _np.asarray(features, dtype=float)
+    seen = set(visible)
+    unseen = [i for i in range(n) if i not in seen]
+    preds = [0.0] * n
+    for i in visible:
+        preds[i] = y[i]
+    if unseen:
+        raw = fn(X, list(visible), list(y), unseen)
+        for k, i in enumerate(unseen):
+            preds[i] = float(raw[k])
+    return preds
+
+
+def replay_one(task, baseline, repeat, model=LEGACY_MODEL):
     X, y, names, _ = _pool(task)
     n = len(y)
     visible = sorted(initial_visible("AB|" + task, repeat, n, INITIAL_SEED_SIZE))
@@ -359,7 +401,7 @@ def replay_one(task, baseline, repeat):
     cum_cost: dict[str, float | None] = {nm: 0.0 for nm in names}
     cum_missing = set()
     while len(visible) <= n:
-        preds = _predict(X, y, visible, n)
+        preds = _predict(X, y, visible, n, model)
         o3 = ev.o3(preds)
         r3 = ev.r3_mean(preds)
         bsr = ev.best_selected_regret(preds)
@@ -430,46 +472,57 @@ def replay_one(task, baseline, repeat):
     return cand_rows, sum_rows
 
 
-def build(repeats: int) -> dict:
+def build(repeats: int, models=MODELS) -> dict:
     all_cand, all_sum, endpoints = [], [], []
-    for task in sorted(TASK_LABEL):
-        for baseline in BASELINES:
-            o3s, r3s = [], []
-            for repeat in range(repeats):
-                cand, srows = replay_one(task, baseline, repeat)
-                all_cand.extend(cand)
-                all_sum.extend(srows)
-                non = [r for r in srows if int(r["n_T"]) < int(r["n_pool"])]
-                if non:
-                    o3s.append(_f(non[-1]["O_3"]))
-                    r3s.append(_f(non[-1]["R_3_mean_ev"]))
-            rows = [r for r in all_sum
-                    if r["task"] == task and r["baseline"] == baseline]
-            stop = empirical_stop_budget(rows, repeats=repeats)
-            desc = descriptive_mean([r for r in rows
-                                     if int(r["n_T"]) < int(r["n_pool"])])
-            mean_o3 = sum(o3s) / len(o3s) if o3s else None
-            mean_r3 = sum(r3s) / len(r3s) if r3s else None
-            endpoints.append({
-                "task": task, "baseline": baseline, "repeats": str(repeats),
-                "pool_label": "wp5_AB_acceptance_replay",
-                "mean_O_3": ("%.6f" % mean_o3) if mean_o3 is not None else "",
-                "mean_R_3_mean_ev": ("%.6f" % mean_r3) if mean_r3 is not None else "",
-                "metric": "R_3_mean (v3.0 §11.2 set-mean loss)",
-                "mean_is": "descriptive_statistic_not_stop_budget",
-                "stop_budget_n_T": (str(stop) if stop is not None else ""),
-                # v3.0 §13.4: a pool too small to host TWO non-exhausted
-                # budget points (pool - 1 <= initial seed) can never host the
-                # 16/20x2 rule -- that is blocked_target_pool, which is a
-                # different statement from "the strategies did not reach it".
-                "stop_budget_status": ("computed" if stop is not None
-                                       else ("blocked_target_pool"
-                                             if len(_pool(task)[1]) <= INITIAL_SEED_SIZE + 1
-                                             else "not_reached_within_pool")),
-                "O_3_threshold": "%.6f" % O3_THRESHOLD,
-                "R_3_threshold_ev": "%.6f" % R3_THRESHOLD_EV,
-                "n_pool": str(len(_pool(task)[1])),
-            })
+    for model in models:
+        for task in sorted(TASK_LABEL):
+            for baseline in BASELINES:
+                o3s, r3s = [], []
+                for repeat in range(repeats):
+                    cand, srows = replay_one(task, baseline, repeat, model)
+                    # every row names its executor: a baseline run can never be
+                    # read as a formal-model run
+                    for r in cand:
+                        r["executed_model"] = model
+                    for r in srows:
+                        r["executed_model"] = model
+                    all_cand.extend(cand)
+                    all_sum.extend(srows)
+                    non = [r for r in srows if int(r["n_T"]) < int(r["n_pool"])]
+                    if non:
+                        o3s.append(_f(non[-1]["O_3"]))
+                        r3s.append(_f(non[-1]["R_3_mean_ev"]))
+                rows = [r for r in all_sum
+                        if r["task"] == task and r["baseline"] == baseline
+                        and r["executed_model"] == model]
+                stop = empirical_stop_budget(rows, repeats=repeats)
+                desc = descriptive_mean([r for r in rows
+                                         if int(r["n_T"]) < int(r["n_pool"])])
+                mean_o3 = sum(o3s) / len(o3s) if o3s else None
+                mean_r3 = sum(r3s) / len(r3s) if r3s else None
+                endpoints.append({
+                    "task": task, "baseline": baseline, "repeats": str(repeats),
+                    "executed_model": model,
+                    "model_is": ("baseline_not_formal" if model == LEGACY_MODEL
+                                 else "formal_frozen_predictor"),
+                    "pool_label": "wp5_AB_acceptance_replay",
+                    "mean_O_3": ("%.6f" % mean_o3) if mean_o3 is not None else "",
+                    "mean_R_3_mean_ev": ("%.6f" % mean_r3) if mean_r3 is not None else "",
+                    "metric": "R_3_mean (v3.0 §11.2 set-mean loss)",
+                    "mean_is": "descriptive_statistic_not_stop_budget",
+                    "stop_budget_n_T": (str(stop) if stop is not None else ""),
+                    # v3.0 §13.4: a pool too small to host TWO non-exhausted
+                    # budget points (pool - 1 <= initial seed) can never host the
+                    # 16/20x2 rule -- that is blocked_target_pool, which is a
+                    # different statement from "the strategies did not reach it".
+                    "stop_budget_status": ("computed" if stop is not None
+                                           else ("blocked_target_pool"
+                                                 if len(_pool(task)[1]) <= INITIAL_SEED_SIZE + 1
+                                                 else "not_reached_within_pool")),
+                    "O_3_threshold": "%.6f" % O3_THRESHOLD,
+                    "R_3_threshold_ev": "%.6f" % R3_THRESHOLD_EV,
+                    "n_pool": str(len(_pool(task)[1])),
+                })
     return {"candidates": all_cand, "summary": all_sum, "endpoints": endpoints}
 
 
@@ -491,7 +544,9 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
         w.writerows(rows)
 
 
-def write_outputs(data: dict, repeats: int) -> None:
+def write_outputs(data: dict, repeats: int,
+                  models_at_write=MODELS) -> None:
+    _n_features = len(_pool("A")[0][0])
     _write_csv(OUT_CAND, data["candidates"])
     _write_csv(OUT_SUM, data["summary"])
     _write_csv(OUT_END, data["endpoints"])
@@ -522,6 +577,22 @@ def write_outputs(data: dict, repeats: int) -> None:
                      "MISSING when a leg has no measured value; the 0.6/yr "
                      "ASSUMED_CONSTANT scenario stays in the legacy replay only"),
             "blindness": "Acquirer never receives the full label vector",
+            # v3.1 item 5: the model is an EXECUTED axis, not a claim about a
+            # library file.  The legacy neighbour mean stays under its own name.
+            "executed_models": list(models_at_write),
+            "model_contracts": {
+                m: ({"executed_model": m,
+                     "kind": "baseline_not_formal",
+                     "note": "legacy k-nearest-neighbour mean, kept so older "
+                             "results stay reproducible; NEVER presented as a "
+                             "formal model"}
+                    if m == LEGACY_MODEL else _contract(m, _n_features))
+                for m in models_at_write
+            },
+            "model_comparison_rule": (
+                "the formal comparison runs every declared model on the SAME "
+                "split, features and acquisition budgets; a baseline winning on "
+                "this subset is a result, not a failure to report"),
         },
         "rows": {"AB_candidate_rounds": len(data["candidates"]),
                  "AB_round_summary": len(data["summary"]),

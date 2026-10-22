@@ -21,8 +21,16 @@ import math
 
 import numpy as np
 
+#: The frozen feature basis is the 12-column X0 descriptor set the replay
+#: already uses (mw, donor_count, n_heavy, rotatable_bonds, tpsa, is_cyclic,
+#: has_fluorine, p0_ox_ev, p0_red_ev, hl_gap_ev, dipole_debye, aux_alpha_bohr3).
+#: An earlier 1/7 constant was frozen against a wrong dimension count (7 was
+#: never the basis size); the rule is now stated in terms of the dimension, so
+#: the kernel bandwidth cannot silently disagree with the features again.
+FEATURE_DIM = 12
+
 #: frozen hyper-parameters (registered before any run; no tuning per replay)
-RBF_GAMMA = 1.0 / 7.0          # 7 core features -> length scale ~ sqrt(7)
+RBF_GAMMA = 1.0 / FEATURE_DIM   # 1/d over the declared basis (d = FEATURE_DIM)
 RIDGE_LAMBDA = 1e-3
 GPR_NOISE = 1e-2
 
@@ -88,11 +96,12 @@ def model_contract(name: str, n_features: int) -> dict:
                          % (name, sorted(PREDICTORS)))
     return {
         "executed_model": name,
-        "features": "week7 features_core (%d dims)" % n_features,
+        "features": "week7 X0 12-column basis (%d dims)" % n_features,
         "visible_only": True,
         "hyperparameters": {
-            "rbf_gamma": RBF_GAMMA, "ridge_lambda": RIDGE_LAMBDA,
-            "gpr_noise": GPR_NOISE,
+            "rbf_gamma": RBF_GAMMA, "rbf_gamma_rule": "1/FEATURE_DIM",
+            "feature_dim": FEATURE_DIM,
+            "ridge_lambda": RIDGE_LAMBDA, "gpr_noise": GPR_NOISE,
         },
         "no_per_replay_tuning": True,
     }

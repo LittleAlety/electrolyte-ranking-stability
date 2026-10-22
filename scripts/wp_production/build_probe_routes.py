@@ -56,6 +56,26 @@ def _canon(seed: str) -> str:
     return str(int(s)) if s.isdigit() else s
 
 
+def _rejected_members() -> set[str]:
+    """Members a preflight refused, with the recorded reason.
+
+    Read from the repair packages' manifests so the exclusion is derived from
+    the recorded decision, never from a hand-maintained list.
+    """
+    out: set[str] = set()
+    for manifest in sorted((REPO / "work").glob(
+            "hpc_torsion_probe_v1*/manifest.json")):
+        try:
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for entry in data.get("rejected") or []:
+            key = entry.get("member_key") if isinstance(entry, dict) else None
+            if key:
+                out.add(key)
+    return out
+
+
 def state_inputs(name: str, state: str) -> dict:
     struct = _rows(ENS / "production_ensemble_structures.csv")
     evidence = {r["member_key"]: r["identity_qc_status"]
@@ -66,9 +86,15 @@ def state_inputs(name: str, state: str) -> dict:
     # primary's bookkeeping row (status=ready, empty attempt) belongs to the
     # main ledger and is NOT a rescue in flight -- counting it made every
     # state read wait_existing_job and hid the real route.
+    #
+    # A member whose preflight REJECTED it (recorded with a reason in the
+    # repair manifest) is excluded too: no job will ever produce it, so
+    # "wait for the job" would be a wait with no end.
+    rejected = _rejected_members()
     in_flight = any(
         r.get("status") in ("pending", "ready")
         and r.get("member_role") != "primary"
+        and r.get("member_key") not in rejected
         for r in struct
         if r.get("name") == name and r.get("slot") == state)
 
@@ -90,11 +116,18 @@ def state_inputs(name: str, state: str) -> dict:
 
     # eligible torsions from the REGISTERED registry (build_torsion_registry);
     # ring deformation is deliberately NOT here -- it is a separate probe kind
-    # and DOL's all-ring topology correctly yields zero torsions
+    # and DOL's all-ring topology correctly yields zero torsions.
+    #
+    # A dihedral the fragment preflight already REJECTED is not eligible: it is
+    # a recorded refusal (e.g. EC's C=O centre), not a candidate waiting to run.
+    rejected_dihedrals = {k.split("|")[2] for k in rejected if k.startswith(
+        "%s|%s|" % (name, state))}
     registry = _rows(REGISTRY)
     eligible_torsions = [r["detail"] for r in registry
                          if r.get("name") == name and r.get("state") == state
-                         and r.get("detail", "").count("-") >= 3]
+                         and r.get("detail", "").count("-") >= 3
+                         and ("tors_" + r["detail"].split(" ")[0].replace("-", "_")
+                              not in rejected_dihedrals)]
 
     # new Li motifs: the round-3 motif search IS the preflight -- its measured
     # zero (all candidates collapsed onto known basins) is a RESULT, not a

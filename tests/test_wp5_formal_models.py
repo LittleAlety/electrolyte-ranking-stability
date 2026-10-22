@@ -79,6 +79,7 @@ def test_unknown_model_name_is_refused():
 def test_hyperparameters_are_frozen_constants():
     """No tuning hook: the constants are module-level and not per-call settable."""
     m = _m()
-    assert m.RBF_GAMMA == pytest.approx(1.0 / 7.0)
+    assert m.RBF_GAMMA == pytest.approx(1.0 / m.FEATURE_DIM)
+    assert m.FEATURE_DIM == 12      # the frozen X0 basis width
     assert m.RIDGE_LAMBDA == 1e-3
     assert m.GPR_NOISE == 1e-2
