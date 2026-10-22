@@ -116,3 +116,78 @@ def model_contract(name: str, n_features: int) -> dict:
         },
         "no_per_replay_tuning": True,
     }
+
+
+#: frozen bootstrap contract for the model-driven acquisition (see run_wp5_AB_replay
+#: ACQ_VERSION): the replicate count and the seed derivation are constants, never
+#: tuned per replay.
+ACQ_BOOTSTRAP_REPLICATES = 8
+ACQ_BOOTSTRAP_SEED = 20261022
+
+
+def bootstrap_predictions(features, visible, labels, query, model,
+                          *, replicates: int = ACQ_BOOTSTRAP_REPLICATES,
+                          seed: int = ACQ_BOOTSTRAP_SEED) -> np.ndarray:
+    """Per-query predictions across bootstrap resamples of the VISIBLE rows.
+
+    Returns an array of shape ``(replicates, len(query))``.  Only visible rows
+    are resampled and only visible labels are read, so no hidden truth can
+    reach the learner; the model is refit from scratch each replicate (no warm
+    start), and the resample is seeded deterministically.
+    """
+    if model not in PREDICTORS:
+        raise ValueError("unknown formal predictor %r" % (model,))
+    vis = list(visible)
+    if len(vis) < 2:
+        # a single visible row cannot be resampled meaningfully: every
+        # replicate is the same fit, which is the honest answer (zero spread)
+        one = PREDICTORS[model](features, vis, labels, query)
+        return np.tile(np.asarray(one, dtype=float), (replicates, 1))
+    rng = np.random.default_rng(seed)
+    X = np.asarray(features, dtype=float)
+    out = []
+    for _ in range(replicates):
+        pick = rng.integers(0, len(vis), size=len(vis))
+        resampled = [vis[i] for i in pick]
+        # a resample may repeat an index; the predictor reads labels by index,
+        # so duplicates are harmless and keep the interface identical
+        out.append(PREDICTORS[model](X, resampled, labels, list(query)))
+    return np.asarray(out, dtype=float)
+
+
+def model_acquisition_scores(features, visible, labels, query, model,
+                             *, replicates: int = ACQ_BOOTSTRAP_REPLICATES,
+                             seed: int = ACQ_BOOTSTRAP_SEED) -> dict:
+    """Model-output-driven acquisition scores for one acquisition step.
+
+    Both scores come from the SAME bootstrap predictions, so the acquisition
+    consumes exactly the executed model's behaviour:
+
+    * ``uncertainty``  -- standard deviation of the predicted value across
+      replicates (larger = the model disagrees with itself = more informative);
+    * ``topk_entropy`` -- entropy of the per-candidate top-k membership
+      probability estimated as the replicate fraction that places the candidate
+      inside the replicate's top-k (a real posterior-like ranking signal).
+
+    ``top_k`` follows the replay's frozen K_TOP.
+    """
+    reps = bootstrap_predictions(features, visible, labels, query, model,
+                                 replicates=replicates, seed=seed)
+    q = list(query)
+    sd = reps.std(axis=0, ddof=0)
+    top_k = min(3, len(q))
+    counts = np.zeros(len(q), dtype=float)
+    for row in reps:
+        order = np.argsort(-row, kind="stable")[:top_k]
+        counts[order] += 1.0
+    p = counts / float(len(reps))
+    eps = 1e-12
+    p = np.clip(p, eps, 1.0 - eps)
+    ent = -(p * np.log(p) + (1.0 - p) * np.log(1.0 - p))
+    return {
+        "uncertainty": {i: float(sd[k]) for k, i in enumerate(q)},
+        "topk_entropy": {i: float(ent[k]) for k, i in enumerate(q)},
+        "replicates": replicates,
+        "seed": seed,
+        "top_k": top_k,
+    }

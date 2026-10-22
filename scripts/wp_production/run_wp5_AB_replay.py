@@ -66,6 +66,12 @@ BASELINES = ("random", "diversity", "uncertainty", "ranking_aware")
 LEGACY_MODEL = "knn_baseline"
 FORMAL_MODELS = ("ridge_std", "krr_rbf", "gpr_rbf")
 MODELS = (LEGACY_MODEL,) + FORMAL_MODELS
+
+#: Acquisition VERSIONS.  `knn_v1` is the legacy mechanism and stays the default
+#: so no published number changes silently; `model_v2` drives uncertainty and
+#: ranking_aware from the executed model's own bootstrap outputs.
+ACQ_VERSIONS = ("knn_v1", "model_v2")
+DEFAULT_ACQ_VERSION = "knn_v1"
 K_TOP = 3
 O3_THRESHOLD = 2.0 / 3.0
 R3_THRESHOLD_EV = 0.10
@@ -224,14 +230,23 @@ def _query_cost(task: str, name: str) -> tuple[str, float | None]:
 class Acquirer:
     """Baseline acquisition on label-free features + VISIBLE labels only."""
 
-    def __init__(self, features, visible, y_vis, baseline, rng):
+    def __init__(self, features, visible, y_vis, baseline, rng, *,
+                 acq_version: str = DEFAULT_ACQ_VERSION, model: str = "",
+                 score_fn=None):
         self.features = features
         self.visible = list(visible)
         self.y_vis = list(y_vis)
         self.baseline = baseline
         self.rng = rng
-        # the acquirer states what drives it; it is NOT the executed model
-        self.acquisition_model = acquisition_identity(baseline, "unset")[0]
+        if acq_version not in ACQ_VERSIONS:
+            raise ValueError("unknown acquisition version %r" % (acq_version,))
+        self.acq_version = acq_version
+        self.model = model
+        # `score_fn(unseen)` returns model-derived scores using VISIBLE data only
+        self._score_fn = score_fn
+        # the acquirer states what drives it; under knn_v1 it is NOT the model
+        self.acquisition_model = acquisition_identity(
+            baseline, model or "unset", acq_version)[0]
         self._assert_blind()
 
     def _assert_blind(self):
@@ -265,6 +280,9 @@ class Acquirer:
                 if d > best_d:
                     best, best_d = i, d
             return best
+        if self.baseline == "uncertainty" and self._score_fn is not None:
+            scores = self._score_fn(unl)["uncertainty"]
+            return max(unl, key=lambda i: (scores.get(i, 0.0), -i))
         if self.baseline == "uncertainty":
             k = min(3, len(self.visible))
             sigma = {}
@@ -277,6 +295,9 @@ class Acquirer:
                 vals = [self.y_vis[self.visible.index(j)] for j in neigh]
                 sigma[i] = statistics.pstdev(vals) if len(vals) > 1 else 0.0
             return max(unl, key=lambda i: (sigma[i], -i))
+        if self.baseline == "ranking_aware" and self._score_fn is not None:
+            scores = self._score_fn(unl)["topk_entropy"]
+            return max(unl, key=lambda i: (scores.get(i, 0.0), -i))
         # ranking_aware: posterior top-3 membership entropy (kNN bootstrap)
         k = min(3, len(self.visible))
         spreads = {}
@@ -407,12 +428,33 @@ ACQUISITION_IDENTITY = {
 }
 
 
-def acquisition_identity(baseline: str, model: str) -> tuple[str, str, str]:
+def acquisition_identity(baseline: str, model: str,
+                         acq_version: str = DEFAULT_ACQ_VERSION
+                         ) -> tuple[str, str, str]:
     """(acquisition_model, acquisition_uses_executed_model, note).
 
-    Pure: the answer is a property of the baseline's implementation, not of the
-    data, so it can be asserted without running a replay.
+    Pure: the answer is a property of the implementation, not of the data, so it
+    can be asserted without running a replay.  ``model_v2`` makes the
+    prediction-driven baselines consume the EXECUTED model; the label-free ones
+    stay label-free in both versions (a model cannot legitimately change them).
     """
+    if acq_version not in ACQ_VERSIONS:
+        raise ValueError("unknown acquisition version %r (have %s)"
+                         % (acq_version, list(ACQ_VERSIONS)))
+    if acq_version == "model_v2" and baseline in ("uncertainty",
+                                                  "ranking_aware"):
+        if model in _FORMAL:
+            return ("executed_model_bootstrap_v2", "true",
+                    "model_v2: uncertainty/ranking_aware consume the executed "
+                    "model's bootstrap predictions over the visible rows only")
+        # the legacy neighbour mean is NOT a formal predictor, so there is no
+        # model output to consume: say so instead of pretending the fallback is
+        # a model-driven acquisition
+        return ("internal_knn_k3_v1", "false",
+                "model_v2 requested but the executed model is the legacy "
+                "neighbour-mean baseline, which exposes no formal predictor "
+                "interface -- the acquisition keeps its internal kNN scoring "
+                "and this row must not be read as model-driven")
     name, _ = ACQUISITION_IDENTITY.get(baseline, ("unknown", None))
     used = name == "executed_model_predictions"
     if name == "none_label_free":
@@ -426,7 +468,8 @@ def acquisition_identity(baseline: str, model: str) -> tuple[str, str, str]:
                 "sequences across all four executed models")
     return name, "true" if used else "false", note
 
-def replay_one(task, baseline, repeat, model=LEGACY_MODEL):
+def replay_one(task, baseline, repeat, model=LEGACY_MODEL,
+               acq_version=DEFAULT_ACQ_VERSION):
     X, y, names, _ = _pool(task)
     n = len(y)
     visible = sorted(initial_visible("AB|" + task, repeat, n, INITIAL_SEED_SIZE))
@@ -505,7 +548,18 @@ def replay_one(task, baseline, repeat, model=LEGACY_MODEL):
             })
         if len(visible) >= n:
             break
-        acq = Acquirer(X, visible, [y[i] for i in visible], baseline, rng)
+        score_fn = None
+        if (acq_version == "model_v2" and model in _FORMAL
+                and baseline in ("uncertainty", "ranking_aware")):
+            import wp5_formal_models as _fmodels
+
+            def score_fn(query, _vis=list(visible), _X=X, _y=y, _m=model):
+                # VISIBLE labels only -- the same interface the evaluator model
+                # gets; the acquisition never sees a hidden value
+                return _fmodels.model_acquisition_scores(
+                    _X, _vis, {i: _y[i] for i in _vis}, list(query), _m)
+        acq = Acquirer(X, visible, [y[i] for i in visible], baseline, rng,
+                       acq_version=acq_version, model=model, score_fn=score_fn)
         chosen = acq.next_index()
         acq._assert_blind()
         if chosen is None or chosen in set(visible):
@@ -514,24 +568,26 @@ def replay_one(task, baseline, repeat, model=LEGACY_MODEL):
     return cand_rows, sum_rows
 
 
-def build(repeats: int, models=MODELS) -> dict:
+def build(repeats: int, models=MODELS,
+          acq_version=DEFAULT_ACQ_VERSION) -> dict:
     all_cand, all_sum, endpoints = [], [], []
     for model in models:
         for task in sorted(TASK_LABEL):
             for baseline in BASELINES:
                 o3s, r3s = [], []
                 for repeat in range(repeats):
-                    cand, srows = replay_one(task, baseline, repeat, model)
+                    cand, srows = replay_one(task, baseline, repeat, model, acq_version)
                     # every row names its executor: a baseline run can never be
                     # read as a formal-model run
                     acq_name, acq_used, acq_note = acquisition_identity(
-                        baseline, model)
+                        baseline, model, acq_version)
                     for r in cand + srows:
                         r["executed_model"] = model
                         r["prediction_model"] = model
                         r["acquisition_model"] = acq_name
                         r["acquisition_uses_executed_model"] = acq_used
                         r["acquisition_note"] = acq_note
+                        r["acquisition_version"] = acq_version
                     all_cand.extend(cand)
                     all_sum.extend(srows)
                     non = [r for r in srows if int(r["n_T"]) < int(r["n_pool"])]
@@ -557,6 +613,7 @@ def build(repeats: int, models=MODELS) -> dict:
                     "executed_model": model,
                     "prediction_model": model,
                     "acquisition_model": acq_name,
+                    "acquisition_version": acq_version,
                     "acquisition_uses_executed_model": acq_used,
                     "model_is": ("baseline_not_formal" if model == LEGACY_MODEL
                                  else "formal_frozen_predictor"),
@@ -606,7 +663,8 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
 
 
 def write_outputs(data: dict, repeats: int,
-                  models_at_write=MODELS) -> None:
+                  models_at_write=MODELS,
+                  acq_version=DEFAULT_ACQ_VERSION) -> None:
     _n_features = len(_pool("A")[0][0])
     _write_csv(OUT_CAND, data["candidates"])
     _write_csv(OUT_SUM, data["summary"])
@@ -653,12 +711,24 @@ def write_outputs(data: dict, repeats: int,
             # NEXT_ACTIONS item 2: the acquisition identity is declared, and the
             # ONE honest thing to say about it today is that it is NOT the model
             "acquisition_identity": {
-                b: acquisition_identity(b, "unset")[0]
+                b: acquisition_identity(b, "unset", acq_version)[0]
                 for b in BASELINES
             },
+            "acquisition_version_in_this_run": acq_version,
+            "acquisition_versions_available": list(ACQ_VERSIONS),
+            "acquisition_version_default": DEFAULT_ACQ_VERSION,
             "acquisition_uses_executed_model": {
-                b: acquisition_identity(b, "unset")[1] for b in BASELINES
+                b: acquisition_identity(b, "unset", acq_version)[1]
+                for b in BASELINES
             },
+            "acquisition_v2_status": (
+                "model_v2 is IMPLEMENTED and dev-verified on the current "
+                "sub-pool (tests/test_wp5_acquisition_v2.py), but the plan "
+                "requires the formal full replay to wait for STABLE labels: "
+                "the products here were produced by the default knn_v1, so "
+                "this index describes the CONTROL run.  A full model_v2 replay "
+                "must be a separate, declared run once the ensemble labels "
+                "stop moving."),
             "acquisition_open_decision": (
                 "wiring the acquisition to the executed model WOULD CHANGE every "
                 "reported number, so it is a plan-level decision and has NOT been "
@@ -680,8 +750,8 @@ def write_outputs(data: dict, repeats: int,
                          encoding="utf-8", newline="\n")
 
 
-def check(repeats: int) -> int:
-    data = build(repeats)
+def check(repeats: int, acq_version=DEFAULT_ACQ_VERSION) -> int:
+    data = build(repeats, acq_version=acq_version)
     for path, rows in ((OUT_CAND, data["candidates"]),
                        (OUT_SUM, data["summary"]),
                        (OUT_END, data["endpoints"])):
@@ -705,11 +775,17 @@ def main(argv=None) -> int:
     ap.add_argument("--quick", action="store_true", help="smoke: 2 repeats, task A")
     ap.add_argument("--check", action="store_true",
                     help="READ-ONLY: recompute in memory and byte-compare")
+    ap.add_argument("--acq-version", default=DEFAULT_ACQ_VERSION,
+                    choices=list(ACQ_VERSIONS),
+                    help="knn_v1 (legacy, default) or model_v2 (model-driven; "
+                         "dev verification only until the labels are stable)")
     args = ap.parse_args(argv)
     if args.check:
-        return check(args.repeats)
-    data = build(2 if args.quick else args.repeats)
-    write_outputs(data, 2 if args.quick else args.repeats)
+        return check(args.repeats, args.acq_version)
+    data = build(2 if args.quick else args.repeats,
+                 acq_version=args.acq_version)
+    write_outputs(data, 2 if args.quick else args.repeats,
+                  acq_version=args.acq_version)
     print("wrote A/B replay: candidates=%d summary=%d endpoints=%d"
           % (len(data["candidates"]), len(data["summary"]), len(data["endpoints"])))
     return 0
