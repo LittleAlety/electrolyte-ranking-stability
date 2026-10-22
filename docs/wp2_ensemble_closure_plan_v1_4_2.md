@@ -595,6 +595,57 @@ dispositions 的 latest 选择挑错行（把 v2 的 computed 当旧谱系失败
 
 **当前系综 42/48**（5 limited：AN/DMC 的 M_plus、DMC/DOL/EC 的 LiM_2plus；1 provisional：
 TMP/M_plus c10 在途）。若 c10 通过，TMP/M_plus 可达 n_unique>=2 → 43/48。
+
+### ⑯ v3.1 验收链修复：八个 P0/P1 项全部落地（2026-10-22）
+
+**第 1 项（四个验收漏洞）**：
+1. 跨自旋混合 → `frontier_spin_qc.py` 按声明波函数逐自旋通道解析（R→restricted，
+   U→alpha+beta），operator+spin+orbital_index 一致；**波函数由多重度声明**（grep UKS
+   会误判——ORCA 对每个 DFT 都打印 UKS）。80/80 全过，244 条自旋记录，alpha 与旧
+   OP=0 交叉验证一致。
+2. FMO 失败仍 computed → 三状态拆分 molden_status/fmopop_status/identity_qc_status。
+3. 同表混用两种量 → 正式明细只用 Löwdin，AO 系数移入方法学对照节。
+4. 筛选阶梯永久误阻 → wp2_flip_persistence 转 **satisfied**（10/10 生产 + 2/2 筛选
+   各自达标，不再把筛选行改成生产行凑 12/12）。
+另删过强表述：报告新增「静态 LUMO 组成不能直接证明实际还原通道」边界声明。
+
+**第 2 项（身份证据链）**：`build_frontier_identity_evidence.py` 验证每成员同一次执行
+的 input/log/geometry/molden 四文件哈希 + 方法/SCF/正常终止/电荷多重度 + 自旋通道一致。
+**80/80 全部 verified**，CSV 同步回写；分母从权重表推导；缺本地文件记 awaiting（不等于
+需重算，fail-closed on integrity not absence）。
+
+**第 3 项（阶梯分开验收）**：见上第 1 项之 4。
+
+**第 4 项（五态逐态路由）**：`probe_route.py`（8 项测试）+ `build_torsion_registry.py`
+（从生产几何按共价半径邻接推导，可旋转判据＝B-C 键不在 ≤7 元环内——**环变形须另行
+登记，不等同扭转**）+ `build_probe_routes.py`（六输入全部数据推导）。**定稿路由**：
+
+| 态 | 路由 | 依据 |
+|---|---|---|
+| AN\|M_plus | draft_torsion_probe | 3 个登记扭转 |
+| DMC\|M_plus | draft_torsion_probe | 10 个 |
+| DMC\|LiM_2plus | draft_torsion_probe | 12 个（motif 已测零新） |
+| DOL\|LiM_2plus | **limited_no_registered_executable_probe** | **五元环全刚性：
+  0 扭转 + 0 新 motif——诚实覆盖限制** |
+| EC\|LiM_2plus | draft_torsion_probe | 2 个 |
+
+期间抓到两个新缺陷：**#29** primary 的 ready 登记行被 in_flight 误算（五态全部假象
+wait_existing_job）——修：只看 extras/恢复角色；**#30** grep UKS 误判波函数——修：由
+多重度声明。
+
+**第 5 项（WP5 正式模型）**：`wp5_formal_models.py`——ridge_std/krr_rbf/gpr_rbf 三个
+**真实可执行**模型（超参冻结 gamma=1/7、lambda=1e-3、noise=1e-2，无逐回放调参；纯函数
+无偷看——标准化只用可见行；model_contract 记录执行内容）。**旧 kNN 邻近均值不再冒充
+模型契约**。子集声明 A=10/B=9/frozen=12 机械推导在契约索引。
+
+**第 6 项（同轮重建）**：链内固定顺序已实现（成员QC→复核→系综→3→6→WP3→WP5→成本合规）。
+
+**第 7 项（完整严格闸门）**：strict_readiness 六项证据全绿，**唯一剩余缺口 =
+ensemble_not_48_accepted（43/48）**。48/48 只是必要条件之一——闸门还查身份、采样、
+WP3/WP5 证据与成本溯源。
+
+**待用户授权**：4 个 draft_torsion_probe 态的扫描点/预算/停止条件逐态预注册后提交；
+DOL 环构象探针另行登记。
 ## 未完成的审查和发布条件
 
 - 2026-10-18 在 batch3 仍为 4 RUNNING + 14 PENDING 时执行不带 `-Commit` 的 `finalize_wp2.ps1`：生成器 75/75、归档账本 300 处比对零失配、全部只读 `--check`、页面校验与链内离线 pytest 退出码均为 0；三个会启动真实本机 ORCA/xtB 的集成节点按 HPC-only 规则排除。此为当时快照的技术闭合，不是 48/48 系综科学验收。
