@@ -50,6 +50,8 @@ Step "acceptance-converge" { & $py -X utf8 work\_converge_acceptance.py }
 # 恢复包预算核算（只读记账，不改变任何验收判定）
 Step "recovery-budget" { & $py -X utf8 scripts\wp_production\build_recovery_budget_accounting.py }
 Step "check-recovery-budget" { & $py -X utf8 scripts\wp_production\build_recovery_budget_accounting.py --check }
+Step "ensemble-cost-by-family" { & $py -X utf8 scripts\wp_production\build_ensemble_cost_by_family.py }
+Step "check-ensemble-cost-by-family" { & $py -X utf8 scripts\wp_production\build_ensemble_cost_by_family.py --check }
 # B组试点预注册（只读，未启动；方法结论由冻结池数据自动推导）
 Step "bgroup-pilot-prereg" { & $py -X utf8 scripts\wp_production\build_bgroup_pilot_preregistration.py }
 Step "check-bgroup-pilot-prereg" { & $py -X utf8 scripts\wp_production\build_bgroup_pilot_preregistration.py --check }
