@@ -94,12 +94,23 @@ def model_contract(name: str, n_features: int) -> dict:
     if name not in PREDICTORS:
         raise ValueError("unknown formal predictor %r (have %s)"
                          % (name, sorted(PREDICTORS)))
+    if n_features != FEATURE_DIM:
+        # The bandwidth rule is 1/FEATURE_DIM.  A feature matrix of another
+        # width would inherit a bandwidth frozen for a different basis, so the
+        # mismatch is REFUSED rather than silently mis-scaled: a new basis must
+        # declare its own frozen contract (and that is a plan-level decision,
+        # never a per-run tweak to improve a result already seen).
+        raise ValueError(
+            "feature dimension %d does not match the frozen basis %d; a "
+            "different basis needs its own declared bandwidth contract"
+            % (n_features, FEATURE_DIM))
     return {
         "executed_model": name,
         "features": "week7 X0 12-column basis (%d dims)" % n_features,
         "visible_only": True,
         "hyperparameters": {
             "rbf_gamma": RBF_GAMMA, "rbf_gamma_rule": "1/FEATURE_DIM",
+            "dimension_mismatch": "refused (new basis needs its own contract)",
             "feature_dim": FEATURE_DIM,
             "ridge_lambda": RIDGE_LAMBDA, "gpr_noise": GPR_NOISE,
         },

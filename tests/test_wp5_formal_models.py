@@ -63,7 +63,7 @@ def test_standardisation_uses_visible_rows_only():
 
 def test_model_contract_records_execution():
     m = _m()
-    c = m.model_contract("gpr_rbf", 7)
+    c = m.model_contract("gpr_rbf", m.FEATURE_DIM)
     assert c["executed_model"] == "gpr_rbf"
     assert c["visible_only"] is True
     assert c["hyperparameters"]["rbf_gamma"] == m.RBF_GAMMA

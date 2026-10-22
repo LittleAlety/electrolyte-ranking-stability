@@ -39,6 +39,69 @@ def _pool_of(rows, task, baseline):
             if r.get("task") == task and r.get("baseline") == baseline]
 
 
+def _validate_stop_rows(rows: list[dict], repeats: int) -> None:
+    """Refuse a structurally invalid batch: raise, never silently drop rows.
+
+    Rules (each corresponds to a reproduced bad input):
+
+    * required keys present and numeric -- a missing key is a defect, not a row
+      to skip;
+    * ``repeat`` inside the REGISTERED batch ``[0, repeats)``;
+    * ``(repeat, n_T)`` unique -- a duplicate would double-count one run;
+    * every metric finite -- NaN never counts as a failed attempt;
+    * one pool for the whole batch -- a changing ``n_pool`` means the two budget
+      points are not the same experiment;
+    * every budget point present carries the FULL repeat set, so "16 of 20"
+      cannot be satisfied by a batch that only recorded 16.
+    """
+    seen: set[tuple[int, int]] = set()
+    pools: set[int] = set()
+    by_budget: dict[int, set[int]] = {}
+    for r in rows:
+        for key in ("repeat", "n_T", "n_pool"):
+            if key not in r:
+                raise ValueError("stop-rule row is missing %r" % key)
+        if not any(k in r for k in ("O_3",)):
+            raise ValueError("stop-rule row is missing 'O_3'")
+        if not any(k in r for k in ("R_3_mean_ev", "R_3_ev")):
+            raise ValueError("stop-rule row is missing the R_3 metric")
+        try:
+            rep = int(r["repeat"])
+            n_t = int(r["n_T"])
+            n_pool = int(r["n_pool"])
+            o3 = float(r["O_3"])
+            r3 = float(r.get("R_3_mean_ev", r.get("R_3_ev")))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("stop-rule row is not numeric: %s" % exc) from exc
+        if rep < 0 or rep >= repeats:
+            raise ValueError(
+                "repeat %d is outside the registered batch [0,%d)" % (rep, repeats))
+        if n_t < 0:
+            raise ValueError("n_T %d is negative" % n_t)
+        if n_pool <= 0:
+            raise ValueError("n_pool %d is not positive" % n_pool)
+        if (rep, n_t) in seen:
+            raise ValueError(
+                "duplicate record for repeat %d at budget %d" % (rep, n_t))
+        seen.add((rep, n_t))
+        if not (math.isfinite(o3) and math.isfinite(r3)):
+            raise ValueError(
+                "non-finite metric at repeat %d budget %d" % (rep, n_t))
+        pools.add(n_pool)
+        by_budget.setdefault(n_t, set()).add(rep)
+    if len(pools) > 1:
+        raise ValueError(
+            "pool size changes within the batch (%s); the two budget points "
+            "must come from one experiment" % sorted(pools))
+    full = set(range(repeats))
+    for n_t, reps in sorted(by_budget.items()):
+        if reps != full:
+            raise ValueError(
+                "budget point %d carries %d of %d repeats; an incomplete batch "
+                "cannot satisfy the >=%d/%d joint rule"
+                % (n_t, len(reps), repeats, repeats, repeats))
+
+
 def empirical_stop_budget(rows: list[dict], repeats: int = 20,
                           min_success: int = 16,
                           o3_threshold: float = 2.0 / 3.0,
@@ -53,19 +116,24 @@ def empirical_stop_budget(rows: list[dict], repeats: int = 20,
     >= min_success distinct repeats (out of ``repeats``); None when the batch
     never reaches it (an honest None, never a fabricated number).
     """
+    # ---- structural gate (plan §13.4) --------------------------------------
+    # An invalid batch may NEVER yield a stop budget.  The five cases the
+    # probe reproduces: incomplete repeat coverage, duplicate records, a pool
+    # that changes between the two budget points, non-finite metrics, and a
+    # repeat index outside the registered batch.  Each is a contract violation
+    # of "the SAME batch of `repeats` runs succeeded at BOTH points".
+    _validate_stop_rows(rows, repeats)
+
     # v3.0 §13.4: the SAME batch of repeats must succeed at BOTH points --
     # at least `min_success` repeats pass at n AND at n+1 (set INTERSECTION,
     # never per-point counts summed separately).  The reported budget is n+1.
     passing: dict[int, set[int]] = {}
     for r in rows:
-        try:
-            n_t = int(r["n_T"])
-            n_pool = int(r["n_pool"])
-            o3 = float(r["O_3"])
-            r3 = float(r.get("R_3_mean_ev", r.get("R_3_ev")))
-            rep = int(r["repeat"])
-        except (KeyError, TypeError, ValueError):
-            continue
+        n_t = int(r["n_T"])
+        n_pool = int(r["n_pool"])
+        o3 = float(r["O_3"])
+        r3 = float(r.get("R_3_mean_ev", r.get("R_3_ev")))
+        rep = int(r["repeat"])
         if n_t >= n_pool:  # exhausted-pool "perfect solution" is not ability
             continue
         if o3 >= o3_threshold and r3 <= r3_threshold_ev:

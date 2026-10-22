@@ -383,7 +383,12 @@ def _predict_formal(features, y, visible, n, model):
     for i in visible:
         preds[i] = y[i]
     if unseen:
-        raw = fn(X, list(visible), list(y), unseen)
+        # ONLY the visible labels cross the interface (probe gap 6).  A dict
+        # keyed by candidate index serves the predictors' `labels[j]` access
+        # exactly like the old full list did, but the hidden truth is now
+        # structurally absent from the call rather than merely unread.
+        visible_labels = {i: y[i] for i in visible}
+        raw = fn(X, list(visible), visible_labels, unseen)
         for k, i in enumerate(unseen):
             preds[i] = float(raw[k])
     return preds
@@ -495,7 +500,13 @@ def build(repeats: int, models=MODELS) -> dict:
                 rows = [r for r in all_sum
                         if r["task"] == task and r["baseline"] == baseline
                         and r["executed_model"] == model]
-                stop = empirical_stop_budget(rows, repeats=repeats)
+                try:
+                    stop = empirical_stop_budget(rows, repeats=repeats)
+                    stop_invalid = ""
+                except ValueError as exc:
+                    # an invalid batch can never yield a budget; record WHY
+                    stop, stop_invalid = None, str(exc)
+
                 desc = descriptive_mean([r for r in rows
                                          if int(r["n_T"]) < int(r["n_pool"])])
                 mean_o3 = sum(o3s) / len(o3s) if o3s else None
@@ -515,10 +526,16 @@ def build(repeats: int, models=MODELS) -> dict:
                     # budget points (pool - 1 <= initial seed) can never host the
                     # 16/20x2 rule -- that is blocked_target_pool, which is a
                     # different statement from "the strategies did not reach it".
-                    "stop_budget_status": ("computed" if stop is not None
-                                           else ("blocked_target_pool"
-                                                 if len(_pool(task)[1]) <= INITIAL_SEED_SIZE + 1
-                                                 else "not_reached_within_pool")),
+                    "stop_budget_status": ("invalid_input" if stop_invalid
+                                           else ("computed" if stop is not None
+                                                 else ("blocked_target_pool"
+                                                       if len(_pool(task)[1]) <= INITIAL_SEED_SIZE + 1
+                                                       else "not_reached_within_pool"))),
+                    "stop_budget_invalid_reason": stop_invalid,
+                    "stop_budget_note": ("not_reached_within_pool is an honest "
+                                         "'the pool never reached it'; "
+                                         "invalid_input means the batch could "
+                                         "not be evaluated at all"),
                     "O_3_threshold": "%.6f" % O3_THRESHOLD,
                     "R_3_threshold_ev": "%.6f" % R3_THRESHOLD_EV,
                     "n_pool": str(len(_pool(task)[1])),

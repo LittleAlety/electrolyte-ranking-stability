@@ -30,19 +30,24 @@ def test_joint_success_not_per_point_counts():
     pass at BOTH.  v3.0 demands >=16 IN THE INTERSECTION; the old per-point
     rule wrongly returned a stop budget here."""
     m = _load("wp5_replay_contract", CONTRACT)
+    # EVERY repeat is recorded at BOTH budget points -- the failing repeats are
+    # runs that happened and did not succeed (O_3=0), not absent rows.  A batch
+    # that simply omitted them could not satisfy ">=16 of 20" honestly, and the
+    # contract now refuses such a batch outright.
     rows = []
     # repeats 0..15 pass at n=5; repeats 4..19 pass at n=6 -> intersection 4..15 = 12
     for rep in range(20):
-        if rep < 16:
-            rows.append(_row(5, 10, 0.9, 0.0, rep))
-        if rep >= 4:
-            rows.append(_row(6, 10, 0.9, 0.01, rep))
+        rows.append(_row(5, 10, 0.9 if rep < 16 else 0.0,
+                         0.0 if rep < 16 else 1.0, rep))
+        rows.append(_row(6, 10, 0.9 if rep >= 4 else 0.0,
+                         0.01 if rep >= 4 else 1.0, rep))
     assert m.empirical_stop_budget(rows) is None
     # and when 16 repeats share BOTH points, the budget IS reported
     rows = []
-    for rep in range(16):
-        rows.append(_row(5, 10, 0.9, 0.0, rep))
-        rows.append(_row(6, 10, 0.9, 0.01, rep))
+    for rep in range(20):
+        ok = rep < 16
+        rows.append(_row(5, 10, 0.9 if ok else 0.0, 0.0 if ok else 1.0, rep))
+        rows.append(_row(6, 10, 0.9 if ok else 0.0, 0.01 if ok else 1.0, rep))
     assert m.empirical_stop_budget(rows) == 6
 
 
