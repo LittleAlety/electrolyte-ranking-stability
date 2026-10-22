@@ -13,7 +13,7 @@
 | AN | 9.0603 | **已越地板**——真值只需保持即可改写 Top-3 | limited | rescue_budget_exhausted | 1 |
 | DMC | 8.3048 | **已越地板**——真值只需保持即可改写 Top-3 | limited | rescue_budget_exhausted | 1 |
 | EMC | 8.1076 | 未越地板（上界敏感） | accepted | — | 2 |
-| TMP | 7.9449 | 未越地板（上界敏感） | accepted | — | 2 |
+| TMP | 7.9449 | 未越地板（上界敏感） | provisional | rescue_budget_exhausted | 3 |
 
 ## 若启动新池搜索，预注册必须冻结的四件事（v3.0 §13.5 + D6）
 
@@ -28,7 +28,7 @@
 
 ### 各态冻结池现状（派生自缺口表，非笼统声明）
 
-AN：冻结池内 M_plus 无未用盆地; DMC：冻结池内 M_plus 无未用盆地。
+AN：冻结池内 M_plus 无未用盆地; DMC：冻结池内 M_plus 无未用盆地; TMP：**池内仍有未用盆地 10（c10 (+4.235 kcal in pool)）**——受限候选可能影响全池 Top-3，现有候选扩展是否改变排序属独立问题，分列登记。
 
 ### 稿件状态
 

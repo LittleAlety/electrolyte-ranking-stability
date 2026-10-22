@@ -1242,6 +1242,12 @@ def iter_packages():
 
 def pkg_attempt(name: str) -> int:
     """Attempt index encoded in the package name (r1 -> 0, reopt/continuation -> 1...)."""
+    # NEW VERSION lineages (user-authorised reopt_v2): base 10 so the fresh
+    # numbering clears every index the same member already carries and
+    # "highest attempt wins" keeps meaning "newest lineage wins"
+    new_lineage = re.search(r"_reopt_v(\d+)(?:_|$)", name)
+    if new_lineage:
+        return 10 + int(new_lineage.group(1)) - 1
     numbered = re.search(r"_reopt(\d+)(?:_|$)", name)
     if numbered:
         return int(numbered.group(1))

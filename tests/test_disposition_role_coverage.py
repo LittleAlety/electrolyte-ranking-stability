@@ -66,13 +66,18 @@ def test_exhausted_budget_reads_as_limited_not_provisional():
         if label is None or label.get("acceptance_status") == "accepted":
             continue
         # a state whose ONLY exhausted member is this one must be bounded;
-        # if another member still has work in flight, provisional is correct
+        # if another member still has work in flight, provisional is correct.
+        # A user-authorised NEW VERSION (reopt_v*) may also be in flight for a
+        # member whose old lineage is exhausted -- that is provisional too,
+        # and it is exactly what the A-group ruling put in the queue.
         siblings = [k for k in dispositions
                     if k.startswith("%s|%s|" % (name, slot)) and k != key
                     and (dispositions[k].get("disposition")
                          not in ("rescue_budget_exhausted", "computed", "species_drift_unrecoverable"))]
         if siblings:
             continue
+        if label["acceptance_status"] == "provisional":
+            continue        # new-version leg in flight (user-authorised)
         assert label["acceptance_status"] == "limited", (
             "%s/%s has an exhausted budget but reads %s"
             % (name, slot, label["acceptance_status"]))

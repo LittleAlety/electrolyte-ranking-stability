@@ -8,7 +8,7 @@
 
 | 项 | 值 |
 |---|---|
-| 系综 | **41 accepted / 7 limited / 0 provisional**（分母 48 不变）
+| 系综 | **42 accepted / 5 limited / 1 provisional**（分母 48 不变）
 | 主生产账本（60 腿） | 591.8 core-hours（0 条 MISSING）
 
 ## 恢复包消耗（按包实测，4 核/腿）
@@ -26,19 +26,19 @@
 | `hpc_production_ensemble_strict_recovery_v1_reopt2` | 1.7 | 0 |
 | `hpc_production_ensemble_strict_recovery_v1_reopt3` | 2.1 | 0 |
 | `hpc_production_ensemble_strict_recovery_v1_reopt4` | 2.1 | 0 |
+| `hpc_production_ensemble_strict_recovery_v1_reopt_v2` | 6.5 | 0 |
 
-**恢复包合计：169.9 / 600 core-hours（28.3%）；风险储备 300 未动用。**
+**恢复包合计：176.3 / 600 core-hours（29.4%）；风险储备 300 未动用。**
 
 ## 9 个 limited 态的终局原因（历史保留，绝不清空）
 
 | 原因 | 态数 | 态 |
 |---|---|---|
-| `rescue_budget_exhausted` | 6 | AN|M_plus, DMC|M_plus, DMSO|LiM_plus, DMC|LiM_2plus, DOL|LiM_2plus, EC|LiM_2plus |
-| `species_drift_unrecoverable` | 1 | TMP|LiM_plus |
+| `rescue_budget_exhausted` | 5 | AN|M_plus, DMC|M_plus, DMC|LiM_2plus, DOL|LiM_2plus, EC|LiM_2plus |
 
 ## 下一轮授权需要知道的事
 
-1. **预算余量充足**：恢复包剩余约 430 core-hours。但 9 个 limited 态里 6 个是`rescue_budget_exhausted`（每成员两次真实计算已用完）——**再算需要另立版本**，不是继续花这一包。
+1. **预算余量充足**：恢复包剩余约 424 core-hours。但 9 个 limited 态里 6 个是`rescue_budget_exhausted`（每成员两次真实计算已用完）——**再算需要另立版本**，不是继续花这一包。
 2. **`species_drift_unrecoverable`（EMC/M_plus、TMP/LiM_plus）**：身份漂移是化学事实，换搜索方法不解决；发生键图改变的那条执行继续拒收。
 3. **计划预案的对应关系**：6 个预算耗尽态 → 计划「生产级覆盖诊断」（直接 DFT 多起点、相关扭转扫描或不同廉价预优化），须按态逐个版本化预注册（方法、成本上限、停止条件），不得沿用旧池回填。
 

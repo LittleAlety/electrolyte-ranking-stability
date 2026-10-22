@@ -8,24 +8,23 @@
 
 | 项 | 值 |
 |---|---|
-| 系综加权成员（非仅 48 primary） | 77 |
-| 已解析 | **77** |
-| 待算 | 0 |
+| 系综加权成员（非仅 48 primary） | 80 |
+| 已解析 | **76** |
+| 待算 | 4 |
 
 ## 两个前沿并不一致
 
 | 指标 | HOMO 侧 | LUMO 侧 |
 |---|---|---|
-| Li 权重最大值 | **0.004331** | **0.310619** |
-| 分类分布 | donor_localized 42 / ligand_localized 35 | donor_localized 5 / li_localized 32 / ligand_localized 40 |
+| Li 权重最大值 | **0.004331** | **0.219803** |
+| 分类分布 | donor_localized 41 / ligand_localized 35 | donor_localized 5 / li_localized 31 / ligand_localized 40 |
 
-**Li 在 HOMO 中实质上不参与**（最大权重 4.3e-03，远低于 0.25 的 Li 定域阈值），但它在 LUMO 中可以占到 0.31。因此「Li 是否承载前线轨道」这个问题，**只问 HOMO 会得出错误答案**。
+**Li 在 HOMO 中实质上不参与**（最大权重 4.3e-03，远低于 0.25 的 Li 定域阈值），但它在 LUMO 中可以占到 0.22。因此「Li 是否承载前线轨道」这个问题，**只问 HOMO 会得出错误答案**。
 
 ## Li 定域的例外（LUMO 侧）
 
 | 成员 | Li_LUMO | 给体_LUMO | 分类 |
 |---|---|---|---|
-| `DMSO|LiM_plus|primary` | 0.3106 | 0.3537 | `li_localized` |
 | `TMP|LiM_plus|primary` | 0.2198 | 0.5624 | `li_localized` |
 | `DMC|LiM_plus|c05` | 0.2093 | 0.4625 | `li_localized` |
 | `DMC|LiM_plus|primary` | 0.1892 | 0.5673 | `li_localized` |
@@ -62,7 +61,7 @@
 
 ## HOMO/LUMO 分类不一致的成员
 
-53 / 77 个已解析成员的 HOMO 与 LUMO 分类不同。
+52 / 76 个已解析成员的 HOMO 与 LUMO 分类不同。
 
 | 成员 | HOMO | LUMO |
 |---|---|---|
@@ -86,7 +85,7 @@
 | `DME|M|14` | `donor_localized` | `ligand_localized` |
 | `DME|M|22` | `donor_localized` | `ligand_localized` |
 | `DME|M|primary` | `donor_localized` | `ligand_localized` |
-| … | 共 53 条 | |
+| … | 共 52 条 | |
 
 ## 已解析成员明细
 
@@ -122,7 +121,6 @@
 | `DME|M|primary` | 0.0000 | 0.5225 | `donor_localized` | 0.0000 | 0.4634 | `ligand_localized` |
 | `DMSO|LiM_2plus|c01` | 0.0002 | 0.7967 | `donor_localized` | 0.0032 | 0.8296 | `li_localized` |
 | `DMSO|LiM_2plus|primary` | 0.0002 | 0.7961 | `donor_localized` | 0.0035 | 0.8278 | `li_localized` |
-| `DMSO|LiM_plus|primary` | 0.0020 | 0.8216 | `donor_localized` | 0.3106 | 0.3537 | `li_localized` |
 | `DMSO|M_plus|primary` | 0.0000 | 0.8095 | `donor_localized` | 0.0000 | 0.8123 | `donor_localized` |
 | `DMSO|M|primary` | 0.0000 | 0.8331 | `donor_localized` | 0.0000 | 0.2609 | `donor_localized` |
 | `DOL|LiM_2plus|c05` | 0.0002 | 0.4720 | `donor_localized` | 0.0002 | 0.4589 | `li_localized` |

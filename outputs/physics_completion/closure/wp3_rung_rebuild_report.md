@@ -49,7 +49,7 @@ note 原文：screen-level only (gas-phase GFN2), NOT the production R4 rung; he
 | EC | 8.2807 | accepted | accepted | [8.2629, 8.2807] |
 | PC | 8.1547 | accepted | accepted | [8.1369, 8.1547] |
 | EMC | 8.1076 | accepted | accepted | [8.0898, 8.1254] |
-| TMP | 7.9449 | accepted | accepted | [7.9271, 7.9627] |
+| TMP | 7.9449 | provisional（rescue_budget_exhausted） | accepted | [7.9167, 7.9627] |
 | SL | 7.7506 | accepted | accepted | [7.7328, 7.7506] |
 | GBL | 7.7030 | accepted | accepted | [7.7030, 7.7208] |
 | DEC | 7.3162 | accepted | accepted | [7.2880, 7.3444] |
@@ -57,7 +57,7 @@ note 原文：screen-level only (gas-phase GFN2), NOT the production R4 rung; he
 | DME | 6.5975 | accepted | accepted | [6.5692, 6.6257] |
 | DMSO | 6.3507 | accepted | accepted | [6.3507, 6.3507] |
 
-**accepted-only Top-3 = EC > PC > EMC**（n=10 个两腿 accepted 的分子）。
+**accepted-only Top-3 = EC > PC > EMC**（n=9 个两腿 accepted 的分子）。
 
 Top-3 地板 = EMC 的 8.1076 eV。若 11 个 limited 态全部换成真值（各分子在其 bound 区间内任意取值）：
 
@@ -65,6 +65,7 @@ Top-3 地板 = EMC 的 8.1076 eV。若 11 个 limited 态全部换成真值（�
 | --- | --- | --- | --- |
 | AN | 9.0603 | 9.0603 | **能** |
 | DMC | 8.3048 | 8.3048 | **能** |
+| TMP | 7.9449 | 7.9627 | 不能 |
 
 注意：AN, DMC 的 RT ln N bound = 0（n_unique = 1，RT ln 1 = 0）。
 该界只覆盖**已计入池的 N 个成员**；limited 态漏掉的独立盆地不在 N 里，
