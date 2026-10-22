@@ -30,7 +30,7 @@
 | 4 | C03 (C03) | 7.316 | 7.114 |
 | 5 | C13 (C13) | 7.703 | 8.920 |
 | 6 | C14 (C14) | 7.751 | 1.097 |
-| 7 | C17 (TMP) | 7.945 | 4.481 |
+| 7 | C17 (C17) | 7.945 | 4.481 |
 | 8 | C02 (C02) | 8.108 | 3.750 |
 | 9 | C05 (C05) | 8.155 | 1.086 |
 | 10 | C04 (EC) | 8.281 | 2.906 |
@@ -50,7 +50,7 @@ Top-3：C15 (C15), C08 (C08), C09 (DOL)
 | 5 | C13 (C13) | 8.370 | 2.741 |
 | 6 | C03 (C03) | 8.448 | 1.811 |
 | 7 | C02 (C02) | 8.503 | 1.261 |
-| 8 | C17 (TMP) | 8.536 | 0.770 |
+| 8 | C17 (C17) | 8.536 | 0.770 |
 | 9 | C05 (C05) | 8.553 | 0.393 |
 | 10 | C04 (EC) | 8.752 | 4.580 |
 | 11 | C01 (DMC) | 8.830 | 1.805 |
@@ -119,16 +119,6 @@ Top-3：C15 (C15), C09 (DOL), C08 (C08)
 - **worst-case 额外拉低**：0.000000 kcal（0.0 meV）＝ max(RT ln N 界 0.000000 kcal，实测 ceiling 无)
 - **排序敏感判定**：**排序不敏感**——Top-3 翻转（氧化轴 否 / Li 条件轴 否），逐对翻轴：none；该态所在轴最多移动 0.000 kcal（0.000 eV）
 无未用盆地——冻结池已全部尝试或烧毁，限制原因是终局证据，登记限制即可
-
-### C17 TMP（M_plus）
-
-- **状态**：provisional（rescue_budget_exhausted）；n_unique=3，n_registered 见 labels；在途救援 1 个
-- **成员处置**：27->computed(strict_reopt_not_needed); 33->rescue_budget_exhausted(strict_reopt_required); c10->rescue_budget_exhausted(); r3_c42->computed(strict_reopt_not_needed)
-- **已烧毁盆地**：2 个（drift/budget-exhausted——重跑不能恢复身份）
-- **池**：审计判定 `sampling_limited`（池内上限 3）；**未用独立盆地 1 个**：c10 (+4.235 kcal in pool)
-- **worst-case 额外拉低**：0.302656 kcal（13.1 meV）＝ max(RT ln N 界 0.302656 kcal，实测 ceiling 无)
-- **排序敏感判定**：**排序不敏感**——Top-3 翻转（氧化轴 否 / Li 条件轴 否），逐对翻轴：none；该态所在轴最多移动 0.303 kcal（0.013 eV）
-在途救援尚未处置——先让登记的救援链落定，暂不新增任何起点
 
 ## 建议口径（按用户裁决格式）
 

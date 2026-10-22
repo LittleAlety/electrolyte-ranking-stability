@@ -571,6 +571,30 @@ manifest 新增 `released` 列，5 个放行态以**冻结证据行**保留（st
 
 **⑤ strict_readiness 当前只剩一个缺口**：`ensemble_not_48_accepted`（39/48）。
 电子身份（77/77）与成本溯源等五项证据全部就位。
+
+### ⑮ 用户三项裁决的实测验证：42/48 与两个被证实的规则（2026-10-21 深夜）
+
+**A组（reopt_v2）**：4/5 条腿在第 1-2 圈内全部 `THE OPTIMIZATION HAS CONVERGED`、0 虚频、
+完整 Hessian——`close-enough → 从收敛末几何重启 → 一圈修复`的规律在 5 个不同分子态上
+第 6 次复现（reopt1 的 DEC/M、DME/M_plus 之后）。唯一未完成的 TMP/M_plus c10 仍在优化
+（34 圈，TMP 阳离子的固有难点）。
+
+**两项放行的科学含义**：
+
+* `DMSO|LiM_plus`：**single_basin_verified** 首次实际应用——单盆地系综的合法性不是
+  靠数量证明的，而是靠「生产级证据 + 独立起点 + 完整身份/频率 QC + 登记的搜索范围」
+  四要素齐备。
+* `TMP|LiM_plus`：**multi_basin_coverage** 放行，n_unique 从 1 升到 **3**——用户裁决
+  「最新两腿是阈值失败并非漂移，应继续探索」被实测完全证实：v2 重优化不仅过了阈值，
+  还揭示了此前被 close-enough 掩盖的新极小。
+
+**第 27 个缺陷（attempt 谱系冲突）**：`reopt_v2` 与旧 `reopt1` 同解析为 attempt=1，
+dispositions 的 latest 选择挑错行（把 v2 的 computed 当旧谱系失败）。修法：`_reopt_v*`
+命名族用基数 10（10+N-1），新谱系高于一切旧 attempt——「最高 attempt 优先」恢复
+「最新谱系优先」语义。教训：**新版本命名族的序号必须高于同成员的一切历史序号**。
+
+**当前系综 42/48**（5 limited：AN/DMC 的 M_plus、DMC/DOL/EC 的 LiM_2plus；1 provisional：
+TMP/M_plus c10 在途）。若 c10 通过，TMP/M_plus 可达 n_unique>=2 → 43/48。
 ## 未完成的审查和发布条件
 
 - 2026-10-18 在 batch3 仍为 4 RUNNING + 14 PENDING 时执行不带 `-Commit` 的 `finalize_wp2.ps1`：生成器 75/75、归档账本 300 处比对零失配、全部只读 `--check`、页面校验与链内离线 pytest 退出码均为 0；三个会启动真实本机 ORCA/xtB 的集成节点按 HPC-only 规则排除。此为当时快照的技术闭合，不是 48/48 系综科学验收。

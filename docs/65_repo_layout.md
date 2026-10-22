@@ -94,7 +94,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**73** 个跟踪文件：67 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**74** 个跟踪文件：68 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -145,6 +145,7 @@ week36 与 week44 只存在于 part2 镜像。
 | `build_li_motif_plan_round2.py` | **第二轮 Li motif 搜索预注册**（v1.4.2 项 5）：第一轮已对单一父几何穷举全部配位规则，8 个审计 Li 态仍只 1–2 个独立极小；第二轮空间＝同一冻结规则 × **冻结自由态构象池的其他中性盆地做替代父几何**（EMC 2/DEC 4/DME 6/TMP 3 盆地，sha256 磁盘核验）；登记 round-1 kept + 已核验父数＝诚实上界（去重可能合并，真实数只能执行后测）；零新增计算，执行为显式独立步骤 | 冻结池 + 第一轮 screen → `li_motif_sampling/li_motif_plan_round2.{csv,_index.json}` |
 | `frontier_fmopop.py` | **ORCA `! FMOPop` 输出解析器**（Mulliken+Löwdin 双口径前沿布居）：解析每 operator 块（UHF 有 OP=0/1 两块）的原子行（`0-C 0.207071 0.189913 ...` 四列＝HOMO/LUMO 的 Mulliken/Loewdin），强制校验每列布居和≈1、块必须以闭合线结束、缺 operator 即 raise（fail-closed，绝不产出部分权重表）。`frontier_populations()` 输出 Li/给体的四列正式布居 | 库模块；产物列在 frontier_localization.csv |
 | `frontier_lowdin.py` | **Löwdin 轨道原子权重**（按计划算法）：从 AO 重叠矩阵做对称正交化，population=|S^(1/2)c|^2 后按原子求和；强制校验 AO 维度一致性/原子映射/有限性/Hermitian/正定谱/MO 归一化/布居和为 1，任何违反直接 raise（不静默回退到 |c|² 捷径） | 库模块 |
+| `build_bgroup_pilot_preregistration.py` | **B组试点预注册（未启动）**：AN/DMC 的 M_plus生产级覆盖诊断——方法结论由冻结池数据**自动推导**（两态池内构象已全部上过生产级 → 直接 DFT 多起点无候选 → 应改走相关扭转扫描，须另行登记）；停止条件冻结（每态≤2腿、双塌缩→production_single_basin生产级单盆地证据、不自动扩态）；预算 ~48 core-hours | `recovery/bgroup_pilot_preregistration.md` + `_index.json` |
 | `build_recovery_budget_accounting.py` | **恢复包预算核算与终局报告**：按包实测 core-hours（从验证快照的 started/normal_termination 时间戳推、4 核/腿）、主账本合计、9 个 limited 态的终局原因分组（历史保留）、下一轮授权须知（预算余量、漂移态不可再算、预算尽态需另立版本） | `recovery/recovery_budget_accounting.md` + `_index.json` |
 | `strict_readiness.py` + `strict_readiness_wiring.py` | **严格总闸门（逐项证据检查）**：`strict_readiness(labels, expected_keys, checks)` 按计划实现——不只数 48 个标签，而是检查六项必需要求（覆盖复核有效/电子身份全成员完整/采样审计完成/WP3 证据完整/WP5 全池评估/成本溯源完整）＋WP6 与扩样"触发后才检查"的条件；返回 `{complete, blocked_by}`，把缺口逐项列出而非一个布尔。wiring 层从磁盘产物**机械推导**每个布尔（缺失/不可解析/不完整一律 False，fail-closed），不接收任何手设标志 | 不写文件（库模块；wiring 打印 JSON） |
 | `run_second_search_emc.py` | **已执行的第二轮换方法搜索（仅 EMC\|M_plus）**：GFN2-xTB + ALPB(乙腈)、256 个 ETKDGv3 起点（首轮 64）、seed 20261022，`--opt tight`。预注册四要素写在模块文档里（方法改动轴、成本上限、停止规则、不回填旧池）。**结论：真新盆地 0**（两条与已有极小 RMSD 0.0102 / 0.1181）→ `search_method_exhausted`；且该态真实限制是 `species_drift_unrecoverable`（键图改变），换方法本就无效 | `recovery/strict_recovery_v2_emc_pool.csv` + `_index.json` |

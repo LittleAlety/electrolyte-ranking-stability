@@ -7,11 +7,11 @@
 
 | 状态 | 态数 |
 |---|---|
-| accepted | 42 |
-| provisional | 1 |
+| accepted | 43 |
+| provisional | 0 |
 | limited | 5 |
 
-分母固定 48；未 accepted 共 **6** 态（`provisional` = 有登记补救在飞，`limited` = 首轮搜索耗尽）。
+分母固定 48；未 accepted 共 **5** 态（`provisional` = 有登记补救在飞，`limited` = 首轮搜索耗尽）。
 
 ## 恢复腿终局统计（按**最后一次真实运行**；规划中的补救另计）
 
@@ -20,20 +20,18 @@
 | `computed` | 10 |
 | `technical_complete_qc_failed` | 2 |
 
-**在飞补救（已提交、尚未产出结果）**：1 条腿
+**在飞补救（已提交、尚未产出结果）**：0 条腿
 
 
 失败类分布（最后一次真实运行）：
 
 - `strict_reopt_not_needed`: 10
-- `strict_reopt_required`: 1
-- `verytight_convergence`: 1
+- `verytight_convergence`: 2
 
 ## 覆盖复核裁决（离开 `limited` 的唯一通道）
 
 | verdict | 态数 |
 |---|---|
-| `pending` | 1 |
 | `search_exhausted` | 5 |
 
 ## 本批放行的态（覆盖复核 resolved）
@@ -48,6 +46,7 @@
 | `SL|LiM_2plus` | `accepted` | 2 | **1** | -713.21346632930 |
 | `TMP|LiM_2plus` | `accepted` | 3 | **1** | -769.48074188281 |
 | `TMP|LiM_plus` | `accepted` | 3 | **1** | -769.79444611358 |
+| `TMP|M_plus` | `accepted` | 3 | **2** | -762.03948794417 |
 
 `n_limited` 一列是**故意保留的历史计数**：这些态经复核放行，但「曾经有限制」这件事仍然记在账本里——不是清空它。
 
@@ -61,7 +60,6 @@
 | DMC\|M_plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
 | DOL\|LiM_2plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
 | EC\|LiM_2plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
-| TMP\|M_plus | `provisional` | `pending` | `new_minima_found` | 2 | M_plus\|c10（2/2；结果 technical_complete_qc_failed/strict_reopt_required；当前 pending）<br>M_plus\|r3_c42（3/2；结果 computed/strict_reopt_not_needed；当前 computed） |
 
 ## 本轮无法恢复的态（需换搜索方法，不在本批预算内）
 
@@ -73,6 +71,7 @@
 
 ## 尝试预算已用尽的腿（不再自动重试，保留原因）
 
+- `TMP|M_plus|c10` — `verytight_convergence`：VeryTightOpt final criterion not met: energy_change_Eh=3.13e-07 > 2e-07;hess_act
 - `DME|LiM_2plus|r3m_c03` — `verytight_convergence`：VeryTightOpt final criterion not met: energy_change_Eh=2.63e-07 > 2e-07;hess_act
 
-**结论口径**：本报告不改变任何验收判定。系综达到 42/48；`plan_overall_complete` 与 WP6 只有在 48/48 时才可能开闸。
+**结论口径**：本报告不改变任何验收判定。系综达到 43/48；`plan_overall_complete` 与 WP6 只有在 48/48 时才可能开闸。

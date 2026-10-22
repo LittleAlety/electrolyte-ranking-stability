@@ -41,7 +41,7 @@
 | DME | LiM_plus | li_motif_round2_measured | 1 | 1 | sampling_limited | accepted | 1 | -198585.253686 | — | — |
 | DME | LiM_2plus | li_motif_round2_measured | 1 | 3 | executable_partial | accepted | 2 | -198409.511357 | — | — |
 | TMP | M | free_conformer | 2 | 2 | sampling_limited | accepted | 2 | -478370.212791 | — | — |
-| TMP | M_plus | free_conformer | 3 | 3 | sampling_limited | provisional | 3 | -478186.998247 | — | — |
+| TMP | M_plus | free_conformer | 3 | 3 | sampling_limited | accepted | 3 | -478186.998247 | — | — |
 | TMP | LiM_plus | li_motif_round2_measured | 2 | 5 | executable_partial | accepted | 3 | -483053.307969 | — | — |
 | TMP | LiM_2plus | li_motif_round2_measured | 2 | 3 | executable_partial | accepted | 3 | -482856.455592 | — | — |
 
