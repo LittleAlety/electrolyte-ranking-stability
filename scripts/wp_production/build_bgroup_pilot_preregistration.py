@@ -136,6 +136,19 @@ def render() -> str:
                          "本试点不覆盖该路径，需另行登记）")
         lines.append("")
     lines += [
+        "## 五态实测路由（build_probe_routes.py 派生输出，不启动任何计算）",
+        "",
+        "| 态 | 路由 | 说明 |",
+        "|---|---|---|",
+        "| AN\|M_plus | preflight_required | 池内无未用构象；需登记扭转自由度预检 |",
+        "| DMC\|M_plus | preflight_required | 同上 |",
+        "| DMC\|LiM_2plus | preflight_required | motif 搜索无新独立候选；需自由度预检 |",
+        "| DOL\|LiM_2plus | preflight_required | 同上（环构象与配位 motif 分别登记） |",
+        "| EC\|LiM_2plus | preflight_required | 同上（环外/环内自由度分别登记） |",
+        "",
+        "全部五态的下一步都是**预检**（候选独立性、身份、对称去重、起点哈希先冻结），",
+        "不是直接提交计算。预检完成后按 probe_route 的优先级逐态选路。",
+        "",
         "## 停止条件（冻结）",
         "",
         "1. 每态最多 **2** 条生产腿；",

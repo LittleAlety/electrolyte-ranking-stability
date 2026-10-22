@@ -237,6 +237,18 @@ def _find_molden(member_key: str) -> Path | None:
     return None
 
 
+EVIDENCE = FRONTIER / "frontier_identity_evidence.csv"
+
+
+def _identity_verdicts() -> dict[str, str]:
+    """member_key -> identity_qc_status from the evidence generator."""
+    if not EVIDENCE.is_file():
+        return {}
+    with EVIDENCE.open(encoding="utf-8") as fh:
+        return {r["member_key"]: r["identity_qc_status"]
+                for r in csv.DictReader(fh)}
+
+
 def build_rows() -> list[dict]:
     legs = list(csv.DictReader(LEGS.open(encoding="utf-8"))) if LEGS.is_file() else []
     rows = []
@@ -328,10 +340,11 @@ def build_rows() -> list[dict]:
             row["fmopop_status"] = "parse_failed"
             row["identity_qc_status"] = "blocked_on_fmopop"
             row["note"] = (row.get("note") or ";fmopop=" + repr(exc))[:400]
-        # the evidence-chain verification (item 2) runs in a dedicated pass;
-        # until then every parsed member is HONESTLY pending, not passed
+        # the evidence-chain verdict (item 2) is authoritative once written;
+        # a member absent from the evidence table stays pending -- fail-visible
         if row.get("fmopop_status") == "parsed":
-            row["identity_qc_status"] = "pending"
+            row["identity_qc_status"] = (
+                _identity_verdicts().get(key, "pending"))
 
         # then the classes, so the formal class can read the fmo columns just
         # populated; both frontiers are classified because Li is redox-silent
