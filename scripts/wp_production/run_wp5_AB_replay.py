@@ -231,8 +231,7 @@ class Acquirer:
     """Baseline acquisition on label-free features + VISIBLE labels only."""
 
     def __init__(self, features, visible, y_vis, baseline, rng, *,
-                 acq_version: str = DEFAULT_ACQ_VERSION, model: str = "",
-                 score_fn=None):
+                 acq_version: str = DEFAULT_ACQ_VERSION, model: str = ""):
         self.features = features
         self.visible = list(visible)
         self.y_vis = list(y_vis)
@@ -242,8 +241,6 @@ class Acquirer:
             raise ValueError("unknown acquisition version %r" % (acq_version,))
         self.acq_version = acq_version
         self.model = model
-        # `score_fn(unseen)` returns model-derived scores using VISIBLE data only
-        self._score_fn = score_fn
         # the acquirer states what drives it; under knn_v1 it is NOT the model
         self.acquisition_model = acquisition_identity(
             baseline, model or "unset", acq_version)[0]
@@ -253,10 +250,40 @@ class Acquirer:
         for name in vars(self):
             assert "y_all" not in name and "labels_all" not in name, \
                 "acquirer must never hold the complete label vector"
+        # NOTE: an earlier version tried to "prove" a callback was safe by
+        # walking __closure__.  That guard could never fire: Python stores
+        # DEFAULT ARGUMENTS in __defaults__, not in __closure__, so a callback
+        # capturing the full truth through defaults passed it silently.  The
+        # fix is structural -- there is no external callback any more -- and the
+        # label containers the acquirer legitimately holds are bounded by the
+        # visible set, which the construction does:
+        #   self.y_vis     has len(visible) entries   (visible labels only)
+        #   self.features  is the LABEL-FREE feature matrix by construction
+        assert len(self.y_vis) == len(self.visible), (
+            "acquirer must hold exactly the visible labels, got %d for %d "
+            "visible candidates" % (len(self.y_vis), len(self.visible)))
+
+    def _model_v2(self) -> bool:
+        """Is this baseline driven by the executed model in this version?"""
+        return (self.acq_version == "model_v2"
+                and self.model in _FORMAL
+                and self.baseline in ("uncertainty", "ranking_aware"))
 
     def _unlabeled(self):
         vis = set(self.visible)
         return [i for i in range(len(self.features)) if i not in vis]
+
+    def _model_scores(self, query):
+        """Model-output-driven scores, computed from the acquirer's OWN state.
+
+        The feature matrix it holds is label-free by construction and the label
+        mapping is built from ``self.y_vis`` / ``self.visible`` -- there is no
+        closure and no external callback that could carry a hidden value.
+        """
+        import wp5_formal_models as _fmodels
+        labels = {i: self.y_vis[k] for k, i in enumerate(self.visible)}
+        return _fmodels.model_acquisition_scores(
+            self.features, self.visible, labels, list(query), self.model)
 
     def next_index(self):
         unl = self._unlabeled()
@@ -280,8 +307,8 @@ class Acquirer:
                 if d > best_d:
                     best, best_d = i, d
             return best
-        if self.baseline == "uncertainty" and self._score_fn is not None:
-            scores = self._score_fn(unl)["uncertainty"]
+        if self.baseline == "uncertainty" and self._model_v2():
+            scores = self._model_scores(unl)["uncertainty"]
             return max(unl, key=lambda i: (scores.get(i, 0.0), -i))
         if self.baseline == "uncertainty":
             k = min(3, len(self.visible))
@@ -295,8 +322,8 @@ class Acquirer:
                 vals = [self.y_vis[self.visible.index(j)] for j in neigh]
                 sigma[i] = statistics.pstdev(vals) if len(vals) > 1 else 0.0
             return max(unl, key=lambda i: (sigma[i], -i))
-        if self.baseline == "ranking_aware" and self._score_fn is not None:
-            scores = self._score_fn(unl)["topk_entropy"]
+        if self.baseline == "ranking_aware" and self._model_v2():
+            scores = self._model_scores(unl)["topk_entropy"]
             return max(unl, key=lambda i: (scores.get(i, 0.0), -i))
         # ranking_aware: posterior top-3 membership entropy (kNN bootstrap)
         k = min(3, len(self.visible))
@@ -548,18 +575,8 @@ def replay_one(task, baseline, repeat, model=LEGACY_MODEL,
             })
         if len(visible) >= n:
             break
-        score_fn = None
-        if (acq_version == "model_v2" and model in _FORMAL
-                and baseline in ("uncertainty", "ranking_aware")):
-            import wp5_formal_models as _fmodels
-
-            def score_fn(query, _vis=list(visible), _X=X, _y=y, _m=model):
-                # VISIBLE labels only -- the same interface the evaluator model
-                # gets; the acquisition never sees a hidden value
-                return _fmodels.model_acquisition_scores(
-                    _X, _vis, {i: _y[i] for i in _vis}, list(query), _m)
         acq = Acquirer(X, visible, [y[i] for i in visible], baseline, rng,
-                       acq_version=acq_version, model=model, score_fn=score_fn)
+                       acq_version=acq_version, model=model)
         chosen = acq.next_index()
         acq._assert_blind()
         if chosen is None or chosen in set(visible):

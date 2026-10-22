@@ -77,6 +77,55 @@ def test_unknown_version_is_refused(replay):
 
 # ---- the new version really consumes the model ------------------------------
 
+def test_no_external_callback_can_carry_the_truth(replay):
+    """Structural guarantee: the acquirer owns its state, no callback crosses in.
+
+    The rejected design passed a `score_fn` closure that captured the complete
+    truth vector through DEFAULT ARGUMENTS (which live in ``__defaults__``, not
+    ``__closure__``), so a guard walking the closure could never fire.
+    """
+    src = (REPO / "scripts" / "wp_production" / "run_wp5_AB_replay.py"
+           ).read_text(encoding="utf-8")
+    assert "_score_fn" not in src, "an external scoring callback came back"
+    assert "def _model_scores(self, query):" in src
+    # the acquirer computes scores from its own visible state
+    assert "labels = {i: self.y_vis[k] for k, i in enumerate(self.visible)}" in src
+
+
+def test_acquirer_holds_exactly_the_visible_labels(replay):
+    """The owned label container must not be wider than the visible set."""
+    src = (REPO / "scripts" / "wp_production" / "run_wp5_AB_replay.py"
+           ).read_text(encoding="utf-8")
+    assert "len(self.y_vis) == len(self.visible)" in src
+
+
+def test_model_v2_scores_are_computed_from_visible_rows_only(replay, fmodels,
+                                                            monkeypatch):
+    """Any call the acquirer makes must see only visible labels.
+
+    NOTE: the runtime path does ``import wp5_formal_models`` at call time, so the
+    patch must land on the module registered under that NAME; a fixture module
+    loaded by file location is a DIFFERENT object and would silently not be
+    intercepted (measured: the first version of this test spied on an unpatched
+    copy and the spy never fired -- the test failed loudly, which is the point).
+    """
+    sys.modules["wp5_formal_models"] = fmodels
+    seen = []
+    original = fmodels.model_acquisition_scores
+
+    def spy(features, visible, labels, query, model, **kw):
+        seen.append((len(labels), len(visible),
+                     any(float(v) >= 10000.0 for v in labels.values())))
+        return original(features, visible, labels, query, model, **kw)
+
+    monkeypatch.setattr(fmodels, "model_acquisition_scores", spy)
+    replay.build(1, acq_version="model_v2")
+    assert seen, "the model-driven path never called the estimator"
+    for n_lab, n_vis, hidden in seen:
+        assert n_lab == n_vis, (n_lab, n_vis)
+        assert hidden is False
+
+
 def test_model_v2_drives_only_the_prediction_based_baselines(replay):
     for baseline in ("uncertainty", "ranking_aware"):
         name, used, note = replay.acquisition_identity(baseline, "ridge_std",
