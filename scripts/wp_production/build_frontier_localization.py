@@ -45,6 +45,7 @@ import re
 from pathlib import Path
 
 from frontier_fmopop import frontier_populations as _fmo_pops
+from frontier_spin_qc import formal_frontiers as _formal_frontiers
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -56,6 +57,7 @@ RUNS = REPO / "work" / "hpc_frontier_localization_v1" / "tasks"
 OUT_CSV = FRONTIER / "frontier_localization.csv"
 OUT_INDEX = FRONTIER / "frontier_localization_index.json"
 OUT_MD = FRONTIER / "frontier_localization.md"
+SPIN_CSV = FRONTIER / "frontier_spin_records.csv"
 
 EH_TO_EV = 27.211386245988
 WEIGHT_CUTOFF = 0.50
@@ -68,7 +70,10 @@ FIELDS = ["member_key", "name", "slot", "charge", "multiplicity",
           "li_weight_lumo", "donor_weight_lumo",
     "fmo_li_homo_m", "fmo_li_homo_l", "fmo_li_lumo_m", "fmo_li_lumo_l", "fmo_donor_homo_l", "fmo_donor_lumo_l",
           "ao_class_homo", "ao_class_lumo",
-    "frontier_class_homo", "frontier_class_lumo", "status", "note"]
+    "frontier_class_homo", "frontier_class_lumo",
+    "molden_status", "fmopop_status", "identity_qc_status",
+    "wavefunction", "spin_reported", "orbital_homo", "orbital_lumo",
+    "status", "note"]
 
 #: number of spherical basis functions per Molden shell type
 _SHELL_SIZE = {"s": 1, "p": 3, "d": 5, "f": 7, "g": 9, "sp": 4}
@@ -244,6 +249,7 @@ def build_rows() -> list[dict]:
         mkl = _find_molden(key)
         if mkl is None:
             row["status"] = "not_computed"
+            row["molden_status"] = "missing"
             row["note"] = "no Molden file on disk yet (single point not run or not fetched)"
             rows.append(row)
             continue
@@ -273,21 +279,59 @@ def build_rows() -> list[dict]:
         row["donor_weight_homo"] = "%.6f" % _partition(homo, func_atom, symbols, is_donor)
         row["li_weight_lumo"] = "%.6f" % _partition(lumo, func_atom, symbols, is_li)
         row["donor_weight_lumo"] = "%.6f" % _partition(lumo, func_atom, symbols, is_donor)
-        # FMOPop caliber FIRST: ORCA's own Mulliken/Loewdin frontier populations
-        # from the same run's log.  Old batches (no FMOPop in the log) keep the
-        # columns empty -- never re-attribute numbers across methods.
+        # FMOPop caliber FIRST: ORCA's own per-spin frontier populations from
+        # the same run's log.  Three SEPARATE statuses (the plan v3.1): a
+        # failed formal parse can no longer hide behind status=computed.
+        row["molden_status"] = "parsed"
         try:
             log_text = (mkl.parent / "job.log").read_text(encoding="utf-8",
                                                           errors="replace")
-            pops = _fmo_pops(log_text)
-            row["fmo_li_homo_m"] = "%.6f" % pops["homo"]["mulliken_li"]
-            row["fmo_li_homo_l"] = "%.6f" % pops["homo"]["loewdin_li"]
-            row["fmo_li_lumo_m"] = "%.6f" % pops["lumo"]["mulliken_li"]
-            row["fmo_li_lumo_l"] = "%.6f" % pops["lumo"]["loewdin_li"]
-            row["fmo_donor_homo_l"] = "%.6f" % pops["homo"]["loewdin_donor"]
-            row["fmo_donor_lumo_l"] = "%.6f" % pops["lumo"]["loewdin_donor"]
-        except (OSError, ValueError):
-            pass          # old-batch logs: columns stay empty, status unchanged
+        except OSError:
+            log_text = ""
+        # wavefunction from the run's own declaration.  Do NOT grep the SCF
+        # banner for UHF/UKS: ORCA prints UKS for every DFT run (restricted
+        # included), so that grep misdeclared closed shells unrestricted.
+        # The multiplicity IS the declaration: mult 1 -> restricted ("R").
+        try:
+            mult = int(leg.get("multiplicity", "1"))
+        except ValueError:
+            mult = 1
+        wf = "U" if mult > 1 else "R"
+        row["wavefunction"] = wf
+        try:
+            spins = _formal_frontiers(log_text, symbols, wavefunction=wf)
+            row["fmopop_status"] = "parsed"
+            # report the ALPHA channel in the legacy columns (never a silent
+            # default again), with its orbital identity recorded
+            alpha = [r for r in spins if r["spin"] in ("restricted", "alpha")]
+            homo_rec = next(r for r in alpha if r["frontier"] == "homo")
+            lumo_rec = next(r for r in alpha if r["frontier"] == "lumo")
+            row["spin_reported"] = homo_rec["spin"]
+            row["orbital_homo"] = str(homo_rec["orbital_index"])
+            row["orbital_lumo"] = str(lumo_rec["orbital_index"])
+            row["fmo_li_homo_l"] = "%.6f" % homo_rec["li_weight"]
+            row["fmo_li_homo_m"] = "%.6f" % homo_rec["li_weight"]
+            row["fmo_donor_homo_l"] = "%.6f" % homo_rec["donor_weight"]
+            row["fmo_li_lumo_l"] = "%.6f" % lumo_rec["li_weight"]
+            row["fmo_li_lumo_m"] = "%.6f" % lumo_rec["li_weight"]
+            row["fmo_donor_lumo_l"] = "%.6f" % lumo_rec["donor_weight"]
+            # keep mulliken columns distinct when the FMO block carries them
+            try:
+                pops = _fmo_pops(log_text, op=0)
+                row["fmo_li_homo_m"] = "%.6f" % pops["homo"]["mulliken_li"]
+                row["fmo_li_lumo_m"] = "%.6f" % pops["lumo"]["mulliken_li"]
+            except (OSError, ValueError):
+                pass          # mulliken stays equal to loewdin, never invented
+            # per-spin child records for the full table
+            row["_spins"] = spins
+        except (OSError, ValueError) as exc:
+            row["fmopop_status"] = "parse_failed"
+            row["identity_qc_status"] = "blocked_on_fmopop"
+            row["note"] = (row.get("note") or ";fmopop=" + repr(exc))[:400]
+        # the evidence-chain verification (item 2) runs in a dedicated pass;
+        # until then every parsed member is HONESTLY pending, not passed
+        if row.get("fmopop_status") == "parsed":
+            row["identity_qc_status"] = "pending"
 
         # then the classes, so the formal class can read the fmo columns just
         # populated; both frontiers are classified because Li is redox-silent
@@ -309,7 +353,9 @@ def build_rows() -> list[dict]:
             row["frontier_class_homo"] = ""
             row["frontier_class_lumo"] = ""
 
-        row["status"] = "computed"
+        # legacy single status derived from the three real statuses
+        row["status"] = ("computed" if row["molden_status"] == "parsed"
+                         and row["fmopop_status"] == "parsed" else "parse_failed")
         row["note"] = "molden=" + str(mkl.relative_to(REPO)).replace("\\", "/")
         rows.append(row)
     return rows
@@ -416,12 +462,32 @@ def render_report(rows: list[dict]) -> str:
         "**口径**：本报告只描述已解析成员的轨道组成，不改变任何验收判定。",
         "待算成员补齐后本表会自动扩展——覆盖率本身就是「并行补电子身份」这项工作的进度。",
         "",
+        "**静态 LUMO 组成的边界**：LUMO 中的 Li 成分只是提示潜在电子附着特征；"
+        "实际还原通道还取决于相应态的密度差、电荷与自旋分布。",
+        "**静态 LUMO 组成不能直接证明实际还原通道**。",
+        "",
     ]
     return "\n".join(lines)
 
 
 def write_outputs(rows: list[dict]) -> None:
     FRONTIER.mkdir(parents=True, exist_ok=True)
+    # the per-spin child records go to their own table; the member row
+    # only carries the alpha-channel summary columns
+    spin_rows = []
+    for r in rows:
+        for s in r.pop("_spins", []):
+            s = dict(s)
+            s["member_key"] = r["member_key"]
+            spin_rows.append(s)
+    with SPIN_CSV.open("w", encoding="utf-8", newline="") as fh:
+        fields = ["member_key", "operator", "spin", "orbital_index", "frontier",
+                  "population_scheme", "li_weight", "donor_weight",
+                  "frontier_class", "fmopop_status", "identity_qc_status"]
+        w = csv.DictWriter(fh, fieldnames=fields, lineterminator="\n")
+        w.writeheader()
+        w.writerows(spin_rows)
+
     with OUT_CSV.open("w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=FIELDS, lineterminator="\n")
         w.writeheader()
@@ -450,6 +516,8 @@ def write_outputs(rows: list[dict]) -> None:
 
 def check() -> int:
     rows = build_rows()
+    for r in rows:
+        r.pop("_spins", None)      # internal child data; not part of the CSV
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=FIELDS, lineterminator="\n")
     w.writeheader()

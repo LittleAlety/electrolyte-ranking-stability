@@ -97,7 +97,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**74** 个跟踪文件：68 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**76** 个跟踪文件：70 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -146,6 +146,8 @@ week36 与 week44 只存在于 part2 镜像。
 | `build_descriptor_analysis.py` | 方案 §7.3 描述符层（派生层，零新增计算）：donor type / chelation / flexibility / functionalization / 廉价 ESP 报**全部**检验（含不显著），Holm 与 BH 并列，TPSA 仅探索性；n=12 不拟合多参数模型 | 冻结产物 → `outputs/physics_completion/pair_evidence/descriptor_analysis.{csv,md}` |
 | `build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） | 结构登记 → `outputs/physics_completion/li_motif_sampling/**` |
 | `build_li_motif_plan_round2.py` | **第二轮 Li motif 搜索预注册**（v1.4.2 项 5）：第一轮已对单一父几何穷举全部配位规则，8 个审计 Li 态仍只 1–2 个独立极小；第二轮空间＝同一冻结规则 × **冻结自由态构象池的其他中性盆地做替代父几何**（EMC 2/DEC 4/DME 6/TMP 3 盆地，sha256 磁盘核验）；登记 round-1 kept + 已核验父数＝诚实上界（去重可能合并，真实数只能执行后测）；零新增计算，执行为显式独立步骤 | 冻结池 + 第一轮 screen → `li_motif_sampling/li_motif_plan_round2.{csv,_index.json}` |
+| `wp5_formal_models.py` | **WP5 正式预测器（计划 v3.1 第 5 项）**：ridge_std（闭式解、仅可见行标准化）、krr_rbf（RBF 核岭回归）、gpr_rbf（GP 后验均值）三个**真实可执行**模型；超参冻结（gamma=1/7、lambda=1e-3、noise=1e-2，无逐回放调参）；纯函数——只见 (features, visible, labels)，无偷看；model_contract() 记录实际执行的模型/特征/可见集。替代旧的 kNN 邻近均值口径（邻近均值不再冒充模型契约） | 库模块；契约记入回放产物 |
+| `frontier_spin_qc.py` | **同自旋同轨道的正式 FMO 解析（计划 v3.1 草案 A）**：`formal_frontiers(log, symbols, wavefunction)` 按声明的波函数（R→单通道，U→alpha+beta）逐自旋通道输出 operator/spin/orbital_index + Li/给体 Löwdin 权重；原子组成/顺序与成员几何交叉核对；非物理逐原子权重拒绝（列和校验之上）；重复 FMO 块、缺通道、RO 未契约一律 raise | `frontier/frontier_spin_records.csv`（244 条自旋记录） |
 | `frontier_fmopop.py` | **ORCA `! FMOPop` 输出解析器**（Mulliken+Löwdin 双口径前沿布居）：解析每 operator 块（UHF 有 OP=0/1 两块）的原子行（`0-C 0.207071 0.189913 ...` 四列＝HOMO/LUMO 的 Mulliken/Loewdin），强制校验每列布居和≈1、块必须以闭合线结束、缺 operator 即 raise（fail-closed，绝不产出部分权重表）。`frontier_populations()` 输出 Li/给体的四列正式布居 | 库模块；产物列在 frontier_localization.csv |
 | `frontier_lowdin.py` | **Löwdin 轨道原子权重**（按计划算法）：从 AO 重叠矩阵做对称正交化，population=|S^(1/2)c|^2 后按原子求和；强制校验 AO 维度一致性/原子映射/有限性/Hermitian/正定谱/MO 归一化/布居和为 1，任何违反直接 raise（不静默回退到 |c|² 捷径） | 库模块 |
 | `build_bgroup_pilot_preregistration.py` | **B组试点预注册（未启动）**：AN/DMC 的 M_plus生产级覆盖诊断——方法结论由冻结池数据**自动推导**（两态池内构象已全部上过生产级 → 直接 DFT 多起点无候选 → 应改走相关扭转扫描，须另行登记）；停止条件冻结（每态≤2腿、双塌缩→production_single_basin生产级单盆地证据、不自动扩态）；预算 ~48 core-hours | `recovery/bgroup_pilot_preregistration.md` + `_index.json` |

@@ -119,5 +119,5 @@ def test_wp2_progress_is_indexed_and_layout_count_is_exact():
     root = REPO / "scripts/wp_production"
     counts = {"all": sum(path.is_file() for path in root.iterdir()),
               "py": len(list(root.glob("*.py"))), "ps1": len(list(root.glob("*.ps1")))}
-    assert counts == {"all": 74, "py": 68, "ps1": 4}
-    assert "**74** 个跟踪文件：68 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`" in layout
+    assert counts == {"all": 76, "py": 70, "ps1": 4}
+    assert "**76** 个跟踪文件：70 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`" in layout
