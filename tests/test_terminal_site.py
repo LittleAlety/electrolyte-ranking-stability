@@ -16,6 +16,7 @@ mouse (a real search input, a dialog for the lightbox, a noscript summary).
 from __future__ import annotations
 
 import hashlib
+import csv
 import importlib.util
 import json
 import re
@@ -120,6 +121,67 @@ def test_wp2_status_separates_runtime_from_scientific_acceptance():
     assert 'role="progressbar"' in block
     assert "正常终止不等于科学闭环" in block
     assert progress["source"] in block
+
+
+def test_ensemble_progress_comes_from_acceptance_not_numerical_rows():
+    progress = _payload()["wp2_progress"]["ensemble"]
+    with (REPO_ROOT / progress["source"]).open(encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert progress["accepted"] == sum(r["acceptance_status"] == "accepted" for r in rows)
+    assert progress["available"] and progress["total"] == 48
+    assert len(progress["remaining"]) == 48 - progress["accepted"]
+    block = site.render_production_status(_payload())
+    assert "生产系综 accepted" in block
+    assert progress["overall_status"] in block
+    for row in progress["remaining"]:
+        assert row["name"] + "/" + row["state"] in block
+    assert "不是实时 Slurm 队列" in block
+
+
+def test_missing_ensemble_source_does_not_claim_primary_as_ensemble(monkeypatch, tmp_path):
+    monkeypatch.setattr(site, "REPO", str(tmp_path))
+    progress = site._ensemble_progress()
+    assert not progress["available"]
+    assert progress["accepted"] == 0
+    assert progress["overall_status"] == "unavailable"
+
+
+@pytest.mark.parametrize("bad_case", ["duplicate", "unknown_status", "wrong_states", "missing_reason"])
+def test_invalid_ensemble_rows_fail_closed(monkeypatch, tmp_path, bad_case):
+    path = tmp_path / "outputs/physics_completion/ensembles/production_ensemble_labels.csv"
+    path.parent.mkdir(parents=True)
+    monkeypatch.setattr(site, "REPO", str(tmp_path))
+    rows = [{"mol_id": f"C{i:02d}", "name": f"name{i}", "state": s,
+             "acceptance_status": "accepted", "limitation_reason": ""}
+            for i in range(12) for s in ("M", "M_plus", "LiM_plus", "LiM_2plus")]
+    if bad_case == "duplicate":
+        rows[-1] = rows[0].copy()
+    elif bad_case == "unknown_status":
+        rows[0]["acceptance_status"] = "mystery"
+    elif bad_case == "wrong_states":
+        rows[0]["state"] = "M_minus"
+    elif bad_case == "missing_reason":
+        rows = [{k: v for k, v in r.items() if k != "limitation_reason"} for r in rows]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    assert not site._ensemble_progress()["available"]
+
+
+def test_readme_and_pages_share_the_current_acceptance_count():
+    progress = _payload()["wp2_progress"]["ensemble"]
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"accepted {progress['accepted']}/48" in readme
+    assert "docs/PROJECT_GUIDE.md" in readme
+    assert readme.index("当前工作入口") < readme.index("历史研究与证据")
+
+
+def test_guide_links_resolve_to_repository_files():
+    guide = (DOCS / "PROJECT_GUIDE.md").read_text(encoding="utf-8")
+    for link in re.findall(r"\]\(([^)#]+)(?:#[^)]*)?\)", guide):
+        if not link.startswith(("https://", "http://")):
+            assert (DOCS / link).is_file(), "dead guide link: " + link
 
 
 def test_weeks_cover_both_stages_and_three_phases():

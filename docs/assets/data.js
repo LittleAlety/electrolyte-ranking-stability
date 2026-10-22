@@ -29,7 +29,49 @@ window.HB = {
    "total": 48
   },
   "stale": false,
-  "source": "outputs/physics_completion/compliance/plan_compliance_meta.json"
+  "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
+  "ensemble": {
+   "accepted": 43,
+   "provisional": 0,
+   "limited": 5,
+   "total": 48,
+   "remaining": [
+    {
+     "name": "AN",
+     "state": "M_plus",
+     "status": "limited",
+     "reason": "rescue_budget_exhausted"
+    },
+    {
+     "name": "DMC",
+     "state": "M_plus",
+     "status": "limited",
+     "reason": "rescue_budget_exhausted"
+    },
+    {
+     "name": "DMC",
+     "state": "LiM_2plus",
+     "status": "limited",
+     "reason": "rescue_budget_exhausted"
+    },
+    {
+     "name": "DOL",
+     "state": "LiM_2plus",
+     "status": "limited",
+     "reason": "rescue_budget_exhausted"
+    },
+    {
+     "name": "EC",
+     "state": "LiM_2plus",
+     "status": "limited",
+     "reason": "rescue_budget_exhausted"
+    }
+   ],
+   "available": true,
+   "source": "outputs/physics_completion/ensembles/production_ensemble_labels.csv",
+   "overall_status": "blocked_on_production",
+   "compliance_source": "outputs/physics_completion/compliance/plan_compliance.csv"
+  }
  },
  "pipeline": [
   {
@@ -1645,7 +1687,7 @@ window.HB = {
   {
    "path": "scripts",
    "note": "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）",
-   "files": 244
+   "files": 245
   },
   {
    "path": "config",
@@ -1665,7 +1707,7 @@ window.HB = {
   {
    "path": "outputs",
    "note": "全部产物：逐阶段载荷、physics_completion/、figures/、溯源与合规",
-   "files": 7607
+   "files": 7609
   },
   {
    "path": "tests",
@@ -1675,7 +1717,7 @@ window.HB = {
   {
    "path": "docs",
    "note": "技术报告与周报（NN_*.md）、协议、结题报告、站点",
-   "files": 149
+   "files": 150
   },
   {
    "path": "deliverables",

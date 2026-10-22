@@ -18,6 +18,7 @@ rewrites only the text between the BEGIN/END comments.  Run ``--check`` to
 verify the on-disk site still matches the repository.
 """
 import argparse
+import csv
 import glob
 import io
 import json
@@ -38,6 +39,50 @@ DELIVERABLES = os.path.join(REPO, "deliverables")
 
 REPO_URL = "https://github.com/LittleAlety/electrolyte-ranking-stability"
 PAGES_URL = "https://littlealety.github.io/electrolyte-ranking-stability/"
+
+
+def _ensemble_progress():
+    """Tracked ensemble evidence, independent of the primary-leg snapshot.
+
+    Missing/duplicate/unknown rows fail closed; 48 numerical values are not
+    evidence of 48 accepted ensembles. No scheduler state is invented here.
+    """
+    source = "outputs/physics_completion/ensembles/production_ensemble_labels.csv"
+    compliance = "outputs/physics_completion/compliance/plan_compliance.csv"
+    result = {"accepted": 0, "provisional": 0, "limited": 0, "total": 48,
+              "remaining": [], "available": False, "source": source,
+              "overall_status": "unavailable", "compliance_source": compliance}
+    try:
+        with io.open(os.path.join(REPO, source), encoding="utf-8-sig", newline="") as f:
+            rows = list(csv.DictReader(f))
+        keys = {(r["mol_id"], r["state"]) for r in rows}
+        molecule_ids = {r["mol_id"] for r in rows}
+        expected = {(m, s) for m in molecule_ids
+                    for s in ("M", "M_plus", "LiM_plus", "LiM_2plus")}
+        if (len(rows) != 48 or len(molecule_ids) != 12 or keys != expected
+                or any(not r.get("name") or r.get("limitation_reason") is None for r in rows)
+                or any(r["acceptance_status"] not in
+                       {"accepted", "provisional", "limited", "blocked"} for r in rows)):
+            return result
+        result.update(available=True)
+        for row in rows:
+            status = row["acceptance_status"]
+            if status in ("accepted", "provisional", "limited"):
+                result[status] += 1
+            if status != "accepted":
+                result["remaining"].append({"name": row["name"], "state": row["state"],
+                                            "status": status,
+                                            "reason": row["limitation_reason"]})
+    except (OSError, KeyError, ValueError, TypeError):
+        return result
+    try:
+        with io.open(os.path.join(REPO, compliance), encoding="utf-8-sig", newline="") as f:
+            overall = [r for r in csv.DictReader(f) if r["item_id"] == "plan_overall_complete"]
+        if len(overall) == 1:
+            result["overall_status"] = overall[0]["status"]
+    except (OSError, KeyError, ValueError, TypeError):
+        pass
+    return result
 
 
 def _wp2_progress():
@@ -63,6 +108,7 @@ def _wp2_progress():
             "frozen": raw["frozen"],
             "stale": bool(raw["stale"]),
             "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
+            "ensemble": _ensemble_progress(),
         }
     except (OSError, KeyError, ValueError, TypeError):
         return {
@@ -73,6 +119,7 @@ def _wp2_progress():
             "frozen": {"accepted": 0, "total": 48},
             "stale": True,
             "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
+            "ensemble": _ensemble_progress(),
         }
 
 
@@ -661,7 +708,7 @@ def render_noscript(payload):
             '      <li>交付镜像：<a href="%s/tree/main/deliverables">deliverables/</a>'
             "（按成果种类分组的 part1 / part2）</li>\n"
             '      <li>源码与全部文档：<a href="%s">GitHub 仓库</a></li>\n'
-            "      <li>质检：<span class=\"js-tests\">%d</span> 个测试通过（pytest）</li>\n"
+            "      <li>历史测试快照（2026-10-19）：<span class=\"js-tests\">%d</span> passed；8 skipped / 13 环境失败，非当前全绿声明</li>\n"
             "      <li>%s</li>\n"
             "    </ul>\n"
             "  </div>\n"
@@ -673,24 +720,18 @@ def render_noscript(payload):
 def render_hero_counts(payload):
     c = payload["counts"]
     return ('    <p class="lead">\n'
-            "      一个反直觉的结论，用 <span class=\"js-weeks\">%d</span> 条阶段记录、"
+            "      历史研究档案：<span class=\"js-weeks\">%d</span> 条阶段记录、"
             '<span class="js-orca">%d</span> 个 ORCA 作业、<span class="js-figures">%d</span> 张图'
-            "和一条「唯一变量」纪律做出来：每改一层模型，都只允许一个变量变，其余全部冻结。"
-            "核心集只有 18 个分子 —— 足以把机制问清楚，不需要大数据。\n"
+            "。18 + 40 分子的历史证据与当前 12 分子生产批次分层保存，不混用验收口径。\n"
             "    </p>\n"
-            '    <p class="kv">\n'
-            "      哪几层可以不算：<b>闭式判据</b>可以在花钱前预判（q_ij &lt;= sqrt(2)/z）、"
-            "<b>介电层自相似</b>而几乎免费（|dE| x eps ~ 2.1 eV）、"
-            "<b>配位位移次线性饱和</b>，漏解只需要靶向而不是全局翻倍。\n"
-            "    </p>"
             % (c["weeks"], c["orca_out"], c["figures"]))
 
 
 def render_hero_links(payload):
     last = payload["weeks"][-1]
     return ('    <nav class="hero-links" aria-label="研究内容快捷入口">\n'
-            '      <a class="hero-link" href="#results"><h4>结果</h4>'
-            "<p>八个小节：从值误差 vs 排序误差，到最小昂贵信息预算。</p></a>\n"
+            '      <a class="hero-link" href="%s/blob/main/docs/PROJECT_GUIDE.md"><h4>从这里开始</h4>'
+            "<p>权威数据、下一步安排与核心代码入口。</p></a>\n"
             '      <a class="hero-link" href="#timeline"><h4>阶段记录</h4>'
             '<p><span class="js-weeks">%d</span> 条，从 Stage 0 到 '
             "physics_completion_v1 的 WP6。</p></a>\n"
@@ -699,12 +740,12 @@ def render_hero_links(payload):
             '      <a class="hero-link" href="#data"><h4>数据与代码</h4>'
             "<p>源码 <code>src/</code>、生成器 <code>scripts/</code>、周报 <code>docs/</code>。</p></a>\n"
             '      <a class="hero-link" id="card-report-latest" href="%s/blob/main/%s">'
-            '<h4>最新记录</h4><p><span class="js-latest-week">%d</span> · '
+            '<h4>历史阶段交付</h4><p><span class="js-latest-week">%d</span> · '
             '<span class="js-latest">Week %d / %s</span></p></a>\n'
             '      <a class="hero-link" href="%s" rel="noopener"><h4>GitHub 仓库</h4>'
             "<p>源码、测试与全部生成器。</p></a>\n"
             "    </nav>"
-            % (len(payload["weeks"]), len(payload["figures"]), REPO_URL, last["doc"],
+            % (REPO_URL, len(payload["weeks"]), len(payload["figures"]), REPO_URL, last["doc"],
                last["n"], last["n"], last["stage"], REPO_URL))
 
 
@@ -714,13 +755,14 @@ def _progress_percent(done, total):
 
 def render_production_status(payload):
     p = payload["wp2_progress"]
+    ensemble = p["ensemble"]
     metrics = (
         ("运行完成", p["runtime"]["computed"], p["runtime"]["total"],
-         "五腿现场 payload"),
-        ("四主态运行", p["main_runtime"]["computed"], p["main_runtime"]["total"],
-         "进程已产出，不代表 QC 通过"),
-        ("科学验收", p["scientific"]["accepted"], p["scientific"]["total"],
-         "收敛 + 完整频率 + 0 虚频"),
+         "60 条登记腿；不含实时队列"),
+        ("主态科学验收", p["scientific"]["accepted"], p["scientific"]["total"],
+         "primary：收敛 + 频率 + 身份 QC"),
+        ("生产系综 accepted", ensemble["accepted"], ensemble["total"],
+         "独立于 primary；仅计 accepted" if ensemble["available"] else "缺少有效标签，不能验收"),
     )
     rows = []
     for label, done, total, note in metrics:
@@ -737,20 +779,32 @@ def render_production_status(payload):
             % (esc(label), done, total, esc(label), total, done, pct, esc(note)))
     freshness = "账本已同步" if not p["stale"] else "账本需重建"
     freshness_class = "fresh" if not p["stale"] else "stale"
+    outstanding = " · ".join(esc(r["name"] + "/" + r["state"]) for r in ensemble["remaining"])
+    if not ensemble["available"]:
+        outstanding = "系综数据不可用，需先重建并核验"
+    elif not outstanding:
+        outstanding = "无未 accepted 态；其余核心闸门仍须单独核验"
     return (
         '    <div class="production-status" id="production">\n'
         '      <div class="production-head">\n'
         '        <div><p class="eyebrow">physics completion · WP2</p>'
-        '<h2>生产进度与科学验收分开计数</h2></div>\n'
+        '<h2>当前进度，不等于最终完成</h2></div>\n'
         '        <a class="snapshot %s" href="%s/blob/main/%s">%s · %s</a>\n'
         '      </div>\n'
         '      <div class="production-grid">\n%s\n      </div>\n'
-        '      <p class="production-note">正常终止不等于科学闭环；运行中、未收敛、虚频和身份 QC '
-        '失败的腿均不进入科学验收。固化交付为 <strong>%d/%d</strong>。</p>\n'
+        '      <p class="production-note">正常终止不等于科学闭环；主态固化交付 <strong>%d/%d</strong>，'
+        '系综 provisional=%d、limited=%d。严格结题闸门：<strong>%s</strong>。</p>\n'
+        '      <p class="production-remaining"><span>未 accepted</span> %s</p>\n'
+        '      <div class="production-evidence"><a href="%s/blob/main/%s">系综标签 ↗</a>'
+        '<a href="%s/blob/main/%s">核心方案合规台账 ↗</a>'
+        '<a href="%s/blob/main/outputs/physics_completion/recovery/strict_recovery_v1_report.md">救援证据 ↗</a></div>\n'
+        '      <p class="snapshot-note">以上为已提交产物快照，不是实时 Slurm 队列；更新时间仅对应主态账本。</p>\n'
         '    </div>'
         % (freshness_class, REPO_URL, p["source"], esc(freshness),
            esc(p["generated_at_utc"]), "\n".join(rows),
-           p["frozen"]["accepted"], p["frozen"]["total"])
+           p["frozen"]["accepted"], p["frozen"]["total"], ensemble["provisional"], ensemble["limited"],
+           esc(ensemble["overall_status"]), outstanding, REPO_URL, ensemble["source"],
+           REPO_URL, ensemble["compliance_source"], REPO_URL)
     )
 
 

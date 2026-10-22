@@ -4,6 +4,26 @@
 >
 > 本仓库**不**给出「18 个溶剂谁最好」的最终排行榜；它研究的是**排序决策**在逐步更真实的计算模型下的**稳定性 / 不稳定性 / 信息成本**。任何把本仓库引用成「最终性能排行榜」的读法都是误读。
 
+## 当前工作入口（与历史阶段分开）
+
+本阶段：12 分子 × 4 主态，wB97X-D4/def2-TZVPD + SMD；解析梯度优化 / AnFreq。以下读自版本化产物，不代表实时超算队列。
+
+| 验收层 | 当前快照 | 权威来源 |
+| --- | --- | --- |
+| 主态科学验收 | 48/48 | [主态账本](outputs/physics_completion/free_states/production_ledger.csv) |
+| 生产系综 | **accepted 43/48** · provisional 0 · limited 5 | [系综标签](outputs/physics_completion/ensembles/production_ensemble_labels.csv) |
+| 严格核心目标 | **blocked_on_production**（工程检查通过不等于科学完成） | [合规台账](outputs/physics_completion/compliance/plan_compliance.md) |
+
+未 accepted：`AN/M_plus`、`DMC/M_plus`、`DMC/LiM_2plus`、`DOL/LiM_2plus`、`EC/LiM_2plus`。
+
+**先读**：[项目导航 / 下一步 / 核心代码](docs/PROJECT_GUIDE.md) · [当前恢复报告](outputs/physics_completion/recovery/strict_recovery_v1_report.md) · [科学协议](docs/physics_completion_protocol.md) · [目录地图](docs/65_repo_layout.md)
+
+**网页**：[静态页面源码](docs/index.html)。仓库可见性与 Pages 托管由 GitHub 设置决定；前端假密码仅为演示门禁，不是保密措施。
+
+---
+
+## 历史研究与证据
+
 在**很小的分子集**（core set = **18** 个分子）上，用**两种**高效量子化学方法（GFN2-xTB 与 r2SCAN-3c），研究「从廉价代理量走向更真实的电子结构 / 环境模型」时，**哪些改变只是数值平移、哪些会真正翻转材料筛选决策**，以及这些翻转背后的物理机制。
 
 > 核心不是「筛出最好的电解液」，而是：
@@ -416,7 +436,7 @@ clean-room 入口（在全新 clone 中逐条执行）：
 它把《电解液排序稳定性：物理证据补强与决策预算研究执行方案》登记为可追溯产物 —— 量名/方向/状态身份、12/8/4 样本与排除原因、锚点三级分类、方法审计矩阵、自由能账本模板与 Δ-learning/成本账本。
 
 该批次 **零数据剔除、零阈值改动**；登记层不引入新计算，增量推进则在同一批次号下登记了新的 ORCA 作业
-（WP1 方法审计 128 个单点 + 32 条弛豫腿 + 1 条 EMC-Li 几何准备；WP2 生产已折入 7 条腿），
+（WP1 方法审计与 WP2 生产证据分别保存在对应账本；最新进度见本 README 顶部），
 这些新计算只增补证据，**不改变**本 README 与 `FINAL_CONCLUSIONS.md` 的任何既有结论
 （Gate 1 仍为 NOT CLOSED / NOT CLOSABLE）；逐周交付件见仓库外 `成果输出（part2）/week37..week44`，
 研究问题→结果→证据→限制见 `docs/physics_completion_final_report.md`。

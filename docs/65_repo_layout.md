@@ -8,6 +8,9 @@
 
 ## 1. 顶层
 
+新读者先看 [PROJECT_GUIDE.md](PROJECT_GUIDE.md)：权威账本、后续安排、核心实现和网页维护入口。
+根 README 与 Pages 当前进度由生成器读取账本；历史周报与当前生产不混为同一验收快照。
+
 | 路径 | 职责 | 是否入交付 |
 | --- | --- | --- |
 | `config/` | 版本化配置：`scientific_definitions.yaml`（旧定义，冻结）、`physics_completion_v1.yaml`（新阶段 WP0-WP6 的量名 / 样本 / 预算 / 停止规则）、`prereg.yaml` | 是（week37 收录 v1） |

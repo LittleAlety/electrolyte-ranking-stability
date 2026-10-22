@@ -18,6 +18,8 @@ Usage
 from __future__ import annotations
 
 import argparse
+import csv
+from collections import Counter
 import hashlib
 import json
 import sys
@@ -712,6 +714,47 @@ def anti_misread_block() -> "list[str]":
     ]
 
 
+def current_progress_block() -> "list[str]":
+    """Current tracked evidence first; never infer completion from row count."""
+    label_path = "outputs/physics_completion/ensembles/production_ensemble_labels.csv"
+    with (REPO / label_path).open(encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    counts = Counter(r["acceptance_status"] for r in rows)
+    molecules = {r["mol_id"] for r in rows}
+    expected = {(m, s) for m in molecules for s in ("M", "M_plus", "LiM_plus", "LiM_2plus")}
+    if (len(rows) != 48 or len(molecules) != 12
+            or {(r["mol_id"], r["state"]) for r in rows} != expected
+            or set(counts) - {"accepted", "provisional", "limited", "blocked"}):
+        raise ValueError("Expected 48 unique production ensemble states")
+    meta = rd("outputs/physics_completion/compliance/plan_compliance_meta.json")
+    with (REPO / "outputs/physics_completion/compliance/plan_compliance.csv").open(
+            encoding="utf-8-sig", newline="") as handle:
+        overall = next(r["status"] for r in csv.DictReader(handle)
+                       if r["item_id"] == "plan_overall_complete")
+    remaining = "、".join(f"`{r['name']}/{r['state']}`" for r in rows
+                         if r["acceptance_status"] != "accepted") or "无"
+    scientific = meta["scientific"]
+    return [
+        "## 当前工作入口（与历史阶段分开）", "",
+        "本阶段：12 分子 × 4 主态，wB97X-D4/def2-TZVPD + SMD；解析梯度优化 / AnFreq。"
+        "以下读自版本化产物，不代表实时超算队列。", "",
+        "| 验收层 | 当前快照 | 权威来源 |", "| --- | --- | --- |",
+        f"| 主态科学验收 | {scientific['accepted']}/{scientific['total']} | "
+        "[主态账本](outputs/physics_completion/free_states/production_ledger.csv) |",
+        f"| 生产系综 | **accepted {counts['accepted']}/48** · provisional {counts['provisional']} · limited {counts['limited']} | "
+        f"[系综标签]({label_path}) |",
+        f"| 严格核心目标 | **{overall}**（工程检查通过不等于科学完成） | "
+        "[合规台账](outputs/physics_completion/compliance/plan_compliance.md) |", "",
+        f"未 accepted：{remaining}。", "",
+        "**先读**：[项目导航 / 下一步 / 核心代码](docs/PROJECT_GUIDE.md) · "
+        "[当前恢复报告](outputs/physics_completion/recovery/strict_recovery_v1_report.md) · "
+        "[科学协议](docs/physics_completion_protocol.md) · [目录地图](docs/65_repo_layout.md)", "",
+        "**网页**：[静态页面源码](docs/index.html)。仓库可见性与 Pages 托管由 GitHub 设置决定；"
+        "前端假密码仅为演示门禁，不是保密措施。", "",
+        "---", "", "## 历史研究与证据", "",
+    ]
+
+
 def new_batch_block() -> "list[str]":
     """新阶段批次（physics_completion_v1）登记段；由 config 与其 WP0 载荷确定性生成。"""
     return [
@@ -724,7 +767,7 @@ def new_batch_block() -> "list[str]":
         "12/8/4 样本与排除原因、锚点三级分类、方法审计矩阵、自由能账本模板与 Δ-learning/成本账本。",
         "",
         "该批次 **零数据剔除、零阈值改动**；登记层不引入新计算，增量推进则在同一批次号下登记了新的 ORCA 作业",
-        "（WP1 方法审计 128 个单点 + 32 条弛豫腿 + 1 条 EMC-Li 几何准备；WP2 生产已折入 7 条腿），",
+        "（WP1 方法审计与 WP2 生产证据分别保存在对应账本；最新进度见本 README 顶部），",
         "这些新计算只增补证据，**不改变**本 README 与 `FINAL_CONCLUSIONS.md` 的任何既有结论",
         "（Gate 1 仍为 NOT CLOSED / NOT CLOSABLE）；逐周交付件见仓库外 `成果输出（part2）/week37..week44`，",
         "研究问题→结果→证据→限制见 `docs/physics_completion_final_report.md`。",
@@ -751,6 +794,7 @@ def build_readme() -> str:
         f"（一致 {fint(dig(g1, 'concordant'))} / 不一致 {fint(dig(g1, 'discordant'))}）（`outputs/week25/series_rel_ordering_check.json`）。**绝对标定层**：溶液相锚点 31 行 `est` 按 R7 裁决记为 **limitation**，不再单列 blocker。**可闭合性**：判 **NOT CLOSABLE**（预注册要求的同装置 / 同判据 / ≥ 7 分子同源序列在公开文献中不存在，最长 k = 1），作为 negative result 记录，不事后救援。 |"
     )
     lines = [status if ln.startswith("**项目状态**") else ln for ln in HEAD]
+    lines[6:6] = current_progress_block()
     lines = [gate1_row if ln.startswith("| Gate 1（方法") else ln for ln in lines]
     anchor = next(i for i, ln in enumerate(lines) if ln.startswith("**项目状态**"))
     lines[anchor + 1:anchor + 1] = [""] + anti_misread_block()
