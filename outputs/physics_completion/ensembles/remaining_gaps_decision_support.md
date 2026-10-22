@@ -72,23 +72,23 @@ Top-3：C15 (C15), C09 (DOL), C08 (C08)
 
 ### C01 DMC（LiM_2plus）
 
-- **状态**：provisional（rescue_budget_exhausted）；n_unique=1，n_registered 见 labels；在途救援 1 个
-- **成员处置**：c06->rescue_budget_exhausted(strict_reopt_required); tors_6_0_1_2->unresolved_qc_failure(max_cycles_exhausted); tors_7_0_1_2->unresolved_qc_failure(); tors_8_0_1_2->unresolved_qc_failure(max_cycles_exhausted)
-- **已烧毁盆地**：1 个（drift/budget-exhausted——重跑不能恢复身份）
+- **状态**：limited（rescue_budget_exhausted）；n_unique=1，n_registered 见 labels；在途救援 0 个
+- **成员处置**：c06->rescue_budget_exhausted(strict_reopt_required); tors_6_0_1_2->unresolved_qc_failure(max_cycles_exhausted); tors_7_0_1_2->rescue_budget_exhausted(verytight_convergence); tors_8_0_1_2->unresolved_qc_failure(max_cycles_exhausted)
+- **已烧毁盆地**：2 个（drift/budget-exhausted——重跑不能恢复身份）
 - **池**：审计判定 `not_in_audit_set`（池内上限 —）；**未用独立盆地 0 个**（池已全部尝试或烧毁）
-- **worst-case 额外拉低**：0.410679 kcal（17.8 meV）＝ max(RT ln N 界 0.410679 kcal，实测 ceiling 无)
-- **排序敏感判定**：**排序不敏感**——Top-3 翻转（氧化轴 否 / Li 条件轴 否），逐对翻轴：none；该态所在轴最多移动 0.411 kcal（0.018 eV）
-在途救援尚未处置——先让登记的救援链落定，暂不新增任何起点
+- **worst-case 额外拉低**：0.000000 kcal（0.0 meV）＝ max(RT ln N 界 0.000000 kcal，实测 ceiling 无)
+- **排序敏感判定**：**排序不敏感**——Top-3 翻转（氧化轴 否 / Li 条件轴 否），逐对翻轴：none；该态所在轴最多移动 0.000 kcal（0.000 eV）
+无未用盆地——冻结池已全部尝试或烧毁，限制原因是终局证据，登记限制即可
 
 ### C01 DMC（M_plus）
 
-- **状态**：provisional（rescue_budget_exhausted）；n_unique=1，n_registered 见 labels；在途救援 1 个
-- **成员处置**：28->rescue_budget_exhausted(strict_reopt_required); tors_6_0_1_2->unresolved_qc_failure(verytight_convergence); tors_7_0_1_2->unresolved_qc_failure(verytight_convergence); tors_8_0_1_2->unresolved_qc_failure()
-- **已烧毁盆地**：1 个（drift/budget-exhausted——重跑不能恢复身份）
+- **状态**：limited（rescue_budget_exhausted）；n_unique=1，n_registered 见 labels；在途救援 0 个
+- **成员处置**：28->rescue_budget_exhausted(strict_reopt_required); tors_6_0_1_2->unresolved_qc_failure(verytight_convergence); tors_7_0_1_2->unresolved_qc_failure(verytight_convergence); tors_8_0_1_2->rescue_budget_exhausted(strict_reopt_required)
+- **已烧毁盆地**：2 个（drift/budget-exhausted——重跑不能恢复身份）
 - **池**：审计判定 `not_in_audit_set`（池内上限 —）；**未用独立盆地 0 个**（池已全部尝试或烧毁）
-- **worst-case 额外拉低**：0.410679 kcal（17.8 meV）＝ max(RT ln N 界 0.410679 kcal，实测 ceiling 无)
-- **排序敏感判定**：**排序不敏感**——Top-3 翻转（氧化轴 否 / Li 条件轴 否），逐对翻轴：none；该态所在轴最多移动 0.411 kcal（0.018 eV）
-在途救援尚未处置——先让登记的救援链落定，暂不新增任何起点
+- **worst-case 额外拉低**：0.000000 kcal（0.0 meV）＝ max(RT ln N 界 0.000000 kcal，实测 ceiling 无)
+- **排序敏感判定**：**排序不敏感**——Top-3 翻转（氧化轴 否 / Li 条件轴 否），逐对翻轴：none；该态所在轴最多移动 0.000 kcal（0.000 eV）
+无未用盆地——冻结池已全部尝试或烧毁，限制原因是终局证据，登记限制即可
 
 ### C04 EC（LiM_2plus）
 

@@ -8,7 +8,7 @@
 
 | 项 | 值 |
 |---|---|
-| 系综 | **44 accepted / 2 limited / 2 provisional**（分母 48 不变）
+| 系综 | **44 accepted / 4 limited / 0 provisional**（分母 48 不变）
 | 主生产账本（60 腿） | 591.8 core-hours（0 条 MISSING）
 
 ## 恢复包消耗（按包实测，4 核/腿）
@@ -34,7 +34,7 @@
 
 | 原因 | 态数 | 态 |
 |---|---|---|
-| `rescue_budget_exhausted` | 2 | DOL|LiM_2plus, EC|LiM_2plus |
+| `rescue_budget_exhausted` | 4 | DMC|M_plus, DMC|LiM_2plus, DOL|LiM_2plus, EC|LiM_2plus |
 
 ## 下一轮授权需要知道的事
 

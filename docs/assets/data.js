@@ -7,11 +7,11 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 150,
+  "test_files": 152,
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-22T13:18:01Z",
+  "generated_at_utc": "2026-10-22T13:44:24Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -32,20 +32,20 @@ window.HB = {
   "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
   "ensemble": {
    "accepted": 44,
-   "provisional": 2,
-   "limited": 2,
+   "provisional": 0,
+   "limited": 4,
    "total": 48,
    "remaining": [
     {
      "name": "DMC",
      "state": "M_plus",
-     "status": "provisional",
+     "status": "limited",
      "reason": "rescue_budget_exhausted"
     },
     {
      "name": "DMC",
      "state": "LiM_2plus",
-     "status": "provisional",
+     "status": "limited",
      "reason": "rescue_budget_exhausted"
     },
     {
@@ -1723,7 +1723,7 @@ window.HB = {
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 153
+   "files": 155
   },
   {
    "path": "docs",

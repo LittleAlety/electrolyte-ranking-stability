@@ -104,10 +104,16 @@ def _probe_starts(name: str, state: str) -> list[str]:
 
 
 def _rejected_probe_members() -> set:
-    """Members a fragment preflight refused, from the repair manifests.
+    """Members that are recorded as REFUSED or as REPLACED-AFTER-CANCELLATION.
 
-    Derived from the recorded decision (``rejected`` entries carry a reason),
-    never from a hand-kept list, so the exclusion stays auditable.
+    Both are decisions with evidence, never absences:
+
+    * ``rejected`` entries carry the reason the fragment preflight refused the
+      candidate (EC's central C=O);
+    * ``replaces_cancelled_job`` + ``requested_tasks`` name the elements of a
+      CANCELLED array that a repair package supersedes (DMC/LiM_2plus tors_7,
+      job 3747724, Elapsed=0).  Their stale ``pending`` rows must not be read as
+      work still in flight.
     """
     import json as _json
     out = set()
@@ -120,6 +126,15 @@ def _rejected_probe_members() -> set:
             key = entry.get("member_key") if isinstance(entry, dict) else None
             if key:
                 out.add(key)
+        if data.get("replaces_cancelled_job"):
+            for task in data.get("requested_tasks") or []:
+                # tasks/DMC/LiM_2plus__tors_7_0_1_2 -> DMC|LiM_2plus|tors_7_0_1_2
+                leaf = task.split("/")[-1]
+                if "__" not in leaf:
+                    continue
+                name = task.split("/")[-2]
+                slot, seed = leaf.split("__", 1)
+                out.add("%s|%s|%s" % (name, slot, seed))
     return out
 
 def _search_scope_documented(search_outcome: str, starts: list) -> bool:

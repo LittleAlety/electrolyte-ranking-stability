@@ -2,7 +2,7 @@
 
 > 由 `scripts/wp_production/build_plan_compliance.py` 从 `outputs/physics_completion/**`、`outputs/week7/`、`data/references/anchor_primary_audit.csv`
 > 只读现算；本文件不写死任何状态或数字，生产腿每落地一批重跑即更新。
-> generated_at_utc=2026-10-22T13:18:01Z; runtime_input_sha256=bcd4d833ae0b7b950406104b59d5807f046e6a66006357e377e2ee689e4f1798; scientific_ledger_sha256=1fa06256a6e760b72f2703ab3e215dbb76c33bcf0aecd5515763147c1688fcda; stale=false
+> generated_at_utc=2026-10-22T13:44:24Z; runtime_input_sha256=bcd4d833ae0b7b950406104b59d5807f046e6a66006357e377e2ee689e4f1798; scientific_ledger_sha256=1fa06256a6e760b72f2703ab3e215dbb76c33bcf0aecd5515763147c1688fcda; stale=false
 > **运行进度：60/60**；**主态运行完成：48/48**；**科学验收（四主态）：48/48**；**固化交付主态：48/48**。QC 失败、partial、missing、running 均不计入科学验收。
 
 | item_id | 方案节 | 要求 | 状态 | 实测 | 证据 |
@@ -18,7 +18,7 @@
 | `wp2_four_state_complete` | §6 WP2 固定背景配对自由能标签 | 12 主集每个分子的 M / M+ / [LiM]+ / [LiM]2+ 四态全部产出 | satisfied | main_four_state_complete=12/12; main_li_pair_complete=12/12; pilot_four_state_complete=4/4; pilot_five_leg_complete=4/4 | work/wp2prod/**/<name>_<state>.json; data/metadata/physics_completion_set.csv; outputs/physics_completion/closure/four_molecule_state_closure.csv |
 | `wp2_free_redox_labels` | §6 WP2 固定背景配对自由能标签 | 绝热电子能差 + 单构象自由能差（两腿同为 def2-TZVPD 才相减） | satisfied | main_free_status_computed=12/12; main_li_status_computed=12/12; pilot_rows=12 | outputs/physics_completion/free_states/production_redox.csv |
 | `wp2_li_legs` | §6 WP2 固定背景配对自由能标签 | Li 条件态（[LiM]+ / [LiM]2+）：E 与 G 两种配位位移 | satisfied | main_li_legs_produced=24/24; main_li_pair_complete=12/12; main_li_labels=12/12 | work/wp2prod/**/<name>_<state>.json; outputs/physics_completion/free_states/production_redox.csv |
-| `wp2_conformer_ensemble` | §6 WP2 固定背景配对自由能标签 | 12 x 4 主态的生产级同态构象/配位 motif 系综自由能 G_ensemble | partial | production_ensemble accepted=44/48; provisional=2; limited=2; screen_gfn2_rows=75 | outputs/physics_completion/ensembles/production_ensemble_labels.csv; outputs/physics_completion/ensembles/ensemble_free_energies.csv |
+| `wp2_conformer_ensemble` | §6 WP2 固定背景配对自由能标签 | 12 x 4 主态的生产级同态构象/配位 motif 系综自由能 G_ensemble | partial | production_ensemble accepted=44/48; provisional=0; limited=4; screen_gfn2_rows=75 | outputs/physics_completion/ensembles/production_ensemble_labels.csv; outputs/physics_completion/ensembles/ensemble_free_energies.csv |
 | `wp2_sampling_extension` | §6 WP2 固定背景配对自由能标签 | 采样审计集 3 -> 6 结构比较与 sampling_limited 判定 | partial | acceptance_ok=9/9; escalation_pending=24/24; executed=C01,C02,C03,C04,C05,C08,C09,C13,C14,C15,C16,C17; designated=C02,C03,C08,C17 | outputs/physics_completion/sampling/sampling_acceptance.csv; outputs/physics_completion/sampling/sampling_escalation.csv; data/metadata/physics_completion_set.csv |
 | `wp2_closure_acceptance` | §6 WP2 固定背景配对自由能标签 | 闭环表自检：不造数 / 未完成显式登记 / 几何与频率 QC | satisfied | closure_checks_ok=11/11 | outputs/physics_completion/closure/closure_acceptance.csv |
 | `wp2_flip_persistence` | §6 WP2 固定背景配对自由能标签 | EMC-GBL / EMC-SL 两对翻转能否保留到自由能层 | satisfied | rungs_computed=10/10 production + 2/2 screen (computed_screen_only) | outputs/physics_completion/closure/flip_persistence.csv |

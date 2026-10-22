@@ -11,7 +11,7 @@
 | 分子 | M_plus gap (eV) | 当前位次含义 | M_plus 态 | 限制原因 | n_unique |
 |---|---|---|---|---|---|
 | AN | 9.0603 | **已越地板**——真值只需保持即可改写 Top-3 | accepted | single_basin_pool | 1 |
-| DMC | 8.3048 | **已越地板**——真值只需保持即可改写 Top-3 | provisional | rescue_budget_exhausted | 1 |
+| DMC | 8.3048 | **已越地板**——真值只需保持即可改写 Top-3 | limited | rescue_budget_exhausted | 1 |
 | EMC | 8.1076 | 未越地板（上界敏感） | accepted | — | 2 |
 | TMP | 7.9449 | 未越地板（上界敏感） | accepted | — | 3 |
 

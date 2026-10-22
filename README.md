@@ -11,7 +11,7 @@
 | 验收层 | 当前快照 | 权威来源 |
 | --- | --- | --- |
 | primary 优化 / 频率 QC | 48/48（全成员身份另列） | [主态账本](outputs/physics_completion/free_states/production_ledger.csv) |
-| 生产系综 | **accepted 44/48** · provisional 2 · limited 2 | [系综标签](outputs/physics_completion/ensembles/production_ensemble_labels.csv) |
+| 生产系综 | **accepted 44/48** · provisional 0 · limited 4 | [系综标签](outputs/physics_completion/ensembles/production_ensemble_labels.csv) |
 | 全成员前沿 / 身份登记 | 解析 80/80 · 证据表标记 verified 80/80；不代表独立完整科学身份 QC | [前沿报告](outputs/physics_completion/frontier/frontier_localization.md) · [证据表](outputs/physics_completion/frontier/frontier_identity_evidence.csv) |
 | 现有合规总体项 | **blocked_on_production**（不是完整 v3 严格目标证书） | [合规台账](outputs/physics_completion/compliance/plan_compliance.md) |
 

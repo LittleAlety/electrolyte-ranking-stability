@@ -45,7 +45,7 @@ note 原文：screen-level only (gas-phase GFN2), NOT the production R4 rung; he
 | 分子 | gap (eV) | M_plus 腿 | M 腿 | bound 区间 [lo, hi] |
 | --- | --- | --- | --- | --- |
 | AN | 9.0603 | accepted | accepted | [9.0603, 9.0603] |
-| DMC | 8.3048 | provisional（rescue_budget_exhausted） | accepted | [8.3048, 8.3048] |
+| DMC | 8.3048 | limited（rescue_budget_exhausted） | accepted | [8.3048, 8.3048] |
 | EC | 8.2807 | accepted | accepted | [8.2629, 8.2807] |
 | PC | 8.1547 | accepted | accepted | [8.1369, 8.1547] |
 | EMC | 8.1076 | accepted | accepted | [8.0898, 8.1254] |
