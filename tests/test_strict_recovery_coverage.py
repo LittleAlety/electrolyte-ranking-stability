@@ -43,9 +43,12 @@ def test_manifest_scope_and_legs_stay_within_the_frozen_caps():
     assert sum(int(r["max_new_starts"]) for r in rows) <= 28
     # every state names its priority and path; no invented start basins
     for r in rows:
-        if r.get("released") == "true":
+        if r.get("released") == "true" and r.get("priority") == "released":
             # released rows are frozen evidence, not new work: their starts
-            # must still exist but no fresh budget is registered
+            # must still exist but no fresh budget is registered.  Rows that
+            # were released by the C-group full-qualified-set rule keep their
+            # original priority spelling and are excluded here (their budget
+            # fields come verbatim from the review, not from this generator).
             assert r["max_new_starts"] == "0", r["name"]
             continue
         assert r["priority"] in ("P0", "P1")
@@ -97,10 +100,10 @@ def test_a_state_is_resolved_only_with_a_computed_kept_member():
         # evidence must match the route; the full per-route contract is pinned in
         # tests/test_resolved_route_evidence.py, this test keeps the weaker
         # invariant so both files fail loudly on a shape regression
-        if route == "single_basin_verified":
-            claimed = [x for x in (r.get("kept_pool_evidence") or "").split(";") if x]
-        else:
-            claimed = [x for x in r["computed_new_members"].split(";") if x]
+        # evidence may live in either column (kept_pool_evidence carries the
+        # C-group closures whose members came from earlier batches)
+        claimed = ([x for x in r["computed_new_members"].split(";") if x]
+                   or [x for x in (r.get("kept_pool_evidence") or "").split(";") if x])
         assert claimed, r["review_id"]
         for key in claimed:
             assert key in weights, "%s resolved but %s is not a kept member" % (
@@ -110,7 +113,10 @@ def test_a_state_is_resolved_only_with_a_computed_kept_member():
     # legs whose motif search collapsed onto known motifs
     exhausted_legged = {(r["name"], r["state"]) for r in rows
                         if r["verdict"] == "search_exhausted"}
-    assert {("AN", "M_plus"), ("DMC", "M_plus"), ("EMC", "M_plus")} <= exhausted_legged
+    # EMC|M_plus left this set by the C-group ruling (two qualified minima);
+    # AN/DMC|M_plus remain genuinely search-exhausted
+    assert {("AN", "M_plus"), ("DMC", "M_plus")} <= exhausted_legged
+    assert ("EMC", "M_plus") not in exhausted_legged
     assert exhausted_legged <= {
         ("AN", "M_plus"), ("DMC", "M_plus"), ("EMC", "M_plus"),
         ("DMC", "LiM_2plus"), ("EC", "LiM_2plus"), ("DOL", "LiM_2plus"),
@@ -123,9 +129,14 @@ def test_search_exhausted_is_never_treated_as_resolved():
         (REPO / "outputs" / "physics_completion" / "ensembles"
          / "production_ensemble_labels.csv").open(encoding="utf-8")))
     for r in labels:
-        if r["name"] in ("AN", "DMC", "EMC") and r["state"] == "M_plus":
+        if r["name"] in ("AN", "DMC") and r["state"] == "M_plus":
             assert r["acceptance_status"] == "limited"
             assert r["coverage_status"] != "resolved_by_review"
+        if r["name"] == "EMC" and r["state"] == "M_plus":
+            # C-group release (user ruling): two qualified minima, history kept
+            assert r["acceptance_status"] == "accepted"
+            assert r["coverage_status"] == "resolved_by_review"
+            assert r["n_qc_failed"] != "0"          # n_limited history retained
 
 
 def test_no_state_leaves_limited_without_a_resolved_review():

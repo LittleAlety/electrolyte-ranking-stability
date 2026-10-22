@@ -642,10 +642,12 @@ def acceptance_decision(*, unresolved: int, n_limited: int, cov, kept_keys) -> t
     cov_resolved = False
     cov_id = ""
     if cov and cov.get("verdict") == "resolved" and not unresolved:
-        if cov.get("route") == "single_basin_verified":
-            claimed = [m for m in (cov.get("kept_pool_evidence") or "").split(";") if m]
-        else:
-            claimed = [m for m in (cov.get("computed_new_members") or "").split(";") if m]
+        # whichever column carries the review's evidence, the anti-cheat is the
+        # same: every claimed member must be in the kept pool.  The C-group
+        # multi-basin route names its members in kept_pool_evidence (they may
+        # come from earlier batches, so computed_new_members is empty).
+        claimed = ([m for m in (cov.get("computed_new_members") or "").split(";") if m]
+                   or [m for m in (cov.get("kept_pool_evidence") or "").split(";") if m])
         cov_resolved = bool(claimed) and all(c in kept_keys for c in claimed)
         cov_id = cov.get("review_id", "") if cov_resolved else ""
     if unresolved:

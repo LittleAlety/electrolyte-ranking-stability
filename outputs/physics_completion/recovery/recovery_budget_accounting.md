@@ -8,7 +8,7 @@
 
 | 项 | 值 |
 |---|---|
-| 系综 | **39 accepted / 9 limited / 0 provisional**（分母 48 不变）
+| 系综 | **41 accepted / 7 limited / 0 provisional**（分母 48 不变）
 | 主生产账本（60 腿） | 591.8 core-hours（0 条 MISSING）
 
 ## 恢复包消耗（按包实测，4 核/腿）
@@ -33,8 +33,8 @@
 
 | 原因 | 态数 | 态 |
 |---|---|---|
-| `rescue_budget_exhausted` | 7 | AN|M_plus, DMC|M_plus, TMP|M_plus, DMSO|LiM_plus, DMC|LiM_2plus, DOL|LiM_2plus, EC|LiM_2plus |
-| `species_drift_unrecoverable` | 2 | EMC|M_plus, TMP|LiM_plus |
+| `rescue_budget_exhausted` | 6 | AN|M_plus, DMC|M_plus, DMSO|LiM_plus, DMC|LiM_2plus, DOL|LiM_2plus, EC|LiM_2plus |
+| `species_drift_unrecoverable` | 1 | TMP|LiM_plus |
 
 ## 下一轮授权需要知道的事
 

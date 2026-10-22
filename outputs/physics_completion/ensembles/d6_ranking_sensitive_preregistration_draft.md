@@ -5,15 +5,15 @@
 
 ## 排序敏感的量化依据（accepted-only，RT 修正后口径）
 
-- accepted Top-3 = EC > PC > SL（地板 7.7506 eV）
+- accepted Top-3 = EC > PC > EMC（地板 8.1076 eV）
 - 四个敏感态的当前 gap 与地板比较（M_plus 态受限）：
 
 | 分子 | M_plus gap (eV) | 当前位次含义 | M_plus 态 | 限制原因 | n_unique |
 |---|---|---|---|---|---|
 | AN | 9.0603 | **已越地板**——真值只需保持即可改写 Top-3 | limited | rescue_budget_exhausted | 1 |
 | DMC | 8.3048 | **已越地板**——真值只需保持即可改写 Top-3 | limited | rescue_budget_exhausted | 1 |
-| EMC | 8.1076 | **已越地板**——真值只需保持即可改写 Top-3 | limited | species_drift_unrecoverable | 2 |
-| TMP | 7.9449 | **已越地板**——真值只需保持即可改写 Top-3 | limited | rescue_budget_exhausted | 2 |
+| EMC | 8.1076 | 未越地板（上界敏感） | accepted | — | 2 |
+| TMP | 7.9449 | 未越地板（上界敏感） | accepted | — | 2 |
 
 ## 若启动新池搜索，预注册必须冻结的四件事（v3.0 §13.5 + D6）
 
@@ -28,7 +28,7 @@
 
 ### 各态冻结池现状（派生自缺口表，非笼统声明）
 
-AN：冻结池内 M_plus 无未用盆地; DMC：冻结池内 M_plus 无未用盆地; EMC：冻结池内 M_plus 无未用盆地; TMP：**池内仍有未用盆地 10（c10 (+4.235 kcal in pool)）**——受限候选可能影响全池 Top-3，现有候选扩展是否改变排序属独立问题，分列登记。
+AN：冻结池内 M_plus 无未用盆地; DMC：冻结池内 M_plus 无未用盆地。
 
 ### 稿件状态
 

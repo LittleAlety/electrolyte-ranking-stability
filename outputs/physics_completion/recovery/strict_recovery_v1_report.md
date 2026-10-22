@@ -7,11 +7,11 @@
 
 | 状态 | 态数 |
 |---|---|
-| accepted | 39 |
+| accepted | 41 |
 | provisional | 0 |
-| limited | 9 |
+| limited | 7 |
 
-分母固定 48；未 accepted 共 **9** 态（`provisional` = 有登记补救在飞，`limited` = 首轮搜索耗尽）。
+分母固定 48；未 accepted 共 **7** 态（`provisional` = 有登记补救在飞，`limited` = 首轮搜索耗尽）。
 
 ## 恢复腿终局统计（按**最后一次真实运行**；规划中的补救另计）
 
@@ -33,8 +33,8 @@
 
 | verdict | 态数 |
 |---|---|
-| `search_exhausted` | 6 |
-| `unresolved` | 3 |
+| `search_exhausted` | 5 |
+| `unresolved` | 2 |
 
 ## 本批放行的态（覆盖复核 resolved）
 
@@ -43,8 +43,10 @@
 | `DEC|M` | `accepted` | 3 | **1** | -422.45386546854 |
 | `DME|LiM_2plus` | `accepted` | 2 | **2** | -316.18568257157 |
 | `DME|M_plus` | `accepted` | 3 | **1** | -308.75146090372 |
+| `EMC|M_plus` | `accepted` | 2 | **1** | -382.82477506813 |
 | `SL|LiM_2plus` | `accepted` | 2 | **1** | -713.21346632930 |
 | `TMP|LiM_2plus` | `accepted` | 3 | **1** | -769.48074188281 |
+| `TMP|M_plus` | `accepted` | 2 | **3** | -762.03948789889 |
 
 `n_limited` 一列是**故意保留的历史计数**：这些态经复核放行，但「曾经有限制」这件事仍然记在账本里——不是清空它。
 
@@ -59,9 +61,7 @@
 | DMSO\|LiM_plus | `limited` | `unresolved` | `new_minima_found` | 1 | LiM_plus\|r3m_c00（2/2；结果 technical_complete_qc_failed/strict_reopt_required；当前 technical_complete_qc_failed） |
 | DOL\|LiM_2plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
 | EC\|LiM_2plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
-| EMC\|M_plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
 | TMP\|LiM_plus | `limited` | `unresolved` | `new_minima_found` | 2 | LiM_plus\|r3m_c05（2/2；结果 technical_complete_qc_failed/verytight_convergence；当前 technical_complete_qc_failed）<br>LiM_plus\|r3m_c08（2/2；结果 technical_complete_qc_failed/strict_reopt_required；当前 technical_complete_qc_failed） |
-| TMP\|M_plus | `limited` | `unresolved` | `new_minima_found` | 2 | M_plus\|c10（2/2；结果 technical_complete_qc_failed/strict_reopt_required；当前 technical_complete_qc_failed）<br>M_plus\|r3_c42（2/2；结果 technical_complete_qc_failed/strict_reopt_required；当前 technical_complete_qc_failed） |
 
 ## 本轮无法恢复的态（需换搜索方法，不在本批预算内）
 
@@ -70,7 +70,6 @@
 - `DMC|M_plus` — no_new_minimum_found
 - `DOL|LiM_2plus` — no_new_minimum_found
 - `EC|LiM_2plus` — no_new_minimum_found
-- `EMC|M_plus` — no_new_minimum_found
 
 ## 尝试预算已用尽的腿（不再自动重试，保留原因）
 
@@ -81,4 +80,4 @@
 - `TMP|LiM_plus|r3m_c05` — `verytight_convergence`：VeryTightOpt final criterion not met: energy_change_Eh=2.0146e-06 > 2e-07;hess_a
 - `TMP|LiM_plus|r3m_c08` — `strict_reopt_required`：orca_close_enough_but_frozen_tolE_missed_reopt_required;hess_act_energy=0_anfreq
 
-**结论口径**：本报告不改变任何验收判定。系综达到 39/48；`plan_overall_complete` 与 WP6 只有在 48/48 时才可能开闸。
+**结论口径**：本报告不改变任何验收判定。系综达到 41/48；`plan_overall_complete` 与 WP6 只有在 48/48 时才可能开闸。

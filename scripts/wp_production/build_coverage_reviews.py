@@ -189,6 +189,26 @@ def build_rows() -> list[dict]:
                    # recovery leg was never seen and no state could ever resolve
                    if r.get("name") == name and r.get("slot") == state
                    and str(r.get("member_role", "")).startswith(RECOVERY_ROLE_PREFIX)]
+        # the FULL qualified evidence set (user ruling C-group): any weighted
+        # computed member counts toward coverage, whichever batch supplied it --
+        # the historical gap may have been closed by an earlier leg
+        qualified_all = [r for r in struct
+                         if r.get("name") == name and r.get("slot") == state
+                         and r.get("status") == "computed"
+                         and r.get("member_key") in weights]
+        # the primary IS a weighted qualified member: its production leg lives
+        # in the MAIN ledger, so the structures table only carries a bookkeeping
+        # row with status ``ready`` -- which IS its computed state, because a
+        # primary enters the ensemble manifest only after production QC passed.
+        # (Without this the count never reached two and the C-group ruling never
+        # fired: the primary was excluded by a status word, not by evidence.)
+        primary_key = "%s|%s|primary" % (name, state)
+        if primary_key in weights and \
+                not any(r.get("member_key") == primary_key
+                        for r in qualified_all):
+            qualified_all.append({"member_key": primary_key,
+                                  "status": "ready",
+                                  "member_role": "primary"})
         computed = [r for r in members if r.get("status") == "computed"]
         pending = [r for r in members if r.get("status") in ("pending", "ready")]
         # "new minimum" == computed AND present in the Boltzmann weight table
@@ -240,12 +260,23 @@ def build_rows() -> list[dict]:
             (r.get("log_sha256") or "") != ""
             for r in computed)
 
-        route, route_note = coverage_route(
-            members, novelty,
-            min_unique_after=_n_unique(key),
-            registered_starts=starts,
-            search_outcome=search_outcome,
-            production_evidence=production_evidence)
+        # C-group ruling: a state whose WEIGHTED qualified members already give
+        # >=2 independent minima is multi-basin covered, whichever batch supplied
+        # them; the review still names the kept-pool members as its evidence so
+        # the aggregator's anti-cheat can verify every claim
+        if len(qualified_all) >= 2 and not pending:
+            route = "multi_basin_coverage"
+            route_note = ("%d weighted independent minima from the full qualified "
+                         "evidence set (user ruling C-group: coverage over ALL "
+                         "qualified members, not only the recovery batch)"
+                         % len(qualified_all))
+        else:
+            route, route_note = coverage_route(
+                members, novelty,
+                min_unique_after=_n_unique(key),
+                registered_starts=starts,
+                search_outcome=search_outcome,
+                production_evidence=production_evidence)
         verdict_route = route
         if route in ("multi_basin_coverage", "single_basin_verified"):
             verdict = "resolved"
@@ -267,7 +298,8 @@ def build_rows() -> list[dict]:
             note = route_note
 
         if route == "multi_basin_coverage":
-            kept_evidence = [k for k, v in novelty.items() if v == "new"]
+            kept_evidence = ([k for k, v in novelty.items() if v == "new"]
+                             or [r["member_key"] for r in qualified_all])
         elif route in ("single_basin_verified", "known_basin_reproduction"):
             kept_evidence = sorted({
                 d.get("duplicate_of", "")

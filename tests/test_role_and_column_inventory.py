@@ -196,10 +196,8 @@ def test_resolved_reviews_claim_members_that_are_really_kept():
             continue
         # evidence shape follows the route: multi-basin claims the new minima
         # themselves; single-basin claims the KEPT minima the starts reproduced
-        if row.get("route") == "single_basin_verified":
-            claimed = [c for c in (row.get("kept_pool_evidence") or "").split(";") if c]
-        else:
-            claimed = [c for c in (row.get("computed_new_members") or "").split(";") if c]
+        claimed = ([c for c in (row.get("computed_new_members") or "").split(";") if c]
+                   or [c for c in (row.get("kept_pool_evidence") or "").split(";") if c])
         assert claimed, "a resolved review must name the member it released"
         for key in claimed:
             assert key in weights, (

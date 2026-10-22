@@ -11,7 +11,7 @@ window.HB = {
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-21T22:44:08Z",
+  "generated_at_utc": "2026-10-22T00:37:20Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -1630,8 +1630,8 @@ window.HB = {
    "file": "F64_physics_completion_budget_curve.png",
    "week": 44,
    "caption": "累计成本 -> 选集恢复曲线（方案 WP5）：冻结的 20 种子池内回放，tau_b 与 Top-3 重叠随已查询标签数 n_T 的曲线与端点线；这是已知数据的回放，不是盲预注册",
-   "sha": "612a4d9e0ef178c4c99a9e66439a6198858551a38a7e19f626ab11a976804f8b",
-   "bytes": 177681,
+   "sha": "5a4435f11dd7bb0daee6aa74c9002fe366079df22507b5856bf0c72439a0f51b",
+   "bytes": 178898,
    "w": 1856,
    "h": 832
   }

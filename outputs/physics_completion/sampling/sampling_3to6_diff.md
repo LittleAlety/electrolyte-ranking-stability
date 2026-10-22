@@ -29,7 +29,7 @@
 | 分子 | 态 | 池类型 | round1 | 池内上限 | 审计判定 | accepted | n_unique | G_ens(round-1) kcal/mol | G_ens(ceiling) | Δ |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | EMC | M | free_conformer | 2 | 2 | sampling_limited | accepted | 2 | -240413.138161 | — | — |
-| EMC | M_plus | free_conformer | 2 | 2 | sampling_limited | limited | 2 | -240226.173237 | — | — |
+| EMC | M_plus | free_conformer | 2 | 2 | sampling_limited | accepted | 2 | -240226.173237 | — | — |
 | EMC | LiM_plus | li_motif_round2_measured | 2 | 4 | executable_partial | accepted | 3 | -245090.677606 | — | — |
 | EMC | LiM_2plus | li_motif_round2_measured | 1 | 2 | executable_partial | accepted | 1 | -244894.595300 | — | — |
 | DEC | M | free_conformer | 3 | 3 | sampling_limited | accepted | 3 | -265093.802909 | — | — |
@@ -41,7 +41,7 @@
 | DME | LiM_plus | li_motif_round2_measured | 1 | 1 | sampling_limited | accepted | 1 | -198585.253686 | — | — |
 | DME | LiM_2plus | li_motif_round2_measured | 1 | 3 | executable_partial | accepted | 2 | -198409.511357 | — | — |
 | TMP | M | free_conformer | 2 | 2 | sampling_limited | accepted | 2 | -478370.212791 | — | — |
-| TMP | M_plus | free_conformer | 3 | 3 | sampling_limited | limited | 2 | -478186.998219 | — | — |
+| TMP | M_plus | free_conformer | 3 | 3 | sampling_limited | accepted | 2 | -478186.998219 | — | — |
 | TMP | LiM_plus | li_motif_round2_measured | 2 | 5 | executable_partial | limited | 1 | -483045.245173 | — | — |
 | TMP | LiM_2plus | li_motif_round2_measured | 2 | 3 | executable_partial | accepted | 3 | -482856.455592 | — | — |
 

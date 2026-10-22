@@ -31,7 +31,7 @@
 | 5 | C13 (C13) | 7.703 | 8.920 |
 | 6 | C14 (C14) | 7.751 | 1.097 |
 | 7 | C17 (TMP) | 7.945 | 4.481 |
-| 8 | C02 (EMC) | 8.108 | 3.750 |
+| 8 | C02 (C02) | 8.108 | 3.750 |
 | 9 | C05 (C05) | 8.155 | 1.086 |
 | 10 | C04 (EC) | 8.281 | 2.906 |
 | 11 | C01 (DMC) | 8.305 | 0.557 |
@@ -50,7 +50,7 @@ Top-3：C15 (DMSO), C08 (C08), C09 (DOL)
 | 5 | C14 (C14) | 8.251 | 1.480 |
 | 6 | C13 (C13) | 8.370 | 2.741 |
 | 7 | C03 (C03) | 8.448 | 1.811 |
-| 8 | C02 (EMC) | 8.503 | 1.261 |
+| 8 | C02 (C02) | 8.503 | 1.261 |
 | 9 | C05 (C05) | 8.553 | 1.163 |
 | 10 | C04 (EC) | 8.752 | 4.580 |
 | 11 | C01 (DMC) | 8.830 | 1.805 |
@@ -86,16 +86,6 @@ Top-3：C15 (DMSO), C09 (DOL), C08 (C08)
 - **成员处置**：28->rescue_budget_exhausted(strict_reopt_required)
 - **已烧毁盆地**：1 个（drift/budget-exhausted——重跑不能恢复身份）
 - **池**：审计判定 `not_in_audit_set`（池内上限 —）；**未用独立盆地 0 个**（池已全部尝试或烧毁）
-- **worst-case 额外拉低**：0.000000 kcal（0.0 meV）＝ max(RT ln N 界 0.000000 kcal，实测 ceiling 无)
-- **排序敏感判定**：**排序不敏感**——Top-3 翻转（氧化轴 否 / Li 条件轴 否），逐对翻轴：none；该态所在轴最多移动 0.000 kcal（0.000 eV）
-无未用盆地——冻结池已全部尝试或烧毁，限制原因是终局证据，登记限制即可
-
-### C02 EMC（M_plus）
-
-- **状态**：limited（species_drift_unrecoverable）；n_unique=2，n_registered 见 labels；在途救援 0 个
-- **成员处置**：21->computed(strict_reopt_not_needed); 4->species_drift_unrecoverable(candidate_bond_graph_changed)
-- **已烧毁盆地**：1 个（drift/budget-exhausted——重跑不能恢复身份）
-- **池**：审计判定 `sampling_limited`（池内上限 2）；**未用独立盆地 0 个**（池已全部尝试或烧毁）
 - **worst-case 额外拉低**：0.000000 kcal（0.0 meV）＝ max(RT ln N 界 0.000000 kcal，实测 ceiling 无)
 - **排序敏感判定**：**排序不敏感**——Top-3 翻转（氧化轴 否 / Li 条件轴 否），逐对翻轴：none；该态所在轴最多移动 0.000 kcal（0.000 eV）
 无未用盆地——冻结池已全部尝试或烧毁，限制原因是终局证据，登记限制即可
@@ -149,16 +139,6 @@ Top-3：C15 (DMSO), C09 (DOL), C08 (C08)
 - **worst-case 额外拉低**：0.000000 kcal（0.0 meV）＝ max(RT ln N 界 0.000000 kcal，实测 ceiling 无)
 - **排序敏感判定**：**排序不敏感**——Top-3 翻转（氧化轴 否 / Li 条件轴 否），逐对翻轴：none；该态所在轴最多移动 0.000 kcal（0.000 eV）
 无未用盆地——冻结池已全部尝试或烧毁，限制原因是终局证据，登记限制即可
-
-### C17 TMP（M_plus）
-
-- **状态**：limited（rescue_budget_exhausted）；n_unique=2，n_registered 见 labels；在途救援 0 个
-- **成员处置**：27->computed(strict_reopt_not_needed); 33->rescue_budget_exhausted(strict_reopt_required); c10->rescue_budget_exhausted(strict_reopt_required); r3_c42->rescue_budget_exhausted(strict_reopt_required)
-- **已烧毁盆地**：3 个（drift/budget-exhausted——重跑不能恢复身份）
-- **池**：审计判定 `sampling_limited`（池内上限 3）；**未用独立盆地 1 个**：c10 (+4.235 kcal in pool)
-- **worst-case 额外拉低**：0.240232 kcal（10.4 meV）＝ max(RT ln N 界 0.240232 kcal，实测 ceiling 无)
-- **排序敏感判定**：**排序不敏感**——Top-3 翻转（氧化轴 否 / Li 条件轴 否），逐对翻轴：none；该态所在轴最多移动 0.240 kcal（0.010 eV）
-- **建议**：有 {'mol_id': 'C17', 'name': 'TMP', 'state': 'M_plus', 'acceptance_status': 'limited', 'limitation_reason': 'rescue_budget_exhausted', 'n_unique': '2', 'n_rescue_in_flight': '0', 'disposition_summary': '27->computed(strict_reopt_not_needed); 33->rescue_budget_exhausted(strict_reopt_required); c10->rescue_budget_exhausted(strict_reopt_required); r3_c42->rescue_budget_exhausted(strict_reopt_required)', 'n_burned_basins': '3', 'audit_status': 'sampling_limited', 'audit_ceiling': '3', 'unused_basins': '10', 'n_unused': '1', 'unused_sources': 'c10 (+4.235 kcal in pool)', 'n_max_members': '3', 'rt_extra_bound_kcal': '0.240232', 'measured_ceiling_drop_kcal': '', 'worst_extra_lowering_kcal': '0.240232', 'worst_extra_lowering_mev': '10.4', 'axis_moves_kcal': 'oxidation=0.240', 'top3_oxidation_flip': 'false', 'top3_licond_flip': 'false', 'pair_order_flips': 'none', 'ranking_sensitive': 'false', 'recommendation': 'keep_limited_ranking_insensitive_unused_basin_on_record'} 个未用盆地但 bound 显示用尽也不改变排序——维持 limited，未用盆地登记在案不续算
 
 ## 建议口径（按用户裁决格式）
 

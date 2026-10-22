@@ -39,7 +39,11 @@ def test_resolved_reviews_carry_route_matching_kept_pool_evidence():
             continue
         route = r.get("route", "")
         if route == "multi_basin_coverage":
-            claimed = [c for c in (r["computed_new_members"] or "").split(";") if c]
+            # the evidence may live in either column: computed_new_members for
+            # recovery-batch closures, kept_pool_evidence for the C-group case
+            # (the closing members came from earlier batches)
+            claimed = ([c for c in (r["computed_new_members"] or "").split(";") if c]
+                       or [c for c in (r.get("kept_pool_evidence") or "").split(";") if c])
             assert claimed, r["review_id"]
             for k in claimed:
                 assert k in weights, "%s: %s not weighted" % (r["review_id"], k)

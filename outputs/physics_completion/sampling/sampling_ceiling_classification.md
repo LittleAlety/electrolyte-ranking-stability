@@ -16,7 +16,7 @@
 | 态 | ceiling | 类别 | 已登记 round-2 | QC 通过 | 池内极小 | 恢复批次起点 | 备注 |
 |---|---|---|---|---|---|---|---|
 | EMC\|M | not_computed | `pool_has_no_independent_structure` | 0 | 0 | — | — | — |
-| EMC\|M_plus | not_computed | `pool_has_no_independent_structure` | 0 | 0 | 2 | — | — |
+| EMC\|M_plus | not_computed | `pool_has_no_independent_structure` | 0 | 0 | — | — | — |
 | EMC\|LiM_plus | complete | `complete` | 0 | 0 | — | — | — |
 | EMC\|LiM_2plus | not_computed | `registered_candidates_qc_pending` | 0 | 0 | — | — | — |
 | DEC\|M | complete | `complete` | 0 | 0 | — | r2_c23 | — |
@@ -28,7 +28,7 @@
 | DME\|LiM_plus | not_computed | `pool_has_no_independent_structure` | 0 | 0 | — | — | — |
 | DME\|LiM_2plus | complete | `complete` | 0 | 0 | — | r3m_c05 | — |
 | TMP\|M | not_computed | `pool_has_no_independent_structure` | 0 | 0 | — | — | — |
-| TMP\|M_plus | not_computed | `registered_candidates_qc_pending` | 0 | 0 | 2 | c10;r3_c42 | strict_recovery_v1 has registered start(s) addressing this state |
+| TMP\|M_plus | not_computed | `registered_candidates_qc_pending` | 0 | 0 | — | c10;r3_c42 | strict_recovery_v1 has registered start(s) addressing this state |
 | TMP\|LiM_plus | not_computed | `registered_candidates_qc_pending` | 0 | 0 | 1 | r3m_c05;r3m_c08 | strict_recovery_v1 has registered start(s) addressing this state |
 | TMP\|LiM_2plus | complete | `complete` | 0 | 0 | — | r3m_c00 | — |
 

@@ -14,48 +14,22 @@
 | EMC | GBL | R1b | -0.336247 | negative | computed | — |
 | EMC | GBL | R2 | 0.436638 | positive | computed | — |
 | EMC | GBL | R3 | 0.442629 | positive | computed | — |
-| EMC | GBL | R4 | 0.404536 | positive | limited | R4 腿含 limited 态（见 note 的逐腿归因） |
+| EMC | GBL | R4 | 0.404536 | positive | computed | — |
 | EMC | GBL | R4_screen | -0.250028 | negative | computed_screen_only | 筛选层（气相 GFN2），按纪律不计入 computed |
 | EMC | SL | R1a | 0.703086 | positive | computed | — |
 | EMC | SL | R1b | -0.477287 | negative | computed | — |
 | EMC | SL | R2 | 0.286060 | positive | computed | — |
 | EMC | SL | R3 | 0.359540 | positive | computed | — |
-| EMC | SL | R4 | 0.356963 | positive | limited | R4 腿含 limited 态（见 note 的逐腿归因） |
+| EMC | SL | R4 | 0.356963 | positive | computed | — |
 | EMC | SL | R4_screen | 0.371082 | positive | computed_screen_only | 筛选层（气相 GFN2），按纪律不计入 computed |
 
-计数：computed=8 / 12；limited=2（有值但不计 computed）；provisional=0；computed_screen_only=2（另一档，不计 computed）；not_computed=0。
+计数：computed=10 / 12；limited=0（有值但不计 computed）；provisional=0；computed_screen_only=2（另一档，不计 computed）；not_computed=0。
 
 ## 2. 四个非 computed 级的逐腿归因
-
-### EMC | GBL / R4（status=limited）
-
-note 原文：delta = G_ensemble(M_plus) - G_ensemble(M), same definition as R3; n_unique M_plus: EMC=2, GBL=1; LIMITED: EMC|M_plus (species_drift_unrecoverable) -- bounded-coverage value, NOT counted as computed
-
-逐腿验收状态（来自生产系综标签）：
-
-| 腿 | acceptance_status | limitation_reason | n_unique |
-| --- | --- | --- | --- |
-| EMC&#124;M_plus | limited | species_drift_unrecoverable | 2 |
-| EMC&#124;M | accepted | — | 2 |
-| GBL&#124;M_plus | accepted | all_extras_deduplicated_to_primary | 1 |
-| GBL&#124;M | accepted | — | 2 |
 
 ### EMC | GBL / R4_screen（status=computed_screen_only）
 
 note 原文：screen-level only (gas-phase GFN2), NOT the production R4 rung; headline L(M_plus) - L(M) at L = G_state; L = G_avg gives -0.267 eV; Li-conditioned L(LiM_2plus) - L(LiM_plus) gives -0.328 eV (sign=negative); four-level ladder in outputs/physics_completion/ensembles/ensemble_pair_rungs.csv
-
-### EMC | SL / R4（status=limited）
-
-note 原文：delta = G_ensemble(M_plus) - G_ensemble(M), same definition as R3; n_unique M_plus: EMC=2, SL=2; LIMITED: EMC|M_plus (species_drift_unrecoverable) -- bounded-coverage value, NOT counted as computed
-
-逐腿验收状态（来自生产系综标签）：
-
-| 腿 | acceptance_status | limitation_reason | n_unique |
-| --- | --- | --- | --- |
-| EMC&#124;M_plus | limited | species_drift_unrecoverable | 2 |
-| EMC&#124;M | accepted | — | 2 |
-| SL&#124;M_plus | accepted | — | 2 |
-| SL&#124;M | accepted | all_extras_deduplicated_to_primary | 1 |
 
 ### EMC | SL / R4_screen（status=computed_screen_only）
 
@@ -74,8 +48,8 @@ note 原文：screen-level only (gas-phase GFN2), NOT the production R4 rung; he
 | DMC | 8.3048 | limited（rescue_budget_exhausted） | accepted | [8.3048, 8.3048] |
 | EC | 8.2807 | accepted | accepted | [8.2629, 8.2807] |
 | PC | 8.1547 | accepted | accepted | [8.1369, 8.1547] |
-| EMC | 8.1076 | limited（species_drift_unrecoverable） | accepted | [8.0898, 8.1254] |
-| TMP | 7.9449 | limited（rescue_budget_exhausted） | accepted | [7.9271, 7.9627] |
+| EMC | 8.1076 | accepted | accepted | [8.0898, 8.1254] |
+| TMP | 7.9449 | accepted | accepted | [7.9271, 7.9627] |
 | SL | 7.7506 | accepted | accepted | [7.7328, 7.7506] |
 | GBL | 7.7030 | accepted | accepted | [7.7030, 7.7208] |
 | DEC | 7.3162 | accepted | accepted | [7.2880, 7.3444] |
@@ -83,23 +57,21 @@ note 原文：screen-level only (gas-phase GFN2), NOT the production R4 rung; he
 | DME | 6.5975 | accepted | accepted | [6.5692, 6.6257] |
 | DMSO | 6.3507 | accepted | accepted | [6.3507, 6.3507] |
 
-**accepted-only Top-3 = EC > PC > SL**（n=8 个两腿 accepted 的分子）。
+**accepted-only Top-3 = EC > PC > EMC**（n=10 个两腿 accepted 的分子）。
 
-Top-3 地板 = SL 的 7.7506 eV。若 11 个 limited 态全部换成真值（各分子在其 bound 区间内任意取值）：
+Top-3 地板 = EMC 的 8.1076 eV。若 11 个 limited 态全部换成真值（各分子在其 bound 区间内任意取值）：
 
 | 分子 | 当前 gap | 区间上界 hi | 上界能否越过 Top-3 地板 |
 | --- | --- | --- | --- |
 | AN | 9.0603 | 9.0603 | **能** |
 | DMC | 8.3048 | 8.3048 | **能** |
-| EMC | 8.1076 | 8.1254 | **能** |
-| TMP | 7.9449 | 7.9627 | **能** |
 
 注意：AN, DMC 的 RT ln N bound = 0（n_unique = 1，RT ln 1 = 0）。
 该界只覆盖**已计入池的 N 个成员**；limited 态漏掉的独立盆地不在 N 里，
 所以这些分子的真值下降**可能超过**其 RT ln N 上界——上表对 bound=0 分子的
 「不能」判定是**弱证据**（对 bound>0 分子才有约束力）。
 
-**结论：Top-3 未被 bound 覆盖。** AN, DMC, EMC, TMP 的区间上界都越过 accepted Top-3 的地板，
+**结论：Top-3 未被 bound 覆盖。** AN, DMC 的区间上界都越过 accepted Top-3 的地板，
 若 limited 态全部换成真值，Top-3 **可能**改写（当前值已越线者可直接改写；
 仅上界越线者的改写依赖其真值落点）。差异与 bound 如上，**不判排序收敛**。
 
