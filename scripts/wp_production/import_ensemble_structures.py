@@ -156,8 +156,11 @@ PACKAGES = ("work/hpc_production_ensemble_r*_*",
 #: the 2026-10-21 strict_recovery_v1 batches (batch 1 = free/cation starts,
 #: batch _b2 = Li coordination starts).  Same importer, distinct role.
 RECOVERY_PACKAGE_GLOB = "work/hpc_production_ensemble_strict_recovery_v1*"
-#: the torsion-probe family (v3.1 item 4): the same importer path, a new name
-TORSION_PACKAGE_GLOB = "work/hpc_torsion_probe_v1*"
+#: the torsion-probe family (v3.1 item 4): the same importer path, a new name.
+#: The glob spans EVERY generation (v1 rigid, v2 real-fragment, reopt_v3,
+#: fragmentfix) -- pinning it to v1 silently dropped a whole later generation,
+#: which is the fifth appearance of "a new naming family must be wired in".
+TORSION_PACKAGE_GLOB = "work/hpc_torsion_probe_v*"
 #: The single ledger role the 3->6 ceiling channel may aggregate.
 ROUND2_LEDGER_ROLE = "round2_audit_extra"
 SSH_KEY = str(Path.home() / ".ssh" / "id_ed25519_whu")
@@ -1248,6 +1251,12 @@ def pkg_attempt(name: str) -> int:
     # NEW VERSION lineages (user-authorised reopt_v2): base 10 so the fresh
     # numbering clears every index the same member already carries and
     # "highest attempt wins" keeps meaning "newest lineage wins"
+    # a *_realfragment* package is a SECOND GENERATION of probe: the first
+    # family rotated every atom (rigid body), so its starts are invalid.  This
+    # generation must own a distinct index or it collides with those att=0 rows
+    # and the import silently keeps the old (invalid) ones.
+    if re.search(r"torsion_probe_v(\d+)_realfragment", name):
+        return 2
     # a *_fragmentfix_* package is a REPAIR of a cancelled/mis-built attempt:
     # it must sort after the family it repairs, or the dead row shadows it
     repair = re.search(r"_fragmentfix_(\d+)$", name)

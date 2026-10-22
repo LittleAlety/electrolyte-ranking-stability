@@ -7,11 +7,11 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 149,
+  "test_files": 150,
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-22T10:02:57Z",
+  "generated_at_utc": "2026-10-22T13:18:01Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -31,27 +31,21 @@ window.HB = {
   "stale": false,
   "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
   "ensemble": {
-   "accepted": 43,
-   "provisional": 0,
-   "limited": 5,
+   "accepted": 44,
+   "provisional": 2,
+   "limited": 2,
    "total": 48,
    "remaining": [
     {
-     "name": "AN",
-     "state": "M_plus",
-     "status": "limited",
-     "reason": "rescue_budget_exhausted"
-    },
-    {
      "name": "DMC",
      "state": "M_plus",
-     "status": "limited",
+     "status": "provisional",
      "reason": "rescue_budget_exhausted"
     },
     {
      "name": "DMC",
      "state": "LiM_2plus",
-     "status": "limited",
+     "status": "provisional",
      "reason": "rescue_budget_exhausted"
     },
     {
@@ -1689,8 +1683,8 @@ window.HB = {
    "file": "F64_physics_completion_budget_curve.png",
    "week": 44,
    "caption": "累计成本 -> 选集恢复曲线（方案 WP5）：冻结的 20 种子池内回放，tau_b 与 Top-3 重叠随已查询标签数 n_T 的曲线与端点线；这是已知数据的回放，不是盲预注册",
-   "sha": "830058deb657714d2f09fc42900bda8734f9b4d870ef7ca5484148fb9e3d4703",
-   "bytes": 179133,
+   "sha": "d5d98c9cba47def1bc44aa6064d5f7efd354c742e9dcd4ef5a28b535cb42905b",
+   "bytes": 179055,
    "w": 1856,
    "h": 832
   }
@@ -1729,7 +1723,7 @@ window.HB = {
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 152
+   "files": 153
   },
   {
    "path": "docs",

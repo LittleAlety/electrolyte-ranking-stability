@@ -80,6 +80,48 @@ def _read(path: Path) -> list[dict]:
         return list(csv.DictReader(fh))
 
 
+
+def _probe_starts(name: str, state: str) -> list[str]:
+    """Probe seeds registered as candidates for this state.
+
+    Read from the candidate manifest (the authoritative registered-member list)
+    and filtered to probe seeds, so the reviewer can distinguish "a probe was
+    registered and run" from "the frozen recovery search was budgeted".
+    """
+    path = REPO / "outputs" / "physics_completion" / "ensembles" \
+        / "production_ensemble_candidates.csv"
+    if not path.is_file():
+        return []
+    out = []
+    with path.open(encoding="utf-8") as fh:
+        for r in csv.DictReader(fh):
+            if r.get("name") != name or r.get("slot") != state:
+                continue
+            seed = r.get("seed", "")
+            if seed.startswith("tors_"):
+                out.append(seed)
+    return out
+
+
+def _rejected_probe_members() -> set:
+    """Members a fragment preflight refused, from the repair manifests.
+
+    Derived from the recorded decision (``rejected`` entries carry a reason),
+    never from a hand-kept list, so the exclusion stays auditable.
+    """
+    import json as _json
+    out = set()
+    for man in sorted((REPO / "work").glob("hpc_torsion_probe_v*/manifest.json")):
+        try:
+            data = _json.loads(man.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for entry in data.get("rejected") or []:
+            key = entry.get("member_key") if isinstance(entry, dict) else None
+            if key:
+                out.add(key)
+    return out
+
 def _search_scope_documented(search_outcome: str, starts: list) -> bool:
     """Was a bounded, registered search actually run for this state?
 
@@ -182,13 +224,23 @@ def build_rows() -> list[dict]:
         mf = manifest.get(key, {})
         starts = [s for s in (mf.get("start_1_basin", ""),
                               mf.get("start_2_basin", "")) if s]
+        # a probe is a DIFFERENT generation of registered start: it lives in the
+        # candidate manifest, never in the frozen recovery row.  Without this
+        # union the route reads "no registered search scope" for a state that
+        # has just registered and run one.
+        starts = list(dict.fromkeys(starts + _probe_starts(name, state)))
+        # a REFUSED member is a recorded decision, not a run in flight: counting
+        # it as pending parks the state forever (EC|LiM_2plus, defect #32 in the
+        # review layer)
+        rejected = _rejected_probe_members()
         # every member of this state that belongs to the recovery batch
         members = [r for r in struct
                    # the structures table names this column `slot`; reading
                    # `state` made `members` permanently empty, so a computed
                    # recovery leg was never seen and no state could ever resolve
                    if r.get("name") == name and r.get("slot") == state
-                   and str(r.get("member_role", "")).startswith(RECOVERY_ROLE_PREFIX)]
+                   and str(r.get("member_role", "")).startswith(RECOVERY_ROLE_PREFIX)
+                   and r.get("member_key", "") not in rejected]
         # the FULL qualified evidence set (user ruling C-group): any weighted
         # computed member counts toward coverage, whichever batch supplied it --
         # the historical gap may have been closed by an earlier leg

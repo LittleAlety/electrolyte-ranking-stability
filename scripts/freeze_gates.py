@@ -447,6 +447,10 @@ STAGE2_EXCLUDED_NAMES: tuple[str, ...] = (
 STAGE2_SELF_REFERENTIAL: tuple[str, ...] = (
     "outputs/week26/clean_room_audit.json",
     "outputs/week26/clean_room_audit.md",
+    # the re-freeze record is the bookkeeping OF the freeze: every --write
+    # rewrites it, so registering it re-breaks its own row forever (measured
+    # 2026-10-22, the second self-reference of this kind).
+    "outputs/week26/provenance_refreeze_record.json",
 )
 
 

@@ -12,19 +12,19 @@
 | 新起点上限 | 每态 2 个，合计 **28** 条 |
 | 可直接用冻结池盆地 | 1 态（TMP|M_plus） |
 | 池盆地 + 需补搜索 | 0 态（无） |
-| 必须版本化新搜索 | 7 态 |
-| 成本依据合计 | 178.2 core-hours（5 态无实测依据 → MISSING） |
+| 必须版本化新搜索 | 6 态 |
+| 成本依据合计 | 175.5 core-hours（6 态无实测依据 → MISSING） |
 | 批次预算 | 恢复包 **600** + 风险储备 **300** core-hours（首批实测后冻结，非全计划总预算） |
 
 ## 逐态登记
 
 | 优先级 | 态 | 路径 | 起点 1 | 起点 2 | 历史限制 | 上限 |
 |---|---|---|---|---|---|---|
-| P0 | AN\|M_plus | new_search_required | （待注册） | （待注册） | rescue_budget_exhausted | 2.728 |
 | P1 | DMC\|LiM_2plus | new_search_required | （待注册） | （待注册） | rescue_budget_exhausted | 23.853 |
 | P0 | DMC\|M_plus | new_search_required | （待注册） | （待注册） | rescue_budget_exhausted | 23.592 |
 | P1 | DOL\|LiM_2plus | new_search_required | （待注册） | （待注册） | rescue_budget_exhausted | 13.998 |
 | P1 | EC\|LiM_2plus | new_search_required | （待注册） | （待注册） | rescue_budget_exhausted | 18.084 |
+| released | AN\|M_plus | released | tors_3_0_1_2 | （待注册） | rescue_budget_exhausted |  |
 | released | DEC\|M | released | r2_c23 | （待注册） | — |  |
 | released | DME\|LiM_2plus | released | r3m_c05 | （待注册） | — |  |
 | released | DME\|M_plus | released | c07 | （待注册） | — |  |

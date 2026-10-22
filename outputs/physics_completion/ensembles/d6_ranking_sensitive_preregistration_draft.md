@@ -5,13 +5,13 @@
 
 ## 排序敏感的量化依据（accepted-only，RT 修正后口径）
 
-- accepted Top-3 = EC > PC > EMC（地板 8.1076 eV）
+- accepted Top-3 = AN > EC > PC（地板 8.1547 eV）
 - 四个敏感态的当前 gap 与地板比较（M_plus 态受限）：
 
 | 分子 | M_plus gap (eV) | 当前位次含义 | M_plus 态 | 限制原因 | n_unique |
 |---|---|---|---|---|---|
-| AN | 9.0603 | **已越地板**——真值只需保持即可改写 Top-3 | limited | rescue_budget_exhausted | 1 |
-| DMC | 8.3048 | **已越地板**——真值只需保持即可改写 Top-3 | limited | rescue_budget_exhausted | 1 |
+| AN | 9.0603 | **已越地板**——真值只需保持即可改写 Top-3 | accepted | single_basin_pool | 1 |
+| DMC | 8.3048 | **已越地板**——真值只需保持即可改写 Top-3 | provisional | rescue_budget_exhausted | 1 |
 | EMC | 8.1076 | 未越地板（上界敏感） | accepted | — | 2 |
 | TMP | 7.9449 | 未越地板（上界敏感） | accepted | — | 3 |
 
@@ -28,7 +28,7 @@
 
 ### 各态冻结池现状（派生自缺口表，非笼统声明）
 
-AN：冻结池内 M_plus 无未用盆地; DMC：冻结池内 M_plus 无未用盆地。
+DMC：冻结池内 M_plus 无未用盆地。
 
 ### 稿件状态
 

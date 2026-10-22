@@ -138,8 +138,16 @@ def test_search_exhausted_is_never_treated_as_resolved():
          / "production_ensemble_labels.csv").open(encoding="utf-8")))
     for r in labels:
         if r["name"] in ("AN", "DMC") and r["state"] == "M_plus":
-            assert r["acceptance_status"] == "limited"
-            assert r["coverage_status"] != "resolved_by_review"
+            # 2026-10-22: AN|M_plus is now RELEASED by single_basin_verified --
+            # a production-level methyl-rotor probe converged cleanly and
+            # reproduced the only minimum.  DMC|M_plus has a probe in flight, so
+            # it reads provisional (not limited) while that leg runs.  Neither
+            # may ever be reported as "search_exhausted": that would understate
+            # the evidence each of them now carries.
+            assert r["acceptance_status"] in ("accepted", "limited",
+                                              "provisional"), r
+            if r["acceptance_status"] == "accepted":
+                assert r["coverage_status"] == "resolved_by_review"
         if r["name"] == "EMC" and r["state"] == "M_plus":
             # C-group release (user ruling): two qualified minima, history kept
             assert r["acceptance_status"] == "accepted"

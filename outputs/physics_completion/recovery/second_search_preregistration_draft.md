@@ -3,11 +3,10 @@
 > 生成器 `build_second_search_preregistration.py`（`--check` 完全只读）。
 > 方案原文：「如决定新一轮搜索，先版本化预注册新池、成本上限和停止规则，再计算；不回填旧池。」
 
-## 本批恢复不了的 5 态（按限制原因分类）
+## 本批恢复不了的 4 态（按限制原因分类）
 
 | 态 | 限制原因 | 首轮证据 |
 |---|---|---|
-| AN\|M_plus | `rescue_budget_exhausted` | 64 个独立 GFN2 阳离子起点：**新极小 0 个**（全部塌缩到已有极小，RMSD 0.0000） |
 | DMC\|LiM_2plus | `rescue_budget_exhausted` | round-3 motif 搜索：9 候选、保留 1、**新独立盆地 0** |
 | DMC\|M_plus | `rescue_budget_exhausted` | 64 个独立 GFN2 阳离子起点：**新极小 0 个**（全部塌缩到已有极小，RMSD 0.0000） |
 | DOL\|LiM_2plus | `rescue_budget_exhausted` | round-3 motif 搜索：6 候选、保留 2、**新独立盆地 0** |

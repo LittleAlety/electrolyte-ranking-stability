@@ -7,27 +7,28 @@
 
 | 状态 | 态数 |
 |---|---|
-| accepted | 43 |
-| provisional | 0 |
-| limited | 5 |
+| accepted | 44 |
+| provisional | 2 |
+| limited | 2 |
 
-分母固定 48；未 accepted 共 **5** 态（`provisional` = 有登记补救在飞，`limited` = 首轮搜索耗尽）。
+分母固定 48；未 accepted 共 **4** 态（`provisional` = 有登记补救在飞，`limited` = 首轮搜索耗尽）。
 
 ## 恢复腿终局统计（按**最后一次真实运行**；规划中的补救另计）
 
 | 状态 | 腿数 |
 |---|---|
 | `computed` | 13 |
-| `never_ran` | 3 |
-| `technical_complete_qc_failed` | 7 |
+| `never_ran` | 2 |
+| `technical_complete_qc_failed` | 8 |
 
-**在飞补救（已提交、尚未产出结果）**：3 条腿
+**在飞补救（已提交、尚未产出结果）**：4 条腿
 
 
 失败类分布（最后一次真实运行）：
 
 - `max_cycles_exhausted`: 2
 - `strict_reopt_not_needed`: 13
+- `strict_reopt_required`: 1
 - `verytight_convergence`: 5
 
 ## 覆盖复核裁决（离开 `limited` 的唯一通道）
@@ -35,15 +36,15 @@
 | verdict | 态数 |
 |---|---|
 | `pending` | 2 |
-| `search_exhausted` | 1 |
-| `unresolved` | 2 |
+| `search_exhausted` | 2 |
 
 ## 本批放行的态（覆盖复核 resolved）
 
 | 态 | 系综状态 | n_unique | 历史 n_limited（保留） | g_ensemble (Eh) |
 |---|---|---|---|---|
+| `AN|M_plus` | `accepted` | 1 | **1** | -132.51274290000 |
 | `DEC|M` | `accepted` | 3 | **1** | -422.45386546854 |
-| `DME|LiM_2plus` | `accepted` | 2 | **2** | -316.18568257157 |
+| `DME|LiM_2plus` | `accepted` | 2 | **1** | -316.18568257157 |
 | `DME|M_plus` | `accepted` | 3 | **1** | -308.75146090372 |
 | `DMSO|LiM_plus` | `accepted` | 1 | **1** | -560.78564823000 |
 | `EMC|M_plus` | `accepted` | 2 | **1** | -382.82477506813 |
@@ -59,15 +60,13 @@
 
 | 态 | 系综状态 | 复核 verdict | 搜索结论 | 注册起点 | 腿（尝试次数 / 最后真实结果 / 当前） |
 |---|---|---|---|---|---|
-| AN\|M_plus | `limited` | `unresolved` | `no_new_minimum_found` | 0 | M_plus\|tors_3_0_1_2（1/2；结果 computed/strict_reopt_not_needed；当前 computed）<br>M_plus\|tors_4_0_1_2（1/2；结果 computed/strict_reopt_not_needed；当前 computed）<br>M_plus\|tors_5_0_1_2（1/2；结果 computed/strict_reopt_not_needed；当前 computed） |
-| DMC\|LiM_2plus | `limited` | `pending` | `no_new_minimum_found` | 0 | LiM_2plus\|tors_6_0_1_2（1/2；结果 technical_complete_qc_failed/max_cycles_exhausted；当前 technical_complete_qc_failed）<br>LiM_2plus\|tors_7_0_1_2（0/2；结果 未跑；当前 pending）<br>LiM_2plus\|tors_8_0_1_2（1/2；结果 technical_complete_qc_failed/max_cycles_exhausted；当前 technical_complete_qc_failed） |
-| DMC\|M_plus | `limited` | `unresolved` | `no_new_minimum_found` | 0 | M_plus\|tors_6_0_1_2（1/2；结果 technical_complete_qc_failed/verytight_convergence；当前 technical_complete_qc_failed）<br>M_plus\|tors_7_0_1_2（1/2；结果 technical_complete_qc_failed/verytight_convergence；当前 technical_complete_qc_failed）<br>M_plus\|tors_8_0_1_2（1/2；结果 technical_complete_qc_failed/verytight_convergence；当前 technical_complete_qc_failed） |
+| DMC\|LiM_2plus | `provisional` | `pending` | `no_new_minimum_found` | 0 | LiM_2plus\|tors_6_0_1_2（1/2；结果 technical_complete_qc_failed/max_cycles_exhausted；当前 technical_complete_qc_failed）<br>LiM_2plus\|tors_7_0_1_2（1/2；结果 technical_complete_qc_failed/strict_reopt_required；当前 pending）<br>LiM_2plus\|tors_8_0_1_2（1/2；结果 technical_complete_qc_failed/max_cycles_exhausted；当前 technical_complete_qc_failed） |
+| DMC\|M_plus | `provisional` | `pending` | `no_new_minimum_found` | 0 | M_plus\|tors_6_0_1_2（1/2；结果 technical_complete_qc_failed/verytight_convergence；当前 technical_complete_qc_failed）<br>M_plus\|tors_7_0_1_2（1/2；结果 technical_complete_qc_failed/verytight_convergence；当前 technical_complete_qc_failed）<br>M_plus\|tors_8_0_1_2（1/2；结果 technical_complete_qc_failed/verytight_convergence；当前 pending） |
 | DOL\|LiM_2plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
-| EC\|LiM_2plus | `limited` | `pending` | `no_new_minimum_found` | 0 | LiM_2plus\|tors_2_3_4_10（0/2；结果 未跑；当前 pending）<br>LiM_2plus\|tors_5_3_4_10（0/2；结果 未跑；当前 pending） |
+| EC\|LiM_2plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | LiM_2plus\|tors_2_3_4_10（0/2；结果 未跑；当前 pending）<br>LiM_2plus\|tors_5_3_4_10（0/2；结果 未跑；当前 pending） |
 
 ## 本轮无法恢复的态（需换搜索方法，不在本批预算内）
 
-- `AN|M_plus` — no_new_minimum_found
 - `DMC|LiM_2plus` — no_new_minimum_found
 - `DMC|M_plus` — no_new_minimum_found
 - `DOL|LiM_2plus` — no_new_minimum_found
@@ -78,4 +77,4 @@
 - `TMP|M_plus|c10` — `verytight_convergence`：VeryTightOpt final criterion not met: energy_change_Eh=3.13e-07 > 2e-07;hess_act
 - `DME|LiM_2plus|r3m_c03` — `verytight_convergence`：VeryTightOpt final criterion not met: energy_change_Eh=2.63e-07 > 2e-07;hess_act
 
-**结论口径**：本报告不改变任何验收判定。系综达到 43/48；`plan_overall_complete` 与 WP6 只有在 48/48 时才可能开闸。
+**结论口径**：本报告不改变任何验收判定。系综达到 44/48；`plan_overall_complete` 与 WP6 只有在 48/48 时才可能开闸。

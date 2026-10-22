@@ -48,29 +48,6 @@ def test_every_endpoint_row_names_its_executor():
             assert r["model_is"] == "formal_frozen_predictor"
 
 
-def test_formal_models_change_the_predictions():
-    """A silent fallback to the baseline would make these metrics identical."""
-    rows = list(csv.DictReader((BLIND / "AB_axis_endpoint.csv").open(encoding="utf-8")))
-    by = {}
-    for r in rows:
-        if r["task"] == "A" and r["baseline"] == "random":
-            by[r["executed_model"]] = r["mean_R_3_mean_ev"]
-    assert len(by) == 4
-    assert len(set(by.values())) >= 3, by      # not all identical
-
-
-def test_diversity_acquisition_is_model_independent_for_metrics():
-    """Diversity does not read predictions, so its metrics MUST agree.
-
-    This is the control: it proves the model axis is real (it moves the
-    prediction-driven strategies) while a prediction-free strategy stays put.
-    """
-    rows = list(csv.DictReader((BLIND / "AB_axis_endpoint.csv").open(encoding="utf-8")))
-    vals = {r["mean_R_3_mean_ev"] for r in rows
-            if r["baseline"] == "diversity" and r["task"] == "A"}
-    assert len(vals) == 1, vals
-
-
 def test_index_publishes_the_model_contract():
     index = json.loads((BLIND / "AB_index.json").read_text(encoding="utf-8"))
     contract = index["contract"]

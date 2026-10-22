@@ -443,11 +443,92 @@ def recovery_candidate_rows():
                     "name": name, "member_role": "recovery_v1_start",
                     "seed": basin, "source_kind": "strict_recovery_v1_start",
                     "geometry": geom, "sha256": sha, "rel_kcal": rel,
-                    "denticity": "", "duplicate_of": "",
+                    "denticity": "", "duplicate_of": "", "probe_class": "",
                     "charge": charge, "multiplicity": mult,
                     "status": "planned",
                     "note": "independent start registered by strict_recovery_v1",
                 })
+    return out
+
+
+def torsion_probe_candidate_rows():
+    """Torsion-probe members as first-class candidate rows, one per identity.
+
+    Returns only the newest REAL generation per (name, slot, seed).  The v1
+    rigid-rotation family is excluded -- its starts are copies of the primary --
+    and the exclusions are listed in ``torsion_probe_exclusions`` for audit.
+    """
+    import csv as _csv
+    import json as _json
+
+    #: generations whose starts are genuinely different geometries
+    REAL_GEN = ("realfragment", "fragmentfix", "_reopt_v")
+
+    def _generation_rank(pkg_name: str) -> int:
+        if "_reopt_v" in pkg_name:
+            return 3
+        if "fragmentfix" in pkg_name:
+            return 2
+        if "realfragment" in pkg_name:
+            return 1
+        return 0            # the original rigid-rotation family
+
+    best: dict[tuple, dict] = {}
+    excluded: list[dict] = []
+    for man in sorted((REPO / "work").glob("hpc_torsion_probe_v*/manifest.json")):
+        try:
+            data = _json.loads(man.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        pkg = man.parent.name
+        rank = _generation_rank(pkg)
+        for m in data.get("members") or []:
+            name, slot = m.get("name", ""), m.get("slot", "")
+            seed = m.get("seed", "")
+            src_rel = m.get("source_geometry", "")
+            if not (name and slot and seed and src_rel):
+                continue
+            key = (name, slot, seed)
+            if rank == 0:
+                if key not in best:
+                    excluded.append({
+                        "member_key": m.get("member_key", "%s|%s|%s" % key),
+                        "package": pkg,
+                        "reason": ("rigid-rotation start (generation 0): all atoms "
+                                   "rotated, heavy-atom RMSD 0.0000 A to the "
+                                   "primary -- NOT an independent start"),
+                    })
+                continue
+            prior = best.get(key)
+            if prior is None or rank > prior["_rank"]:
+                best[key] = {**m, "_rank": rank, "_package": pkg}
+
+    out = []
+    for (name, slot, seed), m in sorted(best.items()):
+        src_rel = m.get("source_geometry", "")
+        sha = m.get("source_sha256", "")
+        src_path = REPO / src_rel
+        if not src_path.is_file():
+            continue        # unverifiable start never becomes a candidate
+        if not sha:
+            import hashlib as _hl
+            sha = _hl.sha256(src_path.read_bytes()).hexdigest()
+        charge, mult = SLOT_QM[slot]
+        cls = m.get("probe_class", "")
+        out.append({
+            "slot": slot, "mol_id": _MOL_ID_BY_NAME.get(name, ""),
+            "name": name, "member_role": "recovery_v1_start",
+            "seed": seed, "source_kind": "torsion_probe_v1_start",
+            "geometry": src_rel, "sha256": sha, "rel_kcal": "",
+            "denticity": "", "duplicate_of": "", "probe_class": cls,
+            "charge": charge, "multiplicity": mult,
+            "status": "planned",
+            "note": ("torsion probe start from %s (%s); coverage strength depends "
+                     "on the probe class -- a methyl rotor is an independent "
+                     "start on a rotor coordinate, NOT a heavy-atom basin search"
+                     % (m.get("_package", ""), cls or "unclassified")),
+        })
+    torsion_probe_candidate_rows.excluded = excluded
     return out
 
 
@@ -477,7 +558,7 @@ def main(argv=None) -> int:
                 "member_role": "primary", "seed": "",
                 "source_kind": f"production_leg:{primary.get('leg_state', '?')}",
                 "geometry": "", "sha256": "",
-                "rel_kcal": "", "denticity": "", "duplicate_of": "",
+                "rel_kcal": "", "denticity": "", "duplicate_of": "", "probe_class": "",
                 "charge": charge, "multiplicity": mult,
                 "status": primary["status"], "note": primary["note"],
             })
@@ -493,6 +574,7 @@ def main(argv=None) -> int:
                     "rel_kcal": round(extra["rel_kcal"], 4),
                     "denticity": "" if extra["denticity"] is None else extra["denticity"],
                     "duplicate_of": extra.get("duplicate_of", ""),
+                    "probe_class": extra.get("probe_class", ""),
                     "charge": charge, "multiplicity": mult,
                     "status": "planned", "note": "",
                 })
@@ -530,13 +612,20 @@ def main(argv=None) -> int:
         "outputs": {"candidates_csv": str(csv_path.relative_to(REPO).as_posix())},
     }
     recovery_rows = recovery_candidate_rows() if args.register_recovery else []
-    if recovery_rows:
+    probe_rows = torsion_probe_candidate_rows() if args.register_recovery else []
+    if recovery_rows or probe_rows:
         rows.extend(recovery_rows)
+        rows.extend(probe_rows)
         # keep the CSV schema order stable: re-dump with the same field order
         with csv_path.open("w", encoding="utf-8", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()), lineterminator="\n")
             w.writeheader()
             w.writerows(rows)
+        if probe_rows:
+            print("torsion probe candidates registered: %d (%s)"
+                  % (len(probe_rows),
+                     ", ".join(sorted({r["probe_class"] or "unclassified"
+                                       for r in probe_rows}))))
     (OUT / "production_ensemble_manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 
