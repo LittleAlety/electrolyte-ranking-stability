@@ -156,6 +156,8 @@ PACKAGES = ("work/hpc_production_ensemble_r*_*",
 #: the 2026-10-21 strict_recovery_v1 batches (batch 1 = free/cation starts,
 #: batch _b2 = Li coordination starts).  Same importer, distinct role.
 RECOVERY_PACKAGE_GLOB = "work/hpc_production_ensemble_strict_recovery_v1*"
+#: the torsion-probe family (v3.1 item 4): the same importer path, a new name
+TORSION_PACKAGE_GLOB = "work/hpc_torsion_probe_v1*"
 #: The single ledger role the 3->6 ceiling channel may aggregate.
 ROUND2_LEDGER_ROLE = "round2_audit_extra"
 SSH_KEY = str(Path.home() / ".ssh" / "id_ed25519_whu")
@@ -1232,6 +1234,7 @@ def iter_packages():
     module enumerates the recovery batches as well.
     """
     patterns = (PACKAGES,) if isinstance(PACKAGES, str) else tuple(PACKAGES)
+    patterns = patterns + (RECOVERY_PACKAGE_GLOB, TORSION_PACKAGE_GLOB)
     seen = set()
     for pattern in patterns:
         for p in sorted(REPO.glob(pattern)):
@@ -2018,6 +2021,10 @@ def _is_round2_package(pkg: Path) -> bool:
                              ceiling-only audit legs.
     """
     if "hpc_production_ensemble_strict_recovery" in pkg.name:
+        return True
+    # the torsion-probe family carries its members in the package manifest
+    # exactly like the recovery batches (candidate CSV never knew about them)
+    if "hpc_torsion_probe" in pkg.name:
         return True
     return (pkg.name.endswith("r2_audit") or pkg.name.endswith("r2_audit_li")
             or pkg.name.endswith("r2_audit_li_emc")

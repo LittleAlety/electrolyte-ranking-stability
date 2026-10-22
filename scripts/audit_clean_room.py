@@ -33,6 +33,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import sys as _sys
+_sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent / 'wp_production'))
+from provenance_hash import sha256_artifact as sha256_of  # noqa: E402
 import json
 import re
 import sys
@@ -82,14 +85,6 @@ MANIFESTS = [
     "outputs/week2/SHA256SUMS",
     "outputs/week3/SHA256SUMS",
 ]
-
-
-def sha256_of(path: Path) -> str:
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def scan_external(rel: str) -> "list[str]":

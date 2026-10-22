@@ -29,8 +29,7 @@ OUT_CSV = FRONTIER / "frontier_identity_evidence.csv"
 OUT_INDEX = FRONTIER / "frontier_identity_evidence_index.json"
 
 
-def _sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+from provenance_hash import sha256_artifact as _sha  # noqa: E402
 
 
 def _members() -> list[dict]:

@@ -86,12 +86,7 @@ DISCIPLINE = (
 )
 
 
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+from provenance_hash import sha256_artifact as sha256_file  # noqa: E402
 
 
 def _read_csv(path: Path):

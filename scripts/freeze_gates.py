@@ -31,6 +31,11 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent / "wp_production"))
+from provenance_hash import sha256_artifact as _sha256_artifact  # noqa: E402
 import json
 import os
 import subprocess
@@ -432,6 +437,18 @@ STAGE2_EXCLUDED_NAMES: tuple[str, ...] = (
     "crest.log",
 )
 
+#: Self-referential artefacts: the clean-room auditor's own report embeds the
+#: result of verifying THIS manifest, so registering it creates a cycle with no
+#: fixed point (re-freezing changes what the audit reads, which changes its
+#: output, which re-breaks the row).  Measured 2026-10-22: the two rows could
+#: never both verify.  Excluded here -- where the manifest is BUILT, not patched
+#: out afterwards -- and recorded in
+#: ``outputs/week26/provenance_refreeze_record.json``.
+STAGE2_SELF_REFERENTIAL: tuple[str, ...] = (
+    "outputs/week26/clean_room_audit.json",
+    "outputs/week26/clean_room_audit.md",
+)
+
 
 
 @dataclass
@@ -447,11 +464,12 @@ class GateResult:
 
 
 def sha256_of(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    """The provenance contract: text artefacts LF-normalised, binary raw.
+
+    Delegates to ``provenance_hash.sha256_artifact`` so this generator and
+    ``audit_clean_room`` can never disagree about a row's caliber.
+    """
+    return _sha256_artifact(path)
 
 
 def bundled_environment(root: Path, environ: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -740,6 +758,8 @@ def stage2_artefacts(root: Path = REPO_ROOT) -> list[str]:
             relative = path.relative_to(root).as_posix()
             if relative.endswith("SHA256SUMS"):
                 continue
+            if relative in STAGE2_SELF_REFERENTIAL:
+                continue          # no fixed point: see STAGE2_SELF_REFERENTIAL
             names.append(relative)
     return list(dict.fromkeys(names))
 

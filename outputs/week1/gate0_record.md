@@ -14,7 +14,7 @@
 
 ## sha256
 
-- config/scientific_definitions.yaml  c8c7d5db9907635ee705b95bd16afdb8380121f3b17c145e79824d4515e095e8
+- config/scientific_definitions.yaml  b4e95382f9fdc5eaf95edb98884852559b7a814ca2553f00f6d2d7705c1304a1
 - config/prereg.yaml  43c269611d108bef1949daa859fa4f1e09c0fd57bdb6eff697c065997297f696
 - data/metadata/core_set.csv  630b0ee8c09dc4141124e335181572bf27a63f297a8df95f9c774683a10cf91b
 - data/metadata/broad_pool.csv  a6ca215e8e217e24c036a4c3571c8096e949b9f46e51571749c7581b9584e346

@@ -11,7 +11,7 @@ window.HB = {
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-22T07:16:07Z",
+  "generated_at_utc": "2026-10-22T09:14:57Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -85,7 +85,7 @@ window.HB = {
    "source_sha256": {
     "outputs/physics_completion/ensembles/production_ensemble_weights.csv": "82d280dab2c203459b7dba53d4850a52559151cacad72985d1f5ebe91a7f1766",
     "outputs/physics_completion/frontier/frontier_localization.csv": "ae6d6f6ae4326e8981053e675c9fba64849be5f1635d90fe61bcc603d81bbedc",
-    "outputs/physics_completion/frontier/frontier_identity_evidence.csv": "fe28a320274a8ebef42e4522ebbcc7ca52ca3fcd50831783132568428edc9ae0"
+    "outputs/physics_completion/frontier/frontier_identity_evidence.csv": "f27d58978f7ead6b443a83e5531c4efeedd4c248783d97433602ad6c8f06d048"
    },
    "error": ""
   }

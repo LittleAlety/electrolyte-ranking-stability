@@ -108,15 +108,23 @@ def test_a_state_is_resolved_only_with_a_computed_kept_member():
         for key in claimed:
             assert key in weights, "%s resolved but %s is not a kept member" % (
                 r["review_id"], key)
-    # states whose registered independent search found no new minimum are
-    # recorded as search_exhausted -- the P0 M_plus trio plus the three Li
-    # legs whose motif search collapsed onto known motifs
+    # States whose registered independent search found no new minimum are
+    # recorded as search_exhausted -- but ONLY while no production-level probe
+    # has superseded that cheap-search verdict.
+    #
+    # 2026-10-22: AN/DMC|M_plus left this set when the torsion probes were
+    # submitted.  Reporting them as "search_exhausted" would now UNDERSTATE
+    # their evidence (a production-level probe exists or is running), so the
+    # invariant is the opposite: a state with a live/finished production probe
+    # must never still read search_exhausted.
     exhausted_legged = {(r["name"], r["state"]) for r in rows
                         if r["verdict"] == "search_exhausted"}
-    # EMC|M_plus left this set by the C-group ruling (two qualified minima);
-    # AN/DMC|M_plus remain genuinely search-exhausted
-    assert {("AN", "M_plus"), ("DMC", "M_plus")} <= exhausted_legged
-    assert ("EMC", "M_plus") not in exhausted_legged
+    assert ("AN", "M_plus") not in exhausted_legged
+    assert ("DMC", "M_plus") not in exhausted_legged
+    assert ("EMC", "M_plus") not in exhausted_legged     # C-group release
+    # the ring-locked DOL state is the one that genuinely cannot be probed by
+    # torsion (0 eligible dihedrals + 0 new motifs): its exhaustion stands
+    assert ("DOL", "LiM_2plus") in exhausted_legged
     assert exhausted_legged <= {
         ("AN", "M_plus"), ("DMC", "M_plus"), ("EMC", "M_plus"),
         ("DMC", "LiM_2plus"), ("EC", "LiM_2plus"), ("DOL", "LiM_2plus"),

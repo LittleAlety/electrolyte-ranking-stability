@@ -17,22 +17,25 @@
 
 | 状态 | 腿数 |
 |---|---|
-| `computed` | 10 |
+| `computed` | 13 |
+| `never_ran` | 8 |
 | `technical_complete_qc_failed` | 2 |
 
-**在飞补救（已提交、尚未产出结果）**：0 条腿
+**在飞补救（已提交、尚未产出结果）**：8 条腿
 
 
 失败类分布（最后一次真实运行）：
 
-- `strict_reopt_not_needed`: 10
+- `strict_reopt_not_needed`: 13
 - `verytight_convergence`: 2
 
 ## 覆盖复核裁决（离开 `limited` 的唯一通道）
 
 | verdict | 态数 |
 |---|---|
-| `search_exhausted` | 5 |
+| `pending` | 3 |
+| `search_exhausted` | 1 |
+| `unresolved` | 1 |
 
 ## 本批放行的态（覆盖复核 resolved）
 
@@ -55,11 +58,11 @@
 
 | 态 | 系综状态 | 复核 verdict | 搜索结论 | 注册起点 | 腿（尝试次数 / 最后真实结果 / 当前） |
 |---|---|---|---|---|---|
-| AN\|M_plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
-| DMC\|LiM_2plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
-| DMC\|M_plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
+| AN\|M_plus | `limited` | `unresolved` | `no_new_minimum_found` | 0 | M_plus\|tors_3_0_1_2（1/2；结果 computed/strict_reopt_not_needed；当前 computed）<br>M_plus\|tors_4_0_1_2（1/2；结果 computed/strict_reopt_not_needed；当前 computed）<br>M_plus\|tors_5_0_1_2（1/2；结果 computed/strict_reopt_not_needed；当前 computed） |
+| DMC\|LiM_2plus | `limited` | `pending` | `no_new_minimum_found` | 0 | LiM_2plus\|tors_6_0_1_2（0/2；结果 未跑；当前 pending）<br>LiM_2plus\|tors_7_0_1_2（0/2；结果 未跑；当前 pending）<br>LiM_2plus\|tors_8_0_1_2（0/2；结果 未跑；当前 pending） |
+| DMC\|M_plus | `limited` | `pending` | `no_new_minimum_found` | 0 | M_plus\|tors_6_0_1_2（0/2；结果 未跑；当前 pending）<br>M_plus\|tors_7_0_1_2（0/2；结果 未跑；当前 pending）<br>M_plus\|tors_8_0_1_2（0/2；结果 未跑；当前 pending） |
 | DOL\|LiM_2plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
-| EC\|LiM_2plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
+| EC\|LiM_2plus | `limited` | `pending` | `no_new_minimum_found` | 0 | LiM_2plus\|tors_2_3_4_10（0/2；结果 未跑；当前 pending）<br>LiM_2plus\|tors_5_3_4_10（0/2；结果 未跑；当前 pending） |
 
 ## 本轮无法恢复的态（需换搜索方法，不在本批预算内）
 

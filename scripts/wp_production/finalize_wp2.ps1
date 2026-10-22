@@ -95,6 +95,9 @@ Step "figures"      { & $py -X utf8 scripts\wp_production\make_physics_completio
 Step "mirror"       { & $py -X utf8 scripts\wp_production\build_physics_completion_deliverables.py }
 Step "site"         { & $py -X utf8 scripts\build_terminal_site.py }
 Step "freeze"       { & $py -X utf8 scripts\freeze_gates.py --stage 2 }
+Step "refreeze-week1" { & $py -X utf8 scripts\wp_production\refreeze_manifest.py --manifest outputs/week1/SHA256SUMS --check }
+Step "refreeze-week2" { & $py -X utf8 scripts\wp_production\refreeze_manifest.py --manifest outputs/week2/SHA256SUMS --check }
+Step "refreeze-week3" { & $py -X utf8 scripts\wp_production\refreeze_manifest.py --manifest outputs/week3/SHA256SUMS --check }
 Step "clean-room"   { & $py -X utf8 scripts\audit_clean_room.py }
 Step "archive-verify" { & $py -X utf8 scripts\wp_production\verify_archive.py --latest --ledger --gate-when-complete }
 Step "check-gen"    { & $py -X utf8 scripts\build_physics_completion_batch.py --check }
