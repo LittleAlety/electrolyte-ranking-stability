@@ -97,7 +97,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**80** 个跟踪文件：74 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**81** 个跟踪文件：75 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -147,6 +147,7 @@ week36 与 week44 只存在于 part2 镜像。
 | `build_li_motif_sampling_plan.py` | 方案 6.1 / 执行第 3 步：四分子 Li 配位 motif 采样的结果前预注册（派生层，零新增计算） | 结构登记 → `outputs/physics_completion/li_motif_sampling/**` |
 | `build_li_motif_plan_round2.py` | **第二轮 Li motif 搜索预注册**（v1.4.2 项 5）：第一轮已对单一父几何穷举全部配位规则，8 个审计 Li 态仍只 1–2 个独立极小；第二轮空间＝同一冻结规则 × **冻结自由态构象池的其他中性盆地做替代父几何**（EMC 2/DEC 4/DME 6/TMP 3 盆地，sha256 磁盘核验）；登记 round-1 kept + 已核验父数＝诚实上界（去重可能合并，真实数只能执行后测）；零新增计算，执行为显式独立步骤 | 冻结池 + 第一轮 screen → `li_motif_sampling/li_motif_plan_round2.{csv,_index.json}` |
 | `build_frontier_identity_evidence.py` | **身份证据链装配（v3.1 第 2 项）**：每成员验证同一次执行的input/log/geometry/molden 四文件存在且记原始哈希；方法(wB97X-D4/def2-TZVPD)/SCF(TightSCF)/正常终止/电荷多重度与登记一致；自旋通道与声明波函数一致 → identity_qc_status=pending→verified；缺本地文件记 awaiting（不等于需重算） | `frontier/frontier_identity_evidence.csv` + `_index.json` |
+| `build_torsion_probe_package.py` | **扭转探针包构建（v3.1 第 4 项执行）**：从扭转登记表取每态≤3 个登记二面角，从收敛 primary 极小绕 b-c 轴 Rodrigues 旋转 +60° 生成起点；完整生产级 Opt+AnFreq；冻结停止规则（每点一次、零新盆地→production_torsion_scan_exhausted） | `work/hpc_torsion_probe_v1/`（11 腿 2 批，Job 3747714/3747724） |
 | `build_torsion_registry.py` | **扭转自由度登记表（v3.1 第 4 项预检）**：从生产几何按共价半径邻接推导键/二面角；可旋转判据＝B-C 键不在 ≤7 元环内（环变形须另行登记，不等同扭转）；每条登记带源几何哈希。实测：AN 3 / DMC 10 / DMC_Li 12 / **DOL 0（五元环全刚性）** / EC 2 | `recovery/torsion_freedom_registry.csv` + `_index.json` |
 | `build_probe_routes.py` | **五态实测路由（v3.1 第 4 项的派生输出）**：probe_route 的六输入全部从数据推导（primary 登记行不算在途）；当前五态全部 preflight_required（池内无未用构象、无新独立 motif、无扭转自由度登记表）——下一步是候选/身份/对称去重/起点哈希预检，不是直接提交计算 | `recovery/probe_routes.csv` + `_index.json` |
 | `probe_route.py` | **五态逐态路由（v3.1 第 4 项，草案 B）**：在途→等待；身份未验→先验身份；预检三要素 None→preflight_required；优先级 unused_starts > new_li_motifs > eligible_torsions > independent_reproductions；全零→limited_no_registered_executable_probe（零=本次预检范围内无可执行候选，**不表示物理上不存在其他极小**） | 库模块（draft_* 仍须登记候选预算授权） |
