@@ -458,12 +458,24 @@ def build_rows(progress=None):
         "数值逐字读回冻结账本，不重算、不换单位。",
     ))
     flip = read_rows("outputs/physics_completion/closure/flip_persistence.csv")
-    flip_done = count(flip, lambda r: r.get("status") == "computed")
+    # production and SCREEN rungs are judged SEPARATELY (v3.1 item 3): the
+    # R4_screen rows are GFN2 screening by design -- they must read
+    # computed_screen_only, never be relabelled computed to reach a count.
+    flip_prod = [r for r in flip if r.get("rung") != "R4_screen"]
+    flip_screen = [r for r in flip if r.get("rung") == "R4_screen"]
+    flip_done = count(flip_prod, lambda r: r.get("status") == "computed")
+    flip_screen_ok = all(r.get("status") == "computed_screen_only"
+                          for r in flip_screen)
     out.append(item(
         "wp2_flip_persistence", "6",
         "EMC-GBL / EMC-SL 两对翻转能否保留到自由能层",
-        "satisfied" if flip and flip_done == len(flip) else ("partial" if flip_done else "not_satisfied"),
-        "rungs_computed=%d/%d" % (flip_done, len(flip)),
+        "satisfied" if (flip_prod and flip_done == len(flip_prod)
+                       and flip_screen_ok)
+        else ("partial" if flip_done else "not_satisfied"),
+        "rungs_computed=%d/%d production + %d/%d screen (computed_screen_only)"
+        % (flip_done, len(flip_prod),
+           count(flip_screen, lambda r: r.get("status") == "computed_screen_only"),
+           len(flip_screen)),
         "outputs/physics_completion/closure/flip_persistence.csv",
         "R1a/R1b 已实测；R2/R3 等生产腿；R4（系综层）设计上要等采样层。",
     ))
@@ -795,7 +807,8 @@ def build_rows(progress=None):
         and li_ok == len(set_main)
         and len(prod_ens_accepted) == main_expected_states
         and samp_extension_ok
-        and bool(flip) and flip_done == len(flip)
+        and bool(flip_prod) and flip_done == len(flip_prod)
+        and flip_screen_ok
     )
     out.append(item(
         "plan_overall_complete", "1",
@@ -806,7 +819,7 @@ def build_rows(progress=None):
         "flip_rungs=%d/%d; pilot_subset=%d/%d"
         % (progress["scientific"]["accepted"], main_expected_states, main4_ok, len(set_main),
            free_ok, len(set_main), li_ok, len(set_main), len(prod_ens_accepted), main_expected_states,
-           samp_extension_ok, flip_done, len(flip), len(produced), len(states)),
+           samp_extension_ok, flip_done, len(flip_prod), len(produced), len(states)),
         "work/wp2prod/**/<name>_<state>.json; data/metadata/physics_completion_set.csv; "
         "outputs/physics_completion/closure/four_molecule_state_closure.csv; "
         "outputs/physics_completion/ensembles/production_ensemble_labels.csv; "
