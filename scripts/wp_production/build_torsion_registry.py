@@ -60,6 +60,20 @@ def _read_xyz(path: Path) -> tuple[list[str], list[tuple[float, float, float]]]:
     return syms, coords
 
 
+def _registered_topology(name: str, syms):
+    """(adjacency, single_bond_set) from REGISTERED bond orders, or None.
+
+    Delegates to the probe package's resolver instead of duplicating it: the
+    distance-only adjacency cannot tell a C=O (1.19 A) from a C-O single bond
+    (1.43 A), which is how carbonyl pseudo-torsions entered the registry.
+    """
+    try:
+        from build_torsion_probe_package import _topology_for_member
+        return _topology_for_member(name, syms)
+    except Exception:                                            # fail closed
+        return None
+
+
 def _adjacency(syms: list[str], coords) -> list[set[int]]:
     """Covalent adjacency by radii sum + tolerance."""
     adj = [set() for _ in syms]
@@ -155,13 +169,24 @@ def _primary_geometry(name: str, state: str) -> Path | None:
     return _member_geometry(name, state, "primary")
 
 
-def _torsions(syms, coords) -> list[dict]:
+def _torsions(syms, coords, *, single_bonds=None) -> list[dict]:
+    """Eligible rotors: verified SINGLE bonds outside a small ring.
+
+    ``single_bonds`` is REQUIRED (a set of ``(i, j)`` with i < j taken from the
+    registered bond orders).  A distance-only run is refused rather than
+    guessed -- that guess is what offered the C=O as a rotor.
+    """
+    if single_bonds is None:
+        raise ValueError("registered bond-order topology required: a distance-only "
+                         "adjacency cannot distinguish a C=O from a C-O single bond")
     adj = _adjacency(syms, coords)
     out = []
     for b in range(len(syms)):
         for c in adj[b]:
             if c <= b:
                 continue                      # each bond once
+            if tuple(sorted((b, c))) not in single_bonds:
+                continue                      # C=O / aromatic: not a rotor
             ring = _smallest_ring_through(adj, b, c)
             if ring <= RING_MAX:
                 continue                      # rigid small ring: not a torsion
@@ -208,7 +233,18 @@ def build_rows() -> list[dict]:
                                     "not zero")})
             continue
         syms, coords = _read_xyz(geom)
-        torsions = _torsions(syms, coords)
+        topo = _registered_topology(name, syms)
+        if topo is None:
+            rows.append({"name": name, "state": state,
+                         "n_eligible_torsions": "0",
+                         "geometry_source": str(geom.relative_to(REPO)).replace("\\", "/"),
+                         "geometry_sha256": _sha(geom),
+                         "detail": ("no registered bond-order topology for this "
+                                    "molecule; eligible torsions are UNKNOWN, not "
+                                    "zero (a distance-only run would count the "
+                                    "C=O as a rotor)")})
+            continue
+        torsions = _torsions(syms, coords, single_bonds=topo[1])
         eligible = [t for t in torsions if t["eligible"] == "true"]
         for t in eligible:
             rows.append({

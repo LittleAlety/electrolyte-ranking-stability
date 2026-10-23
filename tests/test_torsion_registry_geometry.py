@@ -79,8 +79,55 @@ def test_zero_torsions_is_recomputed_on_the_real_geometry(tr):
                if r["name"] == "DOL" and r["state"] == "LiM_2plus")
     src = REPO / row["geometry_source"]
     syms, coords = tr._read_xyz(src)
-    assert tr._torsions(syms, coords) == [], \
+    topo = tr._registered_topology("DOL", syms)
+    assert topo is not None, "DOL's registered topology must resolve"
+    assert tr._torsions(syms, coords, single_bonds=topo[1]) == [], \
         "the recorded count must match a recomputation on the cited geometry"
+
+
+# ---- the bond-order gate (measured defect: the C=O was offered as a rotor) ----
+
+def test_a_carbonyl_is_never_an_eligible_rotor(tr):
+    """EC's two rows were BOTH the C=O (b-c = 1.186 A); they must be gone."""
+    rows = [r for r in _rows() if r["name"] == "EC" and r["state"] == "LiM_2plus"]
+    assert rows, "the EC row must exist (a computed zero, not a missing row)"
+    assert {r["n_eligible_torsions"] for r in rows} == {"0"}, rows
+    geom = tr._primary_geometry("EC", "LiM_2plus")
+    syms, coords = tr._read_xyz(geom)
+    topo = tr._registered_topology("EC", syms)
+    assert tr._torsions(syms, coords, single_bonds=topo[1]) == []
+
+
+def test_the_carbonyl_bond_is_a_double_bond_in_the_registered_topology(tr):
+    """Independently justify the exclusion: b-c 1.186 A is NOT a single bond."""
+    geom = tr._primary_geometry("EC", "LiM_2plus")
+    syms, coords = tr._read_xyz(geom)
+    adj, singles = tr._registered_topology("EC", syms)
+    carbonyl = tuple(sorted((3, 4)))
+    # `adj` is a neighbour-set list, not an edge list
+    assert 4 in adj[3] and 3 in adj[4], "the bond exists"
+    assert carbonyl not in singles, "but it is a double bond, so it is not a rotor"
+
+
+def test_distance_only_torsion_scan_is_refused(tr):
+    """Fail closed: a distance-only adjacency cannot tell C=O from C-O."""
+    geom = tr._primary_geometry("DMC", "LiM_2plus")
+    syms, coords = tr._read_xyz(geom)
+    with pytest.raises(ValueError):
+        tr._torsions(syms, coords)
+
+
+def test_dmc_lost_exactly_its_carbonyl_rotors(tr):
+    """DMC|LiM_2plus: 12 distance-guessed -> 10 bond-order-verified."""
+    rows = [r for r in _rows() if r["name"] == "DMC" and r["state"] == "LiM_2plus"
+            and r["detail"].count("-") >= 3]
+    assert {r["n_eligible_torsions"] for r in rows} == {"10"}, \
+        sorted({r["n_eligible_torsions"] for r in rows})
+    geom = tr._primary_geometry("DMC", "LiM_2plus")
+    syms, coords = tr._read_xyz(geom)
+    topo = tr._registered_topology("DMC", syms)
+    got = tr._torsions(syms, coords, single_bonds=topo[1])
+    assert len(got) == 10
 
 
 def test_no_row_claims_missing_while_the_geometry_exists(tr):
