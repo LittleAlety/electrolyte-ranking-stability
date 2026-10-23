@@ -41,3 +41,35 @@
 
 * `work/wp2prod/**`（主态账本/日志/几何）—— 对应的**归档来源尚未在仓库内登记**；
   clean clone 下依赖它的脚本会失败（响亮），但**归档地址本身需要补登记**。
+
+## 归档来源（实测核验，2026-10-23）
+
+| 项 | 值 |
+|---|---|
+| 远端归档 | `pengqihang@202.114.96.180:~/project/electrolyte_wp2` |
+| 规模（实测 `ls`/`du`） | **58 个目录 / 12 GB** |
+| 覆盖 | 主态 remaining·鞍点修复·技术重试·严优化救援·vfreq 自动·无效重算；全代系综 r1/r2/strict_recovery_v1；扭转探针 v1/v1_fragmentfix/v1_reopt_v3/v2_realfragment；frontier 定域、anfreq 审计/cohort、DEC partial |
+| 恢复路径 | 系综包用 `ensemble_hpc_io.py --package <pkg> --job-id <id>`；主态包是上传目录树 |
+
+### 主态原始证据的拆分（由每条腿 JSON 的 `hpc_import_provenance` 推导）
+
+| 项 | 值 |
+|---|---|
+| 腿 JSON 总数 | **62** |
+| 来自 HPC 导入（可从归档恢复） | **37** |
+| **仅本机**（`job_kind=opt_numfreq`） | **25** |
+| 其中已被**派生账本**覆盖 | **23** |
+| 其中未覆盖 | **2**（`_saddle_attempt1/GBL_LiM_2plus`、`_saddle_attempt1/SL_LiM_2plus`，草稿式鞍点重试） |
+
+**派生层已被跟踪**：`outputs/physics_completion/free_states/production_ledger.csv`（**60/60 computed**）——**项目的结论不依赖本机的 `work/` 层**。
+
+> **如实声明的限制**：那 25 条本机腿的**原始 ORCA 输出只存在于本机**。其中 23 条已被跟踪的派生账本取代、2 条是草稿式鞍点重试。因此：**结论**在 clean clone 下可复现，但**用原始输出重新分析某条本机腿**不可从已声明归档复现。
+
+### 其它 `work/` 子层的归档状态
+
+| 路径 | 状态 |
+|---|---|
+| `work/sampling/**`、`work/enso/**`、`work/recovery_search/**` | **未归档但可复现**（重跑 GFN2 筛选即可再生） |
+| `work/_wp2_commit_msg.txt` | 非证据（每次提交的 scratch） |
+| **`work/recheck/**`** | **未归档且不可复现**——折叠后的 pair-recheck 原始表，远端没有、链也不再生（**已声明的缺口**） |
+| `work/pilot12/gen_baseline.py` | **只是缓存**；`emit_wp2.baseline_source()` 回退到遍历 git 历史找未打补丁版本，找不到即 `SystemExit` → 真实依赖是**完整 git 历史**（**浅克隆会响亮失败**） |

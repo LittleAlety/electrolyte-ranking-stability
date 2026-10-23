@@ -7,11 +7,11 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 171,
+  "test_files": 172,
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-23T12:57:31Z",
+  "generated_at_utc": "2026-10-23T13:40:28Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -1734,12 +1734,12 @@ window.HB = {
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 174
+   "files": 175
   },
   {
    "path": "docs",
    "note": "技术报告与周报（NN_*.md）、协议、结题报告、站点",
-   "files": 164
+   "files": 166
   },
   {
    "path": "deliverables",
