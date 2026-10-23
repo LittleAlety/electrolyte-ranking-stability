@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "scope": "every closure-chain script that references the machine-local work/ layer",
+  "rule": "work/ is gitignored: a clean clone has none of it. Large raw evidence is provided by the declared archives below; a MISSING dependency must fail loudly and must never be skipped silently -- an empty-but-plausible artifact is not an answer.",
+  "entries": {
+    "emit_wp2.py": {
+      "reads": [
+        "work/wp2prod/**/*.json",
+        "work/pilot12/gen_baseline.py"
+      ],
+      "purpose": "fold the finished main-state leg ledgers into the batch generator",
+      "declared_source": "the WP2 main-production campaign (HPC archive of every completed leg)",
+      "on_missing": "loud"
+    },
+    "build_state_identity_qc.py": {
+      "reads": [
+        "work/wp2prod/<NAME>/<STATE>/*.log"
+      ],
+      "purpose": "read the last population block to classify the electronic identity",
+      "declared_source": "the WP2 main-production ORCA logs",
+      "on_missing": "loud"
+    },
+    "build_production_ensemble_aggregator.py": {
+      "reads": [
+        "work/wp2prod/<NAME>/<STATE>/<NAME>_<STATE>_opt.xyz"
+      ],
+      "purpose": "primary-member geometry for the DFT-level dedup",
+      "declared_source": "the WP2 main-production geometries",
+      "on_missing": "loud"
+    },
+    "build_pair_recheck_plan.py": {
+      "reads": [
+        "work/recheck/ (folded raw pair-recheck table)",
+        "work/wp2prod/**/<name>_<state>.json"
+      ],
+      "purpose": "re-register an already-folded external raw table",
+      "declared_source": "the pair-recheck campaign (folded by emit_pair_recheck.py)",
+      "on_missing": "loud"
+    },
+    "build_plan_compliance.py": {
+      "reads": [
+        "work/wp2prod/**/<name>_<state>.json"
+      ],
+      "purpose": "count the frozen main-state ledgers",
+      "declared_source": "the WP2 main-production ledgers",
+      "on_missing": "loud"
+    },
+    "build_frontier_legs.py": {
+      "reads": [
+        "work/hpc_frontier_localization_v1/**"
+      ],
+      "purpose": "locate the single-point package it is rebuilding",
+      "declared_source": "the frontier-localization campaign",
+      "on_missing": "loud"
+    },
+    "build_frontier_localization.py": {
+      "reads": [
+        "work/hpc_frontier_localization_v1/tasks/**/*.molden.input"
+      ],
+      "purpose": "parse HOMO/LUMO populations per weighted member",
+      "declared_source": "the frontier-localization campaign results",
+      "on_missing": "loud"
+    },
+    "build_ensemble_cost_by_family.py": {
+      "reads": [
+        "work/hpc_*/tasks/**/{snapshots,attempts}/**/{started,normal_termination}.utc"
+      ],
+      "purpose": "attribute core-hours to each unique allocation",
+      "declared_source": "every HPC package (the archived Slurm/ORCA timestamps)",
+      "on_missing": "loud (REFUSING: an empty ledger is a silent skip, not zero cost)"
+    },
+    "build_coverage_reviews.py": {
+      "reads": [
+        "work/hpc_torsion_probe_v*/manifest.json"
+      ],
+      "purpose": "exclude members the preflight REFUSED or a repair REPLACED after cancellation",
+      "declared_source": "the torsion-probe repair manifests",
+      "on_missing": "loud (REFUSING: an empty exclusion set would re-admit refused members)"
+    },
+    "build_recovery_budget_accounting.py": {
+      "reads": [
+        "work/hpc_production_ensemble_strict_recovery_v1*"
+      ],
+      "purpose": "account the recovery batch's measured core-hours",
+      "declared_source": "the strict_recovery_v1 packages",
+      "on_missing": "loud (REFUSING: reporting 0.0 core-hours would state that nothing was spent)"
+    },
+    "build_wp2_sampling.py": {
+      "reads": [
+        "work/sampling/**",
+        "work/wp2prod/**"
+      ],
+      "purpose": "GFN2 screening cache and the frozen production legs",
+      "declared_source": "the screening campaign cache (also registered by provenance)",
+      "on_missing": "loud"
+    },
+    "build_wp2_ensemble_free_energies.py": {
+      "reads": [
+        "work/enso/**"
+      ],
+      "purpose": "GFN2 ensemble cache (the CHEAP layer; never counted in the 48 denominator)",
+      "declared_source": "the screening ensemble cache",
+      "on_missing": "loud"
+    },
+    "build_compute_provenance.py": {
+      "reads": [
+        "work/sampling/xtb_results.csv",
+        "work/**"
+      ],
+      "purpose": "register the raw cache that produced each derivative",
+      "declared_source": "the screening cache (declared as the raw provenance source)",
+      "on_missing": "loud"
+    },
+    "build_strict_recovery_manifest.py": {
+      "reads": [
+        "work/sampling/**/xtbopt.xyz"
+      ],
+      "purpose": "recover the basin id from a registered start geometry",
+      "declared_source": "the screening pool",
+      "on_missing": "loud"
+    },
+    "build_sampling_3to6_diff.py": {
+      "reads": [
+        "work/... member task paths (parsed from member keys)"
+      ],
+      "purpose": "resolve a member's task path for the ceiling aggregation",
+      "declared_source": "the ensemble packages",
+      "on_missing": "loud"
+    },
+    "run_strict_recovery_search.py": {
+      "reads": [
+        "work/recovery_search/**"
+      ],
+      "purpose": "cache the screening-level search results",
+      "declared_source": "the second-search campaign cache",
+      "on_missing": "loud"
+    },
+    "make_commit_msg.py": {
+      "reads": [
+        "work/_wp2_commit_msg.txt"
+      ],
+      "purpose": "scratch file for the commit message (machine-local by design)",
+      "declared_source": "not evidence: a scratch file, regenerated per commit",
+      "on_missing": "not_applicable"
+    },
+    "build_terminal_site.py": {
+      "reads": [
+        "work/ (mentioned only in prose/comments)"
+      ],
+      "purpose": "explain why the site reads tracked snapshots instead",
+      "declared_source": "not evidence: documentation text only",
+      "on_missing": "not_applicable"
+    },
+    "build_physics_completion_batch.py": {
+      "reads": [
+        "work/wp2prod/** (via the folded generators)"
+      ],
+      "purpose": "the batch generator itself (a derived artifact of emit_wp2)",
+      "declared_source": "derived, not read: regenerated by emit_wp2 from the git baseline",
+      "on_missing": "not_applicable"
+    }
+  }
+}
