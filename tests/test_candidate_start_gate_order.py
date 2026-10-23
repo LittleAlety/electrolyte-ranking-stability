@@ -232,6 +232,41 @@ def test_a_changed_li_first_shell_is_refused(btp):
     assert verdict["reason"] == "li_coordination_changed", verdict
 
 
+def test_a_declared_li_coordination_probe_is_accepted_as_its_own_kind(btp):
+    """The declared counterpart: the change IS the purpose, so it is classified.
+
+    Without this, the legal Li-coordination search the plan names for
+    DMC|LiM_2plus / DOL / EC could not be executed at all -- 5 of
+    DMC|LiM_2plus's 7 registered torsions change Li's shell.
+    """
+    syms = ["O", "O", "Li", "H"]
+    coords = np.array([[2.0, 0.0, 0.0], [0.0, 2.4, 0.0], [0.0, 0.0, 0.0],
+                       [0.0, 0.0, 3.5]])
+    adj = _adjacency(syms, coords, cutoff=1.9)
+    moved = coords.copy()
+    moved[0] = moved[0] + np.array([2.0, 0.0, 0.0])
+    verdict = btp.validate_candidate_start(
+        syms, coords, moved, adj, declared_li_change=True)
+    assert verdict["accepted"] is True, verdict
+    assert verdict["reason"] == "ok_li_coordination_change", verdict
+    assert verdict["detail"]["probe_class"] == "li_coordination_change", verdict
+    # and the change itself must be recorded, not hidden
+    assert verdict["detail"]["source_shells"] != verdict["detail"]["candidate_shells"]
+
+
+def test_an_undeclared_li_change_is_never_labelled_a_torsion(btp):
+    """Regression on the reason: it must stay a refusal, not a silent torsion."""
+    syms = ["O", "O", "Li", "H"]
+    coords = np.array([[2.0, 0.0, 0.0], [0.0, 2.4, 0.0], [0.0, 0.0, 0.0],
+                       [0.0, 0.0, 3.5]])
+    adj = _adjacency(syms, coords, cutoff=1.9)
+    moved = coords.copy()
+    moved[0] = moved[0] + np.array([2.0, 0.0, 0.0])
+    for kwargs in ({}, {"check_li_shell": True}):
+        v = btp.validate_candidate_start(syms, coords, moved, adj, **kwargs)
+        assert v["accepted"] is False and v["reason"] == "li_coordination_changed", v
+
+
 def test_a_legal_heavy_fragment_change_is_accepted(btp):
     """Positive: the heavy skeleton moved and the topology held."""
     syms, xyz = _ideal_ethane()

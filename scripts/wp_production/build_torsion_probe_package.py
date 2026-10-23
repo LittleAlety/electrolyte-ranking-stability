@@ -205,6 +205,19 @@ def rotate_fragment(coords, dihedral, adjacency, *, single_bonds, degrees):
                      "rotation_degrees": degrees, "contract": "fragment_bridge_v1"}
 
 
+def _covalent_only(edges: set, symbols) -> set:
+    """Drop edges incident to Li.
+
+    ``bond_graph`` uses a 1.3x covalent-radius cut, which counts a 2.0 A Li...O
+    contact as a "bond".  Li coordination is NOT covalent bonding; it is judged by
+    the first-shell check instead.  Leaving those edges in made a DECLARED
+    coordination probe fail the covalent-topology gate (measured), and made the
+    coordination reason unreachable behind ring_broken.
+    """
+    return {e for e in edges
+            if symbols[e[0]] != "Li" and symbols[e[1]] != "Li"}
+
+
 def _edge_set(bond_graph_result) -> set:
     """Undirected edge set.
 
@@ -239,7 +252,7 @@ def _li_first_shell(symbols, coords, *, cutoff=2.6):
 def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency,
                             *, prior_starts=(), min_pair_change_a=1e-5,
                             registered_single_bonds=None, rotated_bond=None,
-                            check_li_shell=True):
+                            check_li_shell=True, declared_li_change=False):
     """One gate every candidate start must pass, whatever generated it.
 
     Returns ``{"accepted": bool, "reason": str, "detail": {...}}`` -- a verdict,
@@ -270,6 +283,12 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
     ``mapping_unresolved``         equivalence could not be decided -> fail closed;
     ``equivalent_start``           a topology-preserving proper rotation of the
                                    source or of an already registered start.
+
+    ``ok_li_coordination_change``  accepted ONLY when the caller DECLARES
+    ``declared_li_change=True``: the probe's purpose is the coordination change
+    itself.  An undeclared shell change is refused, so a coordination change can
+    never ride along as a side effect of a torsion -- and when it is declared, the
+    probe is classified as its own kind, never reported as a torsion.
 
     Accepted classes: ``ok_methyl_rotor`` (the heavy skeleton did not move; a
     legitimate independent start on THAT rotor coordinate only) and
@@ -317,18 +336,24 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
     #    a "bond", so a coordination change would always be reported as
     #    ring_broken and THIS check could never fire (a guard that cannot fire is
     #    worse than none).
+    li_shell_changed = False
+    li_shells = {}
     if check_li_shell and any(s == "Li" for s in symbols):
         s_shell = _li_first_shell(symbols, xyz_s)
         c_shell = _li_first_shell(symbols, xyz_c)
-        if s_shell != c_shell:
+        li_shells = {"source_shells": {str(k): sorted(v) for k, v in s_shell.items()},
+                     "candidate_shells": {str(k): sorted(v) for k, v in c_shell.items()}}
+        li_shell_changed = s_shell != c_shell
+        if li_shell_changed and not declared_li_change:
+            # an ACCIDENTAL coordination change is a different probe kind, not a
+            # side effect of a torsion; it must be declared
             return {"accepted": False, "reason": "li_coordination_changed",
-                    "detail": {"source_shells": {str(k): sorted(v) for k, v in s_shell.items()},
-                               "candidate_shells": {str(k): sorted(v) for k, v in c_shell.items()}}}
+                    "detail": li_shells}
 
     # 4. covalent topology must be intact -- BEFORE any classification
     try:
-        ref = _edge_set(bond_graph(symbols, xyz_s))
-        got = _edge_set(bond_graph(symbols, xyz_c))
+        ref = _covalent_only(_edge_set(bond_graph(symbols, xyz_s)), symbols)
+        got = _covalent_only(_edge_set(bond_graph(symbols, xyz_c)), symbols)
     except (ValueError, IndexError):
         return {"accepted": False, "reason": "malformed_input",
                 "detail": {"note": "bond graph could not be built"}}
@@ -358,6 +383,13 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
                     "detail": {"pair_distance_change_a": change, "against": label}}
 
     # 6. only now classify what KIND of independent start this is
+    if li_shell_changed:
+        # declared above: the probe's PURPOSE is the coordination change, so it is
+        # classified as its own kind and never presented as a torsion
+        return {"accepted": True, "reason": "ok_li_coordination_change",
+                "detail": dict({"pair_distance_change_a": change,
+                                "heavy_pair_change_a": heavy_change,
+                                "probe_class": "li_coordination_change"}, **li_shells)}
     if heavy_change <= min_pair_change_a:
         return {"accepted": True, "reason": "ok_methyl_rotor",
                 "detail": {"pair_distance_change_a": change,
