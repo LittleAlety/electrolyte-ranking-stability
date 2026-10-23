@@ -2,7 +2,7 @@
 
 > 由 `scripts/wp_production/build_plan_compliance.py` 从 `outputs/physics_completion/**`、`outputs/week7/`、`data/references/anchor_primary_audit.csv`
 > 只读现算；本文件不写死任何状态或数字，生产腿每落地一批重跑即更新。
-> generated_at_utc=2026-10-23T15:54:01Z; runtime_input_sha256=bcd4d833ae0b7b950406104b59d5807f046e6a66006357e377e2ee689e4f1798; scientific_ledger_sha256=1fa06256a6e760b72f2703ab3e215dbb76c33bcf0aecd5515763147c1688fcda; stale=false
+> generated_at_utc=2026-10-23T17:07:26Z; runtime_input_sha256=bcd4d833ae0b7b950406104b59d5807f046e6a66006357e377e2ee689e4f1798; scientific_ledger_sha256=1fa06256a6e760b72f2703ab3e215dbb76c33bcf0aecd5515763147c1688fcda; stale=false
 > **运行进度：60/60**；**主态运行完成：48/48**；**科学验收（四主态）：48/48**；**固化交付主态：48/48**。QC 失败、partial、missing、running 均不计入科学验收。
 
 | item_id | 方案节 | 要求 | 状态 | 实测 | 证据 |

@@ -27,6 +27,14 @@ def package(tmp_path, count=3):
     (root / "manifest.json").write_text(json.dumps({
         "schema_version": 2, "batches": [{"batch": 1, "count": count}], "legs": []}),
         encoding="utf-8")
+    # every task must carry an input declaring the core count the submitter
+    # allocates (plan P4: 输入核数与 allocation 一致).  These fixtures predate that
+    # gate, so they declare it here rather than the contract being relaxed.
+    for i in range(count):
+        task = root / ("tasks/X%d/M" % i)
+        task.mkdir(parents=True)
+        (task / "job.inp").write_text(
+            "! wB97X-D4 def2-TZVPD Opt AnFreq\n%pal nprocs 4 end\n", encoding="utf-8")
     return root
 
 

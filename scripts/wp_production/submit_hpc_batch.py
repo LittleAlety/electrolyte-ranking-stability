@@ -19,6 +19,10 @@ import subprocess
 
 DEFAULT_BRIDGE = Path(r"E:\软件\超算连接\hpc\hpc.ps1")
 MAX_ACTIVE_PENDING = 20
+CORES_PER_TASK = 4                  # project production allocation (sacct: AllocCPUS=4)
+WALL_HOURS = 24
+ORCA_NPROCS_RE = re.compile(r"%pal\s+nprocs\s+(\d+)", re.I)
+DEFAULT_BUDGET_CAP_CORE_HOURS = "800"
 REMOTE_SUBMISSION_LOCK = "~/project/electrolyte_wp2/.wp2_submit.lock"
 USER_RE = re.compile(r"[A-Za-z0-9_.-]+\Z")
 JOB_RE = re.compile(r"\d+(?:_(?:\d+|\[[0-9,%\-]+\]))?\Z")
@@ -163,8 +167,80 @@ def collect_sacct(attempt_dir, *, runner=default_runner, bridge=DEFAULT_BRIDGE):
     return {"state": state, "exit_code": exit_code, "path": str(target)}
 
 
+def declared_task_cores(package: Path, listing) -> int:
+    """The core count every task's ORCA input declares (``%pal nprocs N``).
+
+    ``listing`` may be the batch list FILE (what ``_load_package`` returns) or an
+    iterable of task relpaths -- measured: assuming a list raises
+    "TypeError: 'WindowsPath' object is not iterable".
+
+    Plan P4 requires "输入核数与 allocation 一致".  Submitting a task whose input
+    declares a different core count silently changes the resource the run uses, so
+    a mismatch (or a missing declaration, or inconsistent tasks) is refused.
+    """
+    package = Path(package)
+    if isinstance(listing, (str, Path)):
+        listing = [line for line in Path(listing).read_text(encoding="utf-8").splitlines()
+                   if line.strip()]
+    cores = set()
+    for rel in listing:
+        inp = package / rel / "job.inp"
+        if not inp.is_file():
+            raise ValueError("task input missing: %s/job.inp" % rel)
+        match = ORCA_NPROCS_RE.search(inp.read_text(encoding="utf-8"))
+        if match is None:
+            raise ValueError("task input declares no %%pal nprocs: %s" % rel)
+        cores.add(int(match.group(1)))
+    if not cores:
+        raise ValueError("batch listing is empty; nothing to submit")
+    if len(cores) != 1:
+        raise ValueError("tasks declare inconsistent %%pal nprocs: %s" % sorted(cores))
+    return cores.pop()
+
+
+def committed_core_hours(attempts) -> "Decimal":
+    """Committed + in-flight core-hours, deduplicated by Slurm allocation."""
+    from decimal import Decimal
+    seen = set()
+    total = Decimal("0")
+    for a in attempts or []:
+        status = str(a.get("status", ""))
+        if status in ("planned", "rejected", "superseded_unsubmitted"):
+            continue
+        if status in ("pending", "running", "submitting"):
+            # an unfinished attempt cannot release the remainder of its allocation
+            total += Decimal(str(a["cores"])) * Decimal(str(a["wall_hours_reserved"]))
+            continue
+        allocation = a.get("slurm_allocation_id")
+        measured = a.get("measured_core_hours")
+        if not allocation or measured is None:
+            raise ValueError("terminal cost provenance missing: %s"
+                             % a.get("attempt_id", "<unknown attempt>"))
+        if allocation in seen:
+            continue                 # a shared job must not be billed per leg
+        seen.add(allocation)
+        total += Decimal(str(measured))
+    return total
+
+
+def budget_headroom(attempts, *, cap, cores, wall_hours, task_count) -> dict:
+    """The plan's invariant: committed + reserved must not exceed the cap."""
+    from decimal import Decimal
+    reserved = (Decimal(str(cores)) * Decimal(str(wall_hours))
+                * Decimal(str(task_count)))
+    committed = committed_core_hours(attempts)
+    cap = Decimal(str(cap))
+    if committed + reserved > cap:
+        raise ValueError("core-hour budget exceeded: committed %s + reserved %s > cap %s"
+                         % (committed, reserved, cap))
+    return {"committed_core_hours": str(committed), "reserved_core_hours": str(reserved),
+            "cap_core_hours": str(cap),
+            "remaining_after_core_hours": str(cap - committed - reserved)}
+
+
 def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
-                 bridge=DEFAULT_BRIDGE, user="pengqihang"):
+                 bridge=DEFAULT_BRIDGE, user="pengqihang",
+                 attempts_ledger=None, budget_cap_core_hours=DEFAULT_BUDGET_CAP_CORE_HOURS):
     package = Path(package).resolve()
     bridge = Path(bridge)
     if not USER_RE.fullmatch(user):
@@ -204,8 +280,27 @@ def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
             raise ValueError("batch count %d exceeds live headroom %d under the <=20 cap"
                              % (count, headroom))
 
+        # the input's declared core count must match what we allocate
+        declared_cores = declared_task_cores(package, listing)
+        if declared_cores != CORES_PER_TASK:
+            raise ValueError(
+                "task inputs declare %d cores but the protected submitter allocates %d; "
+                "refusing to silently change the resource (version the submitter instead)"
+                % (declared_cores, CORES_PER_TASK))
+
+        budget_record = {"budget_checked": False}
+        if attempts_ledger is not None:
+            budget_record = budget_headroom(
+                attempts_ledger, cap=budget_cap_core_hours, cores=CORES_PER_TASK,
+                wall_hours=WALL_HOURS, task_count=count)
+            budget_record["budget_checked"] = True
+        else:
+            print("NOTE: no --attempts-ledger given; the core-hour budget invariant "
+                  "was NOT checked for this submission")
+
         record = {
             "batch": batch, "batch_count": count, "observed_active_pending": active_pending,
+            "declared_task_cores": declared_cores, **budget_record,
             "headroom_before_submit": headroom, "remote_workdir": remote_workdir,
             "remote_submission_lock": REMOTE_SUBMISSION_LOCK,
             "batch_script_sha256": sha256(script), "batch_list_sha256": sha256(listing),
@@ -258,6 +353,10 @@ def main(argv=None):
     parser.add_argument("--batch", type=int)
     parser.add_argument("--remote-workdir")
     parser.add_argument("--collect-sacct", type=Path, metavar="ATTEMPT_DIR")
+    parser.add_argument("--attempts-ledger", type=Path, metavar="JSON",
+                        help="attempt ledger; enables the core-hour budget invariant")
+    parser.add_argument("--budget-cap-core-hours", default=DEFAULT_BUDGET_CAP_CORE_HOURS,
+                        help="hard cap for committed+reserved core-hours (default 800)")
     parser.add_argument("--bridge", type=Path, default=DEFAULT_BRIDGE)
     parser.add_argument("--user", default="pengqihang")
     args = parser.parse_args(argv)
@@ -269,8 +368,17 @@ def main(argv=None):
         else:
             if args.package is None or args.batch is None or args.remote_workdir is None:
                 raise ValueError("submission requires package, --batch, and --remote-workdir")
+            ledger = None
+            if args.attempts_ledger is not None:
+                doc = json.loads(Path(args.attempts_ledger).read_text(encoding="utf-8"))
+                ledger = doc.get("attempts") if isinstance(doc, dict) else doc
+                if ledger is None:
+                    raise ValueError("attempts ledger has no 'attempts' list: %s"
+                                     % args.attempts_ledger)
             result = submit_batch(args.package, args.batch, args.remote_workdir,
-                                  bridge=args.bridge, user=args.user)
+                                  bridge=args.bridge, user=args.user,
+                                  attempts_ledger=ledger,
+                                  budget_cap_core_hours=args.budget_cap_core_hours)
     except (ValueError, RuntimeError) as exc:
         print("REFUSED: %s" % exc)
         return 2
