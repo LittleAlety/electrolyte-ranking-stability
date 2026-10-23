@@ -383,6 +383,21 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
                     "detail": {"pair_distance_change_a": change, "against": label}}
 
     # 6. only now classify what KIND of independent start this is
+    # A DECLARED Li probe is its own kind: a Li-only move must not be reported as a
+    # heavy-fragment torsion, even when the first-shell membership happens to be
+    # unchanged (Li is a heavy atom by mass, but not part of the covalent skeleton).
+    if declared_li_change:
+        non_li_heavy = [i for i, s in enumerate(symbols) if s != "H" and s != "Li"]
+        non_li_change = (float(np.max(np.abs(
+            before[np.ix_(non_li_heavy, non_li_heavy)]
+            - after[np.ix_(non_li_heavy, non_li_heavy)])))
+            if len(non_li_heavy) > 1 else 0.0)
+        if li_shell_changed or non_li_change <= min_pair_change_a:
+            return {"accepted": True, "reason": "ok_li_coordination_change",
+                    "detail": dict({"pair_distance_change_a": change,
+                                    "heavy_pair_change_a": heavy_change,
+                                    "probe_class": "li_coordination_change"}, **li_shells)}
+
     if li_shell_changed:
         # declared above: the probe's PURPOSE is the coordination change, so it is
         # classified as its own kind and never presented as a torsion
@@ -451,6 +466,179 @@ def equivalent_start(symbols, first, second, adjacency):
         return rmsd <= 1e-4
 
     return search(0)
+
+
+# ---------------------------------------------------------------------------
+# P3: legal candidate generators (ring pucker, Li coordination) + the selector.
+# ---------------------------------------------------------------------------
+
+def _shortest_cycle_through(adjacency, a, b):
+    """The atom indices of the shortest cycle containing the a-b bond, or None."""
+    prev = {a: None}
+    frontier = [a]
+    while frontier:
+        nxt = []
+        for node in frontier:
+            for nb in adjacency[node]:
+                if node == a and nb == b:
+                    continue                      # the bond itself is not a step
+                if nb in prev:
+                    continue
+                prev[nb] = node
+                if nb == b:
+                    # walk back to `a` (whose predecessor is None) WITHOUT putting
+                    # that sentinel into the path (measured: appending it makes
+                    # sorted(set(path)) raise TypeError on None vs int)
+                    path = [b]
+                    cur = b
+                    while prev[cur] is not None:
+                        cur = prev[cur]
+                        path.append(cur)
+                    return sorted(set(path))
+                nxt.append(nb)
+        frontier = nxt
+    return None
+
+
+def ring_atoms(adjacency, *, ring_max=7):
+    """Atom-index sets of every ring of size <= ring_max (smallest per bond)."""
+    rings = set()
+    for i in range(len(adjacency)):
+        for j in adjacency[i]:
+            if j <= i:
+                continue
+            cycle = _shortest_cycle_through(adjacency, i, j)
+            if cycle and len(cycle) <= ring_max:
+                rings.add(frozenset(cycle))
+    # keep only minimal rings: a set that strictly contains another is a macrocycle
+    minimal = {r for r in rings if not any(o < r for o in rings)}
+    return sorted((sorted(r) for r in minimal), key=lambda r: (len(r), r))
+
+
+def ring_pucker_candidates(symbols, coords, adjacency, *,
+                           amplitudes=(0.25, -0.25, 0.40, -0.40, 0.60, -0.60, 0.80, -0.80), ring_max=7):
+    """Legal RING DEFORMATION candidates: displace ring atoms along the ring normal.
+
+    A pucker moves heavy atoms while every bond survives, so the gate classifies it
+    ``ok_heavy_fragment``.  This is the degree of freedom the plan names for DOL/EC,
+    where the registry holds ZERO rotatable torsions (rigid five-membered ring).
+    """
+    xyz0 = np.asarray(coords, dtype=float)
+    out = []
+    for ring in ring_atoms(adjacency, ring_max=ring_max):
+        if len(ring) < 3:
+            continue
+        centre = xyz0[ring].mean(axis=0)
+        _, _, vt = np.linalg.svd(xyz0[ring] - centre)
+        normal = vt[-1]                            # out-of-plane direction
+        modes = (("envelope", [ring[0]]),
+                 ("twist", [ring[0], ring[len(ring) // 2]]),
+                 ("envelope2", [ring[len(ring) // 3]]))
+        for amp in amplitudes:
+            for mode, sel in modes:
+                move = xyz0.copy()
+                for k, atom in enumerate(sel):
+                    sign = 1.0 if k == 0 else -1.0
+                    move[atom] = move[atom] + sign * amp * normal
+                out.append({"kind": "ring_pucker", "ring": ring, "mode": mode,
+                            "amplitude_a": amp, "coords": move,
+                            "moved_atoms": sorted(sel)})
+    return out
+
+
+def li_coordination_candidates(symbols, coords, adjacency, *,
+                               offsets=(0.15, 0.30, 0.45), shell_cutoff=2.6):
+    """DECLARED Caordination probes: move Li along its donor directions.
+
+    Li...O/N is coordination, NOT covalent bonding, so this is a distinct probe
+    class (``ok_li_coordination_change``) that must be declared -- it may never
+    ride along as a side effect of a torsion.
+    """
+    xyz0 = np.asarray(coords, dtype=float)
+    li = [i for i, s in enumerate(symbols) if s == "Li"]
+    out = []
+    for atom in li:
+        d = np.linalg.norm(xyz0 - xyz0[atom], axis=1)
+        shell = [int(k) for k in np.where((d > 0) & (d <= shell_cutoff))[0]]
+        if not shell:
+            continue
+        dirs = []
+        for donor in shell:
+            v = xyz0[donor] - xyz0[atom]
+            n = np.linalg.norm(v)
+            if n > 1e-9:
+                dirs.append(("toward_%d" % donor, v / n))
+        centroid = xyz0[shell].mean(axis=0) - xyz0[atom]
+        n = np.linalg.norm(centroid)
+        if n > 1e-9:
+            dirs.append(("toward_shell_centroid", centroid / n))
+        for label, v in dirs:
+            for off in offsets:
+                move = xyz0.copy()
+                move[atom] = move[atom] + off * v
+                out.append({"kind": "li_coordination", "li": atom, "direction": label,
+                            "offset_a": off, "coords": move, "moved_atoms": [atom]})
+    return out
+
+
+def _distance_fingerprint(coords) -> str:
+    """Rotation- and translation-invariant structural fingerprint."""
+    xyz = np.asarray(coords, dtype=float)
+    d = np.linalg.norm(xyz[:, None] - xyz[None, :], axis=2)
+    iu = np.triu_indices(len(xyz), k=1)
+    return hashlib.sha256(
+        ",".join("%.4f" % v for v in np.sort(d[iu])).encode("utf-8")).hexdigest()
+
+
+def select_candidates(symbols, source_coords, adjacency, candidates, *,
+                      registered_single_bonds=None, source_sha256="",
+                      max_keep=None):
+    """Gate FIRST, then dedupe against the accepted ones.  Never bypasses the gate.
+
+    Returns ``{"accepted": [...], "refused": [...]}``.  Every accepted record
+    carries the evidence P3 requires: source and result geometry hashes, the moved
+    atoms, a rotation-invariant distance fingerprint, the independence class and
+    the gate's own reason/detail.
+    """
+    xyz0 = np.asarray(source_coords, dtype=float)
+    accepted, refused = [], []
+    for cand in candidates:
+        declared = cand["kind"] == "li_coordination"
+        rotated_bond = cand.get("rotated_bond")
+        verdict = validate_candidate_start(
+            symbols, xyz0, cand["coords"], adjacency,
+            prior_starts=[a["coords"] for a in accepted],
+            registered_single_bonds=registered_single_bonds,
+            rotated_bond=rotated_bond,
+            declared_li_change=declared)
+        if not verdict["accepted"]:
+            refused.append({"kind": cand["kind"],
+                            "label": cand.get("mode") or cand.get("direction"),
+                            "reason": verdict["reason"], "detail": verdict["detail"]})
+            continue
+        if max_keep is not None and len(accepted) >= max_keep:
+            break
+        record = {
+            "kind": cand["kind"],
+            "label": cand.get("mode") or cand.get("direction"),
+            "amplitude_a": cand.get("amplitude_a"),
+            "offset_a": cand.get("offset_a"),
+            "ring": cand.get("ring"),
+            "moved_atoms": cand.get("moved_atoms", []),
+            "probe_class": verdict["detail"].get("probe_class", verdict["reason"]),
+            "gate_reason": verdict["reason"],
+            "pair_distance_change_a": verdict["detail"].get("pair_distance_change_a"),
+            "heavy_pair_change_a": verdict["detail"].get("heavy_pair_change_a"),
+            "source_geometry_sha256": source_sha256,
+            "result_distance_fingerprint": _distance_fingerprint(cand["coords"]),
+            "source_distance_fingerprint": _distance_fingerprint(xyz0),
+            "coords": cand["coords"],
+        }
+        if declared:
+            record["source_shells"] = verdict["detail"].get("source_shells")
+            record["candidate_shells"] = verdict["detail"].get("candidate_shells")
+        accepted.append(record)
+    return {"accepted": accepted, "refused": refused}
 
 
 def _repair_member(source_package, member, kept):
