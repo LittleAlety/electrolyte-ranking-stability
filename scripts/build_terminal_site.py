@@ -137,6 +137,48 @@ def _ensemble_progress():
     return result
 
 
+def _strict_evidence_progress():
+    """The itemised strict-evidence state, read from the compliance artifact.
+
+    Source: ``plan_compliance.csv`` row ``strict_readiness_evidence``.  Its
+    ``measured`` carries ``checks_passed=A/B; failed=...``.  Missing row or
+    unparsable counts read as unavailable -> the page must say so rather than
+    imply the evidence is complete.
+    """
+    path = os.path.join(REPO, "outputs", "physics_completion", "compliance",
+                        "plan_compliance.csv")
+    fallback = {"available": False, "status": "unknown", "passed": 0, "total": 0,
+                "failed": [], "source": "outputs/physics_completion/compliance/"
+                                        "plan_compliance.csv"}
+    try:
+        with io.open(path, encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if row.get("item_id") != "strict_readiness_evidence":
+                    continue
+                measured = row.get("measured", "")
+                passed, total = 0, 0
+                for part in measured.split(";"):
+                    part = part.strip()
+                    if part.startswith("checks_passed="):
+                        frac = part.split("=", 1)[1]
+                        if "/" in frac:
+                            a, b = frac.split("/", 1)
+                            passed, total = int(a), int(b)
+                failed = []
+                for part in measured.split(";"):
+                    part = part.strip()
+                    if part.startswith("failed="):
+                        failed = [f for f in part.split("=", 1)[1].split(",")
+                                  if f and f != "none"]
+                return {"available": total > 0, "status": row.get("status", "unknown"),
+                        "passed": passed, "total": total, "failed": failed,
+                        "source": "outputs/physics_completion/compliance/"
+                                  "plan_compliance.csv"}
+    except (OSError, KeyError, ValueError, TypeError):
+        pass
+    return fallback
+
+
 def _wp2_progress():
     """Published WP2 runtime/scientific snapshot from the compliance chain.
 
@@ -162,6 +204,7 @@ def _wp2_progress():
             "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
             "ensemble": _ensemble_progress(),
             "frontier": _frontier_progress(),
+            "strict_evidence": _strict_evidence_progress(),
         }
     except (OSError, KeyError, ValueError, TypeError):
         return {
@@ -174,6 +217,7 @@ def _wp2_progress():
             "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
             "ensemble": _ensemble_progress(),
             "frontier": _frontier_progress(),
+            "strict_evidence": _strict_evidence_progress(),
         }
 
 
@@ -821,6 +865,13 @@ def render_production_status(payload):
         ("全成员前沿解析", frontier["parsed"], frontier["total"],
          "Molden 与 FMOPop 解析；非身份结论" if frontier["available"] else "来源缺失或成员集不一致，不能认证"),
     )
+    strict = p.get("strict_evidence", {})
+    if strict.get("total"):
+        metrics = metrics + ((
+            "逐项严格证据", strict["passed"], strict["total"],
+            "六项证据各自现算；通过 4/6 表示仍有项被拒收" if strict["passed"] < strict["total"]
+            else "六项证据均通过现算校验",
+        ),)
     rows = []
     for label, done, total, note in metrics:
         pct = _progress_percent(done, total)
@@ -844,6 +895,11 @@ def render_production_status(payload):
         outstanding = "<li>系综数据不可用，需先重建并核验</li>"
     elif not outstanding:
         outstanding = "<li>无未 accepted 态；其余核心闸门仍须单独核验</li>"
+    if strict.get("total") and strict["passed"] < strict["total"]:
+        outstanding += "".join(
+            '<li><strong>证据被拒收</strong><span>%s</span><small>详见合规台账 '
+            'strict_readiness_evidence 行</small></li>' % esc(flag)
+            for flag in strict["failed"])
     return (
         '    <div class="production-status" id="production">\n'
         '      <div class="production-head">\n'

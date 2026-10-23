@@ -49,10 +49,16 @@ def strict_readiness(labels: list[dict], expected_keys: set, checks: dict) -> di
         if checks.get(k) is not True:
             reasons.append(k)
 
-    if checks.get("wp6_triggered") and checks.get("wp6_complete") is not True:
-        reasons.append("wp6_incomplete")
-    if checks.get("pool_extension_triggered") and \
-            checks.get("pool_extension_complete") is not True:
-        reasons.append("pool_extension_incomplete")
+    # follow-on gates: a tri-state trigger may be *unknown*, which blocks --
+    # it must never be read as "not triggered" (2026-10-22 hardening).
+    for gate in ("wp6", "pool_extension"):
+        state = checks.get(gate + "_trigger_state")
+        if state is None:                     # backwards-compatible callers
+            state = ("triggered" if checks.get(gate + "_triggered")
+                     else "not_triggered")
+        if state == "unknown":
+            reasons.append(gate + "_trigger_unknown")
+        elif state == "triggered" and checks.get(gate + "_complete") is not True:
+            reasons.append(gate + "_incomplete")
 
     return {"complete": not reasons, "blocked_by": reasons}

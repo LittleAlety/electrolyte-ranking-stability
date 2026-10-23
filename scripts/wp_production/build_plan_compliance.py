@@ -24,6 +24,25 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import wp2_progress  # noqa: E402
+from strict_readiness_wiring import REQUIRED_CHECKS as STRICT_CHECKS  # noqa: E402
+from strict_readiness_wiring import derive_checks as strict_checks  # noqa: E402
+from strict_readiness_wiring import derive_check_details as strict_details  # noqa: E402
+
+#: the six strict checks are read from disk once per process; a failed or
+#: unreadable derivation is a failure, never an excuse to pass.
+_STRICT_CACHE: dict | None = None
+
+
+def strict_checks_cached() -> dict:
+    global _STRICT_CACHE
+    if _STRICT_CACHE is None:
+        try:
+            _STRICT_CACHE = strict_details()
+        except Exception as exc:                                # fail closed
+            _STRICT_CACHE = {k: {"passed": False,
+                                 "problems": ["unreadable: %r" % (exc,)]}
+                             for k in STRICT_CHECKS}
+    return _STRICT_CACHE
 
 REPO = Path(__file__).resolve().parents[2]
 OUTDIR = REPO / "outputs" / "physics_completion" / "compliance"
@@ -751,21 +770,35 @@ def build_rows(progress=None):
     # v1.4.1 §2.2: WP6's gate counts ACCEPTED production ensembles only.
     wp6_ready = wp6_gate_ready(li_pair_ok, len(prod_ens_accepted))
     wp6_scope = "planned" if wp6_ready else "optional"
+    try:
+        wp6_trigger_state = strict_checks().get("wp6_trigger_state", "unknown")
+    except Exception:                                           # fail closed
+        wp6_trigger_state = "unknown"
+    if wp6_trigger_state == "unknown":
+        # 触发判定所需证据缺失 -> 不得冒充「未触发」（2026-10-22 接入）
+        wp6_status = "not_satisfied"
+    elif lig and lig_executed:
+        wp6_status = "satisfied"
+    elif lig and wp6_ready:
+        wp6_status = "not_satisfied"
+    elif lig:
+        wp6_status = "blocked_on_production"
+    else:
+        wp6_status = "not_satisfied"
     out.append(item(
         "wp6_explicit_ligand", "10",
         "可选 WP6：固定 R=DME 的共同背景显式配体检查",
-        "satisfied" if (lig and lig_executed) else (
-            "not_satisfied" if (lig and wp6_ready) else (
-                "blocked_on_production" if lig else "not_satisfied")),
+        wp6_status,
         "plan_rows=%d executed_jobs=%d li_pair_complete=%d/%d required_li_pairs=%d "
-        "production_ensembles=%d/%d gate_ready=%s scope=%s" % (
+        "production_ensembles=%d/%d gate_ready=%s trigger_state=%s scope=%s" % (
             len(lig), lig_executed, li_pair_ok, len(set_main), WP6_REQUIRED_LI_PAIRS,
             len(prod_ens_accepted), WP6_REQUIRED_PRODUCTION_ENSEMBLES,
-            str(wp6_ready).lower(), wp6_scope),
+            str(wp6_ready).lower(), wp6_trigger_state, wp6_scope),
         "outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv",
         "WP6 在 gate 前保持可选；当且仅当 Li 配对 complete >= 9/12 且生产系综 = 48/48 时，"
         "自动升级为计划内。gate 后若仍零执行则记 not_satisfied；gate 前记 blocked_on_production，"
-        "不把「登记完整」折成部分完成。",
+        "不把「登记完整」折成部分完成。触发状态由 labels + Li 配对真值现算，"
+        "证据不足以判定记 unknown 并按 not_satisfied 阻塞。",
     ))
 
     # ---------------- §11 停止规则 ----------------
@@ -839,6 +872,29 @@ def build_rows(progress=None):
     ))
 
     # ---------------- §1 / §12 总体 ----------------
+    # 逐项严格证据（2026-10-22 接入）：总体闸门必须消费 strict_readiness 的
+    # 六项证据检查，否则「总体闭环」仍可在一项证据宽松放行时成立。
+    # 任一项读不到/不合法即 not_satisfied（fail-closed），并把具体缺什么写进 measured。
+    try:
+        _strict = strict_checks_cached()
+    except Exception as exc:                                    # fail closed
+        _strict = {k: {"passed": False, "problems": ["unreadable: %r" % (exc,)]}
+                   for k in STRICT_CHECKS}
+    strict_failed = sorted(k for k in STRICT_CHECKS if not _strict[k]["passed"])
+    strict_problems = []
+    for k in strict_failed:
+        for p in _strict[k]["problems"][:3]:
+            strict_problems.append("%s: %s" % (k, p))
+    strict_evidence_ok = not strict_failed
+    try:
+        _triggers = strict_checks()
+    except Exception as exc:                                    # fail closed
+        _triggers = {"wp6_trigger_state": "unknown",
+                     "pool_extension_trigger_state": "unknown"}
+    strict_unknown = sorted(g for g in ("wp6", "pool_extension")
+                            if _triggers.get(g + "_trigger_state") == "unknown")
+    strict_evidence_ok = strict_evidence_ok and not strict_unknown
+
     # 项目级分母来自方案登记的 12 主集，而不是当前四分子 pilot ledger。四分子
     # 20 腿即使全部完成，也只能关闭 pilot 子集，不能关闭完整 physics_completion_v1。
     plan_complete = (
@@ -851,7 +907,24 @@ def build_rows(progress=None):
         and samp_extension_ok
         and bool(flip_prod) and flip_done == len(flip_prod)
         and flip_screen_ok
+        and strict_evidence_ok
     )
+    out.append(item(
+        "strict_readiness_evidence", "1",
+        "逐项严格证据：覆盖复核 / 成员身份 / 采样审计 / WP3 / WP5 全池 / 成本来源",
+        "satisfied" if strict_evidence_ok else "not_satisfied",
+        "checks_passed=%d/%d; failed=%s; wp6_trigger=%s; pool_extension_trigger=%s" % (
+            len(STRICT_CHECKS) - len(strict_failed), len(STRICT_CHECKS),
+            ",".join(strict_failed) or "none",
+            _triggers.get("wp6_trigger_state"),
+            _triggers.get("pool_extension_trigger_state")),
+        "scripts/wp_production/strict_readiness_wiring.py",
+        ("六项检查各自从盘上产物现算，并执行五条规则：键必须存在且取值在声明集合内、"
+         "队列必须覆盖冻结全集（不是行数相等）、数值必须有限（NaN/inf/负值拒收、"
+         "空值即 MISSING 绝不当 0）、处置与数值分开（not_computed 不得带数、complete 必须"
+         "满足打印恒等式、非 complete 成本必须声明 scope）、触发由真实前置推导。"
+         "未通过项：%s" % ("; ".join(strict_problems) or "无")),
+    ))
     out.append(item(
         "plan_overall_complete", "1",
         "原方案核心闭环：12 主集 x 4 主态、12 个 free/Li 标签、48 态生产系综与目标排序证据",

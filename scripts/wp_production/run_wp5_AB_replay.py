@@ -57,6 +57,29 @@ OUT_SUM = BLIND / "AB_round_summary.csv"
 OUT_END = BLIND / "AB_axis_endpoint.csv"
 OUT_INDEX = BLIND / "AB_index.json"
 
+
+def output_paths(acq_version: str = None) -> dict:
+    """Artifact paths for one acquisition version.
+
+    ``knn_v1`` (the default) resolves to the historical ``blind_replay/``
+    directory so the control products stay byte-identical.  Every other version
+    writes to its own sibling directory, so a formal ``model_v2`` run can never
+    overwrite the control it is being compared against.
+    """
+    v = DEFAULT_ACQ_VERSION if acq_version is None else acq_version
+    if v not in ACQ_VERSIONS:
+        raise ValueError("unknown acquisition version %r (have %s)"
+                         % (v, list(ACQ_VERSIONS)))
+    base = BLIND if v == DEFAULT_ACQ_VERSION else \
+        BLIND.parent / ("blind_replay_" + v)
+    return {
+        "dir": base,
+        "candidates": base / "AB_candidate_rounds.csv",
+        "summary": base / "AB_round_summary.csv",
+        "endpoints": base / "AB_axis_endpoint.csv",
+        "index": base / "AB_index.json",
+    }
+
 INITIAL_SEED_SIZE = 4
 BASELINES = ("random", "diversity", "uncertainty", "ranking_aware")
 
@@ -683,9 +706,11 @@ def write_outputs(data: dict, repeats: int,
                   models_at_write=MODELS,
                   acq_version=DEFAULT_ACQ_VERSION) -> None:
     _n_features = len(_pool("A")[0][0])
-    _write_csv(OUT_CAND, data["candidates"])
-    _write_csv(OUT_SUM, data["summary"])
-    _write_csv(OUT_END, data["endpoints"])
+    paths = output_paths(acq_version)
+    paths["dir"].mkdir(parents=True, exist_ok=True)
+    _write_csv(paths["candidates"], data["candidates"])
+    _write_csv(paths["summary"], data["summary"])
+    _write_csv(paths["endpoints"], data["endpoints"])
     index = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "inputs": {str(p.relative_to(REPO)): _sha256(p)
@@ -762,16 +787,22 @@ def write_outputs(data: dict, repeats: int,
         "rows": {"AB_candidate_rounds": len(data["candidates"]),
                  "AB_round_summary": len(data["summary"]),
                  "AB_axis_endpoint": len(data["endpoints"])},
+        "outputs": {"directory": str(paths["dir"].relative_to(REPO)),
+                    "is_control_directory":
+                        acq_version == DEFAULT_ACQ_VERSION,
+                    "acquisition_version": acq_version},
     }
-    OUT_INDEX.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n",
-                         encoding="utf-8", newline="\n")
+    paths["index"].write_text(
+        json.dumps(index, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8", newline="\n")
 
 
 def check(repeats: int, acq_version=DEFAULT_ACQ_VERSION) -> int:
     data = build(repeats, acq_version=acq_version)
-    for path, rows in ((OUT_CAND, data["candidates"]),
-                       (OUT_SUM, data["summary"]),
-                       (OUT_END, data["endpoints"])):
+    paths = output_paths(acq_version)
+    for path, rows in ((paths["candidates"], data["candidates"]),
+                       (paths["summary"], data["summary"]),
+                       (paths["endpoints"], data["endpoints"])):
         if not rows:
             continue
         buf = io.StringIO()
@@ -782,7 +813,8 @@ def check(repeats: int, acq_version=DEFAULT_ACQ_VERSION) -> int:
         if disk != buf.getvalue():
             print("CHECK FAILED -- %s drifted" % path.name)
             return 1
-    print("CHECK OK -- A/B replay tables match recomputation")
+    print("CHECK OK -- %s A/B replay tables match recomputation"
+          % acq_version)
     return 0
 
 

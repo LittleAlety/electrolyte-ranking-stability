@@ -2,7 +2,7 @@
 
 > 由 `scripts/wp_production/build_plan_compliance.py` 从 `outputs/physics_completion/**`、`outputs/week7/`、`data/references/anchor_primary_audit.csv`
 > 只读现算；本文件不写死任何状态或数字，生产腿每落地一批重跑即更新。
-> generated_at_utc=2026-10-22T18:12:08Z; runtime_input_sha256=bcd4d833ae0b7b950406104b59d5807f046e6a66006357e377e2ee689e4f1798; scientific_ledger_sha256=1fa06256a6e760b72f2703ab3e215dbb76c33bcf0aecd5515763147c1688fcda; stale=false
+> generated_at_utc=2026-10-23T04:43:34Z; runtime_input_sha256=bcd4d833ae0b7b950406104b59d5807f046e6a66006357e377e2ee689e4f1798; scientific_ledger_sha256=1fa06256a6e760b72f2703ab3e215dbb76c33bcf0aecd5515763147c1688fcda; stale=false
 > **运行进度：60/60**；**主态运行完成：48/48**；**科学验收（四主态）：48/48**；**固化交付主态：48/48**。QC 失败、partial、missing、running 均不计入科学验收。
 
 | item_id | 方案节 | 要求 | 状态 | 实测 | 证据 |
@@ -40,16 +40,17 @@
 | `wp5_model_family_restriction` | §9 WP5 delta-learning 与成本感知主动查询 | §9.1 主模型只用岭回归/核岭与 GPR 两类（direct/shift 同特征、同外层 split、同调参预算） | satisfied | frozen_model_family=ridge,krr,gpr; ml_rows=48 | src/electrolyte_ranking/pc_batch.py; outputs/physics_completion/ml/frozen_family_view.csv |
 | `wp5_remaining_unqueried_error` | §9 WP5 delta-learning 与成本感知主动查询 | §9.2 每轮报告 n_T->tau_b、O_3、R_3、remaining_unqueried_error 与累计 core-hours | partial | legacy_rounds=296 remaining_error_MISSING=296 cumulative_core_hours_MISSING=296; source_kind=legacy_round_diagnostics | outputs/physics_completion/active_learning/round_diagnostics.csv |
 | `wp5_pool_extension` | §9 WP5 delta-learning 与成本感知主动查询 | §9.3 扩样触发：目标池扩到约 20-24（先加 8-12 个，含一个方法审计未覆盖的家族），先冻结再计算 | not_satisfied | extension_rows=0; replay_pool=legacy_pool_not_blind | data/metadata/physics_completion_set.csv; outputs/physics_completion/ml/frozen_family_view.csv |
-| `wp6_explicit_ligand` | §10 WP6 显式配体检查（可选） | 可选 WP6：固定 R=DME 的共同背景显式配体检查 | blocked_on_production | plan_rows=4 executed_jobs=0 li_pair_complete=12/12 required_li_pairs=9 production_ensembles=44/48 gate_ready=false scope=optional | outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv |
+| `wp6_explicit_ligand` | §10 WP6 显式配体检查（可选） | 可选 WP6：固定 R=DME 的共同背景显式配体检查 | blocked_on_production | plan_rows=4 executed_jobs=0 li_pair_complete=12/12 required_li_pairs=9 production_ensembles=44/48 gate_ready=false trigger_state=not_triggered scope=optional | outputs/physics_completion/explicit_ligand/explicit_ligand_plan.csv |
 | `stop_rules_registered` | §11 停止规则 | 停止规则（unresolved / sampling_limited / identity outcome / validation limitation） | partial | stop_rules_in_config=True; li_motif_screen_computed=23/24 | config/physics_completion_v1.yaml; docs/physics_completion_protocol.md |
 | `wp2_pilot_cost_fields` | §11 停止规则 | §11 前 2 个分子的 pilot 逐作业记录 wall time / allocated cores / core-hours / memory / failed-retry / phase / method / state / conformer / raw output | partial | pilot_rows=109; columns=conformer,core_hours,cores,evidence_note,job_id,memory,method,mol_id,molecule,phase,raw_output,raw_output_sha256,raw_output_status,retry,state,status,wall_sec; missing_fields=none; raw_verified=109/109; memory_MISSING=109; retry_UNVERIFIABLE=109 | outputs/physics_completion/cost/pilot_cost_ledger.csv |
 | `plan_cost_scenarios_and_concurrency` | §11 停止规则 | §11 用 pilot 的中位与 p90 按作业类别估算剩余成本，给出低/中/高资源情景及可用并发 | satisfied | scenario_rows=0; concurrency_registered=True; cost_acceptance_all_true=True | outputs/physics_completion/cost/remaining_cost_scenarios.csv; outputs/physics_completion/cost/cost_scenario_index.json; outputs/physics_completion/cost/cost_scenario_acceptance.csv |
+| `strict_readiness_evidence` | §1 研究问题与最终交付 | 逐项严格证据：覆盖复核 / 成员身份 / 采样审计 / WP3 / WP5 全池 / 成本来源 | not_satisfied | checks_passed=4/6; failed=execution_cost_provenance_complete,wp5_full_target_pool_evaluated; wp6_trigger=not_triggered; pool_extension_trigger=not_triggered | scripts/wp_production/strict_readiness_wiring.py |
 | `plan_overall_complete` | §1 研究问题与最终交付 | 原方案核心闭环：12 主集 x 4 主态、12 个 free/Li 标签、48 态生产系综与目标排序证据 | blocked_on_production | main_states=48/48; main_four_state_complete=12/12; free_labels=12/12; li_labels=12/12; production_ensembles=44/48; sampling_complete=False; flip_rungs=10/10; pilot_subset=20/20 | work/wp2prod/**/<name>_<state>.json; data/metadata/physics_completion_set.csv; outputs/physics_completion/closure/four_molecule_state_closure.csv; outputs/physics_completion/ensembles/production_ensemble_labels.csv; outputs/physics_completion/closure/flip_persistence.csv |
 | `plan_stage_reports_present` | §12 时间安排与阶段验收 | §12 阶段验收：WP0-WP6 各阶段报告落盘（只写完成的科学问题与尚未解决的限制） | satisfied | stage_reports=7 present=7 missing=none | docs/58_week37_wp0_definition_migration.md ... docs/64_week43_wp6_explicit_ligand_and_paper.md |
 | `plan_landing_paths` | §13 推荐仓库落点 | §13 推荐落点：协议 / 样本集 / 锚点 / 新批次产物 / docs 逐条落地 | satisfied | checked=16 present=16 missing=none | config/physics_completion_v1.yaml; data/metadata/physics_completion_set.csv; data/references/anchor_primary_audit.csv; docs/physics_completion_final_report.md |
 | `plan_main_figures_six` | §14 最终图与论文主线 | §14 主图控制为 6 张：模型与条件态定义 / 独立方法审计 / E->G->ensemble 决策变化 / pair 证据与身份 outcome / 机制案例 / 累计成本-选集恢复曲线 | satisfied | figures=6 present=6 missing=none | docs/assets/figures/F59_physics_completion_definition.png ... docs/assets/figures/F64_physics_completion_budget_curve.png |
 
-**状态合计**：satisfied=22; partial=13; not_satisfied=1; blocked_on_production=2; exempt=3
-**未闭合项（不含 exempt）**：16；exempt 仅表示经证据支持的范围豁免/永久限制，不表示科学检查通过。
+**状态合计**：satisfied=22; partial=13; not_satisfied=2; blocked_on_production=2; exempt=3
+**未闭合项（不含 exempt）**：17；exempt 仅表示经证据支持的范围豁免/永久限制，不表示科学检查通过。
 
 **总体判定**：未闭环 -- 见 `plan_overall_complete` 行

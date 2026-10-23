@@ -11,7 +11,7 @@ window.HB = {
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-22T18:12:08Z",
+  "generated_at_utc": "2026-10-23T04:43:34Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -82,6 +82,17 @@ window.HB = {
     "outputs/physics_completion/frontier/frontier_identity_evidence.csv": "f27d58978f7ead6b443a83e5531c4efeedd4c248783d97433602ad6c8f06d048"
    },
    "error": ""
+  },
+  "strict_evidence": {
+   "available": true,
+   "status": "not_satisfied",
+   "passed": 4,
+   "total": 6,
+   "failed": [
+    "execution_cost_provenance_complete",
+    "wp5_full_target_pool_evaluated"
+   ],
+   "source": "outputs/physics_completion/compliance/plan_compliance.csv"
   }
  },
  "pipeline": [
