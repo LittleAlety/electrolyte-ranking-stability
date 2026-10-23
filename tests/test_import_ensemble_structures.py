@@ -96,10 +96,14 @@ def _log(n_freq=6, negative=False, close_enough=False, terminated=True):
 
 
 def _cand(slot="M", charge=0, multiplicity=1, seed="8", source="free_conformer"):
+    # A candidate reaching qc_task must DECLARE its role: since 2026-10-22 G1 the
+    # importer no longer defaults it, so an undeclared role is refused instead of
+    # silently becoming round1_extra.
     return {
         "name": "DMC", "mol_id": "C01", "slot": slot, "seed": seed,
         "source_kind": source, "charge": str(charge),
         "multiplicity": str(multiplicity),
+        "member_role": "round1_extra",
     }
 
 
@@ -642,7 +646,9 @@ def _continuation_fixture(tmp_path, monkeypatch, frames, cand_geom=None):
     row = module.qc_task(task, "tasks/DMC/M__8",
                         {"slot": "M", "mol_id": "C01", "name": "DMC", "seed": "8",
                          "source_kind": "free_conformer", "charge": "0",
-                         "multiplicity": "1"})
+                         "multiplicity": "1",
+                         # declared: qc_task no longer defaults the role (2026-10-22 G1)
+                         "member_role": "round1_extra"})
     assert row["status"] == "technical_complete_qc_failed"
     assert row["failure_class"] == "max_cycles_exhausted"
     with (ens / "production_ensemble_structures.csv").open("w", encoding="utf-8",

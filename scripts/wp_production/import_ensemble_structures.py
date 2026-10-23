@@ -658,6 +658,12 @@ def build_dol_continuation_package() -> int:
             "task_index": index,
             "member_key": row["member_key"],
             "slot": slot, "name": name, "seed": seed,
+            # DECLARED, not inferred: a follow-up keeps the role of the member
+            # it follows up.  Omitting it here is what forced the importer to
+            # fall back to a literal default (and, after the G0/G1 hardening, to
+            # the structure ledger) -- declaring it makes new packages
+            # self-describing.
+            "member_role": row["member_role"],   # guaranteed: the caller filters by role
             "source_attempt": row["attempt"],
             "member_attempt": int(row["attempt"] or 0) + 1,
             "failure_class": "max_cycles_exhausted",
@@ -780,7 +786,8 @@ def qc_task(task_dir: Path, task: str, cand: dict) -> dict:
         "member_key": f"{cand['name']}|{cand['slot']}|{cand['seed']}",
         "slot": cand["slot"], "mol_id": cand["mol_id"], "name": cand["name"],
         "seed": cand["seed"],
-        "member_role": cand.get("member_role", "round1_extra"),
+        # declared only: an empty value means the caller refused the member
+        "member_role": cand.get("member_role") or "",
         "source_kind": cand["source_kind"],
         "charge": cand["charge"], "multiplicity": cand["multiplicity"],
         "method": "wB97X-D4 def2-TZVPD SMD(acetonitrile)",
@@ -1181,6 +1188,12 @@ def build_reopt_packages() -> int:
             "task_index": index,
             "member_key": row["member_key"],
             "slot": slot, "name": name, "seed": seed,
+            # DECLARED, not inferred: a follow-up keeps the role of the member
+            # it follows up.  Omitting it here is what forced the importer to
+            # fall back to a literal default (and, after the G0/G1 hardening, to
+            # the structure ledger) -- declaring it makes new packages
+            # self-describing.
+            "member_role": row["member_role"],   # guaranteed: the caller filters by role
             "source_attempt": row["attempt"],
             "member_attempt": int(row["attempt"] or 0) + 1,
             "failure_class": row["failure_class"],
@@ -1244,6 +1257,108 @@ def iter_packages():
             if p.is_dir() and p.name not in seen:
                 seen.add(p.name)
                 yield p
+    # ADDITIONAL, name-independent channel: any injected batch whose manifest
+    # declares members is an ensemble package.  This is what stops a NEW campaign
+    # naming family from being dropped just because nobody extended the globs --
+    # the manifest, written at pack time, is the authority.
+    for p in sorted(REPO.glob("work/hpc_*")):
+        if not p.is_dir() or p.name in seen:
+            continue
+        doc = read_package_manifest(p)
+        if doc is not None and doc.get("members"):
+            seen.add(p.name)
+            yield p
+
+
+#: member_key -> member_role, read once from the structure ledger on disk.
+_LEDGER_ROLE_CACHE: dict | None = None
+
+
+def ledger_role_index() -> dict:
+    """Roles already REGISTERED for each member in the structure ledger.
+
+    This is a declaration source: the role was fixed when the member first
+    entered the ledger, and it is consistent across that member's attempts
+    (verified: 0 members carry two different roles).  It exists so that
+    follow-up packages whose manifest predates role recording are still read by
+    a declared value instead of a literal default.
+    """
+    global _LEDGER_ROLE_CACHE
+    if _LEDGER_ROLE_CACHE is None:
+        index: dict = {}
+        if OUT.is_file():
+            try:
+                with OUT.open(encoding="utf-8") as fh:
+                    for row in csv.DictReader(fh):
+                        key = (row.get("member_key") or "").strip()
+                        role = (row.get("member_role") or "").strip()
+                        if key and role:
+                            index[key] = role
+            except (OSError, UnicodeDecodeError, csv.Error):
+                index = {}
+        _LEDGER_ROLE_CACHE = index
+    return _LEDGER_ROLE_CACHE
+
+
+def resolve_member_identity(pkg, name, slot, seed, pm, registry, ledger_roles):
+    """Resolve one task's identity and role from DECLARED sources only.
+
+    Returns ``(cand, role, source, reason)``:
+
+    * ``cand``   -- identity dict for ``qc_task`` (or None when unknown);
+    * ``role``   -- the resolved role ("" when no source declares one);
+    * ``source`` -- which declaration supplied the role, for auditability:
+                    ``package_manifest`` / ``candidate_registry`` /
+                    ``structure_ledger`` / ``""``;
+    * ``reason`` -- a machine-readable refusal reason when ``cand``/``role``
+                    is missing.  A refusal is RECORDED by the caller, never
+                    dropped: a silently skipped leg is a ledger lie.
+
+    There is deliberately NO fallback to a literal role.  ``pkg`` is used only
+    to decide which identity source is authoritative for this family; it is
+    never parsed for the member's role.
+    """
+    registry = registry or {}
+    manifest_role = (pm or {}).get("member_role") or ""
+    registry_role = registry.get("member_role") or ""
+    ledger_role = (ledger_roles or {}).get(f"{name}|{slot}|{seed}", "")
+    role = manifest_role or registry_role or ledger_role
+    source = ("package_manifest" if manifest_role else
+              "candidate_registry" if registry_role else
+              "structure_ledger" if ledger_role else "")
+
+    if pm is not None and (_is_round2_package(pkg) or not registry):
+        cand = {"name": name, "slot": slot, "mol_id": pm.get("mol_id", ""),
+                "seed": seed, "source_kind": "round2_pool_extension",
+                "charge": str(pm.get("charge", "")),
+                "multiplicity": str(pm.get("multiplicity", "")),
+                "geometry": pm.get("source_geometry", "")}
+    elif registry:
+        cand = dict(registry)
+    else:
+        cand = None
+
+    if cand is None:
+        return None, "", "", "member_identity_unknown"
+    if not str(role).strip():
+        return None, "", "", "member_role_undeclared"
+    return cand, role, source, ""
+
+
+def read_package_manifest(pkg: Path):
+    """The package's own manifest, or None when absent/unreadable.
+
+    Never raises: a malformed manifest is a refusal for that package, not a
+    crash that hides every other batch.
+    """
+    path = pkg / "manifest.json"
+    if not path.is_file():
+        return None
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError):
+        return None
+    return doc if isinstance(doc, dict) else None
 
 
 def pkg_attempt(name: str) -> int:
@@ -2143,22 +2258,31 @@ def main(argv=None) -> int:
             slot, seed = leaf.split("__", 1)
             key = f"{name}|{slot}|{seed}"
             pm = package_members.get(key)
-            if pm is not None and _is_round2_package(pkg):
-                # Round-2 audit / follow-up members live in the package manifest,
-                # not the candidates CSV (they are NOT round-1 extras).  The
-                # manifest member carries the same identity fields qc_task needs,
-                # and its own member_role so a follow-up attempt keeps the role.
-                cand = {"name": name, "slot": slot, "mol_id": pm.get("mol_id", ""),
-                        "seed": seed, "source_kind": "round2_pool_extension",
-                        "charge": str(pm.get("charge", "")),
-                        "multiplicity": str(pm.get("multiplicity", "")),
-                        "member_role": pm.get("member_role") or ROUND2_LEDGER_ROLE,
-                        "geometry": pm.get("source_geometry", "")}
-            else:
-                cand = extras.get(key)
-            if cand is None:
-                print(f"  UNKNOWN task not in candidates: {pkg.name}/{task}")
+            registry = extras.get(key)
+            cand, role, role_source, reason = resolve_member_identity(
+                pkg, name, slot, seed, pm, registry, ledger_role_index())
+            if reason:
+                print(f"  REJECTED {reason}: {pkg.name}/{task}")
+                row = {f: "" for f in FIELDS}
+                row.update(
+                    member_key=key, slot=slot, name=name, seed=seed,
+                    mol_id=(pm or registry or {}).get("mol_id", ""),
+                    member_role="", status="failed", qc_flags=reason,
+                    attempt="0",
+                    task_relpath=f"work/{pkg.name}/{task}",
+                    source_kind="rejected_identity",
+                    method="wB97X-D4/def2-TZVPD/SMD(acetonitrile)",
+                    protocol_version="1.3",
+                    frequency_hessian="analytical_hessian",
+                )
+                extra_rows.append(row)
+                seen.add(key)
                 continue
+            # the RESOLVED role must reach the row in EVERY branch: a role that
+            # is computed but never written back leaves the member with an empty
+            # role -- the same silent blank the old literal default used to hide
+            # (measured: 80 rows went blank when only the fallback branch wrote).
+            cand["member_role"] = role
             seen.add(key)
             row = qc_task(task_dir, f"work/{pkg.name}/{task}", cand)
             row["attempt"] = str(resolve_member_attempt(pkg.name, package_members.get(key)))
