@@ -787,6 +787,7 @@ def write_outputs(data: dict, repeats: int,
         "rows": {"AB_candidate_rounds": len(data["candidates"]),
                  "AB_round_summary": len(data["summary"]),
                  "AB_axis_endpoint": len(data["endpoints"])},
+        "protocol": declared_protocol(),
         "outputs": {"directory": str(paths["dir"].relative_to(REPO)),
                     "is_control_directory":
                         acq_version == DEFAULT_ACQ_VERSION,
@@ -795,6 +796,117 @@ def write_outputs(data: dict, repeats: int,
     paths["index"].write_text(
         json.dumps(index, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8", newline="\n")
+
+
+def declared_protocol() -> dict:
+    """The FROZEN protocol a run directory must declare.
+
+    Written into the index so any table can be traced to the exact
+    hyperparameters, seeds, thresholds and acquisition version that produced it.
+    A drifted constant makes ``run_manifest_problems`` fail -- silently changing
+    a hyperparameter would otherwise be invisible in the artifacts.
+    """
+    import wp5_formal_models as _fm
+    return {
+        "feature_dim": _fm.FEATURE_DIM,
+        "rbf_gamma": _fm.RBF_GAMMA,
+        "ridge_lambda": _fm.RIDGE_LAMBDA,
+        "gpr_noise": _fm.GPR_NOISE,
+        "acq_bootstrap_replicates": _fm.ACQ_BOOTSTRAP_REPLICATES,
+        "acq_bootstrap_seed": _fm.ACQ_BOOTSTRAP_SEED,
+        "repeats": REPEATS,
+        "k_top": K_TOP,
+        "o3_threshold": "%.6f" % O3_THRESHOLD,
+        "r3_threshold_ev": "%.6f" % R3_THRESHOLD_EV,
+        "frozen_target_molecules": 12,
+    }
+
+
+def _display(path: Path) -> str:
+    """A readable path that never raises.
+
+    The check must not crash on a directory outside the checkout (a redirected
+    output root, a tmp fixture): a validator that raises reports nothing.
+    """
+    try:
+        return str(path.relative_to(REPO))
+    except ValueError:
+        return str(path)
+
+
+def run_manifest_problems(acq_version=DEFAULT_ACQ_VERSION) -> list:
+    """READ-ONLY consistency check of one version's run directory.
+
+    Returns a list of human-readable problems ([] = consistent).  Never writes,
+    never creates a directory, and never falls back to another version's files.
+    """
+    problems = []
+    paths = output_paths(acq_version)
+    d = paths["dir"]
+    if not d.is_dir():
+        return ["run directory missing: %s" % _display(d)]
+    if not paths["index"].is_file():
+        return ["run manifest missing: %s" % paths["index"].name]
+    try:
+        index = json.loads(paths["index"].read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return ["run manifest unreadable: %r" % (exc,)]
+
+    is_control = acq_version == DEFAULT_ACQ_VERSION
+    declared = index.get("outputs") or {}
+    if declared.get("acquisition_version") != acq_version:
+        problems.append("manifest declares acquisition_version=%r, directory is %r"
+                        % (declared.get("acquisition_version"), acq_version))
+    if bool(declared.get("is_control_directory")) != is_control:
+        problems.append("manifest is_control_directory=%r for %r"
+                        % (declared.get("is_control_directory"), acq_version))
+    if is_control and d != BLIND:
+        problems.append("the control run must live in %s" % BLIND.name)
+
+    # protocol drift
+    recorded = index.get("protocol")
+    if not recorded:
+        problems.append("manifest declares no protocol (hyperparameters cannot be traced)")
+    else:
+        for k, want in sorted(declared_protocol().items()):
+            if str(recorded.get(k)) != str(want):
+                problems.append("protocol drift on %s: recorded %r, current %r"
+                                % (k, recorded.get(k), want))
+
+    # stale inputs
+    for rel, want in sorted((index.get("inputs") or {}).items()):
+        path = REPO / rel
+        if not path.is_file():
+            problems.append("declared input missing: %s" % rel)
+            continue
+        if _sha256(path) != want:
+            problems.append("declared input changed since the run: %s" % rel)
+
+    # the tables must exist and hold the declared number of rows
+    for key, name in (("candidates", "AB_candidate_rounds"),
+                      ("summary", "AB_round_summary"),
+                      ("endpoints", "AB_axis_endpoint")):
+        path = paths[key]
+        if not path.is_file():
+            problems.append("table missing: %s" % path.name)
+            continue
+        with path.open(encoding="utf-8") as fh:
+            n = sum(1 for _ in fh) - 1
+        want = (index.get("rows") or {}).get(name)
+        if want is not None and int(want) != n:
+            problems.append("%s has %d rows, manifest declares %s" % (name, n, want))
+    return problems
+
+
+def check_run(acq_version=DEFAULT_ACQ_VERSION) -> int:
+    problems = run_manifest_problems(acq_version)
+    if problems:
+        print("RUN MANIFEST FAILED -- %s" % acq_version)
+        for p in problems:
+            print("  - %s" % p)
+        return 1
+    print("RUN MANIFEST OK -- %s is self-consistent and current" % acq_version)
+    return 0
 
 
 def check(repeats: int, acq_version=DEFAULT_ACQ_VERSION) -> int:
@@ -824,6 +936,10 @@ def main(argv=None) -> int:
     ap.add_argument("--quick", action="store_true", help="smoke: 2 repeats, task A")
     ap.add_argument("--check", action="store_true",
                     help="READ-ONLY: recompute in memory and byte-compare")
+    ap.add_argument("--check-run", action="store_true",
+                    help="READ-ONLY: validate this version's run manifest "
+                         "(directory ownership, protocol drift, stale inputs, "
+                         "row counts) and never write")
     ap.add_argument("--acq-version", default=DEFAULT_ACQ_VERSION,
                     choices=list(ACQ_VERSIONS),
                     help="knn_v1 (legacy, default) or model_v2 (model-driven; "
@@ -831,6 +947,8 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     if args.check:
         return check(args.repeats, args.acq_version)
+    if args.check_run:
+        return check_run(args.acq_version)
     data = build(2 if args.quick else args.repeats,
                  acq_version=args.acq_version)
     write_outputs(data, 2 if args.quick else args.repeats,
