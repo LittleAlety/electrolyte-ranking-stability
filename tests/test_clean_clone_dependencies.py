@@ -50,6 +50,24 @@ def test_the_probe_exclusion_source_refuses_a_missing_layer(tmp_path, monkeypatc
     assert "re-admit" in str(exc.value)
 
 
+def test_the_budget_accounting_refuses_a_missing_layer(tmp_path, monkeypatch):
+    """The worst case: it would print '0.0/600 core-hours', a concrete false number."""
+    m = _load("build_recovery_budget_accounting")
+    monkeypatch.setattr(m, "REPO", tmp_path)
+    with pytest.raises(SystemExit) as exc:
+        m.collect()
+    assert "REFUSING" in str(exc.value)
+    assert "0.0 core-hours would state that nothing was spent" in str(exc.value)
+
+
+def test_the_budget_accounting_still_reports_the_real_figure():
+    m = _load("build_recovery_budget_accounting")
+    doc = m.collect()
+    # measured: the batch total is 186.9933... core-hours (printed as 187.0/600)
+    assert doc["batch_total"] == pytest.approx(186.99, abs=0.01), doc.get("batch_total")
+    assert doc["batch_total"] > 100, "a real spend must not look like nothing"
+
+
 # ---- normal behaviour is unchanged ---------------------------------------
 
 def test_the_cost_builder_still_builds_from_the_real_layer():

@@ -63,6 +63,15 @@ def collect() -> dict:
     # so this generator is self-contained (no wall clock: all input mtimes)
     package_dirs = sorted(
         (REPO / "work").glob("hpc_production_ensemble_strict_recovery_v1*"))
+    if not package_dirs:
+        # "nothing spent" and "the packages are not here" are different facts.
+        # Reporting 0.0/600 in a clean checkout would be a concrete false number,
+        # and regenerating the committed report from it would corrupt the record.
+        raise SystemExit(
+            "REFUSING to account the recovery budget: no "
+            "work/hpc_production_ensemble_strict_recovery_v1* package found. "
+            "The work/ layer is machine-local (gitignored); reporting "
+            "0.0 core-hours would state that nothing was spent, which is false.")
     batch_rows = []
     batch_total = 0.0
     for pkg in package_dirs:
