@@ -31,9 +31,15 @@ import csv
 import hashlib
 import json
 import math
+import sys
 from pathlib import Path
 
 import numpy as np
+
+#: the same covalent-graph comparison the importer uses, so a conformer and an
+#: imported attempt can never disagree about what "the same molecule" means.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from import_ensemble_structures import bond_graph  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -197,6 +203,83 @@ def rotate_fragment(coords, dihedral, adjacency, *, single_bonds, degrees):
                 raise ValueError("probe has an obvious atomic clash")
     return rotated, {"moving_indices": sorted(moving), "pair_distance_change_a": change,
                      "rotation_degrees": degrees, "contract": "fragment_bridge_v1"}
+
+
+def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency,
+                            *, prior_starts=(), min_pair_change_a=1e-5):
+    """One gate every candidate start must pass, whatever generated it.
+
+    Returns ``{"accepted": bool, "reason": str, "detail": {...}}`` -- a verdict,
+    never an exception, so a caller can register the refusal with its reason
+    (the project's rule: an invalid start is kept as history, not silently
+    dropped, and never counted as coverage evidence).
+
+    The four refusals the plan names explicitly:
+
+    ``rigid_transformation``  -- the candidate barely moved any pair distance,
+                                 so it is a rotation of the SAME structure and
+                                 must not be presented as an independent start;
+    ``ring_broken``           -- the covalent graph changed (a broken/formed
+                                 ring is a different species, not a conformer);
+    ``equivalent_start``      -- a topology-preserving proper rotation of the
+                                 source or of an already registered start;
+    ``identity_changed``      -- element composition/order differs.
+
+    Composition is checked first: everything else compares against the source.
+    """
+    xyz_s = np.asarray(source_coords, dtype=float)
+    xyz_c = np.asarray(candidate_coords, dtype=float)
+    if (xyz_s.ndim != 2 or xyz_c.ndim != 2 or xyz_s.shape != xyz_c.shape
+            or xyz_s.shape[1] != 3
+            or len(symbols) != xyz_s.shape[0]
+            or len(adjacency) != xyz_s.shape[0]
+            or not np.isfinite(xyz_s).all() or not np.isfinite(xyz_c).all()):
+        return {"accepted": False, "reason": "malformed_input",
+                "detail": {"source_atoms": int(xyz_s.shape[0]) if xyz_s.ndim == 2 else 0,
+                           "candidate_atoms": int(xyz_c.shape[0]) if xyz_c.ndim == 2 else 0}}
+
+    before = np.linalg.norm(xyz_s[:, None] - xyz_s[None, :], axis=2)
+    after = np.linalg.norm(xyz_c[:, None] - xyz_c[None, :], axis=2)
+    change = float(np.max(np.abs(before - after)))
+
+    # 1. must actually move heavy atoms somewhere
+    heavy = [i for i, s in enumerate(symbols) if s != "H"]
+    heavy_change = (float(np.max(np.abs(
+        before[np.ix_(heavy, heavy)] - after[np.ix_(heavy, heavy)])))
+        if len(heavy) > 1 else 0.0)
+    if change <= min_pair_change_a:
+        return {"accepted": False, "reason": "rigid_transformation",
+                "detail": {"pair_distance_change_a": change}}
+    if heavy_change <= min_pair_change_a:
+        # a methyl rotor is a legitimate independent start on THAT coordinate,
+        # but it must never be labelled a heavy-fragment search
+        return {"accepted": True, "reason": "ok_methyl_rotor",
+                "detail": {"pair_distance_change_a": change,
+                           "heavy_pair_change_a": heavy_change,
+                           "probe_class": "methyl_rotor"}}
+
+    # 2. the covalent graph must be intact (a broken ring is another species)
+    try:
+        same_graph = (bond_graph(symbols, xyz_s) == bond_graph(symbols, xyz_c))
+    except (ValueError, IndexError):
+        same_graph = False
+    if not same_graph:
+        return {"accepted": False, "reason": "ring_broken",
+                "detail": {"pair_distance_change_a": change}}
+
+    # 3. not an equivalent copy of the source or of an already registered start
+    if equivalent_start(symbols, xyz_s, xyz_c, adjacency):
+        return {"accepted": False, "reason": "equivalent_start",
+                "detail": {"pair_distance_change_a": change, "against": "source"}}
+    for i, prior in enumerate(prior_starts):
+        if equivalent_start(symbols, prior, xyz_c, adjacency):
+            return {"accepted": False, "reason": "equivalent_start",
+                    "detail": {"pair_distance_change_a": change,
+                               "against": "prior_start_%d" % i}}
+    return {"accepted": True, "reason": "ok_heavy_fragment",
+            "detail": {"pair_distance_change_a": change,
+                       "heavy_pair_change_a": heavy_change,
+                       "probe_class": "heavy_fragment_torsion"}}
 
 
 def equivalent_start(symbols, first, second, adjacency):

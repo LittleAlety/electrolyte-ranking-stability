@@ -94,17 +94,65 @@ def _smallest_ring_through(adj: list[set[int]], a: int, b: int) -> int:
     return best
 
 
-def _primary_geometry(name: str, state: str) -> Path | None:
-    """The state's primary production geometry from the ensemble package."""
-    for pattern in ("*primary*", "*__primary"):
-        for cand in (REPO / "work").glob(
-                "hpc_production_ensemble_*/tasks/%s/%s__*/*xyz" % (name, state)):
-            if cand.is_file() and "primary" in cand.parent.name:
-                return cand
-    # fallback: the frontier package carries every weighted member's geometry
-    leaf = "%s__%s__primary" % (name, state)
-    cand = REPO / "work" / "hpc_frontier_localization_v1" / "tasks" / leaf / "geom.xyz"
+#: authoritative weighted cohort: the states' REPRESENTATIVE members
+WEIGHTS = (REPO / "outputs" / "physics_completion" / "ensembles"
+           / "production_ensemble_weights.csv")
+
+
+def representative_members() -> dict:
+    """(name, state) -> the seed of its highest-weight member.
+
+    The weighted cohort is the authority for "which structure represents this
+    state"; asking for a literal ``primary`` leaf silently resolves to nothing
+    whenever the representative is a later basin (measured: DOL|LiM_2plus is
+    represented by c05, not primary).
+    """
+    best: dict = {}
+    if not WEIGHTS.is_file():
+        return best
+    with WEIGHTS.open(encoding="utf-8") as fh:
+        for r in csv.DictReader(fh):
+            key = (r.get("name", ""), r.get("slot", ""))
+            try:
+                w = float(r.get("boltzmann_weight") or 0.0)
+            except ValueError:
+                continue
+            member = r.get("member_key", "")
+            seed = member.rsplit("|", 1)[-1] if "|" in member else ""
+            if not seed:
+                continue
+            prev = best.get(key)
+            if prev is None or w > prev[0]:
+                best[key] = (w, seed)
+    return {k: v[1] for k, v in best.items()}
+
+
+def _member_geometry(name: str, state: str, seed: str) -> Path | None:
+    """One named member's geometry: production package first, then frontier."""
+    for cand in (REPO / "work").glob(
+            "hpc_production_ensemble_*/tasks/%s/%s__%s/*xyz" % (name, state, seed)):
+        if cand.is_file() and cand.parent.name == "%s__%s" % (state, seed):
+            return cand
+    leaf = "%s__%s__%s" % (name, state, seed)
+    cand = (REPO / "work" / "hpc_frontier_localization_v1" / "tasks" / leaf
+            / "geom.xyz")
     return cand if cand.is_file() else None
+
+
+def _primary_geometry(name: str, state: str) -> Path | None:
+    """The geometry of the state's ACTUAL representative member.
+
+    Order: the weighted cohort's representative -> a literal ``primary`` member
+    (still correct for states whose representative IS primary) -> None.  A None
+    result is recorded with its own reason; it is never reported as
+    ``n_eligible_torsions=0``.
+    """
+    seed = representative_members().get((name, state), "")
+    if seed:
+        geom = _member_geometry(name, state, seed)
+        if geom is not None:
+            return geom
+    return _member_geometry(name, state, "primary")
 
 
 def _torsions(syms, coords) -> list[dict]:
@@ -155,7 +203,9 @@ def build_rows() -> list[dict]:
             rows.append({"name": name, "state": state,
                          "n_eligible_torsions": "0",
                          "geometry_source": "not_found", "geometry_sha256": "",
-                         "detail": "no primary geometry on disk"})
+                         "detail": ("no geometry for this state's representative "
+                                    "member on disk; the torsion count is UNKNOWN, "
+                                    "not zero")})
             continue
         syms, coords = _read_xyz(geom)
         torsions = _torsions(syms, coords)
