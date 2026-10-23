@@ -91,12 +91,26 @@ def state_inputs(name: str, state: str) -> dict:
     # repair manifest) is excluded too: no job will ever produce it, so
     # "wait for the job" would be a wait with no end.
     rejected = _rejected_members()
-    in_flight = any(
-        r.get("status") in ("pending", "ready")
-        and r.get("member_role") != "primary"
-        and r.get("member_key") not in rejected
-        for r in struct
-        if r.get("name") == name and r.get("slot") == state)
+    # IN FLIGHT is a property of the member's LATEST attempt, never of the mere
+    # presence of some older pending row: a cancelled element keeps a pending row
+    # forever, and letting it speak for the member hides every legitimate route.
+    latest: dict = {}
+    for r in struct:
+        if r.get("name") != name or r.get("slot") != state:
+            continue
+        if r.get("member_role") == "primary":
+            continue
+        key = r.get("member_key", "")
+        if not key or key in rejected:
+            continue
+        try:
+            attempt = int(r.get("attempt") or 0)
+        except ValueError:
+            attempt = 0
+        prev = latest.get(key)
+        if prev is None or attempt >= prev[0]:
+            latest[key] = (attempt, r.get("status"))
+    in_flight = any(status in ("pending", "ready") for _, status in latest.values())
 
     # identity: every WEIGHTED member of this state verified
     members = [k for k in weights if k.startswith("%s|%s|" % (name, state))]
