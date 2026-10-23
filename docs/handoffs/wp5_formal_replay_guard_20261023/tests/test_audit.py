@@ -155,6 +155,12 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(report["integrity"], "FAIL")
         self.assertEqual(report["submission_gate"], "HOLD")
 
+    def sync_index_count(self, basename):
+        index_rel = self.replay + "/AB_index.json"
+        index = json.loads((self.root / index_rel).read_text())
+        index["rows"][basename.removesuffix(".csv")] = len(read_rows(self.root, self.replay + "/" + basename))
+        write_json(self.root, index_rel, index)
+
     def test_full_pool_valid(self):
         fixture(self.root, n=12)
         code, report = self.audit()
@@ -182,7 +188,10 @@ class AuditTests(unittest.TestCase):
 
     def test_missing_endpoint_axis(self):
         self.mutate_rows("AB_axis_endpoint.csv", lambda rows: rows.pop())
-        self.assert_bad()
+        self.sync_index_count("AB_axis_endpoint.csv")
+        code, report = self.audit()
+        self.assertEqual(code, 1)
+        self.assertEqual(report["issues"][0]["code"], "AXES")
 
     def test_duplicate_endpoint(self):
         self.mutate_rows("AB_axis_endpoint.csv", lambda rows: rows.__setitem__(-1, rows[0].copy()))
@@ -190,7 +199,19 @@ class AuditTests(unittest.TestCase):
 
     def test_missing_whole_budget_point(self):
         self.mutate_rows("AB_round_summary.csv", lambda rows: rows.__setitem__(slice(None), [r for r in rows if r["n_T"] != "5"]))
-        self.assert_bad()
+        self.sync_index_count("AB_round_summary.csv")
+        code, report = self.audit()
+        self.assertEqual(code, 1)
+        self.assertEqual(report["issues"][0]["code"], "ROUND_COVERAGE")
+
+    def test_index_row_count_tampering_is_a_separate_gate(self):
+        index_rel = self.replay + "/AB_index.json"
+        index = json.loads((self.root / index_rel).read_text())
+        index["rows"]["AB_axis_endpoint"] = 31
+        write_json(self.root, index_rel, index)
+        code, report = self.audit()
+        self.assertEqual(code, 1)
+        self.assertEqual(report["issues"][0]["code"], "INDEX_ROWS")
 
     def test_wrong_version_does_not_fall_back(self):
         code, report = self.audit("model_v2")
@@ -228,6 +249,12 @@ class AuditTests(unittest.TestCase):
     def test_forged_stop_budget(self):
         self.mutate_rows("AB_axis_endpoint.csv", lambda rows: rows[0].__setitem__("stop_budget_n_T", "999"))
         self.assert_bad()
+
+    def test_endpoint_declared_repeats_and_pool_cannot_be_forged(self):
+        for field, value in (("repeats", "0"), ("n_pool", "12"), ("repeats", "20.0")):
+            fixture(self.root, n=7)
+            self.mutate_rows("AB_axis_endpoint.csv", lambda rows: rows[0].__setitem__(field, value))
+            self.assert_bad()
 
     def test_joint_16_rule_is_reused_not_independent_counts(self):
         fixture(self.root, n=6)
@@ -290,6 +317,12 @@ class AuditTests(unittest.TestCase):
             prerequisite_core_hours="11", total_core_hours_incl_prerequisite="15"))
         self.assert_bad()
 
+    def test_cost_values_must_be_finite_and_nonnegative(self):
+        for value in ("NaN", "Infinity", "-1"):
+            fixture(self.root, n=7)
+            self.mutate_rows("AB_round_summary.csv", lambda rows: rows[0].__setitem__("cumulative_core_hours_measured", value))
+            self.assert_bad()
+
     def test_b_requires_actual_free_legs_not_qc_flag(self):
         labels = read_rows(self.root, LABELS)
         labels[0]["acceptance_status"] = "limited"
@@ -297,7 +330,15 @@ class AuditTests(unittest.TestCase):
         idx = json.loads((self.root / (BASE + "/target_pool_AB_index.json")).read_text())
         idx["inputs"][LABELS] = digest(self.root, LABELS)
         write_json(self.root, BASE + "/target_pool_AB_index.json", idx)
-        self.assert_bad()
+        targets = read_rows(self.root, BASE + "/target_pool_AB.csv")
+        targets[0].update(lo_acceptance="limited", qc_complete_pair="False")
+        write_rows(self.root, BASE + "/target_pool_AB.csv", targets)
+        index = json.loads((self.root / (self.replay + "/AB_index.json")).read_text())
+        index["inputs"][BASE + "/target_pool_AB.csv"] = digest(self.root, BASE + "/target_pool_AB.csv")
+        write_json(self.root, self.replay + "/AB_index.json", index)
+        code, report = self.audit()
+        self.assertEqual(code, 1)
+        self.assertEqual(report["issues"][0]["code"], "TARGET_ADMISSION")
 
     def test_snapshot_change_is_reported(self):
         original = m.Snapshot.finish
@@ -311,11 +352,12 @@ class AuditTests(unittest.TestCase):
         self.assertIn("SNAPSHOT_CHANGED", json.dumps(report))
 
     def test_all_exit_paths_are_read_only(self):
-        for broken in (False, True):
-            if broken:
+        for case in ("full", "subset", "broken", "missing_version"):
+            fixture(self.root, n=12 if case == "full" else 7)
+            if case == "broken":
                 self.mutate_rows("AB_axis_endpoint.csv", lambda rows: rows.pop())
             before = {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in self.root.rglob("*") if p.is_file()}
-            self.audit()
+            self.audit("model_v2" if case == "missing_version" else "knn_v1")
             after = {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in self.root.rglob("*") if p.is_file()}
             self.assertEqual(before, after)
 
@@ -328,6 +370,22 @@ class AuditTests(unittest.TestCase):
         with redirect_stdout(io.StringIO()) as output:
             self.assertEqual(m.main(["--repo-root", str(self.root), "--acq-version", "made_up"]), 1)
         self.assertEqual(json.loads(output.getvalue())["integrity"], "FAIL")
+
+    def test_deeply_nested_json_cli_returns_invalid_json_not_traceback(self):
+        path = self.root / (self.replay + "/AB_index.json")
+        path.write_text("[" * 1500 + "0" + "]" * 1500, encoding="utf-8")
+        with redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(m.main(["--repo-root", str(self.root), "--acq-version", "knn_v1"]), 1)
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["integrity"], "FAIL")
+        self.assertEqual(result["submission_gate"], "HOLD")
+        self.assertEqual(result["issues"][0]["code"], "JSON")
+
+    def test_helper_recursion_failure_is_fail_closed(self):
+        with patch.object(m.ast, "parse", side_effect=RecursionError("synthetic helper depth")):
+            code, report = self.audit()
+        self.assertEqual(code, 1)
+        self.assertEqual(report["issues"][0]["code"], "HELPER_DEPTH")
 
 
 if __name__ == "__main__":

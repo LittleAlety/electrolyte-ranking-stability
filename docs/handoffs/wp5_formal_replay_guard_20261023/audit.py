@@ -76,11 +76,14 @@ class Snapshot:
         return self.raw[rel]
 
     def json(self, rel):
-        return json.loads(self.read(rel).decode("utf-8-sig"), object_pairs_hook=unique_json,
-                          parse_constant=lambda value: (_ for _ in ()).throw(AuditError("JSON", "nonfinite JSON")))
+        try:
+            return json.loads(self.read(rel).decode("utf-8-sig"), object_pairs_hook=unique_json,
+                              parse_constant=lambda value: (_ for _ in ()).throw(AuditError("JSON", "nonfinite JSON")))
+        except RecursionError as exc:
+            raise AuditError("JSON", "JSON nesting exceeds parser limit: " + rel) from exc
 
     def csv(self, rel):
-        reader = csv.DictReader(io.StringIO(self.read(rel).decode("utf-8-sig"), newline=""))
+        reader = csv.DictReader(io.StringIO(self.read(rel).decode("utf-8-sig"), newline=""), strict=True)
         fields = reader.fieldnames
         need(fields and len(set(fields)) == len(fields), "CSV", "missing/duplicate columns: " + rel)
         rows = list(reader)
@@ -134,7 +137,10 @@ def check_inputs(snapshot, index, expected):
 
 def load_stop_rule(snapshot):
     raw = snapshot.read(HELPER)
-    tree = ast.parse(raw, filename=HELPER)
+    try:
+        tree = ast.parse(raw, filename=HELPER)
+    except RecursionError as exc:
+        raise AuditError("HELPER_DEPTH", "stop-rule helper exceeds AST parser depth") from exc
     # Only the known pure standard-library helper is executed, never the replay
     # runner/model modules (which would import NumPy and training code).
     allowed = {"__future__", "math", "random", "hashlib"}
@@ -144,7 +150,10 @@ def load_stop_rule(snapshot):
         elif isinstance(node, ast.ImportFrom):
             need(node.module in allowed and node.level == 0, "HELPER", "unexpected helper import")
     namespace = {"__name__": "wp5_guard_contract", "__file__": str(snapshot.root / HELPER)}
-    exec(compile(tree, HELPER, "exec"), namespace)
+    try:
+        exec(compile(tree, HELPER, "exec"), namespace)
+    except RecursionError as exc:
+        raise AuditError("HELPER_DEPTH", "stop-rule helper exceeds compile/execution depth") from exc
     return namespace["empirical_stop_budget"]
 
 
@@ -365,7 +374,7 @@ def run_audit(repo_root, acq_version="knn_v1"):
     try:
         need(acq_version in VERSIONS, "VERSION", "unknown acquisition version")
         details = check_artifacts(snapshot, acq_version)
-    except (OSError, ValueError, TypeError, KeyError, DecimalException, SyntaxError) as exc:
+    except (OSError, ValueError, TypeError, KeyError, DecimalException, SyntaxError, csv.Error) as exc:
         report["issues"].append({"code": getattr(exc, "code", "INVALID"), "message": str(exc)[:400]})
     try:
         snapshot.finish()
