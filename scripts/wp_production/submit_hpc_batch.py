@@ -187,10 +187,23 @@ def declared_task_cores(package: Path, listing) -> int:
         inp = package / rel / "job.inp"
         if not inp.is_file():
             raise ValueError("task input missing: %s/job.inp" % rel)
-        match = ORCA_NPROCS_RE.search(inp.read_text(encoding="utf-8"))
-        if match is None:
-            raise ValueError("task input declares no %%pal nprocs: %s" % rel)
-        cores.add(int(match.group(1)))
+        text = inp.read_text(encoding="utf-8")
+        match = ORCA_NPROCS_RE.search(text)
+        if match is not None:
+            cores.add(int(match.group(1)))
+            continue
+        # Non-ORCA engines (an xtB/GFN2 screening package) have no %pal block, so
+        # they must declare their core count explicitly instead.  Fail closed:
+        # without a declaration the resource is unknown.
+        declared = package / rel / "cores.txt"
+        if declared.is_file():
+            value = declared.read_text(encoding="utf-8").strip()
+            if not value.isdigit() or int(value) < 1:
+                raise ValueError("invalid cores.txt for %s" % rel)
+            cores.add(int(value))
+            continue
+        raise ValueError("task declares no core count (no %%pal nprocs and no "
+                         "cores.txt): %s" % rel)
     if not cores:
         raise ValueError("batch listing is empty; nothing to submit")
     if len(cores) != 1:
