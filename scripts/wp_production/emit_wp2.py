@@ -1472,6 +1472,23 @@ MECH_CASES_MD_BLOCK = r'''
 
 '''
 
+ANCHOR_COST_DICT = '''            "hpc_core_hours": prod["hpc_core_hours"],
+            "status": prod["status"],
+        })'''
+COST_DICT_BLOCK = '''            "hpc_core_hours": prod["hpc_core_hours"],
+            "cost_scope": prod.get("cost_scope", ""),
+            "status": prod["status"],
+        })'''
+
+# The strict cost check requires a declared scope for non-complete rows; the value is
+# already declared upstream, so it only has to be carried into the artifact.
+ANCHOR_COST_CSV = '''        ["job_id", "mol_id", "name", "state", "phase", "level", "cores", "wall_sec",
+         "core_hours", "cost_status", "hpc_wall_sec", "hpc_core_hours", "status"], production_cost)'''
+COST_CSV_BLOCK = '''        ["job_id", "mol_id", "name", "state", "phase", "level", "cores", "wall_sec",
+         "core_hours", "cost_status", "hpc_wall_sec", "hpc_core_hours", "cost_scope",
+         "status"], production_cost)'''
+
+
 def main():
     src = baseline_source()
     rows, extras = load_rows()
@@ -1557,6 +1574,9 @@ def main():
     src = sub_once(src, ANCHOR_MECH_CASES_CSV, MECH_CASES_CSV_BLOCK)
     src = sub_once(src, ANCHOR_MECH_CASES_MD, MECH_CASES_MD_BLOCK)
     src = apply_v1_1_decisions(src)
+    # P7: the declared cost_scope must reach the artifact the strict gate reads
+    src = sub_once(src, ANCHOR_COST_DICT, COST_DICT_BLOCK)
+    src = sub_once(src, ANCHOR_COST_CSV, COST_CSV_BLOCK)
     src = apply_derivative_policy(src)
     if GEN.exists():
         with GEN.open("r", encoding="utf-8", newline="") as f:

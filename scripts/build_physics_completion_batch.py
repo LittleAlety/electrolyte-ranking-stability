@@ -2304,6 +2304,7 @@ def wp2():
             "wall_sec": prod["wall_sec"], "core_hours": prod["core_hours"],
             "cost_status": prod["cost_status"], "hpc_wall_sec": prod["hpc_wall_sec"],
             "hpc_core_hours": prod["hpc_core_hours"],
+            "cost_scope": prod.get("cost_scope", ""),
             "status": prod["status"],
         })
     production_cost_complete_jobs = sum(row["cost_status"] == "complete" for row in production_cost)
@@ -2736,7 +2737,8 @@ def wp2():
         production_redox)
     local["outputs/physics_completion/cost/production_cost_ledger.csv"] = csv_text(
         ["job_id", "mol_id", "name", "state", "phase", "level", "cores", "wall_sec",
-         "core_hours", "cost_status", "hpc_wall_sec", "hpc_core_hours", "status"], production_cost)
+         "core_hours", "cost_status", "hpc_wall_sec", "hpc_core_hours", "cost_scope",
+         "status"], production_cost)
     local["outputs/physics_completion/free_states/sampling_plan.csv"] = csv_text(
         ["mol_id", "name", "state", "structures_round1", "structures_round2_max", "status",
          "escalation_rule"], sampling)
