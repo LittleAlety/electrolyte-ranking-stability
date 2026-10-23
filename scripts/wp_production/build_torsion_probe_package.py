@@ -205,8 +205,41 @@ def rotate_fragment(coords, dihedral, adjacency, *, single_bonds, degrees):
                      "rotation_degrees": degrees, "contract": "fragment_bridge_v1"}
 
 
+def _edge_set(bond_graph_result) -> set:
+    """Undirected edge set.
+
+    ``bond_graph`` already returns a SET of ``(i, j)`` index pairs, but an
+    adjacency-list form is accepted too, so the helper cannot misread its input
+    (measured: treating that set as an adjacency list raises
+    "'set' object is not subscriptable").
+    """
+    if isinstance(bond_graph_result, (set, frozenset)):
+        return {tuple(sorted((int(a), int(b)))) for a, b in bond_graph_result}
+    return {tuple(sorted((i, j)))
+            for i in range(len(bond_graph_result))
+            for j in bond_graph_result[i] if i < j}
+
+
+def _li_first_shell(symbols, coords, *, cutoff=2.6):
+    """Which atoms sit in each Li's first coordination shell.
+
+    A torsion probe must not silently change the coordination environment: that
+    is a different probe kind, registered separately, not a side effect.
+    """
+    xyz = np.asarray(coords, dtype=float)
+    shells = {}
+    for li in range(len(symbols)):
+        if symbols[li] != "Li":
+            continue
+        d = np.linalg.norm(xyz - xyz[li], axis=1)
+        shells[li] = frozenset(int(k) for k in np.where((d > 0) & (d <= cutoff))[0])
+    return shells
+
+
 def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency,
-                            *, prior_starts=(), min_pair_change_a=1e-5):
+                            *, prior_starts=(), min_pair_change_a=1e-5,
+                            registered_single_bonds=None, rotated_bond=None,
+                            check_li_shell=True):
     """One gate every candidate start must pass, whatever generated it.
 
     Returns ``{"accepted": bool, "reason": str, "detail": {...}}`` -- a verdict,
@@ -214,21 +247,38 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
     (the project's rule: an invalid start is kept as history, not silently
     dropped, and never counted as coverage evidence).
 
-    The four refusals the plan names explicitly:
+    **Order matters and is the point of this function.**  Every REJECTION is
+    evaluated before the candidate is CLASSIFIED.  An earlier version classified
+    first ("heavy atoms barely moved, so it is a methyl rotor") and returned
+    immediately, which accepted two kinds of bad geometry:
 
-    ``rigid_transformation``  -- the candidate barely moved any pair distance,
-                                 so it is a rotation of the SAME structure and
-                                 must not be presented as an independent start;
-    ``ring_broken``           -- the covalent graph changed (a broken/formed
-                                 ring is a different species, not a conformer);
-    ``equivalent_start``      -- a topology-preserving proper rotation of the
-                                 source or of an already registered start;
-    ``identity_changed``      -- element composition/order differs.
+    * a hydrogen displaced 100 A (its bond is gone) -- ``heavy_change`` is 0 when
+      only H moves, so it looked like a clean methyl rotor;
+    * a symmetry-equivalent rotation -- equivalence was only checked after that
+      return.
 
-    Composition is checked first: everything else compares against the source.
+    Refusal reasons, in evaluation order:
+
+    ``malformed_input``            shape/finiteness/composition unusable;
+    ``not_a_single_bond_rotor``    the rotated bond is not a registered single
+                                   bond (C=O / aromatic) -- a pseudo-torsion;
+    ``rigid_transformation``       no pair distance moved: the same structure;
+    ``ring_broken``                a covalent bond disappeared (broken ring or
+                                   detached atom != conformer);
+    ``collision_or_new_bond``      a new covalent contact appeared;
+    ``li_coordination_changed``    a Li first shell gained/lost a partner;
+    ``mapping_unresolved``         equivalence could not be decided -> fail closed;
+    ``equivalent_start``           a topology-preserving proper rotation of the
+                                   source or of an already registered start.
+
+    Accepted classes: ``ok_methyl_rotor`` (the heavy skeleton did not move; a
+    legitimate independent start on THAT rotor coordinate only) and
+    ``ok_heavy_fragment`` (the heavy skeleton moved -- a real fragment torsion).
     """
     xyz_s = np.asarray(source_coords, dtype=float)
     xyz_c = np.asarray(candidate_coords, dtype=float)
+
+    # 0. shape / finiteness / composition
     if (xyz_s.ndim != 2 or xyz_c.ndim != 2 or xyz_s.shape != xyz_c.shape
             or xyz_s.shape[1] != 3
             or len(symbols) != xyz_s.shape[0]
@@ -241,41 +291,78 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
     before = np.linalg.norm(xyz_s[:, None] - xyz_s[None, :], axis=2)
     after = np.linalg.norm(xyz_c[:, None] - xyz_c[None, :], axis=2)
     change = float(np.max(np.abs(before - after)))
-
-    # 1. must actually move heavy atoms somewhere
     heavy = [i for i, s in enumerate(symbols) if s != "H"]
     heavy_change = (float(np.max(np.abs(
         before[np.ix_(heavy, heavy)] - after[np.ix_(heavy, heavy)])))
         if len(heavy) > 1 else 0.0)
+
+    # 1. the rotation axis itself must be a registered SINGLE bond
+    if rotated_bond is not None:
+        axis = tuple(sorted((int(rotated_bond[0]), int(rotated_bond[1]))))
+        if axis[0] == axis[1] or axis[1] >= len(symbols):
+            return {"accepted": False, "reason": "malformed_input",
+                    "detail": {"rotated_bond": list(rotated_bond)}}
+        if registered_single_bonds is not None and axis not in registered_single_bonds:
+            return {"accepted": False, "reason": "not_a_single_bond_rotor",
+                    "detail": {"rotated_bond": list(axis),
+                               "note": "C=O / aromatic bonds are not free rotors"}}
+
+    # 2. it must actually move
     if change <= min_pair_change_a:
         return {"accepted": False, "reason": "rigid_transformation",
                 "detail": {"pair_distance_change_a": change}}
+
+    # 3. a Li first shell must not change silently -- evaluated BEFORE the covalent
+    #    graph, because bond_graph's 1.3x radius cut counts a 2.0 A Li-O contact as
+    #    a "bond", so a coordination change would always be reported as
+    #    ring_broken and THIS check could never fire (a guard that cannot fire is
+    #    worse than none).
+    if check_li_shell and any(s == "Li" for s in symbols):
+        s_shell = _li_first_shell(symbols, xyz_s)
+        c_shell = _li_first_shell(symbols, xyz_c)
+        if s_shell != c_shell:
+            return {"accepted": False, "reason": "li_coordination_changed",
+                    "detail": {"source_shells": {str(k): sorted(v) for k, v in s_shell.items()},
+                               "candidate_shells": {str(k): sorted(v) for k, v in c_shell.items()}}}
+
+    # 4. covalent topology must be intact -- BEFORE any classification
+    try:
+        ref = _edge_set(bond_graph(symbols, xyz_s))
+        got = _edge_set(bond_graph(symbols, xyz_c))
+    except (ValueError, IndexError):
+        return {"accepted": False, "reason": "malformed_input",
+                "detail": {"note": "bond graph could not be built"}}
+    lost = sorted(ref - got)
+    added = sorted(got - ref)
+    if lost:
+        return {"accepted": False, "reason": "ring_broken",
+                "detail": {"pair_distance_change_a": change,
+                           "lost_bonds": lost}}
+    if added:
+        return {"accepted": False, "reason": "collision_or_new_bond",
+                "detail": {"pair_distance_change_a": change,
+                           "new_bonds": added}}
+
+    # 5. must not be an equivalent copy of the source or of a prior start
+    for label, reference in [("source", xyz_s)] + [
+            ("prior_start_%d" % i, np.asarray(prior, dtype=float))
+            for i, prior in enumerate(prior_starts)]:
+        try:
+            equivalent = equivalent_start(symbols, reference, xyz_c, adjacency)
+        except ValueError:
+            # an unresolved mapping is a MISSING decision, not an approval
+            return {"accepted": False, "reason": "mapping_unresolved",
+                    "detail": {"against": label, "pair_distance_change_a": change}}
+        if equivalent:
+            return {"accepted": False, "reason": "equivalent_start",
+                    "detail": {"pair_distance_change_a": change, "against": label}}
+
+    # 6. only now classify what KIND of independent start this is
     if heavy_change <= min_pair_change_a:
-        # a methyl rotor is a legitimate independent start on THAT coordinate,
-        # but it must never be labelled a heavy-fragment search
         return {"accepted": True, "reason": "ok_methyl_rotor",
                 "detail": {"pair_distance_change_a": change,
                            "heavy_pair_change_a": heavy_change,
                            "probe_class": "methyl_rotor"}}
-
-    # 2. the covalent graph must be intact (a broken ring is another species)
-    try:
-        same_graph = (bond_graph(symbols, xyz_s) == bond_graph(symbols, xyz_c))
-    except (ValueError, IndexError):
-        same_graph = False
-    if not same_graph:
-        return {"accepted": False, "reason": "ring_broken",
-                "detail": {"pair_distance_change_a": change}}
-
-    # 3. not an equivalent copy of the source or of an already registered start
-    if equivalent_start(symbols, xyz_s, xyz_c, adjacency):
-        return {"accepted": False, "reason": "equivalent_start",
-                "detail": {"pair_distance_change_a": change, "against": "source"}}
-    for i, prior in enumerate(prior_starts):
-        if equivalent_start(symbols, prior, xyz_c, adjacency):
-            return {"accepted": False, "reason": "equivalent_start",
-                    "detail": {"pair_distance_change_a": change,
-                               "against": "prior_start_%d" % i}}
     return {"accepted": True, "reason": "ok_heavy_fragment",
             "detail": {"pair_distance_change_a": change,
                        "heavy_pair_change_a": heavy_change,
@@ -344,13 +431,22 @@ def _repair_member(source_package, member, kept):
     dihedral = tuple(int(v) for v in member["dihedral"].split("-"))
     rotated, audit = rotate_fragment(coords, dihedral, adjacency,
                                      single_bonds=singles, degrees=member["scan_offset_deg"])
-    if equivalent_start(symbols, coords, rotated, adjacency):
-        raise ValueError("probe is symmetrically equivalent to its source")
-    for prior in kept:
-        if ((prior["member"]["name"], prior["member"]["slot"])
-                == (member["name"], member["slot"])):
-            if equivalent_start(symbols, prior["coords"], rotated, adjacency):
-                raise ValueError("probe duplicates an already selected start")
+    # P0: the SAME gate every candidate start must pass, called HERE so a bad
+    # geometry cannot reach the manifest.  It used to be an uncalled helper while
+    # this function re-implemented only part of it (no topology check), which
+    # accepted a hydrogen displaced 100 A as a clean methyl rotor.
+    verdict = validate_candidate_start(
+        symbols, coords, rotated, adjacency,
+        prior_starts=[p["coords"] for p in kept
+                      if (p["member"]["name"], p["member"]["slot"])
+                      == (member["name"], member["slot"])],
+        registered_single_bonds=singles,
+        rotated_bond=(dihedral[1], dihedral[2]))
+    if not verdict["accepted"]:
+        raise ValueError("candidate start refused: %s %s"
+                         % (verdict["reason"], verdict["detail"]))
+    audit.update(gate_reason=verdict["reason"])
+    audit.update(verdict["detail"])
     old_task = source_package / "tasks" / member["name"] / (member["slot"] + "__" + member["seed"])
     inp = (old_task / "job.inp").read_text(encoding="utf-8")
     require_analytic_gradient(inp, minimum_optimization_tier="verytight")
@@ -434,6 +530,23 @@ def _registry_torsions(name: str, state: str) -> list[dict]:
 
 
 def _state_geometry(name: str, state: str) -> Path | None:
+    """The state's REPRESENTATIVE member geometry.
+
+    A hardcoded ``__primary`` leaf resolves to nothing whenever the state's
+    weighted member is a later basin (measured: DOL|LiM_2plus is represented by
+    ``c05``), which is the "missing file read as a result" defect this project has
+    hit before.  Reuse the registry's resolver -- do not re-implement it -- and
+    keep the literal ``primary`` only as a fallback.
+    """
+    try:
+        from build_torsion_registry import _member_geometry, representative_members
+        seed = representative_members().get((name, state), "")
+        if seed:
+            geom = _member_geometry(name, state, seed)
+            if geom is not None:
+                return geom
+    except Exception:
+        pass                                    # fall through to the literal leaf
     leaf = "%s__%s__primary" % (name, state)
     cand = REPO / "work" / "hpc_frontier_localization_v1" / "tasks" / leaf / "geom.xyz"
     return cand if cand.is_file() else None
@@ -457,9 +570,13 @@ def _build_state(name: str, state: str, charge: int, mult: int) -> list[dict]:
         try:
             rotated, _ = rotate_fragment(coords, (a, b, c, d), adjacency,
                                           single_bonds=singles, degrees=SCAN_OFFSET_DEG)
-            if equivalent_start(syms, coords, rotated, adjacency) or any(
-                    equivalent_start(syms, old, rotated, adjacency) for old in selected):
-                print("REJECT %s|%s: duplicate start" % (name, state))
+            verdict = validate_candidate_start(
+                syms, coords, rotated, adjacency, prior_starts=selected,
+                registered_single_bonds=singles,
+                rotated_bond=(b, c))
+            if not verdict["accepted"]:
+                print("REJECT %s|%s: %s %s" % (name, state, verdict["reason"],
+                                               verdict["detail"]))
                 continue
         except ValueError as exc:
             print("REJECT %s|%s: %s" % (name, state, exc))
