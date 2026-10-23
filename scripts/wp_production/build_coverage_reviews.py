@@ -117,7 +117,17 @@ def _rejected_probe_members() -> set:
     """
     import json as _json
     out = set()
-    for man in sorted((REPO / "work").glob("hpc_torsion_probe_v*/manifest.json")):
+    manifests = sorted((REPO / "work").glob("hpc_torsion_probe_v*/manifest.json"))
+    if not manifests:
+        # "no refusals recorded" and "the record of refusals is missing" are
+        # different facts; the second must not silently become the first, or a
+        # cancelled element reads as fresh work again.
+        raise SystemExit(
+            "REFUSING to derive probe exclusions: no "
+            "work/hpc_torsion_probe_v*/manifest.json found.  The work/ layer is "
+            "machine-local (gitignored); an empty exclusion set here would "
+            "silently re-admit refused or cancelled members.")
+    for man in manifests:
         try:
             data = _json.loads(man.read_text(encoding="utf-8"))
         except (OSError, ValueError):

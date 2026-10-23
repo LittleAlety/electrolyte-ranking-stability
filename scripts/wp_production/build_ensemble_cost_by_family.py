@@ -86,9 +86,23 @@ def _job_identity(attempt: Path, pkg: str) -> tuple[str, str]:
     return "%s|%s" % (pkg, name), ""
 
 
+#: the machine-local layer this builder reads.  It is gitignored, so a clean
+#: checkout has none of it -- and an EMPTY cost ledger is not a valid answer to
+#: "the packages are not here", it is a silent skip.
+WORK_LAYER = "work/hpc_*"
+
+
 def build_rows() -> list[dict]:
     rows: dict[str, dict] = {}
-    for pkg_dir in sorted((REPO / "work").glob("hpc_*")):
+    packages = sorted((REPO / "work").glob("hpc_*"))
+    if not packages:
+        raise SystemExit(
+            "REFUSING to build a cost ledger: no %s package found.  The work/ "
+            "layer is machine-local (gitignored); an empty ledger would be a "
+            "silent skip of a declared dependency, not a zero-cost result. "
+            "Restore the archived packages or point REPO at a full checkout."
+            % WORK_LAYER)
+    for pkg_dir in packages:
         if not pkg_dir.is_dir():
             continue
         pkg = pkg_dir.name
