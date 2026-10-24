@@ -61,7 +61,7 @@ def test_the_budget_accounting_refuses_a_missing_layer(tmp_path, monkeypatch):
 
 
 def test_the_budget_accounting_still_reports_the_real_figure():
-    if not (Path(__file__).resolve().parents[1] / "work").is_dir():
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
         pytest.skip(
             "the machine-local work/ layer (gitignored) is absent in this checkout; "
             "this test pins the dev-tree figure, the refusal side is covered by "
@@ -77,7 +77,7 @@ def test_the_budget_accounting_still_reports_the_real_figure():
 # ---- normal behaviour is unchanged ---------------------------------------
 
 def test_the_cost_builder_still_builds_from_the_real_layer():
-    if not (Path(__file__).resolve().parents[1] / "work").is_dir():
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
         pytest.skip(
             "the machine-local work/ layer (gitignored) is absent in this checkout; "
             "this test pins the dev-tree figure, the refusal side is covered by "
@@ -90,7 +90,7 @@ def test_the_cost_builder_still_builds_from_the_real_layer():
 
 
 def test_the_probe_exclusion_source_still_lists_the_refusals():
-    if not (Path(__file__).resolve().parents[1] / "work").is_dir():
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
         pytest.skip(
             "the machine-local work/ layer (gitignored) is absent in this checkout; "
             "this test pins the dev-tree figure, the refusal side is covered by "
