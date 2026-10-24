@@ -51,7 +51,15 @@
    `EC|LiM_2plus/toward_4` 被推到 Li–O **1.4528 Å**、`DMC|LiM_2plus/toward_3` 到 **1.4768 Å**
    （Li⁺–O 常见 1.9–2.1 Å）。这两个元素很可能直接弛豫回源极小 → 属成本有效性问题。
 
-## 4. 授权后回收阶段的对应阶段
+## 4. 明令禁止（已实测其在结构上不可被链调用，但执行者仍可能手 run）
+- **禁止运行 `work/_p3_run.py` 与 `work/_p4_screen_plan.py`**：它们是旧 scratch 生成器，
+  会用**错误的电子身份与资源配置**覆盖正式结果（历史字段曾把 `record_id` 塞进 `mol_id`、
+  三个 `LiM_2plus` 曾错成 `1/1`）。实测：在 `scripts/`、`tests/` 与交接文档中
+  **引用数 = 0**，即收口链与测试**不会**调用它们，危险只来自手 run。
+- 生成与只读复核**只用**：`build_torsion_probe_package.py --build-p4-screening` /
+  `--check-p4-screening`。
+
+## 5. 授权后回收阶段的对应阶段
 提交 → 回收（`ensemble_hpc_io.py`，幂等）→ 逐元素收终态/`xtbopt.log`/`stderr.log`/`xtbopt.xyz`/
 启动终止时间/实测成本 → 按冻结 **6 kcal/mol** 窗筛选 → 四态分流（新盆地／回已知盆地／身份漂移／
 八条均无新盆地）→ 有界生产计算（每态 ≤2 起点 + ≤1 有因补救）→ 逐腿六项验收。
