@@ -692,3 +692,38 @@ MAX step            0.0000208560            0.0002000000      YES
     with pytest.raises(ValueError, match="missing complete final geometry"):
         mod.enforce_geometry_convergence(table.replace(
             "RMS step            0.0000087907            0.0001000000      YES\n", ""), inp)
+
+
+def test_a_printed_tolerance_that_differs_from_the_frozen_one_is_rejected():
+    """Anti-drift guard: ORCA must PRINT the frozen VeryTightOpt tolerances.
+
+    ``enforce_geometry_convergence`` compares the printed tolerance column with
+    ``derivative_policy.VERY_TIGHT_THRESHOLDS`` at ``abs_tol=5e-12`` before it
+    compares any value.  Measured 2026-10-24: no test exercised that branch —
+    every existing case replaces a VALUE cell, not a TOLERANCE cell — so
+    loosening the tolerance guard (or letting a leg that requested looser
+    tolerances through) would have gone unnoticed.  A leg whose tolerances are
+    not the frozen ones must be refused, never accepted at the looser number.
+    """
+    inp = ("! wB97X-D4 def2-TZVPD Opt AnFreq SMD(acetonitrile) VeryTightOpt "
+           "TightSCF SlowConv\n")
+    table = """
+----------------------|Geometry convergence|-------------------------
+Item                value                   Tolerance       Converged
+Energy change       0.0000001000            0.0000002000      YES
+RMS gradient        0.0000070000            0.0000080000      YES
+MAX gradient        0.0000200000            0.0000300000      YES
+RMS step            0.0000800000            0.0001000000      YES
+MAX step            0.0001500000            0.0002000000      YES
+"""
+    # the frozen table itself is accepted
+    assert mod.enforce_geometry_convergence(table, inp)["tier"] == "verytight"
+
+    for old, new, key in (
+            ("0.0000002000", "0.0000009000", "TolE_Eh"),
+            ("0.0000080000", "0.0000090000", "TolRMSG_Eh_per_Bohr"),
+            ("0.0000300000", "0.0000400000", "TolMaxG_Eh_per_Bohr"),
+            ("0.0001000000", "0.0002000000", "TolRMSD_Bohr"),
+            ("0.0002000000", "0.0003000000", "TolMaxD_Bohr")):
+        with pytest.raises(ValueError, match="tolerance mismatch for %s" % key):
+            mod.enforce_geometry_convergence(table.replace(old, new), inp)
