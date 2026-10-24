@@ -38,7 +38,7 @@ pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1 -Commit            
 
 **先读**：[项目导航 / 下一步 / 核心代码](docs/PROJECT_GUIDE.md) · [当前恢复报告](outputs/physics_completion/recovery/strict_recovery_v1_report.md) · [科学协议](docs/physics_completion_protocol.md) · [目录地图](docs/65_repo_layout.md)
 
-**网页**：[静态页面源码](docs/index.html)。仓库可见性与 Pages 托管由 GitHub 设置决定；前端假密码仅为演示门禁，不是保密措施。
+**网页**：[静态页面源码](docs/index.html)。仓库可见性与 Pages 托管由 GitHub 设置决定
 
 ---
 
