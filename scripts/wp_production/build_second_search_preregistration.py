@@ -119,7 +119,8 @@ def _evidence(name: str, state: str) -> str:
 def render() -> str:
     bad = unrecoverable()
     lines = [
-        "# 第二轮搜索预注册稿（EMC|M_plus 已执行并排除；剩余 5 态待用户裁决）",
+        # 计数由 unrecoverable() 派生：硬编码会在系综变化时静默漂移
+        "# 第二轮搜索预注册稿（EMC|M_plus 已执行并排除；剩余 %d 态待用户裁决）" % len(bad),
         "",
         "> 生成器 `build_second_search_preregistration.py`（`--check` 完全只读）。",
         "> 方案原文：「如决定新一轮搜索，先版本化预注册新池、成本上限和停止规则，再计算；不回填旧池。」",
@@ -160,9 +161,10 @@ def render() -> str:
         "**漂移结论本身的适用范围也随之收窄**：它只说明「该*失败尝试*的起点会重排成别的物种、"
         "重试无法恢复身份」，**不等于**「该态没有别的盆地」——后者要由覆盖复核判定。",
         "",
-        "## 剩余 5 态：候选方法变更（每项都需单独版本化登记，组合由用户裁决）",
+        "## 剩余 %d 态：候选方法变更（每项都需单独版本化登记，组合由用户裁决）" % len(bad),
         "",
-        "### 阳离子单极小态（AN/DMC/EMC 的 M_plus）",
+        "### 阳离子单极小态（%s 的 M_plus）"
+        % ("、".join(sorted(n for n, s in bad if s == "M_plus")) or "本次无"),
         "",
         "| 变更 | 具体做法 |",
         "|---|---|",
@@ -196,7 +198,8 @@ def render() -> str:
         "* 若 6 态都找到 2 个新盆地：12 腿 × ~6 core-hours ≈ **70 core-hours**；",
         "* 这批的失败模式是「搜索无果」，所以最可能的结果是**只花搜索级成本**。",
         "",
-        "**本稿不选方法、不算具体预算、不启动任何计算。已执行的部分只有 EMC|M_plus（用户授权），其余 5 态的选定由用户裁决。**",
+        "**本稿不选方法、不算具体预算、不启动任何计算。已执行的部分只有 EMC|M_plus（用户授权），"
+        "其余 %d 态的选定由用户裁决。**" % len(bad),
         "",
     ]
     return "\n".join(lines)
@@ -238,8 +241,9 @@ def main(argv=None) -> int:
     if args.check:
         return check()
     write_outputs()
-    print("second-search draft: %d unrecoverable states; EMC|M_plus excluded by execution, the other 5 await a ruling"
-          % len(unrecoverable()))
+    _n = len(unrecoverable())
+    print("second-search draft: %d unrecoverable states; EMC|M_plus excluded by execution, "
+          "the other %d await a ruling" % (_n, _n))
     return 0
 
 
