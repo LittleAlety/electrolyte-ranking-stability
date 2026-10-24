@@ -1,4 +1,4 @@
-# Round 5 —— T4：Li+ 配位条件态 C1（机制解释）
+# Week 5 —— T4：Li+ 配位条件态 C1（机制解释）
 
 > 对应 v2 §7.1（条件态层次 C0 -> C1）与 v2 §9（sigma 分源报告）；协议见
 > `docs/08_stage2_production_protocol.md` §3.4/§5/§7。本报告只报告数据，不改协议。

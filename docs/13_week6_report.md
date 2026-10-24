@@ -1,4 +1,4 @@
-# 13 Round 6 报告：Stage 6 不确定性感知排序分析
+# 13 Week 6 报告：Stage 6 不确定性感知排序分析
 
 - 项目：电解液溶剂 ranking 稳定性（decision-centric ranking stability）
 - 对应执行计划：Stage 6「不确定性感知排序分析（预注册统计计划）」，第 9 周
@@ -10,14 +10,14 @@
 
 ## 1. 本轮解决的问题
 
-Round 5 结束时有两个卡口：**（a）** Stage 6 的全部指标虽然已经在 `src/electrolyte_ranking/ranking.py` 里实现，但一直只跑「临时口径」`|ΔP_ij| ≥ z·σ_ij`（z = 1.0）；预注册里那个**固定兜底容差 `delta_m`** 从未被赋值，`ranking.resolved_mask()` 的 `tolerance` 参数从未被启用。**（b）** Round 5 遗留的 6 条冲突里，有 4 条没有收口。
+Week 5 结束时有两个卡口：**（a）** Stage 6 的全部指标虽然已经在 `src/electrolyte_ranking/ranking.py` 里实现，但一直只跑「临时口径」`|ΔP_ij| ≥ z·σ_ij`（z = 1.0）；预注册里那个**固定兜底容差 `delta_m`** 从未被赋值，`ranking.resolved_mask()` 的 `tolerance` 参数从未被启用。**（b）** Week 5 遗留的 6 条冲突里，有 4 条没有收口。
 
 本轮按四个任务（T6/T7/T8/T9）把这两件事一起做完：
 
 | 任务 | 内容 | 关键产物 |
 |---|---|---|
 | **T6** | 构象系综展宽 `σ_conf`（`delta_m` 的构象项） | `outputs/week6/t6_conformer_spread.*`、`structures/conformers/` |
-| **T7** | C1 `[Li M]+` 优化几何的**虚频检查**（Round 5 冲突 5） | `outputs/week6/t7_c1_freq_check.*` |
+| **T7** | C1 `[Li M]+` 优化几何的**虚频检查**（Week 5 冲突 5） | `outputs/week6/t7_c1_freq_check.*` |
 | **T8** | `delta_m` 组装（按预注册 source_rule + docx §6.2 的 max 规则） | `outputs/week6/delta_m_frozen.*` |
 | **T9** | 三口径（`z_only` / `floor_only` / `docx_max`）下的全套 Stage 6 指标 | `outputs/week6/stage6_decision_stability.*`、`F14`、`F15` |
 
@@ -103,7 +103,7 @@ Round 5 结束时有两个卡口：**（a）** Stage 6 的全部指标虽然已�
 | 氧化 | −1.373 | **0.7002** | 1.839 |
 | 还原 | +7.378 | **2.0743** | 9.034 |
 
-还原侧的位移均值高达 +7.4 eV、逐分子标准差 2.07 eV，**这正是 Koopmans 定理对 EA 失效**留下的痕迹（P0 用 `+ε_LUMO` 近似 EA，而中性闭壳层的 LUMO 常常预示一个不束缚的阴离子）。这一点在 Round 4 已经定性看到（`F5`），本轮第一次把它量化成 `delta_m` 的数值。
+还原侧的位移均值高达 +7.4 eV、逐分子标准差 2.07 eV，**这正是 Koopmans 定理对 EA 失效**留下的痕迹（P0 用 `+ε_LUMO` 近似 EA，而中性闭壳层的 LUMO 常常预示一个不束缚的阴离子）。这一点在 Week 4 已经定性看到（`F5`），本轮第一次把它量化成 `delta_m` 的数值。
 
 ### 3.4 四个数值
 
@@ -142,7 +142,7 @@ Round 5 结束时有两个卡口：**（a）** Stage 6 的全部指标虽然已�
 
 | 口径 | `delta_m` | 含义 |
 |---|---|---|
-| `z_only` | 0（等于不启用固定容差） | Round 5 及之前的临时口径，作为对照基线 |
+| `z_only` | 0（等于不启用固定容差） | Week 5 及之前的临时口径，作为对照基线 |
 | `floor_only` | 0.05 eV | 只看规划文档的数值下限，隔离「证据驱动」部分的效果 |
 | `docx_max` | 0.7002 eV（氧化）/ 2.0743 eV（还原） | 主口径：完整 docx §6.2 合成规则（T8 候选） |
 
@@ -197,9 +197,9 @@ Round 5 结束时有两个卡口：**（a）** Stage 6 的全部指标虽然已�
 
 ---
 
-## 5. T7：C1 `[Li M]+` 优化几何的虚频检查（Round 5 冲突 5 收口）
+## 5. T7：C1 `[Li M]+` 优化几何的虚频检查（Week 5 冲突 5 收口）
 
-Round 5 的 C1 扫描只跑了 `Opt`，没有 Hessian，所以 `docs/12` §7 只能写「未检虚频」。本轮不改动 Stage 5 的任何几何与数值，只**追加**一次**纯 Freq**（`orca.JOB_FREQUENCY`）在**已经优化好**的 `outputs/week5/c1/<NAME>/<NAME>_m1_G2Li.xyz` 上：
+Week 5 的 C1 扫描只跑了 `Opt`，没有 Hessian，所以 `docs/12` §7 只能写「未检虚频」。本轮不改动 Stage 5 的任何几何与数值，只**追加**一次**纯 Freq**（`orca.JOB_FREQUENCY`）在**已经优化好**的 `outputs/week5/c1/<NAME>/<NAME>_m1_G2Li.xyz` 上：
 
 - 为什么不用 `run_c1_li_coordination.py --freq`：那条路会重跑 `Opt+Freq`，即对一个**已经收敛**的几何再优化一遍，白花机时；最小判据要的是「驻点处的 Hessian」。
 - QC 判据采用 THEMol 数据集对自身 Hessian 子集的做法（英文原句见 `outputs/_week6_scratch/themol_note.md`）：**剔除平动/转动对应的六个近零模**后，其余本征值必须全为正，才确认是局部极小。ORCA 自己会把负频标为 `***imaginary mode***`，本表同时记录标记计数与最低的若干模式。
@@ -225,7 +225,7 @@ Round 5 的 C1 扫描只跑了 `Opt`，没有 Hessian，所以 `docs/12` §7 只
 
 ---
 
-## 6. Round 5 遗留冲突的收口状态
+## 6. Week 5 遗留冲突的收口状态
 
 | # | 冲突 | 本轮状态 |
 |---|---|---|

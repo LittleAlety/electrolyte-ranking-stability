@@ -1,4 +1,4 @@
-# ORCA / r2SCAN-3c 安装指南与 runner 说明（Round 2 → 3 桥梁）
+# ORCA / r2SCAN-3c 安装指南与 runner 说明（Week 2 → 3 桥梁）
 
 **目的：** 把 ORCA 臂「就绪化」。ORCA **已在本机安装并跑通**（版本 **6.1.1**，Windows AVX2 **msmpi** 构建），
 Gate 1 的这条 blocker（`orca binary not installed`）已经清掉；另一个 blocker 是溶液相锚点仍是 `method=est`。

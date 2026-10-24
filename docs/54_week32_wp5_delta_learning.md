@@ -1,9 +1,9 @@
-# Round 32 / WP5：Δ-learning 与跨家族泛化（RQ4 前半）
+# Week 32 / WP5：Δ-learning 与跨家族泛化（RQ4 前半）
 
 > 阶段：下一阶段实施方案 WP5（RQ4 前半）。产物目录 `outputs/week32/`，交付镜像
 > `..\成果输出（part2）\week32/`。数字由 `scripts/build_week32_wp5_delta_learning.py`
-> 确定性生成，`--check` 逐字节复核。**零新增电子结构计算**：唯一输入是 Round 7 的冻结产物
-> （`stage7_ml_predictions.csv` / `stage7_ml_results.csv`）与 Round 5 的 C1 状态身份表
+> 确定性生成，`--check` 逐字节复核。**零新增电子结构计算**：唯一输入是 Week 7 的冻结产物
+> （`stage7_ml_predictions.csv` / `stage7_ml_results.csv`）与 Week 5 的 C1 状态身份表
 > （`c1_state_identity.csv`）。
 
 ## 0. 本轮解决的问题
@@ -115,7 +115,7 @@ LOFO 下 6/8 个组合 Δ-learning 的 τ_b 更高；两个反例（`C|X0|reduct
 | reduction | Li_centered_or_mixed_redox | AN;DMC;DME;DMSO;DOL;EC;GBL;SL;TMP |
 | reduction | molecule_centered_redox | SN |
 
-与 Round 30 完全一致：还原轴 10 个分子里 9 个外加电子落在 Li 上，只有 SN 保持分子中心还原。
+与 Week 30 完全一致：还原轴 10 个分子里 9 个外加电子落在 Li 上，只有 SN 保持分子中心还原。
 因此 C 任务的还原轴条件回归**只能在 SN 上做（n=1）**，本阶段按实施方案把它标为探索性，
 不并入正式结论。
 
@@ -188,7 +188,7 @@ Jaccard ≤ 3.34e-07 ≪ 1e-6）。近并列归因只对 τ_b 与 regret 成立�
 - 「哪种模型算最优」会改变 Δ-learning 的胜负（本阶段固定为 τ_b 最大）；报告已把口径写死在
   代码与测试里，换口径必须重新走一遍验收。
 - 结论依赖 Stage 7 的冻结预测；本阶段是复算与再解释，不是重训。
-- 下一步 WP6（Round 33）：最小昂贵信息预算（主动学习四策略、多种子、决策性能曲线）。
+- 下一步 WP6（Week 33）：最小昂贵信息预算（主动学习四策略、多种子、决策性能曲线）。
 
 ## 10. 复现命令
 

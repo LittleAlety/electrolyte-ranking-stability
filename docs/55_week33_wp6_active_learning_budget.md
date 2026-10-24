@@ -1,9 +1,9 @@
-# Round 33 / WP6：最小昂贵信息预算（RQ4 后半）
+# Week 33 / WP6：最小昂贵信息预算（RQ4 后半）
 
 > 阶段：下一阶段实施方案 WP6（RQ4 后半）。产物目录 `outputs/week33/`，交付镜像
 > `..\成果输出（part2）\week33/`。数字由 `scripts/build_week33_wp6_active_learning_budget.py`
 > 确定性生成，`--check` 逐字节复核。**零新增电子结构计算，且不重跑 acquisition loop**：
-> 唯一输入是 Round 7 Stage 8 的冻结 replay（`stage8_al_curves.csv` / `stage8_al_runs.csv` /
+> 唯一输入是 Week 7 Stage 8 的冻结 replay（`stage8_al_curves.csv` / `stage8_al_runs.csv` /
 > `stage8_al_trajectories.csv` / `stage8_al_results.json`）与 Stage 7 的冻结 ML 结果。
 
 ## 0. 本轮解决的问题
@@ -250,7 +250,7 @@ target 上有 4 个胜率不到 0.49：**「直接优化 Top-k 不确定性」�
 - posterior sampling 来自 GPR 后验协方差（样本 256），未做 uncertainty calibration 检验；
   在 18 个点上无法做可信校准，这一点在 `uncertainty` 策略的任何结论里都必须重申。
 - family-held-out 的 AL 曲线不可用；如需要须重跑 acquisition。
-- 下一步 WP7（Round 34）：外部参考分层与 Gate 1 结论边界。
+- 下一步 WP7（Week 34）：外部参考分层与 Gate 1 结论边界。
 
 ## 11. 复现命令
 

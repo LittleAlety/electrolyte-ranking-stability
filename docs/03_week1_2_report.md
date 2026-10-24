@@ -1,4 +1,4 @@
-# Round 1–2 执行报告 (Stage 0 + Stage 1)
+# Week 1–2 执行报告 (Stage 0 + Stage 1)
 
 **日期:** 2026-09-29
 **范围:** v2 第 19 节的 Stage 0–1 与 **Gate 0 / Gate 1**
@@ -76,7 +76,7 @@ core set = **18** 个分子,匹配 v2「宁可缩小 core set,也不批量生成
 
 > xtb 已解决:采用官方 \`xtb-6.7.1pre-windows-x86_64.zip\`(SHA256 校验通过),置于 \`.toolchain/\`,
 > 由 \`scripts/activate_toolchain.ps1\` 或 \`.env\` 的 \`ELECTROLYTE_XTB\` 指向。
-> 因此 xTB 层的生产计算可以在 Round 3 立即开始;r2SCAN-3c 层仍等待 ORCA。
+> 因此 xTB 层的生产计算可以在 Week 3 立即开始;r2SCAN-3c 层仍等待 ORCA。
 
 ### 已标注需人工核对处
 - 气相:VC 的 IP(NIST 收 10.08 与 11.91 eV,差 1.8 eV)、DME 的 IP(NIST 9.3 vs Fadel 2019 引 9.8 eV)。
@@ -85,7 +85,7 @@ core set = **18** 个分子,匹配 v2「宁可缩小 core set,也不批量生成
 
 ---
 
-## 5. 真实 xTB 烟雾测试(Round 2 的关键验证)
+## 5. 真实 xTB 烟雾测试(Week 2 的关键验证)
 
 用 \`scripts/run_xtb_job.py\`(RDKit ETKDG+MMFF 建几何 → 冻结 GFN2 优化 → 解析)跑通碳酸乙烯酯(EC):
 
@@ -131,7 +131,7 @@ core set = **18** 个分子,匹配 v2「宁可缩小 core set,也不批量生成
 
 ---
 
-## 7. 下一步(Round 3–4)
+## 7. 下一步(Week 3–4)
 
 1. Stage 2:broad pool(40)廉价层 $P_0$,并做化学空间覆盖检查。
 2. Stage 3:core set 自由分子 $P_0 \to P_1$ 的 xTB 部分;r2SCAN-3c 部分待 ORCA。

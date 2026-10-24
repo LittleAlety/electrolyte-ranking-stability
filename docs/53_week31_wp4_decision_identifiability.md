@@ -1,8 +1,8 @@
-# Round 31 / WP4：把排序变化转成可辩护的筛选决策（RQ3）
+# Week 31 / WP4：把排序变化转成可辩护的筛选决策（RQ3）
 
 > 阶段：下一阶段（评审实施方案）WP4（RQ3）。产物目录 `outputs/week31/`，交付镜像
 > `..\成果输出（part2）\week31/`。数字由 `scripts/build_week31_wp4_decision_identifiability.py`
-> 确定性生成并 `--check` 逐字节复核。**零新增电子结构计算**：唯一输入是 Round 28 冻结主表。
+> 确定性生成并 `--check` 逐字节复核。**零新增电子结构计算**：唯一输入是 Week 28 冻结主表。
 
 ## 0. 本轮解决的问题
 
@@ -44,7 +44,7 @@ WP2 说清了「哪些物理改变排序」，WP3 说清了「Li+ 配位怎样�
 
 ## 2. 分辨率曲线 `f_unresolved(z)`
 
-15 组全部满足 `f_unresolved` 随 z 单调不减（违例 0）；z = 1.0 时与 Round 28 `decision_table`
+15 组全部满足 `f_unresolved` 随 z 单调不减（违例 0）；z = 1.0 时与 Week 28 `decision_table`
 逐位一致（最大绝对差 5.6e-17）。还原轴的不可识别性明显更高，且随 z 上升更快：
 
 | 对比 | 轴 | f(lo)@1.0 | f(lo)@1.645 | f(lo)@1.96 | f(up)@1.0 |
@@ -65,7 +65,7 @@ z > 1/√2  =>  反向 pair 两侧不可能同时 resolved
 
 反向 pair 两侧同时 resolved 的个数，按 z：`0.0 → 209`、`0.5 → 63`、`1/√2 → 0`，
 此后所有 z 恒为 0。全部 1326 个 pair 都带 `structurally_non_testable = True`；
-Round 28 `decision_table` 的 `n_robust_inversion` 合计 0。
+Week 28 `decision_table` 的 `n_robust_inversion` 合计 0。
 
 **因此 `f_robust_inversion == 0` 不能读成「排序稳定」**，它只是 `z = 1.0 > 1/√2` 的代数必然。
 本阶段用 `robust_inversion_is_structurally_impossible` 把这一点钉成断言。
@@ -90,7 +90,7 @@ S_lower）、`P(S_upper 全中)`、平均 `|选中 ∩ S_upper| / k`。
 | P1v_to_P2a | oxidation | 4/18 | AN;SN;FEC;DMC | AN;SN;FEC;EC | 0.750 | 0.071 | 0.637 |
 | C0_to_C1 | primary | oxidation | 1/6 | SN | FEC | 0.000 | 0.208 | 0.208 |
 
-端点重叠与 Round 28 冻结 `overlap` 逐位一致（最大差 0）。`P(S_upper 全中)` 普遍很低：
+端点重叠与 Week 28 冻结 `overlap` 逐位一致（最大差 0）。`P(S_upper 全中)` 普遍很低：
 **当前 Top-k 集合整体成立的概率远低于「其中有几个候选成立」的概率**，这正是 selection
 uncertainty 要暴露的东西。
 
@@ -150,8 +150,8 @@ uncertainty 要暴露的东西。
 - 「确定选择」是相对于一套不确定性假设与一种分层算法而言的；换假设会改变结论（第 6 节已量化）。
 - 每组 n 随对比变化（18/12/10/6），跨行不可比；结论不外推到 core18 之外。
 - 冻结的 `decision_table.selected_upper/lower` 列，其组内顺序来自 CPython `set` 迭代、无语义；
-  Round 31 的对应列按数值降序，两者按集合对账。
-- 下一步 WP5（Round 32）：Δ-learning 与 LOFO 跨家族泛化，源数据 `outputs/week7`。
+  Week 31 的对应列按数值降序，两者按集合对账。
+- 下一步 WP5（Week 32）：Δ-learning 与 LOFO 跨家族泛化，源数据 `outputs/week7`。
 
 ## 10. 复现命令
 

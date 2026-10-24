@@ -39,9 +39,9 @@ MANIFEST = "figure_manifest_week20_stage21.md"
 F40 = "F40_stage21_path_profiles.png"
 F41 = "F41_stage21_shell_redox.png"
 
-#: the sentence the terminal site quotes verbatim as the round-20 tag.  Kept here so
+#: the sentence the terminal site quotes verbatim as the week-20 tag.  Kept here so
 #: the report and the site can never drift apart.
-TAG = ("所以 Round 19 那句「几何 RMSD 是判据」在临界带上站不住：把 Stage 19 最脆的"
+TAG = ("所以 Week 19 那句「几何 RMSD 是判据」在临界带上站不住：把 Stage 19 最脆的"
        " 0.021–0.100 Å 带换成能量尺子重读，被判 `distinct_lower` 的 EC/cation/ε=5 "
        "其实是一条无鼓包的直线路径（相对弦最大 0.00424 eV ≪ k_B T = 0.0257 eV）"
        "——同一个平坦盆地的两个肩，RMSD 阈值把它**过度判定**成了两个解。")
@@ -138,12 +138,12 @@ def render(data_dir):
     control = cells.get("TEGDME/anion/20", {})
     manifest = _manifest_lines()
 
-    add("# Round 20 报告 —— Stage 21：临界带的能量裁决、判据的运行手册预检、第一溶剂壳的氧化还原、"
+    add("# Week 20 报告 —— Stage 21：临界带的能量裁决、判据的运行手册预检、第一溶剂壳的氧化还原、"
         "以及一次真回填")
     add("")
     add("## 0. 一句话结论")
     add("")
-    add("本周把 Round 19 §10 的候选清单整条做完，四个 Part 互不依赖，各自有一个可独立检验的产物。")
+    add("本周把 Week 19 §10 的候选清单整条做完，四个 Part 互不依赖，各自有一个可独立检验的产物。")
     add("")
     add("**Part A —— 把 Stage 19 最脆的判据换一把尺子。** 在 Stage 19 两条松弛终点之间做"
         "**直线内插**，每个内插点跑一个冻结 r2SCAN-3c 单点（3 格 × %d 帧 = **%d 个单点**，"
@@ -198,7 +198,7 @@ def render(data_dir):
            B["cross_tabs"]["binary_vs_rule_strict"]["sensitivity"],
            B["cross_tabs"]["binary_vs_rule_lenient"]["sensitivity"]))
     add("")
-    add("顺带把 Round 19 那句「89%% 同几何一致性」的适用条件写死：把 **%d** 个被冻结读法判为"
+    add("顺带把 Week 19 那句「89%% 同几何一致性」的适用条件写死：把 **%d** 个被冻结读法判为"
         "「不可测」的闭壳层格子重新读一遍它们**实际打印出来的**电荷表，`charge_l1` 最大只有 "
         "**%.6f**（比阈值小约 %.1f 倍），**%d 格越阈** —— `charge_l1` 的短板是「够不着」，"
         "不是「看错」，本目录**反例为空**。"
@@ -242,7 +242,7 @@ def render(data_dir):
     add("")
     add("- **严格 P2 腿（SMD）**：%d 格，其中 %s 有弛豫数据、可回填 **%d 格（%.1f%%）**；"
         "而 Stage 19/20 的弛豫格子**全部落在裸 CPCM 介电子腿上，没有一格是 SMD**，"
-        "所以这个回填靠的是「弛豫修正是一个态内量」的**转移假设**（Round 19 量过它的 ε 依赖性："
+        "所以这个回填靠的是「弛豫修正是一个态内量」的**转移假设**（Week 19 量过它的 ε 依赖性："
         "逐分子极差中位仅 0.0263 eV）。"
         % (R["coverage"]["strict_p2_leg"]["n_cells"],
            R["verdict"]["strict_p2_leg_coverage"], R["coverage"]["strict_p2_leg"]["n_refillable"],
@@ -272,7 +272,7 @@ def render(data_dir):
     add("")
     add("## 1. 为什么要有这一步（Stage 21 的动机）")
     add("")
-    add("Round 19 §10 列了四条待办，本周把它们全部做完，并额外补上「真回填」这一条自检：")
+    add("Week 19 §10 列了四条待办，本周把它们全部做完，并额外补上「真回填」这一条自检：")
     add("")
     add("1. **临界带的能量裁决（Part A）**：Stage 19 用一条固定的几何阈值（两臂弛豫终点 "
         "RMSD ≤ 0.02 Å → `same_*`）裁了 37 个格。37 格里 6 格 RMSD = 0.000、2 格 > 2 Å，"
@@ -285,7 +285,7 @@ def render(data_dir):
     add("3. **第一溶剂壳与弛豫联合（Part C）**：Stage 9 报的溶剂壳位移是**垂直**量 —— "
         "氧化/还原能量都是在那张冻结的 `+1` 几何上的单点。要回答「配位一个溶剂分子后，"
         "第二解还在不在」，必须让复合物自己在新的电荷态下找几何。")
-    add("4. **真回填（Part D）**：Round 19 只把弛豫**放到台阶的尺子上**，没有把 P2 腿里对应的格子"
+    add("4. **真回填（Part D）**：Week 19 只把弛豫**放到台阶的尺子上**，没有把 P2 腿里对应的格子"
         "**换成**弛豫后能量再合成一次。这一步现在做。")
     add("")
     add("## 2. 口径与记号")
@@ -453,9 +453,9 @@ def render(data_dir):
            B["cross_tabs"]["n_disagreements_lenient"],
            B["cross_tabs"]["binary_vs_rule_strict"]["fp"]))
     add("")
-    add("### 5.3 「廉价单点读数」的适用条件与反例（Round 19 遗留问题）")
+    add("### 5.3 「廉价单点读数」的适用条件与反例（Week 19 遗留问题）")
     add("")
-    add("Round 19 §3 用同几何 **89%** 的偏好一致率说明「廉价单点能复现昂贵方法的偏好方向」。"
+    add("Week 19 §3 用同几何 **89%** 的偏好一致率说明「廉价单点能复现昂贵方法的偏好方向」。"
         "把这句话套到 `charge_l1` 上，适用条件必须写死：")
     add("")
     for index, condition in enumerate(B["applicability"]["conditions"], start=1):
@@ -563,7 +563,7 @@ def render(data_dir):
     add("")
     add("**结论**：把 P2 腿换成弛豫能量之后，**氧化轴的排序被改写**（3 个分子的排序整体反转，"
         "Top-10% 重叠归零），**还原轴没有**（Top-10% 重叠 1.000）。"
-        "这与 Round 19 的预警完全一致：氧化轴的相对散布（0.74）本来就落在能改写排序的区间里，"
+        "这与 Week 19 的预警完全一致：氧化轴的相对散布（0.74）本来就落在能改写排序的区间里，"
         "而还原轴是刚性平移型（0.08）。")
     add("")
     add("但这条结论有**两个必须写明的限制**：")
@@ -574,7 +574,7 @@ def render(data_dir):
         % R["coverage"]["strict_p2_leg"]["n_refillable"])
     add("2. **转移假设**：可回填的弛豫格全部来自**裸 CPCM** 层，不是 SMD 层，所以这一节回答的是"
         "「如果把 CPCM 上量到的弛豫修正搬到 SMD 层，排序会不会动」。"
-        "搬得动是因为 Round 19 量到该修正的 ε 依赖性很小（逐分子极差中位 0.0263 eV），"
+        "搬得动是因为 Week 19 量到该修正的 ε 依赖性很小（逐分子极差中位 0.0263 eV），"
         "但**这是一个假设，不是测量**。")
     add("")
     add("## 8. 物理读法")
@@ -594,9 +594,9 @@ def render(data_dir):
         "量级与冻结位移同阶；也就是说 Stage 9 报的那些溶剂壳位移，作为**垂直量**成立，"
         "作为**绝热量**需要一个不能忽略的修正。")
     add("5. **而那个修正足以改写氧化轴的排序。** Part D 把弛豫真正回填进台阶，"
-        "氧化轴 3 个分子整体反转、还原轴不动。结合 Round 19 的「相对散布」读数，"
+        "氧化轴 3 个分子整体反转、还原轴不动。结合 Week 19 的「相对散布」读数，"
         "这条结论是可预期的：**位移的离散度 std 决定排序会不会被改写，与位移的大小 |mean| 无关**"
-        "（Round 19 已经量到 ρ(std, τ_b) = −0.851）。")
+        "（Week 19 已经量到 ρ(std, τ_b) = −0.851）。")
     add("")
     add("## 9. 读法纪律")
     add("")
@@ -614,7 +614,7 @@ def render(data_dir):
     add("- **不要**把 Part C 的 QC 通过读成「电子结构没变」。QC 只说**结构**没散。")
     add("- **不要**把 Part D 的氧化轴反转当成普遍结论。3 个点的枚举不是统计推断，"
         "而且它建立在「弛豫修正是态内量」的转移假设上。")
-    add("- **不要**把本周任何数字和 Round 19 的 89% 混用。那个 89% 是**同一几何上两个方法**"
+    add("- **不要**把本周任何数字和 Week 19 的 89% 混用。那个 89% 是**同一几何上两个方法**"
         "的偏好一致率；Part A/B/D 比的是**判据之间**或**台阶之间**的一致性。")
     add("")
     add("## 10. 产物与图表")
@@ -712,7 +712,7 @@ def render(data_dir):
         "噪声底之上的小鼓包（0.004 eV 级）虽然有信号，仍在 k_B T 之下。"
         % (fragile.get("hump_over_noise") or 0.0))
     add("")
-    add("## 12. 下一步（Round 21 候选）")
+    add("## 12. 下一步（Week 21 候选）")
     add("")
     add("1. **把临界带走完（新计算，量很小）**：补 `EC/cation/ε=7`、`ε=10` 两格各 %d 帧 "
         "（约 %d 个单点），以及从 0.15–1 Å 区间里再抽 2–3 格，"

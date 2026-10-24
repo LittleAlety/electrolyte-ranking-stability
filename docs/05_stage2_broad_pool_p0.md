@@ -1,4 +1,4 @@
-# Round 3 / Stage 2 -- broad pool 廉价层 P0 + 化学空间覆盖
+# Week 3 / Stage 2 -- broad pool 廉价层 P0 + 化学空间覆盖
 
 - 生成脚本: scripts/run_broad_pool_p0.py (一条命令产出本篇所属的全部产物)
 - 引擎: GFN2-xTB 6.7.1pre (.toolchain/xtb/xtb-6.7.1/bin/xtb.exe)
@@ -75,9 +75,9 @@ P0 的定义被 config/scientific_definitions.yaml 冻结为"只能是轨道能�
   unbound_anion; 本轮 P0 只算中性分子, 不产生 unbound_anion 标志)。
 - 还原侧最难还原 (P0_red 最小): B05 TFMEC = -6.825, B08 ClEC = -6.770, B29 MN = -6.769。
 
-### 3.3 与 Round-2 method audit 的一致性交叉检查
+### 3.3 与 Week-2 method audit 的一致性交叉检查
 
-core set 中与 Round-2 method audit 重叠的 12 个分子, 其本轮的 p0_ox 与 week2 的
+core set 中与 Week-2 method audit 重叠的 12 个分子, 其本轮的 p0_ox 与 week2 的
 ip_koopmans_ev (= -eps_HOMO) 对比: **最大绝对偏差 = 0.0063 eV** (仅 EA 一个分子为 0.0063,
 其余 11 个为 0.0000)。说明 P0 管线可复现 (微小差异来自 GFN2 优化落点/SCF 末位的构象微差),
 详见 outputs/week3/p0_summary.json 的 cross_check_vs_week2。

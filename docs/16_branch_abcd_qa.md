@@ -379,7 +379,7 @@ RDF（径向分布函数）与配位数是主分析量；综述第 3 节标题�
 | D3 | Peherstorfer, Willcox & Gunzburger, *SIAM Review* 2018, `10.1137/16M1082469` | **无 PDF** |
 | E | Efron & Tibshirani, *An Introduction to the Bootstrap* | **无 PDF**（教材） |
 
-其中 **D3（multi-fidelity）** 与本项目直接相关：reading list 自己已指出 `P(M) → P([LiM]⁺)` 严格说更适合称为 **environment perturbation** 而不是数值 fidelity correction——这一点在本项目的 Round 7 `Δ`-learning 结论里已经**用实验方式**验证（`outputs/week7/stage7_ml_summary.md`：LOFO 下 Δ-learning 在 8 个组合里赢 6 个，而唯一反转出现在还原轴），但我们**没有** D3 原文，因此**不**在报告里引用其形式命题 `P_H(x) = P_L(x) + Δ(x)` 作为文献依据。
+其中 **D3（multi-fidelity）** 与本项目直接相关：reading list 自己已指出 `P(M) → P([LiM]⁺)` 严格说更适合称为 **environment perturbation** 而不是数值 fidelity correction——这一点在本项目的 Week 7 `Δ`-learning 结论里已经**用实验方式**验证（`outputs/week7/stage7_ml_summary.md`：LOFO 下 Δ-learning 在 8 个组合里赢 6 个，而唯一反转出现在还原轴），但我们**没有** D3 原文，因此**不**在报告里引用其形式命题 `P_H(x) = P_L(x) + Δ(x)` 作为文献依据。
 
 ---
 

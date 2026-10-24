@@ -1,14 +1,14 @@
-﻿# Round 29 / WP2：哪些电子结构与介质物理改变候选排序
+﻿# Week 29 / WP2：哪些电子结构与介质物理改变候选排序
 
 > 阶段：下一阶段（评审实施方案）WP2（RQ1）。产物目录 `outputs/week29/`，交付镜像
 > `..\成果输出（part2）\week29/`。本文件由手工撰写，数字由
 > `scripts/build_week29_wp2_physics_response.py` 确定性生成并 `--check` 逐字节复核。
-> **零新增电子结构计算**：唯一输入是 Round 28 冻结主表。
+> **零新增电子结构计算**：唯一输入是 Week 28 冻结主表。
 
 ## 0. 本轮解决的问题
 
-Round 28（WP1）把 Round 1–27 的物理量、状态身份、排序指标与成本收敛成一张版本冻结的主表，
-并逐位复现了 Round 6 的 354 个 stored pair。WP2 用这张主表回答 RQ1：
+Week 28（WP1）把 Week 1–27 的物理量、状态身份、排序指标与成本收敛成一张版本冻结的主表，
+并逐位复现了 Week 6 的 354 个 stored pair。WP2 用这张主表回答 RQ1：
 
 > 从极廉价代理量 `P0` 到电子结构 `P1v`/`P1a`，再到固定连续介质 `P2a`，哪些模型变化会
 > **改变候选排序**？变化发生在哪些候选上，是否超出原始数据的分辨能力？
@@ -96,14 +96,14 @@ Round 28（WP1）把 Round 1–27 的物理量、状态身份、排序指标与�
 | id | 检查 | 关键数字 |
 | --- | --- | --- |
 | `displacement_reproduces_pairwise_shift` | `delta_i - delta_j` 是否等于主表 `delta_shift_ev` | 最大绝对误差 1.33e-15 eV，1116 个 pair 行 |
-| `decision_metrics_match_week28` | 重算 Top-k/Jaccard/regret/tau/rho 是否复现 Round 28 | 最大绝对差 **0.000e+00**（5 个指标全 0） |
+| `decision_metrics_match_week28` | 重算 Top-k/Jaccard/regret/tau/rho 是否复现 Week 28 | 最大绝对差 **0.000e+00**（5 个指标全 0） |
 | `molecule_model_is_exact` | 分子级校正残差是否为 0 | 最大 RMSE 5.95e-16 eV |
 | `family_variance_identity` | `SS_between + SS_within = SS_total` 且 `R2_family ≡ 族效应占比` | 偏差 0 / 3.33e-16 |
 | `ladder_additivity_exact` | `delta(P0->P2a) = delta(P0->P1v) + delta(P1v->P2a)` | 最大绝对误差 8.88e-16 eV |
 | `p1a_reduction_is_rule_excluded` | `P1v_to_P1a` 还原轴是否按 `unbound_anion` 排除 | 0 行 |
-| `zero_new_electronic_structure` | 是否只用 Round 28 主表、零新增作业 | 4 个输入文件，0 个新作业 |
+| `zero_new_electronic_structure` | 是否只用 Week 28 主表、零新增作业 | 4 个输入文件，0 个新作业 |
 
-`decision_metrics_match_week28` 的零误差说明：WP2 不是并行于 Round 28 的另一套定义，而是
+`decision_metrics_match_week28` 的零误差说明：WP2 不是并行于 Week 28 的另一套定义，而是
 在同一个对象上补物理机制。
 
 ## 4. 结论的三层表述

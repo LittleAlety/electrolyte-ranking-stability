@@ -42,7 +42,7 @@
 ### `outputs/` 子目录
 
 - 逐周载荷：`week1` 到 `week43` 的 `weekNN/`，每个目录带自己的 `manifest.json`。
-- 特殊命名的周：`week22_hardening/`（W22-H 复核）、`week24_corealign/`（Round 24 主协变对齐）。
+- 特殊命名的周：`week22_hardening/`（W22-H 复核）、`week24_corealign/`（Week 24 主协变对齐）。
 - 跨阶段公共产物：`figures/`（含 F59-F64 六张主图）、`gate1/`、`state_identity/`、
   `decision_state/`、`phase2_p1a/`、`smoke/`。
 - 新阶段批次：`physics_completion/`，其下 17 个子包：
@@ -56,9 +56,9 @@
 | 阶段 | 周目录 | WP | 说明 |
 | --- | --- | --- | --- |
 | 计划 v1：代理量 → 决策稳定性 | `outputs/week1..week23` | 早期 stage | 主题日志见 `docs/progress/`；冻结周报仍在 `docs/NN_*.md` |
-| 主协变对齐 | `outputs/week24_corealign` | Round 24 | 目录名不是 `week24/`，是历史命名 |
-| 论文 v6 阶段 | `outputs/week25..week35` | Round 25-35 | 其中 `week28..week34` = **评审实施方案 WP1-WP7**（`docs/50`-`56`） |
-| 论文 v7 结题 | 仅镜像 `成果输出（part2）/week36` | Round 36 | 仓库内没有 `outputs/week36/`；由 `scripts/build_week36_final_submission.py` 生成 |
+| 主协变对齐 | `outputs/week24_corealign` | Week 24 | 目录名不是 `week24/`，是历史命名 |
+| 论文 v6 阶段 | `outputs/week25..week35` | Week 25-35 | 其中 `week28..week34` = **评审实施方案 WP1-WP7**（`docs/50`-`56`） |
+| 论文 v7 结题 | 仅镜像 `成果输出（part2）/week36` | Week 36 | 仓库内没有 `outputs/week36/`；由 `scripts/build_week36_final_submission.py` 生成 |
 | 新阶段：物理证据补强与决策预算 | `outputs/week37..week43` | **WP0-WP6** | week37=WP0 定义迁移、week38=WP1 方法审计、week39=WP2 自由能标签、week40=WP3、week41=WP4 锚点、week42=WP5 ML/AL+成本、week43=WP6 显式配体 |
 | 结题提交包 | 仅镜像 `week44` | — | `scripts/wp_production/build_physics_completion_deliverables.py` |
 

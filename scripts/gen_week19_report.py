@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Generate ``docs/29_week19_report.md`` from the Stage 20 artefacts (Round 19).
+"""Generate ``docs/29_week19_report.md`` from the Stage 20 artefacts (Week 19).
 
 The report is a pure function of ``outputs/week19/`` plus the frozen Stage 10
 ladder (``outputs/week9/stage10_ladder.csv``).  ``--check`` re-renders the text
@@ -26,7 +26,7 @@ OUT_DEFAULT = Path(os.environ.get("W19_REPORT_OUT") or (REPO / "docs" / "29_week
 LADDER_CSV = REPO / "outputs" / "week9" / "stage10_ladder.csv"
 
 # --- frozen knobs (inherited; this week refits nothing) -----------------------
-MATERIAL_THRESHOLD_EV = 1.0e-3             # inherited from Round 14 (Stage 15)
+MATERIAL_THRESHOLD_EV = 1.0e-3             # inherited from Week 14 (Stage 15)
 GEOMETRY_SAME_TOLERANCE_ANGSTROM = 0.02    # descriptive column only, frozen pre-run
 MIN_N_FOR_RANK_METRICS = 5                 # Stage 10 rule for reporting tau_b / Top-k
 AXES = ("oxidation", "reduction")
@@ -365,15 +365,15 @@ def render(data_dir):
         lines.append(text)
 
     # ------------------------------------------------------------------ §0 ---
-    add("# Round 19 报告 —— Stage 20：把「弛豫」放回台阶上，再问「第二解」是不是跨方法的概念")
+    add("# Week 19 报告 —— Stage 20：把「弛豫」放回台阶上，再问「第二解」是不是跨方法的概念")
     add("")
     add("## 0. 一句话结论")
     add("")
-    add("本周把 Round 18 留下的两个问题拆成互不依赖的两个 Part：Part 1 是**零新增计算**的台阶回填"
-        "（Round 18 §10 的第 1 条候选），Part 2 是 **74 个冻结 GFN2-xTB 作业**的跨方法检验"
-        "（这一条不在 Round 18 的候选清单里，是本周新增的检验）。")
+    add("本周把 Week 18 留下的两个问题拆成互不依赖的两个 Part：Part 1 是**零新增计算**的台阶回填"
+        "（Week 18 §10 的第 1 条候选），Part 2 是 **74 个冻结 GFN2-xTB 作业**的跨方法检验"
+        "（这一条不在 Week 18 的候选清单里，是本周新增的检验）。")
     add("")
-    add("**Part 1 —— 弛豫是第六级台阶。** 把 Round 18 落盘的 37 格弛豫能量放回 Stage 10 五级台阶的同一把尺子上"
+    add("**Part 1 —— 弛豫是第六级台阶。** 把 Week 18 落盘的 37 格弛豫能量放回 Stage 10 五级台阶的同一把尺子上"
         "（`Delta_ox = -drop(cation)`、`Delta_red = -drop(anion)`，两轴都是越大越稳，故 Delta 为负 = 弛豫把该轴的值推低）：")
     add("")
     add("- **弛豫不是「另一个环境」**：同一个 (分子, 态) 在它已有的各个介电常数上，Delta 的极差中位只有 "
@@ -436,7 +436,7 @@ def render(data_dir):
     # ------------------------------------------------------------------ §1 ---
     add("## 1. 为什么要有这一步（Stage 20 的动机）")
     add("")
-    add("Round 18（`docs/28_week18_report.md`）把 37 个 `moread_lower` 格子各自的**两条 SCF 解**都做了几何弛豫，"
+    add("Week 18（`docs/28_week18_report.md`）把 37 个 `moread_lower` 格子各自的**两条 SCF 解**都做了几何弛豫，"
         "得到两个坚硬的数字：终点仍判不同态的 %d 格、偏好被几何反转的 %d 格。但它把两个问题留在了半空中："
         "一条是 §10 的第 1 条候选（这条弛豫修正要不要回填台阶），"
         "另一条是它自己没写下来的 —— 这 37 格全部只用了一个方法（r2SCAN-3c），"
@@ -449,7 +449,7 @@ def render(data_dir):
         "所以不必重跑台阶：只要量出这条新台阶的 mean 与 std，就能判断它有没有资格改写排序。"
         "这正是 Part 1 要做的，而且**不需要任何新的量化计算**。")
     add("")
-    add("**Part 2 回答第二条：第二解是不是只在昂贵方法里存在？** Round 18 只在一个方法（r2SCAN-3c）里"
+    add("**Part 2 回答第二条：第二解是不是只在昂贵方法里存在？** Week 18 只在一个方法（r2SCAN-3c）里"
         "说「第二解是真的另一个电子态」。这里要分两个**不同**的问题：")
     add("")
     add("1. 在**同一个几何**上，「哪条腿更低」这个判断能不能被廉价方法复现？—— 如果能，"
@@ -476,7 +476,7 @@ def render(data_dir):
     add("  ```")
     add("")
     add("  两个轴都是「越大越稳」，所以 **Delta 为负 = 弛豫把该轴的值推低**。")
-    add("- **输入**：`outputs/week18/stage19_relax_cells_analysis.csv`（37 格，Round 18 已发布、本周未改动）。")
+    add("- **输入**：`outputs/week18/stage19_relax_cells_analysis.csv`（37 格，Week 18 已发布、本周未改动）。")
     add("- **相对散布** = `shift_std_ev / |shift_mean_ev|`：Stage 10 用来判断「这条台阶有没有资格改写排序」的量。"
         "它在 |mean| 接近 0 时会发散，本报告在使用处逐条说明。")
     add("- **五级台阶参照物**：`outputs/week9/stage10_ladder.csv`（冻结），以及本目录自带的 `ladder_rows`"
@@ -511,7 +511,7 @@ def render(data_dir):
     # ------------------------------------------------------------------ §3 ---
     add("## 3. 本周新增的计算")
     add("")
-    add("**Part 1：0 个新作业。** 它只把 Round 18 已经落盘的 37 格弛豫能量放到台阶的同一把尺子上。")
+    add("**Part 1：0 个新作业。** 它只把 Week 18 已经落盘的 37 格弛豫能量放到台阶的同一把尺子上。")
     add("")
     add("**Part 2：%d 个 GFN2-xTB 作业 = %d 格 × 2 条腿**（每腿 `sp` + `opt` 两步）。"
         % (run["summary"]["n_jobs"], run["summary"]["n_target_cells"]))
@@ -656,7 +656,7 @@ def render(data_dir):
     add("")
     add("来源：`stage20_relax_rung_cells.csv`（%d 行）。`Δ_default` = −(default 腿的弛豫能量降)，"
         "`Δ_moread` = −(moread 腿的弛豫能量降)，`Δ_arm` = 两腿之差；**Delta 为负 = 弛豫把该轴的值推低**。"
-        "「Stage 19 裁决」一列是从 Round 18 逐格台账原样带入的，**本周未重算**。" % len(D["rung_cells"]))
+        "「Stage 19 裁决」一列是从 Week 18 逐格台账原样带入的，**本周未重算**。" % len(D["rung_cells"]))
     add("")
     add("### 4.5 分层")
     add("")
@@ -873,7 +873,7 @@ def render(data_dir):
         % (_fmt(100 * all_block["agreement_rate"], 0), _fmt(100 * sp_vs["agreement_rate"], 0)))
     add("7. **合并的格子集中在特定的化学环境**：%d 格合并里 %d 格是 EMC 阴离子、%d 格是 DMC 阳离子；"
         "而 PC/DEC/TMP 与 EC 的那些格子两臂始终分得开（共 %d 格 `distinct_*`）。"
-        "这与 Round 18 的观察一致：**身份差异的大小与分子/态强相关**。"
+        "这与 Week 18 的观察一致：**身份差异的大小与分子/态强相关**。"
         % (all_block["n_xtb_same_minimum"],
            len([c for c in cells if c["xtb_same_minimum"] and c["name"] == "EMC"]),
            len([c for c in cells if c["xtb_same_minimum"] and c["name"] == "DMC"]),
@@ -1013,9 +1013,9 @@ def render(data_dir):
     add("")
 
     # ------------------------------------------------------------------ §10 ---
-    add("## 10. 下一步（Round 20 候选）")
+    add("## 10. 下一步（Week 20 候选）")
     add("")
-    add("1. **对 Round 18 的 5 个 `distinct_lower` 幸存者做极小点确认**（新计算，数量小）："
+    add("1. **对 Week 18 的 5 个 `distinct_lower` 幸存者做极小点确认**（新计算，数量小）："
         "EC/cation/eps=5,7,10 与 TEGDME/anion/eps=20,200 做频率分析，确认它们是**真极小点**而不是鞍点，"
         "并看两条腿落在哪个自由度上。注意本周 Part 2 已经说明：这 5 格里只有 EC/cation/eps=7 "
         "在廉价势能面上**仍是** `distinct_lower`，另外 4 格都被 xTB 弛豫改判 —— "

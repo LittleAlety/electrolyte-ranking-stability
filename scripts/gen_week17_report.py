@@ -1,4 +1,4 @@
-"""Generate docs/27_week17_report.md from the Round 17 (Stage 18) artefacts.
+"""Generate docs/27_week17_report.md from the Week 17 (Stage 18) artefacts.
 
 Every number in the prose and in every table is read back out of the JSON / CSV
 files under outputs/week17; nothing is transcribed by hand.  The assert block in
@@ -22,7 +22,7 @@ REPORT_OUT = Path(os.environ.get("W17_REPORT_OUT") or (REPO / "docs" / "27_week1
 FIGDIR = REPO / "outputs" / "figures"
 
 # ---- named constants: the only hard-coded numbers allowed to appear here -----
-MATERIAL_THRESHOLD_EV = 1.0e-3   # inherited unchanged from Round 14 (Stage 15)
+MATERIAL_THRESHOLD_EV = 1.0e-3   # inherited unchanged from Week 14 (Stage 15)
 S2_DOUBLET = 0.75                # <S^2> of a pure doublet
 
 # Figure paths are fixed by the Stage 18 figure plan; the PNGs are produced by a
@@ -174,7 +174,7 @@ def render():
             (pres_matrix["true_positive"] + pres_matrix["false_positive"]) / pres["n_rows"],
     }
 
-    add("# Round 17 报告 —— Stage 18：全目录电子结构身份普查，与零额外成本的自诊断")
+    add("# Week 17 报告 —— Stage 18：全目录电子结构身份普查，与零额外成本的自诊断")
     add("")
     add("## 0. 一句话结论")
     add("")
@@ -205,7 +205,7 @@ def render():
     add("")
     add("## 1. 为什么要有这一步（Stage 18 的动机）")
     add("")
-    add("Round 16（`docs/26_week16_report.md`）§10 把下一步候选列了七条，其中前两条是**唯一两条"
+    add("Week 16（`docs/26_week16_report.md`）§10 把下一步候选列了七条，其中前两条是**唯一两条"
         "零新增计算**的条目：")
     add("")
     add("1. 把 Stage 17 的两条腿（default / moread）从 32 格扩成**全目录**，作为「第二解不是数值"
@@ -213,7 +213,7 @@ def render():
     add("2. 只用默认臂**已经打印出来的**字段，问「能不能在跑第二个作业之前就知道它停在了解的上支」。")
     add("")
     add("这两条合起来回答一个物理上更硬的问题：**`moread_lower` 的那些格子，到底是数值残差，"
-        "还是真实的另一个电子态？** 如果第二解只是同一态的多算了一遍，那么 Round 15/16 发布的口径"
+        "还是真实的另一个电子态？** 如果第二解只是同一态的多算了一遍，那么 Week 15/16 发布的口径"
         "不需要加限定；如果它是真正的另一个态，那么「默认臂给的那一个解」在物理上就是一个"
         "**选择性**的结果，必须写明。")
     add("")
@@ -328,7 +328,7 @@ def render():
         "tp/fn/fp/tn = %d/%d/%d/%d —— 与发现集**同一种模式**。"
         % (SEP["all"]["threshold"], SEP["holdout"]["auc"]["charge_l1"],
            hoc["tp"], hoc["fn"], hoc["fp"], hoc["tn"]))
-    add("- Round 15 报告的 DEC、TEGDME 两处漏解，在身份指标上同样落在漏解一侧（真阳性），"
+    add("- Week 15 报告的 DEC、TEGDME 两处漏解，在身份指标上同样落在漏解一侧（真阳性），"
         "两臂身份判为「不同」。")
     add("")
     add("### 4.7 按电荷态与按家族")
@@ -628,7 +628,7 @@ def render():
     add("")
     add("---")
     add("")
-    add("## 7. 读法纪律（延续 Round 9 §10 / 10 §11 / 11 §11 / 12 §10 / 13 §11 / 14 §9 / 15 §8 / 16 §7）")
+    add("## 7. 读法纪律（延续 Week 9 §10 / 10 §11 / 11 §11 / 12 §10 / 13 §11 / 14 §9 / 15 §8 / 16 §7）")
     add("")
     add("1. **AUC = 1.0 只在「可测子集」上成立**。闭壳层中性分子的 `.out` 不打印自旋块，"
         "`charge_l1` / `spin_l1` / `delta_s2` 对那 %d 对**未定义**；它们的 "
@@ -691,7 +691,7 @@ def render():
     add("")
     add("---")
     add("")
-    add("## 10. 下一步（Round 18 候选）")
+    add("## 10. 下一步（Week 18 候选）")
     add("")
     add("1. **弛豫检验**：对本目录里 %d 个 `moread_lower` 格子做几何优化（不是单点），"
         "看第二解在弛豫后是否仍然存在、以及它落在哪一支极小点上。这是「第二解是真实的另一个态」"

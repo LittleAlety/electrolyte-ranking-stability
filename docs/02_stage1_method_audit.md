@@ -75,7 +75,7 @@ r2SCAN-3c 臂仍待 ORCA。
 4. 溶液趋势与锚点方向一致;
 5. production protocol 已**显式冻结**并写入 provenance(见 `provenance.py`)。
 
-> 若 ORCA 尚未就绪,Gate 1 记作「**待真实二进制**」,Round 3 之前不启动真实批量计算;
+> 若 ORCA 尚未就绪,Gate 1 记作「**待真实二进制**」,Week 3 之前不启动真实批量计算;
 > dry-run 路径仍可先把流水线跑通。
 
 ---

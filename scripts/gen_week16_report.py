@@ -1,4 +1,4 @@
-"""Generate docs/26_week16_report.md from the Round 16 (Stage 17) artefacts.
+"""Generate docs/26_week16_report.md from the Week 16 (Stage 17) artefacts.
 
 Every number in the prose and in every table is read back out of the JSON / CSV
 files under outputs/week16; nothing is transcribed by hand.  The assert block in
@@ -23,7 +23,7 @@ FIGDIR = REPO / "outputs" / "figures"
 
 # ---- named constants: the only hard-coded numbers allowed to appear here ----
 Z_PRIMARY = 1.0                 # config/prereg.yaml: pair_comparison.z_factor.value
-MATERIAL_THRESHOLD_EV = 1.0e-3  # inherited unchanged from Round 14 (Stage 15)
+MATERIAL_THRESHOLD_EV = 1.0e-3  # inherited unchanged from Week 14 (Stage 15)
 SQRT2 = math.sqrt(2.0)
 ROOT2_MINUS_1 = SQRT2 - 1.0     # constant of the two-realization lemma (section 4.7)
 S2_DOUBLET = 0.75               # <S^2> of a pure doublet, S(S+1) with S = 1/2
@@ -94,7 +94,7 @@ def _lemma_check():
 def _guard():
     """Hard assertions: refuse to render a report whose spine moved."""
     if not (CONT["stage"] == IDENT["stage"] == SMD["stage"] == 17):
-        raise SystemExit("stage mismatch: not a Stage 17 / Round 16 artefact set")
+        raise SystemExit("stage mismatch: not a Stage 17 / Week 16 artefact set")
 
     # ---- Part A: the swapped layer and the ladder comparison ----------------
     if P2SUM["n_jobs"] != 54 or P2SUM["n_ok"] != 54 or P2SUM["n_failed"] != 0:
@@ -236,7 +236,7 @@ COUNTS = _cell_counts()
 
 L = []
 L += [
-    "# Round 16 报告 —— Stage 17：亚稳态对已发布台阶结论的污染上限，与两个 SCF 解的电子结构身份",
+    "# Week 16 报告 —— Stage 17：亚稳态对已发布台阶结论的污染上限，与两个 SCF 解的电子结构身份",
     "",
     "> 本文由 `scripts/gen_week16_report.py` 从 `outputs/week16/` 的 JSON / CSV 逐数读出生成，数字不手抄；",
     "> 重跑该脚本即可刷新（`--check` 只渲染不落盘）。",
@@ -246,7 +246,7 @@ L += [
     "",
     "## 0. 一句话结论",
     "",
-    f"**Part A（污染上限）**：把 Round 9「五级台阶」第 2 级 `P1 -> P2` 的 **P2 腿**（取自 **SMD(乙腈)** 层）"
+    f"**Part A（污染上限）**：把 Week 9「五级台阶」第 2 级 `P1 -> P2` 的 **P2 腿**（取自 **SMD(乙腈)** 层）"
     f"从 ORCA 自带初猜换成 moread 初猜重算（{N_MOL_A} 分子 x 3 态 = {N_CELLS_A} 格，全部 ok）之后，"
     f"两条轴上的 `tau_b` / `O_20%` / `f_unresolved` / `f_robust_inv` **没有任何一条被改写**："
     f"oxidation `tau_b` {OXD['kendall_tau_b']:.4f} -> {OXM['kendall_tau_b']:.4f}"
@@ -266,26 +266,26 @@ L += [
     "",
     "## 1. 为什么要有这一步（Stage 17 的动机）",
     "",
-    "Stage 17 直接执行 Round 15 §11 的第 1 条与第 4 条。Round 15 的原文是：",
+    "Stage 17 直接执行 Week 15 §11 的第 1 条与第 4 条。Week 15 的原文是：",
     "",
-    "> 1. **把漏解回填到 sigma 台阶结论上（最高优先）**：Round 9–12 的台阶分析用的是 P0/P1 的默认初猜能量。",
+    "> 1. **把漏解回填到 sigma 台阶结论上（最高优先）**：Week 9–12 的台阶分析用的是 P0/P1 的默认初猜能量。",
     ">    既然默认初猜在某些 (分子, 状态, 电介质) 上会停在高解，就要量化「台阶结论被污染的上限」——",
     ">    把本周目录里 `delta < -1 meV` 的单元格按台阶归类，看它们是否真的改写过 tau_b / Top-k / 清单。",
     "",
     "> 4. **把「第二解」从能量现象升级为电子结构现象**：对漏解单元格比较两条解的占据轨道与 Mulliken 自旋",
     ">    分布，回答「低解多了什么」——是某个 sigma*/pi* 轨道被额外占据，还是自旋重新定域。",
     "",
-    "Round 15 自己留了一句免责：目录只知道两条臂的能量不同，没有比较它们的占据轨道、自旋分布或键长"
-    "（Round 15 §10 第 6 条）。Stage 17 把这两件事同时补上，并刻意选了**最便宜、也最像真实污染源**的路：",
+    "Week 15 自己留了一句免责：目录只知道两条臂的能量不同，没有比较它们的占据轨道、自旋分布或键长"
+    "（Week 15 §10 第 6 条）。Stage 17 把这两件事同时补上，并刻意选了**最便宜、也最像真实污染源**的路：",
     "",
-    "- **Part A** 不重算整条台阶，只把 Round 9 第 2 级台阶 `P1 -> P2` 的 P2 腿（SMD(乙腈) 层）从默认初猜换成",
+    "- **Part A** 不重算整条台阶，只把 Week 9 第 2 级台阶 `P1 -> P2` 的 P2 腿（SMD(乙腈) 层）从默认初猜换成",
     "  moread 重算。这是「已发布结论直接架在默认初猜上、且污染有明确物理来源」的唯一一处：",
-    "  Round 9 报告的台阶定义原文是「环境：气相 P1 -> SMD(乙腈) P2」，来源表 `outputs/week4/p2_environment_effects.csv`。",
+    "  Week 9 报告的台阶定义原文是「环境：气相 P1 -> SMD(乙腈) P2」，来源表 `outputs/week4/p2_environment_effects.csv`。",
     "- **Part B** 不新开任何量化作业，只读**已经存在**的 `.out`，把两条解的 `<S^2>`、自旋中心、轨道标签、",
-    "  定域性（参与率 PR）与 Mulliken 电荷 / 自旋的 L1 差逐格对照——这正是 Round 15 §11 第 4 条要求的升级。",
+    "  定域性（参与率 PR）与 Mulliken 电荷 / 自旋的 L1 差逐格对照——这正是 Week 15 §11 第 4 条要求的升级。",
     "",
     "两个问题的意义不同：Part A 回答「已发布的东西还站得住吗」（防守），Part B 回答「两个解到底差在哪」",
-    "（机制）。合起来，Stage 17 把 Round 15 的「漏解是能量现象」推进成「漏解是一个可量化的污染上限，",
+    "（机制）。合起来，Stage 17 把 Week 15 的「漏解是能量现象」推进成「漏解是一个可量化的污染上限，",
     "而且它的电子结构身份可以被刻画」。",
     "",
     "## 2. 口径与记号",
@@ -293,10 +293,10 @@ L += [
     "### 2.1 沿用不变的部分",
     "",
     "- 方法：**r2SCAN-3c**（气相与连续介质同法），**ORCA 6.1.1**，几何固定为 **G1**（不做任何重优化）。",
-    "- 状态：中性 / 阳离子 / 阴离子三态，垂直量语义与 Round 4–15 完全一致。",
+    "- 状态：中性 / 阳离子 / 阴离子三态，垂直量语义与 Week 4–15 完全一致。",
     f"- 判据约定（产物 `convention` 字段原文）：`{CONT['convention']}`。",
-    f"- 材料阈值：**{THRESHOLD_MEV:g} meV**，原样继承 Round 14（Stage 15），本周**不重新标定**。",
-    "- 台阶定义（Round 9 §2.3 原文）：第 2 级 `P1_to_P2` = 「环境：气相 P1 -> SMD(乙腈) P2」，",
+    f"- 材料阈值：**{THRESHOLD_MEV:g} meV**，原样继承 Week 14（Stage 15），本周**不重新标定**。",
+    "- 台阶定义（Week 9 §2.3 原文）：第 2 级 `P1_to_P2` = 「环境：气相 P1 -> SMD(乙腈) P2」，",
     "  来源表 `outputs/week4/p2_environment_effects.csv`。**本周只动这一级的 P2 腿。**",
     f"- 受影响格子的定义（Part B）：`delta = E_moread - E_default < -{THRESHOLD_MEV:g} meV`，"
     "即默认初猜停在一个更高的 SCF 解上。",
@@ -305,8 +305,8 @@ L += [
 L += [
     "### 2.2 两个冻结判据的原文定义（引用，不改写）",
     "",
-    "`sigma` 与 `f_unresolved` 不是本周新造的量：它们自 Round 4 起被使用，在 Round 10 被化简为闭式，",
-    "在 Round 11 §2 以记号表的形式冻结。本报告一律**引用原文**，不做改写：",
+    "`sigma` 与 `f_unresolved` 不是本周新造的量：它们自 Week 4 起被使用，在 Week 10 被化简为闭式，",
+    "在 Week 11 §2 以记号表的形式冻结。本报告一律**引用原文**，不做改写：",
     "",
     "- `sigma` 的闭式（`docs/20_week10_report.md` T1 原文）：",
     "",
@@ -336,11 +336,11 @@ L += [
     "本阶段只替换 `P1 -> P2` 的 **P2 腿**：`P1` 的数值、G1 几何、方法层（r2SCAN-3c / SMD(乙腈)）以及其余四级",
     "台阶（`P0_to_P1`、`G1_to_G2`、`C0_to_C1`、`C1_to_C2`）**全部未动**。因此本部分给出的是**单腿敏感性**，",
     "不是整条台阶的重算——它回答「这一条腿的初猜会不会改写已发布结论」，不回答「重算整条台阶会怎样」。",
-    "它的合法性来自 3.1 的几何审计：新作业与 Round 4 参照**逐位同几何**，所以被替换的只有初猜这一个变量。",
+    "它的合法性来自 3.1 的几何审计：新作业与 Week 4 参照**逐位同几何**，所以被替换的只有初猜这一个变量。",
     "",
     "### 2.4 Part B 的判据（只读既有 `.out`，零新增作业）",
     "",
-    "Part B 只读**已经存在**的 `.out`：默认臂来自 Round 12/13 的 CPCM 目录，moread 臂来自 Round 14 的同名目录。",
+    "Part B 只读**已经存在**的 `.out`：默认臂来自 Week 12/13 的 CPCM 目录，moread 臂来自 Week 14 的同名目录。",
     f"普查扫过 `outputs/week*/orca*/**/*.out` 共 {CEN['n_outfiles_scanned']} 个文件，"
     f"其中 {CEN['n_outfiles_parsed']} 个可解析为 C-PCM 臂输出。",
     f"「受影响格子」的判据仍是 `delta_ev < -{THRESHOLD_MEV:g} meV`（Stage 16 目录的 {N_HIT_B} 格），"
@@ -356,7 +356,7 @@ L += [
     f"- **逐层墙钟中位数：{P2SUM['wall_clock_seconds_median']:.2f} s**"
     "（`p2_summary_moread_smd_acetonitrile.json` 的 `wall_clock_seconds_median`）。"
     f"全部为新算：`n_computed = {P2SUM['n_computed']}`、`n_reused = {P2SUM['n_reused']}`。",
-    f"- 参照表：`{SMD['reference_csv']}`（default 臂，Round 4 冻结；产物原文："
+    f"- 参照表：`{SMD['reference_csv']}`（default 臂，Week 4 冻结；产物原文："
     f"「{SMD['guess_protocol']['default']}」），零格缺参照（`n_cells_without_reference = "
     f"{SMD['n_cells_without_reference']}`）。",
     "- 初猜协议（产物原文）：`moread` = 「" + SMD["guess_protocol"]["moread"] + "」。",
@@ -545,7 +545,7 @@ L += [
     "> 来源：`stage17_contamination.json` 的 `ci_overlap`（`method` 字段原文："
     f"「{CIO['oxidation']['method']}」）。",
     "",
-    "两个轴的两臂 CI 都重叠，因此本次单腿替换带来的位移**落在 Round 9 冻结的区间估计之内**——",
+    "两个轴的两臂 CI 都重叠，因此本次单腿替换带来的位移**落在 Week 9 冻结的区间估计之内**——",
     "这就是「污染上限」的确切含义：即便把这条腿换掉，`tau_b` 的不确定区间也不足以把它与 published 分开。",
     "",
     "### 4.7 为什么 `f_robust_inv` 从 0 变非 0 是结构性不可能",
@@ -728,7 +728,7 @@ L += [
     f"**(ii) 空穴比电子更难安放。** 阴离子的自旋中心在两臂完全一致（{BYSTATE['anion']['n_same_spin_center']}/"
     f"{BYSTATE['anion']['n_cells']}），阳离子只有 {BYSTATE['cation']['n_same_spin_center']}/"
     f"{BYSTATE['cation']['n_cells']}。也就是说：**默认初猜倾向把多余电子放在哪里基本是可复现的，",
-    "而它倾向把空穴放在哪里则高度依赖初猜**。这与 Round 15 §7.2 的机制一致——阳离子的近简并让 SCF",
+    "而它倾向把空穴放在哪里则高度依赖初猜**。这与 Week 15 §7.2 的机制一致——阳离子的近简并让 SCF",
     "更容易落进不同分支，而阴离子的自旋在缺弥散基组下被迫定域到一个可预判的位点。",
     "",
     f"**(iii) 差异的主轴是电荷重组，不只是自旋重排。** `charge_l1` 均值 {AGG['charge_l1']['mean']:.3f}",
@@ -744,7 +744,7 @@ L += [
     f"三个氧近简并，所以「哪个氧承载最大自旋」在两臂之间翻转（{BYFAM['phosphate']['n_same_spin_center']}/{BYFAM['phosphate']['n_cells']} 一致）几乎是投硬币的结果，",
     "**不能读成「TMP 的解身份不稳定」**。这一条写进 9.4 的限制里。",
     "",
-    "## 7. 读法纪律（延续 Round 9 §10 / 10 §11 / 11 §11 / 12 §10 / 13 §11 / 14 §9 / 15 §8）",
+    "## 7. 读法纪律（延续 Week 9 §10 / 10 §11 / 11 §11 / 12 §10 / 13 §11 / 14 §9 / 15 §8）",
     "",
     "1. **Part A 是单腿敏感性，不是整条台阶的重算。** 本周只换了 `P1 -> P2` 的 **P2 腿**；`P1` 值、几何、",
     "   方法层与其余四级台阶都没动（2.3）。所以结论只能写成「这条腿的初猜不足以改写已发布结论」，",
@@ -760,7 +760,7 @@ L += [
     f"   与 EC/PC 那种「自旋真的换了位点」不是同一件事；报告里把两者分开写，不让 {BYFAM['phosphate']['n_same_spin_center']}/{BYFAM['phosphate']['n_cells']} 拉低整体结论。",
     f"5. **样本小就把不确定性写在脸上。** Part B 只有 {N_HIT_B} 格、{N_MOL_B} 个分子、2 个态；家族结论每个家族只有 1–2 个",
     "   分子（cyclic 2 个、linear 2 个、phosphate 1 个），只能当作**机制提示**，不能当作发生率估计。",
-    "6. **复用与只读都要留出处。** Part A 的 default 臂不是重算的，而是从 Round 4 参照表原样读入；",
+    "6. **复用与只读都要留出处。** Part A 的 default 臂不是重算的，而是从 Week 4 参照表原样读入；",
     "   Part B 的每一个 `.out` 路径都记在 `stage17_solution_identity.csv` 的 `default_path` / `moread_path` 列里，",
     "   去重规则（按最新周 / 最新 mtime）写在 `census` 里。",
     "",
@@ -851,7 +851,7 @@ L += [
     f"8. **冗余路径去重只按「最新周 / 最新 mtime」**：{CEN['n_duplicate_paths']} 条冗余路径说明历史上多次重算过同一",
     "   `(arm, 分子, 态, epsilon)` 键；本周选中的那一个不保证是最科学的那个，只保证是最新的。",
     "",
-    "## 10. 下一步（Round 17 候选）",
+    "## 10. 下一步（Week 17 候选）",
     "",
     "按「先堵漏、再扩张」排序，并逐条标明是否需要新作业：",
     "",
@@ -862,8 +862,8 @@ L += [
     "   (分子, 态, epsilon) 的漏解会伴随自旋中心翻转 / 大 `charge_l1` / 大 `loss_in_pr`」。",
     "   如果三者能预测漏解，就得到一个**不必读 `.out`** 的事前筛查量。",
     "3. **（需要新作业）真正的 out-of-sample 扩张**：把 moread 协议推广到 broad pool 的 40 个分子阴离子",
-    "   （Round 15 §11 第 2 条仍未做）。这是对整套协议唯一有意义的样本外检验。",
-    "4. **（需要新作业，但更便宜）用 GFN2-xTB 初猜**（Round 15 §11 第 3 条）：检验「读 xTB 轨道」能否拿到",
+    "   （Week 15 §11 第 2 条仍未做）。这是对整套协议唯一有意义的样本外检验。",
+    "4. **（需要新作业，但更便宜）用 GFN2-xTB 初猜**（Week 15 §11 第 3 条）：检验「读 xTB 轨道」能否拿到",
     "   同样低的解，把一次气相 DFT 降成一次 xTB；若能，预警与修复的成本同时下降。",
     "5. **（需要新作业）把 TMP 的近简并做实**：对 TMP 做指定初猜 / 更严格 SCF 收敛的定点计算，看三个",
     "   磷酸氧的简并是否被打破——这决定 6(iv) 的「近简并表观」是否真的只是表观。",

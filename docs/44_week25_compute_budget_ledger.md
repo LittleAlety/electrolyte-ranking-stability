@@ -1,4 +1,4 @@
-# Round 25 计算预算与执行规模台账
+# Week 25 计算预算与执行规模台账
 
 核心文件 §21《计算预算与执行规模》对照审计。**零新增电子结构计算**：全部数字由
 `scripts/build_compute_budget_ledger.py` 从既有产物 `outputs/**` 与冻结 `config/**` 重算，
@@ -125,7 +125,7 @@ ORCA/xTB 判定基于文件内 banner 与终止串（`O   R   C   A` / `xtb vers
 
 - 含 `n_jobs` 字段的 JSON：71 个；直接求和 2349 次作业（**含 plan/summary/analysis 重复计数，仅作量级参考**）。
 - Stage 8 active-learning replay：run 行 5920、curve 行 296、repeat 20（`outputs/week7/stage8_al_results.json:counts/settings`）。
-- Round 24 预算合成：pool size E:oxidation 18 / C:oxidation 10；key n_T E:oxidation 15、C:oxidation 9（`outputs/week24_corealign/al_budget.json:pool_sizes/key_n_T_by_pool`）。
+- Week 24 预算合成：pool size E:oxidation 18 / C:oxidation 10；key n_T E:oxidation 15、C:oxidation 9（`outputs/week24_corealign/al_budget.json:pool_sizes/key_n_T_by_pool`）。
 
 ## 8. 数据集、方法与条件态口径
 

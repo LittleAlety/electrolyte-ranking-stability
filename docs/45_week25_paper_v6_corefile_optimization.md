@@ -1,4 +1,4 @@
-# 45 Round 25 追加 —— 对照核心文件要求的论文 v6 优化
+# 45 Week 25 追加 —— 对照核心文件要求的论文 v6 优化
 
 - 生成日期：2026-10-02（Asia/Shanghai）
 - 性质：**交付物修订**（论文源码 + 重建 docx/pdf）与随附说明。**零新增电子结构计算**；不改动任何冻结件、判据或数值。
@@ -47,7 +47,7 @@
 - 结果：**35 页**（v5 为 34）；图号范围仍 **1–22**；表号范围 **1–15 → 1–17**。
 - 版面断言（pypdf 抽取）：中/英文摘要（含 `Key Words`）与中图分类号在同页且完整落**第 1 页**；`图 1…22`、`表 1…17` 首次出现顺序单调无缺号；`5.10`、`表 16`、`表 17` 均在正文出现。
 - 交付层断言：`scripts/build_week24_deliverables.py` 的 `PAPER_EXPECTED_TABLES` 由 15 同步为 **17**；重建 `成果输出/week24_corealign/` 后 **37/37 全通过、0 stale**（含 `paper.pages ≥ 26`、图/表单调、`Key Words` 在第 1 页）。
-- README：`scripts/build_github_readme.py` 增补 Round 25 的 v6 条目并把「当前 `_v5`」改为 `_v6`，重生成后 `--check` 通过（33016 字节）。
+- README：`scripts/build_github_readme.py` 增补 Week 25 的 v6 条目并把「当前 `_v5`」改为 `_v6`，重生成后 `--check` 通过（33016 字节）。
 
 ## 4. 明确**不做**的项（与 `docs/41` §4 一致）
 

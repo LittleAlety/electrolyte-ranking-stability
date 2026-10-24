@@ -1,4 +1,4 @@
-# Round 24（W24-C）报告 —— 核心文件对齐、决策流程图与统一数据
+# Week 24（W24-C）报告 —— 核心文件对齐、决策流程图与统一数据
 
 - 命名说明：本周命名空间 `week24_corealign`（W24-C）；仓库既有 `week23`（Stage 24）、`week22`（Stage 23）与 `week22_hardening`（W22-H）均不改动。
 - 对照对象：核心文件 `核心文件/ranking-electrolyte-materials-v2.md`（1279 行 / 30 章）与 `核心文件/ranking-electrolyte-materials-reading-list.md`（729 行）。
@@ -87,7 +87,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\docx2pdf.ps1 `
 ## 5. 统一数据文档
 
 - `成果输出/统一数据文档.md` 第七节「W24-C 新增产物」补齐 G1–G14 与 F51；图表索引的 F 图计数由 50（F0–F50）更新为 **51（F0–F51）**，manifest 计数由 26 更新为 **27**。
-- 第二节标题由「Round 1 – Round 23」更正为「**Round 1 – Round 24**」（该节此前已含 Round 24 小节）。
+- 第二节标题由「Week 1 – Week 23」更正为「**Week 1 – Week 24**」（该节此前已含 Week 24 小节）。
 - 交付镜像 `成果输出/week24_corealign/` 与 `outputs/week24_corealign/`、`outputs/figures/`、`docs/` 三方一致，逐文件 SHA256 见镜像内 `SHA256SUMS` 与 `verification.json`。
 
 ## 6. QC 与限制

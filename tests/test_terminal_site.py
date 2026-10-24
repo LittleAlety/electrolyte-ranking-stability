@@ -634,7 +634,7 @@ def test_argument_timeline_has_one_row_per_stage_with_a_link():
     assert [int(n) for n, _ in rows] == [w["n"] for w in weeks], (
         "the timeline is not in stage order")
     for number, row in rows:
-        assert re.search(r">Round ", row), "stage %s row lost its round label" % number
+        assert re.search(r">Week ", row), "stage %s row lost its week label" % number
         hrefs = re.findall(r'href="([^"]+)"', row)
         assert any("/blob/main/" in h for h in hrefs), (
             "stage %s row carries no report link" % number)
@@ -653,7 +653,7 @@ def test_index_html_static_numbers_track_the_payload():
         "js-orca": str(counts["orca_out"]),
         "js-tests": str(counts["tests_passed"]),
         "js-latest-week": str(last["n"]),
-        "js-latest": "Round %d / %s" % (last["n"], last["stage"]),
+        "js-latest": "Week %d / %s" % (last["n"], last["stage"]),
     }
     seen = {key: [] for key in expected}
     for match in re.finditer(r'<span class="(js-[a-z-]+)">([^<]*)</span>', html):

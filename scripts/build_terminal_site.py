@@ -764,11 +764,8 @@ def esc(text):
 
 
 def week_label(n):
-    """Stages 1 and 2 share one report, so the first row names both.
-
-    Reads "Round", not "Week": the number is a work round, not calendar time.
-    """
-    return "Round 1\u20132" if n == 1 else "Round %d" % n
+    """Weeks 1 and 2 share one report, so the first row names both."""
+    return "Week 1\u20132" if n == 1 else "Week %d" % n
 
 
 def gate_summary(payload):
@@ -842,7 +839,7 @@ def render_hero_links(payload):
             "<p>源码 <code>src/</code>、生成器 <code>scripts/</code>、周报 <code>docs/</code>。</p></a>\n"
             '      <a class="hero-link" id="card-report-latest" href="%s/blob/main/%s">'
             '<h4>历史阶段交付</h4><p><span class="js-latest-week">%d</span> · '
-            '<span class="js-latest">Round %d / %s</span></p></a>\n'
+            '<span class="js-latest">Week %d / %s</span></p></a>\n'
             '      <a class="hero-link" href="%s" rel="noopener"><h4>GitHub 仓库</h4>'
             "<p>源码、测试与全部生成器。</p></a>\n"
             "    </nav>"
