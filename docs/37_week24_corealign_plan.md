@@ -1,4 +1,4 @@
-﻿# Week 24（W24-C）计划 —— 核心文件对齐补齐（core-file alignment）
+﻿# Round 24（W24-C）计划 —— 核心文件对齐补齐（core-file alignment）
 
 - 上游依据：`核心文件/ranking-electrolyte-materials-v2.md`（29 章）与 `ranking-electrolyte-materials-reading-list.md`（Part I / Part II）。
 - 触发问题：对照核心文件逐条核查"已承诺 vs 论文已呈现"，发现**数据已算、论文未写**的系统性缺口。

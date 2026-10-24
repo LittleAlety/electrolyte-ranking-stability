@@ -1,4 +1,4 @@
-# 41 Week 25 —— 核心文件要求 vs 项目交付物：剩余缺口审计
+# 41 Round 25 —— 核心文件要求 vs 项目交付物：剩余缺口审计
 
 - 审计对象（核心文件）：`核心文件/ranking-electrolyte-materials-v2.md`（v2，1779 行）与 `核心文件/ranking-electrolyte-materials-reading-list.md`（729 行）。
 - 审计对象（交付物）：`论文/build_paper_docx.py`（论文源码，当前 v5）、`成果输出/统一数据文档.md`（602 行）、`成果输出/数据结果汇总.md`（389 行）、`电解液溶剂HB-Code/docs/` 下各周报告（含本周 W25 的 `39`、`40`）。
@@ -15,7 +15,7 @@
 - 阅读清单 **全文读完**：Part I（M1–M7、8 问最低标准、两周安排）、Part II（A/B/C/D/E）、"不建议本科阶段先读的 5 项"。
 - 交付物侧：`论文/build_paper_docx.py` 的结构与全部章节标题、图题（图 1–19）、表题（表 1–14）、§5.1–§5.8 的对照表内容；`成果输出/统一数据文档.md` 的第一、三、四、五、六、七、八节与附录 A1–A14；`成果输出/数据结果汇总.md` 的口径纪律、三层臂定义、核心结论、Gate 状态与 22 条已知限制。
 - 证据层：`config/prereg.yaml`、`config/scientific_definitions.yaml`、`data/metadata/{core_set,broad_pool}.csv`、`data/anchors/*`、`outputs/week{1,2,4,5,7,8,9,22,23,24_corealign,25}` 的关键 JSON/CSV，以及 `src/electrolyte_ranking/qc.py`。
-- 周报告：重点读 `docs/00–08`（Stage 0–2）、`14`（阅读清单 QA）、`15`（Stage 7/8）、`18`（Week 8）、`31`（计划修订与合规核查）、`37/38`（W24）、`39/40`（W25），其余周报按标题与结论段抽查。
+- 周报告：重点读 `docs/00–08`（Stage 0–2）、`14`（阅读清单 QA）、`15`（Stage 7/8）、`18`（Round 8）、`31`（计划修订与合规核查）、`37/38`（W24）、`39/40`（W25），其余周报按标题与结论段抽查。
 
 ### 1.2 未覆盖什么
 
@@ -223,7 +223,7 @@
 - 做什么：把 `formal_charge`、`conformer_count`、`Li_motif_count`、`state_identity_status`、`reactivity_status`、`qc_status` 从 `outputs/week4`、`week5` 的 JSON 汇总进 `data/metadata`（新列，不改冻结件）或至少在统一数据文档新增字段映射表。
 - 为什么值得：§5.2 是硬性字段表，主 metadata 缺 6 项会被直接对照扣分。
 - 成本：1–2 天（纯抽取；不动 `core_set.csv` 的既有列语义）。
-- 改进：§2.1；`成果输出/统一数据文档.md` 第二节 Week 1。
+- 改进：§2.1；`成果输出/统一数据文档.md` 第二节 Round 1。
 
 **3. §24 Figure 1 专用二维层级示意图（对应 O1）**
 - 做什么：用 matplotlib 画一张"横轴 = P0/P1/P2，纵轴 = C0/C1/C2，外侧 = R_gas/R_sol/R_env"的示意图（新 F 图 + 图清单），替换表 14 中 Figure 1 的"图 1+图 2"近似。

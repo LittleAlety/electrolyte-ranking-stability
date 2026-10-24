@@ -2,7 +2,7 @@
 
 ## 1. 为什么要有这个协议
 
-C1 = Li⁺ 配位条件态。它的 redox 电子**可能不再落在同一个分子上**。Week-5 的
+C1 = Li⁺ 配位条件态。它的 redox 电子**可能不再落在同一个分子上**。Round-5 的
 `outputs/week5/c1_state_identity.json` 给出核心事实：
 
 ```
@@ -38,7 +38,7 @@ C1 = Li⁺ 配位条件态。它的 redox 电子**可能不再落在同一个分
 其余所有标签          ← mechanistic state-identity outcome，单独统计
 ```
 
-实现：`scripts/classify_state_identity.py`（只读已冻结的 Week-5 产物，不跑新 QM），产物在
+实现：`scripts/classify_state_identity.py`（只读已冻结的 Round-5 产物，不跑新 QM），产物在
 `outputs/state_identity/`：
 
 ```

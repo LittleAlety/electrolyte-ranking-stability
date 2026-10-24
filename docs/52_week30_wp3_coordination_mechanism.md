@@ -1,8 +1,8 @@
-﻿# Week 30 / WP3：Li+ 配位条件态如何影响 redox 行为
+﻿# Round 30 / WP3：Li+ 配位条件态如何影响 redox 行为
 
 > 阶段：下一阶段（评审实施方案）WP3（RQ2）。产物目录 `outputs/week30/`，交付镜像
 > `..\成果输出（part2）\week30/`。数字由 `scripts/build_week30_wp3_coordination_mechanism.py`
-> 确定性生成并 `--check` 逐字节复核。**零新增电子结构计算**：唯一输入是 Week 28 冻结主表。
+> 确定性生成并 `--check` 逐字节复核。**零新增电子结构计算**：唯一输入是 Round 28 冻结主表。
 
 ## 0. 本轮解决的问题
 
@@ -73,7 +73,7 @@ WP2 处理 Axis-A 阶梯；WP3 处理电解液化学最有特色的一层 ——
 | id | 检查 | 关键数字 |
 | --- | --- | --- |
 | `coord_shift_reproduces_pairwise_shift` | δ_i − δ_j 是否等于主表 `delta_shift_ev` | 最大绝对误差 ≤ 1e-9 eV |
-| `ranking_metrics_match_week28` | 重算 Top-k/Jaccard/regret/tau/rho 是否复现 Week 28 | 最大绝对差 ≤ 1e-9 |
+| `ranking_metrics_match_week28` | 重算 Top-k/Jaccard/regret/tau/rho 是否复现 Round 28 | 最大绝对差 ≤ 1e-9 |
 | `identity_gate_holds` | R13 闸门后主集合 | 还原 `['SN']`，氧化 n=6 |
 | `li_centered_dominates_c1_reduction` | 还原态电子去向 | 9/10 落在 Li 上 |
 | `mechanism_cases_present_and_qc_flags_surfaced` | 机制案例与 QC 上报 | 3 个案例；SL 的 C1 氧化态带 `geometry_failed` 已如实上报（未静默丢弃） |

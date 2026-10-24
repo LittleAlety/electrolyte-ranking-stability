@@ -1,6 +1,6 @@
 """Render ``docs/33_week22_report.md`` from the batch-B (docs/31) artefacts.
 
-Week 22 executes batch B of ``docs/31_plan_revision_expert_review.md`` -- three items
+Round 22 executes batch B of ``docs/31_plan_revision_expert_review.md`` -- three items
 that *do* produce new electronic structure, plus one stored adversary check:
 
 * R9   -- sample the xTB ``--ohess`` thermochemical correction on 8 molecules so the
@@ -9,7 +9,7 @@ that *do* produce new electronic structure, plus one stored adversary check:
           outside the pre-registered ``[5, 10, 20, 40]`` scan and feeds no frozen number.
 * R11  -- the last open item: refine the two-or-three borderline Stage 19 cells with a
           real NEB instead of a straight-line chord bound.
-* (check) -- was the Week 21 phase-diagram boundary a grid artefact?  Interpolated, not
+* (check) -- was the Round 21 phase-diagram boundary a grid artefact?  Interpolated, not
           resampled.
 
 Every number in the rendered text is read from the artefacts; the module holds prose and
@@ -34,7 +34,7 @@ MANIFEST = FIGDIR / "figure_manifest_week22_stage23.md"
 F43 = "F43_dielectric_limit_check.png"
 F44 = "F44_neb_refinement.png"
 
-#: the sentence the terminal site quotes verbatim as the week-22 tag.  Kept here so the
+#: the sentence the terminal site quotes verbatim as the round-22 tag.  Kept here so the
 #: report and the site can never drift apart.  No markup: the site stores the plain text
 #: and a test strips markup from the report before comparing.
 TAG = ("R11 用真 NEB 取代直线插值之后，Stage 19 判成「两个盆地」的 EC/阳离子/eps=5 一格"
@@ -98,7 +98,7 @@ def render(data: Path = W22) -> str:
 
     out = []
     add = out.append
-    add("# Week 22 报告（Stage 23：批次 B）")
+    add("# Round 22 报告（Stage 23：批次 B）")
     add("")
     add("> 上游：`docs/31_plan_revision_expert_review.md` 的「批次 B」——"
         "`R9`（xTB 热修正抽样）、`R4b`（一格导体极限，附加诊断）、`R11`（NEB 精修 2-3 格）。")
@@ -335,7 +335,7 @@ def render(data: Path = W22) -> str:
     # ---------------------------------------------------------------- adversary check
     analysis = grid["analysis"]
     step = analysis["step_ev"]
-    add("## 4. Week 21 对抗式复检：相图边界是不是网格假象？")
+    add("## 4. Round 21 对抗式复检：相图边界是不是网格假象？")
     add("")
     add("- 对象：`analyze_sigma_synthetic.py` 报出的 `std_where_mean_tau_b_below_0p8`（氧化 0.45 eV）、"
         "`below_0p5`（1.20 eV）以及 overlap 的 0.25 / 0.10")
@@ -386,13 +386,13 @@ def render(data: Path = W22) -> str:
     add("- `data/anchors/solution_redox_anchors.csv`：**0 改动**")
     add("- R4b 的 eps = 80/200/1000/1e6 与 R11 的 1 kT / 1 kcal/mol 阈值都按 `docs/31` 的默认裁决"
         "**不进 prereg**：它们分别被登记为「附加诊断」与「本阶段内部判据、不回溯改写 Stage 19」。")
-    add("因此本报告的数字可以与 Week 4-21 的结果直接比较，不需要口径护身符。")
+    add("因此本报告的数字可以与 Round 4-21 的结果直接比较，不需要口径护身符。")
     add("")
     add("## 6. Gate 状态")
     add("")
     add("Gate 0 CLOSED、Gate 1 NOT CLOSED。")
     add("")
-    add("Gate 0 保持 CLOSED 的理由与 Week 21 相同：本周只新增诊断与精修，"
+    add("Gate 0 保持 CLOSED 的理由与 Round 21 相同：本周只新增诊断与精修，"
         "没有一条改动落进目标量、family 定义、筛选方向、delta_m、k/N、种子集或 splits。"
         "Gate 1 的 blocker 在本周由 R7 重新定义（PI 已裁决：within-series 排序一致性优先于绝对标定）："
         "绝对标定层（`data/anchors/solution_redox_anchors.csv` 的 31 行 `method=est`）降级为**已记录的限制**，"
@@ -407,7 +407,7 @@ def render(data: Path = W22) -> str:
     add("| `outputs/week22/raw/<mol_id>/<state>_ohess.out` | R9 的原始 xTB 文本 |")
     add("| `outputs/week22/dielectric_limit.{json,csv,md}` | R4b 的逐分子逐态残余与 1/eps 幂律 |")
     add("| `outputs/week22/neb_refinement.{json,csv,md}` | R11 的路径、峰高与一致/冲突清单 |")
-    add("| `outputs/week22/sigma_boundary_resolution.{json,md}` | Week 21 边界网格分辨率复检 |")
+    add("| `outputs/week22/sigma_boundary_resolution.{json,md}` | Round 21 边界网格分辨率复检 |")
     add("| `outputs/week22/neb_example_EC_cation_eps5/` | 交给 PI 自行运行的那一格（输入 + 端点 + 说明） |")
     add("| `outputs/week22/neb_EC_cation_eps20/`、`outputs/week22/neb_TEGDME_anion_eps20/` | 另外两格 |")
     add("| `outputs/figures/%s` | 导体极限图 |" % F43)

@@ -1,11 +1,11 @@
-# Stage 1 / Week 2：溶液相 redox 锚点逐行核验报告
+# Stage 1 / Round 2：溶液相 redox 锚点逐行核验报告
 
 - 文档编号：06
 - 日期：2026-09-29
 - 关联：`data/anchors/solution_anchor_verification.md`（逐行证据表）、
   `outputs/week2/solution_anchor_audit.csv` / `.json`（机器可读审计）、
   `scripts/audit_solution_anchors.py`（离线复算）、`tests/test_solution_anchors.py`（测试）
-- 写入范围说明：本报告与上述文件为 Week 2 / Stage 1 缺口的核验交付物。
+- 写入范围说明：本报告与上述文件为 Round 2 / Stage 1 缺口的核验交付物。
 
 ## 1. 目的
 

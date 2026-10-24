@@ -1,4 +1,4 @@
-# Week 22 报告（Stage 23：批次 B）
+# Round 22 报告（Stage 23：批次 B）
 
 > 上游：`docs/31_plan_revision_expert_review.md` 的「批次 B」——`R9`（xTB 热修正抽样）、`R4b`（一格导体极限，附加诊断）、`R11`（NEB 精修 2-3 格）。
 > 本文件由 `scripts/gen_week22_report.py` 从 `outputs/week22/` 的产物渲染；`--check` 逐字节复核。
@@ -110,7 +110,7 @@ R11 用真 NEB 取代直线插值之后，Stage 19 判成「两个盆地」的 E
 
 ---
 
-## 4. Week 21 对抗式复检：相图边界是不是网格假象？
+## 4. Round 21 对抗式复检：相图边界是不是网格假象？
 
 - 对象：`analyze_sigma_synthetic.py` 报出的 `std_where_mean_tau_b_below_0p8`（氧化 0.45 eV）、`below_0p5`（1.20 eV）以及 overlap 的 0.25 / 0.10
 - 机制：`boundary()` 返回的是**第一个穿越阈值的网格点**，`STD_GRID` 步长 0.05 eV，所以这个数字天然被量化到一个步长
@@ -138,13 +138,13 @@ R11 用真 NEB 取代直线插值之后，Stage 19 判成「两个盆地」的 E
 - `config/scientific_definitions.yaml`：**0 改动**
 - `data/anchors/solution_redox_anchors.csv`：**0 改动**
 - R4b 的 eps = 80/200/1000/1e6 与 R11 的 1 kT / 1 kcal/mol 阈值都按 `docs/31` 的默认裁决**不进 prereg**：它们分别被登记为「附加诊断」与「本阶段内部判据、不回溯改写 Stage 19」。
-因此本报告的数字可以与 Week 4-21 的结果直接比较，不需要口径护身符。
+因此本报告的数字可以与 Round 4-21 的结果直接比较，不需要口径护身符。
 
 ## 6. Gate 状态
 
 Gate 0 CLOSED、Gate 1 NOT CLOSED。
 
-Gate 0 保持 CLOSED 的理由与 Week 21 相同：本周只新增诊断与精修，没有一条改动落进目标量、family 定义、筛选方向、delta_m、k/N、种子集或 splits。Gate 1 的 blocker 在本周由 R7 重新定义（PI 已裁决：within-series 排序一致性优先于绝对标定）：绝对标定层（`data/anchors/solution_redox_anchors.csv` 的 31 行 `method=est`）降级为**已记录的限制**，不再单独阻塞；现在唯一的 blocker 是**排序一致性层** —— `data/anchors/within_series_ordering.csv` 里没有任何已核验的 within-series 值（`n_pairs = 0`）。
+Gate 0 保持 CLOSED 的理由与 Round 21 相同：本周只新增诊断与精修，没有一条改动落进目标量、family 定义、筛选方向、delta_m、k/N、种子集或 splits。Gate 1 的 blocker 在本周由 R7 重新定义（PI 已裁决：within-series 排序一致性优先于绝对标定）：绝对标定层（`data/anchors/solution_redox_anchors.csv` 的 31 行 `method=est`）降级为**已记录的限制**，不再单独阻塞；现在唯一的 blocker 是**排序一致性层** —— `data/anchors/within_series_ordering.csv` 里没有任何已核验的 within-series 值（`n_pairs = 0`）。
 
 ## 7. 产物清单
 
@@ -154,7 +154,7 @@ Gate 0 保持 CLOSED 的理由与 Week 21 相同：本周只新增诊断与精�
 | `outputs/week22/raw/<mol_id>/<state>_ohess.out` | R9 的原始 xTB 文本 |
 | `outputs/week22/dielectric_limit.{json,csv,md}` | R4b 的逐分子逐态残余与 1/eps 幂律 |
 | `outputs/week22/neb_refinement.{json,csv,md}` | R11 的路径、峰高与一致/冲突清单 |
-| `outputs/week22/sigma_boundary_resolution.{json,md}` | Week 21 边界网格分辨率复检 |
+| `outputs/week22/sigma_boundary_resolution.{json,md}` | Round 21 边界网格分辨率复检 |
 | `outputs/week22/neb_example_EC_cation_eps5/` | 交给 PI 自行运行的那一格（输入 + 端点 + 说明） |
 | `outputs/week22/neb_EC_cation_eps20/`、`outputs/week22/neb_TEGDME_anion_eps20/` | 另外两格 |
 | `outputs/figures/F43_dielectric_limit_check.png` | 导体极限图 |

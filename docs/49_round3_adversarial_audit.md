@@ -117,7 +117,7 @@ UNDER THE PRE-REGISTERED DISCOVERY / VALIDATION CRITERIA
 
 - 不把 core set 扩到 60–100、broad pool 扩到 300–1000。
 - 不把 Gate 1 做成 PASS（不改判据、不剔分子、不放宽阈值）。
-- 不为「看起来完整」再堆 Week 28/29 或大量图。
+- 不为「看起来完整」再堆 Round 28/29 或大量图。
 - 不改 week1–week26 的任何既有产物数字。
 - 不修改任何已经通过的阈值。
 

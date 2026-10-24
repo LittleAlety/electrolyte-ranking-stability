@@ -1,11 +1,11 @@
 # 基于外部评审意见的计划修订（R1–R12）
 
 > **文件名变更（2026-10-01）**：本文件原为 `docs/30_plan_revision_expert_review.md`。
-> 因 `docs/30` 已被 Week 20 周报预定（`scripts/gen_week20_report.py:28` 的默认输出即
+> 因 `docs/30` 已被 Round 20 周报预定（`scripts/gen_week20_report.py:28` 的默认输出即
 > `docs/30_week20_report.md`，且 `scripts/build_deliverables.py` 的 `WEEKS[20]` 以 required=True
 > 引用它、`scripts/freeze_gates.py` 的 `STAGE2_PATTERNS` 收 `docs/30_*.md`），
 > 故让出该编号，改名为 `docs/31_plan_revision_expert_review.md`。
-> **注意：序号 31 自此被占用，Week 21 周报请用 32。**
+> **注意：序号 31 自此被占用，Round 21 周报请用 32。**
 
 > 来源：2026-10-01 外部评审对「第 20 周进展小结」的逐条意见。
 > 上游：`docs/17_plan_optimization_branchABC.md`（P1–P8，文献驱动的措辞修订）。
@@ -215,10 +215,10 @@ docstring 原话：Gate 1 在「溶液相锚点仍是未核验估值」期间报
 
 - **动作**：
   1. 所有关键对比**统一报配对 bootstrap 的「差值」分布**，不再用「两个独立 CI 是否重叠」目测；
-  2. 把 Week 9「被迫统一到共同 10 分子」这件事在**方法部分透明写出**；
+  2. 把 Round 9「被迫统一到共同 10 分子」这件事在**方法部分透明写出**；
   3. 做**子集敏感性检查**：结论在 10 分子 vs 18 分子子集上是否同向。
 - **落点**：`scripts/analyze_stage10_synthesis.py` 扩展 + `docs/19` 方法节。
-- **连带纪律（交付层）**：改写 `docs/19`/`docs/22`/`docs/26` 的正文会改变 `成果输出/` 交付副本的 SHA256。任何这类改写完成后必须重跑 `scripts/build_deliverables.py` 并重算 `SHA256SUMS` 与 `verification.json`，否则交付层与仓库会再次出现「过期副本」（Week 4 的 T3 就是这个毛病）。
+- **连带纪律（交付层）**：改写 `docs/19`/`docs/22`/`docs/26` 的正文会改变 `成果输出/` 交付副本的 SHA256。任何这类改写完成后必须重跑 `scripts/build_deliverables.py` 并重算 `SHA256SUMS` 与 `verification.json`，否则交付层与仓库会再次出现「过期副本」（Round 4 的 T3 就是这个毛病）。
 - **需 PI 裁决？** 否。
 
 ### R11 —— RMSD 判据 → 能量判据 + NEB 精修　【P1】
@@ -235,7 +235,7 @@ docstring 原话：Gate 1 在「溶液相锚点仍是未核验估值」期间报
      （`outputs/week6/delta_m_frozen.json`），拿它当 distinct 门限会留下 0.05–0.70 eV 的**未定义带**。
      另注意 0.043364 eV（1 kcal/mol）≈ 执行计划 docx §6.2 里那个 **0.05 eV 下限**，
      与 `config/prereg.yaml:67` 的 `delta_default = 2.0 kJ/mol`（= 0.0207 eV）**不是同一个数**，引用时必须点明用的是哪一个。
-     - **本轮实测（Stage 21 Part A，2026-10-01）**：`EC/cation/5`（RMSD 0.100 Å，Stage 19 判 `distinct_lower`）峰高仅 0.00424 eV → **`one_basin`，Stage 19 未被支持**；`EC/cation/20`、`TEGDME/anion/20` 判决一致。即 0.02 Å 的一刀切在抽样的 2 个临界格里已误判 1 格。5 个临界 EC/阳离子格只扫了两端（ε = 5、20），ε = 7/10/14 三格仍是旧判决，报告里必须写明这是**抽样**。来源：`outputs/week20/stage21_path_summary.md`（Week 20 未提交件）。
+     - **本轮实测（Stage 21 Part A，2026-10-01）**：`EC/cation/5`（RMSD 0.100 Å，Stage 19 判 `distinct_lower`）峰高仅 0.00424 eV → **`one_basin`，Stage 19 未被支持**；`EC/cation/20`、`TEGDME/anion/20` 判决一致。即 0.02 Å 的一刀切在抽样的 2 个临界格里已误判 1 格。5 个临界 EC/阳离子格只扫了两端（ε = 5、20），ε = 7/10/14 三格仍是旧判决，报告里必须写明这是**抽样**。来源：`outputs/week20/stage21_path_summary.md`（Round 20 未提交件）。
   2. **NEB / QST2 精修**：直线插值**不是最低能路径**，峰高会**高估**真实势垒；
      对扫描出峰的格子用 ORCA NEB（或至少 QST2）精修 2–3 格。
   3. **新判据不得回溯适用**：阈值属**新判据**，必须在 prereg 登记，或明确写成
@@ -294,9 +294,9 @@ R11 的阈值同理 —— 且 2026-10-01 已实际采用 **1 kT / 1 kcal/mol**�
    判据采用 `scripts/analyze_stage21_path.py:64-66,165-168` 的**双侧口径**（≤ 1 kT → 同一盆地；≥ 1 kcal/mol → 分离；之间 `inconclusive`），并**明确声明为「本阶段内部判据、不回溯改写 Stage 19 的既有判决」** —— 与 `docs/13` §3.6 对 `delta_m` 采用的「选项 B」同一路子。
    好处：Gate 0 保持 CLOSED。缓解措辞张力的办法也与 `delta_m` 相同：把阈值作为 `outputs/week20/stage21_path_analysis.json` 的显式字段并在报告中回链（已实现：`thermal_ev` / `kcal_ev`）。
    **PI 可推翻**：若坚持登记，改走 `amendment_log`，并接受 Gate 0 变 NOT CLOSED。
-3. **【Week 6 遗留】** `delta_m` 是否 append 进 `config/prereg.yaml`？
-4. **【Week 7 遗留】** `ranking._resolve_k` 口径偏差（prereg 写 `max(1, floor(frac·N+0.5))`，代码用 `round(frac·N)`）。
-5. **【Week 4 遗留】** Gate 1 的绝对标定级 blocker：溶液锚点 31 行仍为 `est`（R7 的直接对象）。
+3. **【Round 6 遗留】** `delta_m` 是否 append 进 `config/prereg.yaml`？
+4. **【Round 7 遗留】** `ranking._resolve_k` 口径偏差（prereg 写 `max(1, floor(frac·N+0.5))`，代码用 `round(frac·N)`）。
+5. **【Round 4 遗留】** Gate 1 的绝对标定级 blocker：溶液锚点 31 行仍为 `est`（R7 的直接对象）。
    **本轮未执行 R7**：它要动 Stage 1 冻结件与 Gate 的关闭判据，且必须先完成文献核验（批次 C）。旁路线程不做此类改动，等 PI 裁决 + 核验通过后再动。
 6. **【本轮新增】** 三臂子集不一致（n = 12/10/12）的**对外表述**是否需要发布勘误（若 R1 结果改变 headline）。
 
@@ -308,7 +308,7 @@ R11 的阈值同理 —— 且 2026-10-01 已实际采用 **1 kT / 1 kcal/mol**�
 - `config/scientific_definitions.yaml`：**0 改动**
 - 目标量、family 定义、筛选方向、δ_m、k/N 比例、bootstrap 种子集、splits 规则：**全部沿用**
 
-因此本文件列出的批次 A 结果**可以**与 Week 4–19 的结果直接比较，不需要任何口径护身符。
+因此本文件列出的批次 A 结果**可以**与 Round 4–19 的结果直接比较，不需要任何口径护身符。
 
 > **2026-10-01 补充**：该声明的前提是「按默认路子执行」—— R7 不登记、R11 不登记、R4b 只作附加诊断。若三者中任一项走进 `amendment_log`，本节的「0 改动」不再成立，须以重跑后的 `outputs/week0*/gate*` 记录为准。
 

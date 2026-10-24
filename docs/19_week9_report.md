@@ -1,4 +1,4 @@
-# Week 9 报告 —— Stage 10：五级台阶合成与决策稳定性总判
+# Round 9 报告 —— Stage 10：五级台阶合成与决策稳定性总判
 
 > 上游：`docs/10_week4_report.md`（P₀/P₁/P₂、T2 几何台阶）、`docs/12_week5_report.md`（T4 / C₁ = [Li M]⁺）、
 > `docs/15_week7_report.md`（Stage 7/8：ML 与主动学习）、`docs/18_week8_report.md`（Stage 9 / C₂ = [Li(M)₂]⁺）、
@@ -11,7 +11,7 @@
 
 ## 0. 一句话结论
 
-把此前**分散在 Week 4–8** 的五个「台阶」放到**同一把尺子**（同一约定 `p_red = −EA`、两个轴都 `higher_is_better`）
+把此前**分散在 Round 4–8** 的五个「台阶」放到**同一把尺子**（同一约定 `p_red = −EA`、两个轴都 `higher_is_better`）
 和**同一批分子**（10 个在每一级都有完整数据的分子）上重算之后，本项目的中心命题第一次可以被定量回答：
 
 > **决定一级台阶会不会改写候选排序的，是这一级位移的「离散度」（std），而不是它的「大小」（|mean|）。**
@@ -24,7 +24,7 @@
 | H_mean（对照）：位移**大小**决定 τ_b | Spearman ρ(abs(shift mean), τ_b) | −0.535 | 现象示意，且**已判定为共线性伪影** | 幅度也相关，但更弱；且它并不解释「大位移却不换序」的那些台阶 |
 | 机制环节：离散度 → 不可判定比例 | Spearman ρ(shift std, f_unresolved) | **+0.894** | 现象示意 | 离散度通过方法分歧矩阵 σ_ij 直接喂给 `f_unresolved` |
 
-> **Week 21 修订（`docs/31` R2）：这张表已从 headline 降级为「现象示意」。** 三条理由，逐条可复核：
+> **Round 21 修订（`docs/31` R2）：这张表已从 headline 降级为「现象示意」。** 三条理由，逐条可复核：
 >
 > 1. **点数与 rung 数不是一回事。** 10 个数据点来自 **5 个台阶**（每级两个轴），秩相关的有效自由度更接近 5 而不是 10；
 >    把它写成「10 个点的相关」会系统性高估信息量。
@@ -33,7 +33,7 @@
 >    「位移越大时散布也越大」的影子。合成数据相图（`outputs/figures/F42_sigma_synthetic_phase_diagram.png`）里
 >    两者按构造独立，同一个相关系数是 **0.000**；而 `std` 与 τ_b 的秩相关在那张相图上是 **−1.000**。
 > 3. **主角已经换成闭式判据，不再需要这一行。** `docs/20`（Stage 11）把 σ 化简成闭式、把整个
->    resolved / unresolved 机器化简成一条无量纲判据 `q_ij <= sqrt(2)/z`。Week 21 又补了合成数据蒙特卡洛相图
+>    resolved / unresolved 机器化简成一条无量纲判据 `q_ij <= sqrt(2)/z`。Round 21 又补了合成数据蒙特卡洛相图
 >    （`scripts/analyze_sigma_synthetic.py`）与一次**样本外前瞻检验**（`scripts/analyze_sigma_prospective.py`）。
 >    −0.851 自此只作为「与仿真方向一致」的一句旁证出现。
 
@@ -50,12 +50,12 @@
 
 ## 1. 为什么要有这一步（Stage 10 的动机）
 
-Week 4–8 各自回答了自己的问题，但每一周都用了**不同的分子子集**和**自己的口径**：
+Round 4–8 各自回答了自己的问题，但每一周都用了**不同的分子子集**和**自己的口径**：
 
-- Week 4 的 P₀→P₁ / P₁→P₂ 建在 core 18 上；
-- Week 4 的 G1→G2 只在 12 个有 Opt+Freq 的分子上；
-- Week 5 的 C₀→C₁ 建在 12 个 motif（10 个 primary 分子 + DMC m2 + TMP m2）上，且还原轴用的是 `−EA`；
-- Week 8 的 C₁→C₂ 建在 12 个 `[Li(M)₂]⁺` 壳层上。
+- Round 4 的 P₀→P₁ / P₁→P₂ 建在 core 18 上；
+- Round 4 的 G1→G2 只在 12 个有 Opt+Freq 的分子上；
+- Round 5 的 C₀→C₁ 建在 12 个 motif（10 个 primary 分子 + DMC m2 + TMP m2）上，且还原轴用的是 `−EA`；
+- Round 8 的 C₁→C₂ 建在 12 个 `[Li(M)₂]⁺` 壳层上。
 
 于是出现两个问题：
 
@@ -80,8 +80,8 @@ Stage 10 就是来消掉这两个歧义的：**统一约定、统一子集、统
 | oxidation | p_ox | = IP | 抗氧化 |
 | reduction | p_red | = **−EA** | 抗还原 |
 
-两轴都设 `higher_is_better = True`（与 Week 4/5 已冻结的约定一致；本轮核对过 Week 4–8 的全部 JSON，
-无一处例外）。**P₀→P₁ 与 P₁→P₂ 两级的公式与 Week 4 原文逐字相同**，所以本轮不是重算，
+两轴都设 `higher_is_better = True`（与 Round 4/5 已冻结的约定一致；本轮核对过 Round 4–8 的全部 JSON，
+无一处例外）。**P₀→P₁ 与 P₁→P₂ 两级的公式与 Round 4 原文逐字相同**，所以本轮不是重算，
 而是把已有数字搬到同一坐标系里。
 
 ### 2.2 一个子集：common-10
@@ -128,17 +128,17 @@ AN, DMC, DME, DMSO, DOL, EC, GBL, SL, SN, TMP
 本轮**没有**改动这些定义，只是把它们逐个台阶平行调用。
 ---
 
-### 2.6 小样本纪律：共同 10 分子、配对检验与子集敏感性（Week 21 · `docs/31` R10 追加）
+### 2.6 小样本纪律：共同 10 分子、配对检验与子集敏感性（Round 21 · `docs/31` R10 追加）
 
 三条纪律此前只做了一半，本轮补齐。
 
 1. **所有关键对比统一报「配对」差值分布，不再用「两个独立 CI 是否重叠」目测。**
    独立 CI 回答的是「每个量是否离 0 够远」，**不是**「两个量是否彼此不同」；把区间重叠当检验是无效的。
-   Week 4 的三臂比较已按此重做：`docs/10_week4_report.md` §2.3.1 给出
+   Round 4 的三臂比较已按此重做：`docs/10_week4_report.md` §2.3.1 给出
    `Δτ_b` 的配对 95% CI 与精确配对置换 p 值（结论：**排序差异未达显著**）。
-2. **「Week 9 被迫统一到共同 10 分子」这件事在方法部分透明写出。**
+2. **「Round 9 被迫统一到共同 10 分子」这件事在方法部分透明写出。**
    上一节 §2.3 已列明五级台阶各自的 native 分子集（18 / 18 / 12 / 10 / 10）。
-   Week 9 的合成体系之所以必须落到 **common-10**，是因为 `f_unresolved` 的分母是「全部 pair 数」，
+   Round 9 的合成体系之所以必须落到 **common-10**，是因为 `f_unresolved` 的分母是「全部 pair 数」，
    N = 18 与 N = 10 的 pair 数相差三倍以上，跨 N 直接比较 τ_b 与 O_k 会把**子集效应**读成**台阶效应**。
    代价是丢掉 8 个分子（DEC, EA, EMC, FEC, MA, PC, TEGDME, VC）——**这个代价现在被显式地量化了**：
    同一组秩相关在两个 population 上同向（§0 末段的子集敏感性表）。
@@ -161,7 +161,7 @@ AN, DMC, DME, DMSO, DOL, EC, GBL, SL, SN, TMP
 | C₁→C₂ 壳层 | red | +1.199 | **0.335** | **0.289** | 0.000 | 0.000 | 0.356 | 0.000 | 0.176 |
 
 （`native` 口径——每级各用其自身的分子集，n = 18/18/12/10/10——也一并写在
-`outputs/week9/stage10_ladder.csv` 里，便于与 Week 4/5/8 的原始报告对齐。）
+`outputs/week9/stage10_ladder.csv` 里，便于与 Round 4/5/8 的原始报告对齐。）
 
 三项立刻可见的事实：
 
@@ -245,7 +245,7 @@ H_mean 想说的是「位移大 → 排序坏」。但本项目的五个台阶�
 | **A** 廉价 proxy 已足够 | **NOT SUPPORTED** | P₀→P₂ 氧化轴 τ_b = 0.673、Top-10% 重叠 0.000、后一层 `f_unresolved` = 0.229 |
 | **B** 位移大但排序稳 | **SUPPORTED** | P₁→P₂ 氧化轴 mean = −2.393 eV、std = 0.302 eV，而 τ_b = 0.895、O_20% = 0.750、`f_robust_inv` = 0.000 |
 | **C** 结构集中的 robust inversion | **NOT OBSERVED** | 20 个 (台阶, 轴) 组合中 `f_robust_inv` 全为 0.000（z = 1.96 亦同） |
-| **D** 配位引发 state-identity 改变 | **OBSERVED** | Week 5：还原态 12/12 中 **11 个**是 `Li_centered_or_mixed_redox`；氧化态（dication）12 个里 8 个 `molecule_centered_redox`、4 个 `no_intact_minimum_found` |
+| **D** 配位引发 state-identity 改变 | **OBSERVED** | Round 5：还原态 12/12 中 **11 个**是 `Li_centered_or_mixed_redox`；氧化态（dication）12 个里 8 个 `molecule_centered_redox`、4 个 `no_intact_minimum_found` |
 | **E** Δ-learning 优于 direct | **SUPPORTED（6/8）**；例外：`C/reduction/X0`、`C/reduction/X0+X1` | LOFO 下每组取模型阶梯最优 τ_b：提升最大的是 C₀→C₁ 氧化轴（0.111 → 0.644，+0.533） |
 | **F** Δ 无法从廉价特征学出 | **NOT SUPPORTED**（Δ 在 6/8 个分组上可从廉价特征学出） | 同上；唯二失败者与情形 D 是同一根还原轴 |
 | **G** 大部分 pair 不可判定 | **PARTIALLY SUPPORTED**（C₀→C₁ 还原轴） | 该轴 `f_unresolved`(after) = 0.800、τ_b = −0.467、O_10% = 0.000；对照同级氧化轴 0.200 / 0.689 |
@@ -267,7 +267,7 @@ v2 §22.2 给出的下一步是可检验的：若该台阶只引入族层级偏�
 所以「C 未观测到」与「排序处处可靠」是两回事，后者由 G 直接否掉。
 
 **D（OBSERVED）** —— 详见 §7。这一条本轮从「未观测」**翻案成「成立」**，原因是此前只看
-`counts` 汇总字段（该字段在 Week 5 的文件里并不存在），没有读 `per_redox_state`。
+`counts` 汇总字段（该字段在 Round 5 的文件里并不存在），没有读 `per_redox_state`。
 
 **E / F** —— 详见 §8。
 
@@ -376,17 +376,17 @@ C₀→C₁ 还原轴：电子落到 Li 上（D）
 
 | # | 判据 | 状态 | 证据 |
 | --- | --- | --- | --- |
-| 1 | metadata 严格、chemical-space 平衡的 core set（18 分子） | **PASS** | Week 1–3：core 18 / broad 40，family 平衡，`data/metadata/core_set.csv` |
-| 2 | broad cheap pool（40 分子廉价层） | **PASS** | Week 3：`outputs/week3/p0_pool.csv`（58 分子合并池） |
-| 3 | P₀ / P₁ / P₂ 的一致定义 | **PASS** | Week 1 冻结（`config/scientific_definitions.yaml`），Week 3–4 全部执行 |
-| 4 | C₁ Li-coordination conditional analysis | **PASS** | Week 5（T4）：12 motif / 8 家族；Week 8 的 C₂ 复核 |
-| 5 | external gas / solution anchors | **PARTIAL** | 气相锚点已用（Week 2/4）；**溶液锚点 31 行仍为 `method=est`**（Gate 1 未关闭） |
-| 6 | uncertainty-aware rank comparison | **PASS** | Week 4–9：τ_b / O_k / Jaccard / regret / `f_unresolved` / `f_robust_inv` |
+| 1 | metadata 严格、chemical-space 平衡的 core set（18 分子） | **PASS** | Round 1–3：core 18 / broad 40，family 平衡，`data/metadata/core_set.csv` |
+| 2 | broad cheap pool（40 分子廉价层） | **PASS** | Round 3：`outputs/week3/p0_pool.csv`（58 分子合并池） |
+| 3 | P₀ / P₁ / P₂ 的一致定义 | **PASS** | Round 1 冻结（`config/scientific_definitions.yaml`），Round 3–4 全部执行 |
+| 4 | C₁ Li-coordination conditional analysis | **PASS** | Round 5（T4）：12 motif / 8 家族；Round 8 的 C₂ 复核 |
+| 5 | external gas / solution anchors | **PARTIAL** | 气相锚点已用（Round 2/4）；**溶液锚点 31 行仍为 `method=est`**（Gate 1 未关闭） |
+| 6 | uncertainty-aware rank comparison | **PASS** | Round 4–9：τ_b / O_k / Jaccard / regret / `f_unresolved` / `f_robust_inv` |
 | 7 | robust inversion mechanism analysis | **PASS（负结果）** | 本报告 §3/§6：五级台阶上 `f_robust_inv` 恒为 0，机制归属见情形 C + §10 |
-| 8 | random / group / LOFO 三种拆分 | **PASS** | Week 7 / Stage 7：`outputs/week7/stage7_ml_results.json` |
-| 9 | direct vs Δ-learning | **PASS** | Week 7 / Stage 7（F16）；本报告 §8 给出 6/8 的分组级复核 |
-| 10 | feature-cost-aware active-learning replay | **PASS** | Week 7 / Stage 8：`outputs/week7/stage8_al_results.json`（F17） |
-| 11 | high-cost-label budget vs decision accuracy 曲线 | **PASS** | Week 7：`n_T → τ_b` 四条 acquisition 曲线（F17） |
+| 8 | random / group / LOFO 三种拆分 | **PASS** | Round 7 / Stage 7：`outputs/week7/stage7_ml_results.json` |
+| 9 | direct vs Δ-learning | **PASS** | Round 7 / Stage 7（F16）；本报告 §8 给出 6/8 的分组级复核 |
+| 10 | feature-cost-aware active-learning replay | **PASS** | Round 7 / Stage 8：`outputs/week7/stage8_al_results.json`（F17） |
+| 11 | high-cost-label budget vs decision accuracy 曲线 | **PASS** | Round 7：`n_T → τ_b` 四条 acquisition 曲线（F17） |
 
 **唯一未达标项是第 5 条**，且它卡在**外部数据的可获得性**上，不是流程问题：溶液相 redox 锚点
 在文献里系统性缺失，本项目用 `method=est` 明确标注其来源为估计值，并在 Gate 1 上保持 NOT CLOSED，
@@ -450,18 +450,18 @@ C₀→C₁ 还原轴：电子落到 Li 上（D）
 ## 12. 遗留与需裁决项
 
 1. **【新增】Stage 9/10 的指标是否写进 prereg？** —— `τ_b` / `f_unresolved` / `f_robust_inv` 已是 prereg 指标，
-   但「五级台阶平行比较」这一步本身及其 Spearman 汇总**是 Week 9 新增的分析动作**。
+   但「五级台阶平行比较」这一步本身及其 Spearman 汇总**是 Round 9 新增的分析动作**。
    若 PI 决定把它提升为必报指标，需走 `amendment_log`，**Gate 0 由 CLOSED → NOT CLOSED**。
    当前默认是**不改 prereg**、作为探索性分析报告。
-2. **【Week 6】`delta_m` 是否 append 进 prereg**（当前取候选值，未冻结）。
-3. **【Week 4】Gate 1 NOT CLOSED** —— 唯一 blocker：溶液锚点 31 行仍为 `method=est`。
-4. **【Week 7】`ranking._resolve_k` 口径偏差** —— prereg 写 `max(1, floor(frac·N + 0.5))`，
+2. **【Round 6】`delta_m` 是否 append 进 prereg**（当前取候选值，未冻结）。
+3. **【Round 4】Gate 1 NOT CLOSED** —— 唯一 blocker：溶液锚点 31 行仍为 `method=est`。
+4. **【Round 7】`ranking._resolve_k` 口径偏差** —— prereg 写 `max(1, floor(frac·N + 0.5))`，
    代码用 `round(frac·N)`；在 N = 18 / 40 上一致，在 N = 5 时退化。本轮未触发（N = 10 时两者同为 1）。
-5. **【Week 8】reading list 勘误回改** —— A2 作者名补全 4 位；「分支 a–d 实为 A/B/C 三支」。
+5. **【Round 8】reading list 勘误回改** —— A2 作者名补全 4 位；「分支 a–d 实为 A/B/C 三支」。
 
 ---
 
-## 13. 下一步（Week 10 候选）
+## 13. 下一步（Round 10 候选）
 
 按依赖关系排序，都只依赖已有产物：
 

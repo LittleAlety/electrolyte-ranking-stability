@@ -6,10 +6,10 @@
 
 | 主题日志 | 历史范围 | 主要问题 |
 | --- | --- | --- |
-| [基础、基线与计算台阶](01_foundations_and_ladders.md) | Week 1–8 | 定义、锚点、P0/P1/P2、构象与配位层如何建立？ |
-| [排序稳定性与机制](02_stability_and_mechanisms.md) | Week 9–15 | 排序何时变化，介电、畸变和 SCF 初猜为什么重要？ |
-| [状态身份、加固与收口](03_identity_hardening_and_closeout.md) | Week 16–27 | 电子态身份、反例审计、Gate 1 与 clean-room 复现如何收口？ |
-| [工作包与物理证据补强](04_work_packages_and_physics.md) | Week 28–44 | WP0–WP7 如何把问题重新组织为定义、自由能、机制、ML 与预算工作包？ |
+| [基础、基线与计算台阶](01_foundations_and_ladders.md) | Round 1–8 | 定义、锚点、P0/P1/P2、构象与配位层如何建立？ |
+| [排序稳定性与机制](02_stability_and_mechanisms.md) | Round 9–15 | 排序何时变化，介电、畸变和 SCF 初猜为什么重要？ |
+| [状态身份、加固与收口](03_identity_hardening_and_closeout.md) | Round 16–27 | 电子态身份、反例审计、Gate 1 与 clean-room 复现如何收口？ |
+| [工作包与物理证据补强](04_work_packages_and_physics.md) | Round 28–44 | WP0–WP7 如何把问题重新组织为定义、自由能、机制、ML 与预算工作包？ |
 | [当前生产与恢复](05_current_production.md) | physics_completion_v1 | 当前 12×4 主态、系综、前沿身份与严格闸门进展在哪里看？ |
 
 ## 权威层级

@@ -146,7 +146,7 @@
 | **D2** | 方法栈 | §4.3：几何/频率 r2SCAN-3c；单点 `wB97X-D4/def2-TZVP`；阴离子另启 `ma-def2-TZVP` | 几何 **G1 = GFN2-xTB `--opt`**；单点 **r2SCAN-3c**（垂直量 @ G1）；`wB97X-D4`、`def2-TZVPD` 仅列为待跑对照臂（`docs/08` §2） | 用户要求「简单 & 高效，只用 xtb 和 r2SCAN-3c」；`计划.md` §4 已冻结该协议，与 `config/prereg.yaml` 一致 | 保留简化。**已知代价（必须明示）**：r2SCAN-3c 的复合基组是 **def2-mTZVPP、不含弥散函数**，因此气相阴离子 EA 的「全部不束缚」结论受方法边界限制（`docs/10` §2.6：18/18 气相自由基阴离子在 r2SCAN-3c 下不束缚）。处置：把「弥散函数对照臂 `def2-TZVPD`」列为当前**最高优先级的裁断任务**（见 §5 第 ②） |
 | **D3** | `z` 因子 | §6.1 / §6.2 取 `z = 1` | `config/prereg.yaml` 的 `pair_comparison.z_factor.value = 1.0`（并规定 probabilistic pair ordering 为主判据）。**开发期曾**把 z 当作 1.96 单值使用；**当前代码**（`scripts/analyze_p1_core_set.py` 第 54–55 行）为 `Z_PRIMARY = 1.0`（主判据）+ `Z_SENSITIVITY = 1.96`（保守敏感性并列），`Z_BAND` 这个名字在仓库中**已不存在** | **实现与冻结预注册不一致，属缺陷而非有意设计**（1.96 是常见 95% 双侧系数，被误当作默认值写死） | **已修正**：`scripts/analyze_p1_core_set.py` 与 `scripts/analyze_p2_environment.py` 现在**同时报告** `z=1.0`（预注册主判据）与 `z=1.96`（保守敏感性），主判据回归 `1.0`；新增回归测试 `tests/test_analysis_z_bands.py`。**未向 `amendment_log` 追加条目，也无需追加**：`z_factor.value` 始终是 `1.0`，本次没有改动任何冻结的科学定义，只是让**实现回归冻结值**，属代码缺陷修复而非预注册变更。因此 `config/prereg.yaml` 保持**逐字节不变**（sha256 `e89f2e2a…f340`），Gate 0 仍为 **CLOSED**。证据见 `docs/10_week4_report.md` §2.4 与 §3。 |
 | **D4** | bootstrap 设置 | §6.3：**1000 次 BCa 95% CI** | 20 个固定 seed × 2000 次 paired **percentile**，报告 20 个区间中位数 | `config/prereg.yaml` 的 `uncertainty.bootstrap`（`repetitions: 2000`、`ci_method: percentile`、`random_seeds` 20 个）已冻结，且**更保守**：多 seed 消除单次运气，percentile 在 n=18 时比 BCa 更稳，避免小样本下 BCa 的覆盖率失真 | 保留 prereg 设置，记录偏差；报告统一给出「区间中位数」（见 `outputs/week4/p1_decision_stability.md` §1 注、`docs/10` §2.3） |
-| **D5** | `delta_m` 规则 | §6.2：`delta_m = max(构象 ensemble 90 分位展宽, 方法审计 inter-method 展宽, 0.05 eV 下限)` | `config/prereg.yaml` 定义的是 `delta_m`（**固定兜底阈值**，`delta_default = 2.0 kJ/mol`，`source_rule` 三优先级）+ `z·sigma_ij` 两臂离散度；Week 6 已按该 max() 规则算出四个数值（氧化 0.7002 eV / 还原 2.0743 eV，方法项主导，见 `docs/13` §3），但**尚未写入 prereg**（选项 B：数值冻结在 `outputs/week6/delta_m_frozen.json`） | 新计划的 max() 规则需要 Stage 1 的构象展宽与方法展宽（`sigma_conf`、`sigma_method`）作为输入，而 Stage 1 未收口。**Week 6 已把三项补齐**：`σ_conf`（T6 构象系综）、`σ_env`（T3 eps 扫描）、`σ_geom`（T2 Opt+Freq）；`docs/08` §5 的「待算」字样已不适用，见 `docs/13` §2.4 的同口径对比表 | **Week 6 已完成数值补齐**（`outputs/week6/delta_m_frozen.json`）并首次启用 `resolved_mask` 的 `tolerance`；是否 append 写入 prereg 属 PI 裁决项（写入会让 Gate 0 因 `amendment_log` 非空而显示未关闭）。在裁决之前，所有 pair 判定仍同时给出「临时口径（`z·sigma`）」与「预注册口径（`z·sigma` + `delta_m`）」两列，不得只引用后者，也不得把前者称为已冻结 |
+| **D5** | `delta_m` 规则 | §6.2：`delta_m = max(构象 ensemble 90 分位展宽, 方法审计 inter-method 展宽, 0.05 eV 下限)` | `config/prereg.yaml` 定义的是 `delta_m`（**固定兜底阈值**，`delta_default = 2.0 kJ/mol`，`source_rule` 三优先级）+ `z·sigma_ij` 两臂离散度；Round 6 已按该 max() 规则算出四个数值（氧化 0.7002 eV / 还原 2.0743 eV，方法项主导，见 `docs/13` §3），但**尚未写入 prereg**（选项 B：数值冻结在 `outputs/week6/delta_m_frozen.json`） | 新计划的 max() 规则需要 Stage 1 的构象展宽与方法展宽（`sigma_conf`、`sigma_method`）作为输入，而 Stage 1 未收口。**Round 6 已把三项补齐**：`σ_conf`（T6 构象系综）、`σ_env`（T3 eps 扫描）、`σ_geom`（T2 Opt+Freq）；`docs/08` §5 的「待算」字样已不适用，见 `docs/13` §2.4 的同口径对比表 | **Round 6 已完成数值补齐**（`outputs/week6/delta_m_frozen.json`）并首次启用 `resolved_mask` 的 `tolerance`；是否 append 写入 prereg 属 PI 裁决项（写入会让 Gate 0 因 `amendment_log` 非空而显示未关闭）。在裁决之前，所有 pair 判定仍同时给出「临时口径（`z·sigma`）」与「预注册口径（`z·sigma` + `delta_m`）」两列，不得只引用后者，也不得把前者称为已冻结 |
 | **D6** | P1 量的定义 | Stage 3：core 三电荷态在**目标层几何**上做 `Opt`+`Freq`，P1 为弛豫后的 `G(M±) − G(M)` | 本项目 P1 = **垂直** IP/EA（ΔSCF 单点 @ 中性 **G1** 几何），无 `Opt` / `Freq`、无热校正（`docs/10` §1、§7） | 为满足「唯一变量 = 电子结构方法」（P0→P1 只换方法，`docs/08` §1 明令禁止同时改两件事）与「与实验 PE 值可比」（`docs/10` §1），并按用户要求压到最小方法栈 | 明确标注 P1 为**垂直量**（已在 `docs/10` §7 声明，不得当作热力学量用于电位换算）；把 T2（G2 `Opt`+`Freq`、虚频、`sigma_geom`）列入 §5 第 ③ 优先 |
 | **D7** | pool 构建方式 | §3.2：broad pool 来自 Electrolyte Genome / PubChem / 课题组历史分子，经 RDKit 可解析 + MW≤250 等规则自动筛至 N≈500 | 本项目 broad pool 为**人工策展的 40 分子**，逐分子带 `pool_reason`，覆盖 11 个 family（core 8 个，`outputs/week3/coverage_report.md`） | 小数据集路线下，**逐分子可解释性与 family 覆盖**优先于自动筛选规模；保证每分子都能回溯入选理由与 anchor 可识别性 | 保留人工策展；若未来扩池，再引入计划 §3.2 的自动筛选规则与 fingerprint + PCA/UMAP 覆盖检查（该流程当前**未**在 config 中冻结） |
 
@@ -214,8 +214,8 @@
 | --- | --- | --- |
 | 546 | 新执行计划纯文本行数 | `outputs/_plan_docx.txt` |
 | 18 / 40 | core set / broad pool 分子数 | `data/metadata/core_set.csv`、`data/metadata/broad_pool.csv`、`config/scientific_definitions.yaml` `dataset` |
-| 58/58 | Week 3 P0 收敛数（core 18 + broad 40），0 失败 | `docs/05` §3、`docs/09` |
-| 54/54 | Week 4 T1（r2SCAN-3c 垂直 IP/EA）成功数，18 分子三态齐全 | `docs/10` §2.1–2.2、`outputs/week4/p1_core_set_audit.*` |
+| 58/58 | Round 3 P0 收敛数（core 18 + broad 40），0 失败 | `docs/05` §3、`docs/09` |
+| 54/54 | Round 4 T1（r2SCAN-3c 垂直 IP/EA）成功数，18 分子三态齐全 | `docs/10` §2.1–2.2、`outputs/week4/p1_core_set_audit.*` |
 | 18/18 | 气相自由基阴离子在 r2SCAN-3c 下全部不束缚（`unbound_anion`） | `docs/10` §2.2、§2.6 |
 | 31 / 16 | 溶液锚点行数 / 物种数，**全部 `method=est`** | `data/anchors/solution_redox_anchors.csv`、`docs/06` §4 |
 | 39 / 26 | 气相锚点行数 / 物种数（`exp` 28、`calc` 2、`na` 9） | `data/anchors/gas_phase_anchors.csv`、`docs/03` §2 |
@@ -268,7 +268,7 @@
 | 弥散函数边界（EA 符号） | D2（方法栈简化代价） | —（已由 T5 回答，不在 §5 表内） | —（裁断 EA 符号） |
 | 目标层几何 T2（`sigma_geom`） | D6（P1 为垂直量） | **已完成（原 ②）** | M5 |
 | `eps` 扫描 T3（`sigma_env`） | D5（`delta_m` 合成来源） | **已完成** | M5 |
-| `delta_m` 数值（`z` 一致性已由 D3 收口） | D5 | **已完成（Week 6：四个数值已算出；写入 prereg 待裁决）** | M5、M6 |
+| `delta_m` 数值（`z` 一致性已由 D3 收口） | D5 | **已完成（Round 6：四个数值已算出；写入 prereg 待裁决）** | M5、M6 |
 | C1 条件配位态 | — | **已完成** | M4 |
 | ML / AL 结论强度 | D1（扩展触发条件） | ③ | M5、M6 |
 
@@ -281,14 +281,14 @@
 | `docs/00_stage0_definitions.md` | Stage 0 定义冻结汇总 + Gate 0 判据（15 条） |
 | `docs/01_stage1_external_anchors.md` | 三类锚点用途与 tolerance 来源、条件字段落位 |
 | `docs/02_stage1_method_audit.md` | 方法审计协议、四个 arms、Gate 1 判据 |
-| `docs/03_week1_2_report.md` | Week 1–2 交付物与可复现验证结果 |
+| `docs/03_week1_2_report.md` | Round 1–2 交付物与可复现验证结果 |
 | `docs/04_stage1_xtb_audit_result.md` | GFN2-xTB 审计臂实测（12 分子，ΔSCF / Koopmans） |
 | `docs/05_stage2_broad_pool_p0.md` | broad pool P0 与化学空间覆盖 |
 | `docs/06_stage1_solution_anchor_audit.md` | 溶液锚点逐条核验（31 行仍 `est`，2 处引用错配） |
 | `docs/07_orca_setup_and_runner.md` | ORCA 安装、版本探测、runner 与标定 |
 | `docs/08_stage2_production_protocol.md` | 生产协议（三层臂、几何 G1/G2、sigma 来源、预算优先级） |
-| `docs/09_week3_report.md` | Week 3 报告（P0 58/58、覆盖、决策稳定性预演） |
-| `docs/10_week4_report.md` | Week 4 报告（T1 54/54、P2、`unbound_anion` 18/18、Gate 状态） |
+| `docs/09_week3_report.md` | Round 3 报告（P0 58/58、覆盖、决策稳定性预演） |
+| `docs/10_week4_report.md` | Round 4 报告（T1 54/54、P2、`unbound_anion` 18/18、Gate 状态） |
 | `docs/11_plan_alignment.md` | 本文件：执行计划 ↔ 实际执行的逐 Stage 对齐与偏差记录 |
-| `docs/12_week5_report.md` | Week 5 报告（T4 C1 Li+ 配位条件态、state-identity QC、四台阶 sigma） |
-| `docs/13_week6_report.md` | Week 6 报告（T6 构象系综、T7 C1 虚频、T8 `delta_m` 组装、T9 Stage 6 三口径） |
+| `docs/12_week5_report.md` | Round 5 报告（T4 C1 Li+ 配位条件态、state-identity QC、四台阶 sigma） |
+| `docs/13_week6_report.md` | Round 6 报告（T6 构象系综、T7 C1 虚频、T8 `delta_m` 组装、T9 Stage 6 三口径） |

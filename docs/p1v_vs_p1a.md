@@ -4,7 +4,7 @@
 
 ## 定义
 
-- **P1v**：气相 vertical redox-energy proxy（中性/阳离子/阴离子共用几何 G1，只做单点）→ Week-4 层。
+- **P1v**：气相 vertical redox-energy proxy（中性/阳离子/阴离子共用几何 G1，只做单点）→ Round-4 层。
 - **P1a**：气相 adiabatic redox thermodynamics（每个电荷态各自 r2SCAN-3c Opt 到自身极小）→ 本层。
 
 ## 氧化轴结果

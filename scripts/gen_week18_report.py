@@ -1,11 +1,11 @@
-"""Generate docs/28_week18_report.md from the Week 18 (Stage 19) artefacts.
+"""Generate docs/28_week18_report.md from the Round 18 (Stage 19) artefacts.
 
 Every number in the prose and in every table is read back out of the JSON / CSV
 files under outputs/week18; nothing is transcribed by hand.  The assert block in
 _guard() turns a silent drift into a hard failure, and --check renders the text in
 memory without touching the file.
 
-Week 18 asks one question.  The 37 ``moread_lower`` cells of the Week 17 census
+Round 18 asks one question.  The 37 ``moread_lower`` cells of the Round 17 census
 carried two self-consistent SCF solutions *on one frozen geometry*; this stage
 relaxes both solutions (``Opt`` instead of a single point, everything else
 frozen) and asks which verdict survives.
@@ -33,8 +33,8 @@ FIGDIR = REPO / "outputs" / "figures"
 CENSUS_CSV = REPO / "outputs" / "week17" / "stage18_identity_census.csv"
 
 # ---- named constants: the only hard-coded numbers allowed to appear here -----
-MATERIAL_THRESHOLD_EV = 1.0e-3            # inherited unchanged from Week 14 (Stage 15)
-THRESHOLD_CHARGE_L1 = 0.039               # frozen in Week 17 (Stage 18), NOT refitted here
+MATERIAL_THRESHOLD_EV = 1.0e-3            # inherited unchanged from Round 14 (Stage 15)
+THRESHOLD_CHARGE_L1 = 0.039               # frozen in Round 17 (Stage 18), NOT refitted here
 GEOMETRY_SAME_TOLERANCE_ANGSTROM = 0.02   # descriptive column only
 S2_DOUBLET = 0.75                         # <S^2> of a pure doublet
 NEAR_THRESHOLD_FRACTION = 0.2             # descriptive band: |margin| <= 20% of the frozen cut
@@ -185,7 +185,7 @@ def _guard(D):
     assert all(abs(cell["threshold_charge_l1"] - THRESHOLD_CHARGE_L1) < 1e-12
                for cell in cells)
 
-    # the 37 cells are exactly the week-17 moread_lower set, and their single-point
+    # the 37 cells are exactly the round-17 moread_lower set, and their single-point
     # numbers are the ones published last week
     census = {(row["name"], row["state"], round(float(row["epsilon"]), 6)): row
               for row in derived["census_moread"]}
@@ -290,7 +290,7 @@ def render(data_dir):
     lines = []
     add = lines.append
 
-    add("# Week 18 报告 \u2014\u2014 Stage 19\uff1a\u7b2c\u4e8c\u4e2a SCF \u89e3\u80fd\u4e0d\u80fd\u625b\u4f4f\u51e0\u4f55\u5f1b\u8c6b\uff1f")
+    add("# Round 18 报告 \u2014\u2014 Stage 19\uff1a\u7b2c\u4e8c\u4e2a SCF \u89e3\u80fd\u4e0d\u80fd\u625b\u4f4f\u51e0\u4f55\u5f1b\u8c6b\uff1f")
     add("")
     add("## 0. \u4e00\u53e5\u8bdd\u7ed3\u8bba")
     add("")
@@ -349,17 +349,17 @@ def render(data_dir):
     add("")
     add("## 1. \u4e3a\u4ec0\u4e48\u8981\u6709\u8fd9\u4e00\u6b65\uff08Stage 19 \u7684\u52a8\u673a\uff09")
     add("")
-    add("Week 17\uff08`docs/27_week17_report.md`\uff09\u628a\u5168\u76ee\u5f55 1066 \u4e2a ORCA \u8f93\u51fa\u626b\u4e86\u4e00\u904d\uff0c"
+    add("Round 17\uff08`docs/27_week17_report.md`\uff09\u628a\u5168\u76ee\u5f55 1066 \u4e2a ORCA \u8f93\u51fa\u626b\u4e86\u4e00\u904d\uff0c"
         "\u7528\u51bb\u7ed3\u7684\u7535\u5b50\u8eab\u4efd\u91cf `charge_l1` \u5728**\u540c\u4e00\u4e2a\u51e0\u4f55\u4e0a**\u533a\u5206\u51fa\u4e24\u79cd\u81ea\u6d3d\u7684 SCF \u89e3\uff1a"
         "\u9ed8\u8ba4\u521d\u731c\u4e0e `MORead` \u4f1a\u5728 **37 \u683c**\uff08\u5168\u90e8 %d \u5bf9\u91cc\uff09\u843d\u5230\u4e0d\u540c\u7684\u7535\u5b50\u6001\uff0c"
-        "\u4e14 `moread` \u8fd9\u4e00\u652f\u80fd\u91cf\u66f4\u4f4e\u3002\u4f46 Week 17 \u7684\u7ed3\u8bba\u6709\u4e00\u4e2a\u575a\u786c\u7684\u9650\u5236\uff1a"
+        "\u4e14 `moread` \u8fd9\u4e00\u652f\u80fd\u91cf\u66f4\u4f4e\u3002\u4f46 Round 17 \u7684\u7ed3\u8bba\u6709\u4e00\u4e2a\u575a\u786c\u7684\u9650\u5236\uff1a"
         "\u5b83\u6bd4\u8f83\u7684\u662f\u4e24\u6761\u817f\u5728**\u540c\u4e00\u4e2a\u88c5\u914d\u51e0\u4f55\u4e0a**\u7684\u5355\u70b9\u80fd\u91cf\u2014\u2014"
         "\u90a3\u4e2a\u51e0\u4f55\u672c\u8eab\u5e76\u4e0d\u662f\u4efb\u4f55\u4e00\u652f\u89e3\u7684\u5f1b\u8c6b\u6781\u5c0f\u70b9\u3002"
         % (len(D["census"])))
     add("")
     add("\u56e0\u6b64\u4e0b\u4e00\u6b65\u662f\u552f\u4e00\u81ea\u7136\u7684\uff1a**\u628a\u4e24\u6761\u817f\u5404\u81ea\u653e\u5230\u5b83\u4eec\u81ea\u5df1\u7684\u51e0\u4f55\u6781\u5c0f\u70b9\u4e0a\uff0c"
         "\u518d\u95ee\u4e00\u6b21\u201c\u8fd9\u8fd8\u662f\u4e24\u4e2a\u4e0d\u540c\u7684\u7535\u5b50\u6001\u5417\uff1f\u8fd8\u662f moread \u8fd8\u66f4\u4f4e\uff1f\u201d**"
-        "\u3002\u8fd9\u662f Week 17 \u00a710 \u5217\u51fa\u7684\u7b2c\u4e00\u6761\u5019\u9009\uff08\u201c\u672c\u76ee\u5f55\u91cc 37 \u4e2a `moread_lower` \u683c\u5b50\u505a\u51e0\u4f55\u4f18\u5316\u201d\uff09\uff0c"
+        "\u3002\u8fd9\u662f Round 17 \u00a710 \u5217\u51fa\u7684\u7b2c\u4e00\u6761\u5019\u9009\uff08\u201c\u672c\u76ee\u5f55\u91cc 37 \u4e2a `moread_lower` \u683c\u5b50\u505a\u51e0\u4f55\u4f18\u5316\u201d\uff09\uff0c"
         "\u4e5f\u662f\u201c\u7b2c\u4e8c\u89e3\u662f\u771f\u5b9e\u7684\u53e6\u4e00\u4e2a\u6001\u201d\u8fd9\u4e00\u65ad\u8a00\u7684**\u6700\u540e\u4e00\u5757\u8bc1\u636e**\u3002")
     add("")
     add("## 2. \u53e3\u5f84\u4e0e\u8bb0\u53f7")
@@ -755,7 +755,7 @@ def render(data_dir):
     add("")
     add("---")
     add("")
-    add("## 7. \u8bfb\u6cd5\u7eaa\u5f8b\uff08\u5ef6\u7eed Week 9 \u00a710 / 10 \u00a711 / 11 \u00a711 / 12 \u00a710 / 13 \u00a711 / 14 \u00a79 / 15 \u00a78 / 16 \u00a77 / 17 \u00a77\uff09")
+    add("## 7. \u8bfb\u6cd5\u7eaa\u5f8b\uff08\u5ef6\u7eed Round 9 \u00a710 / 10 \u00a711 / 11 \u00a711 / 12 \u00a710 / 13 \u00a711 / 14 \u00a79 / 15 \u00a78 / 16 \u00a77 / 17 \u00a77\uff09")
     add("")
     add("1. **\u6bd4\u4f8b\u53ea\u4f5c\u6761\u4ef6\u9648\u8ff0**\uff1a\u8fd9 37 \u683c\u662f\u201c\u5355\u70b9\u4e0a\u4e24\u89e3\u4e0d\u540c\u3001"
         "\u4e14 `moread` \u66f4\u4f4e\u201d\u8fd9\u4e00\u5b9a\u4e49\u4e0b\u7684**\u5168\u96c6**\uff0c\u6240\u4ee5"
@@ -859,7 +859,7 @@ def render(data_dir):
     add("")
     add("---")
     add("")
-    add("## 10. \u4e0b\u4e00\u6b65\uff08Week 19 \u5019\u9009\uff09")
+    add("## 10. \u4e0b\u4e00\u6b65\uff08Round 19 \u5019\u9009\uff09")
     add("")
     add("1. **\u628a\u8fd9 37 \u683c\u7684\u7ed3\u8bba\u56de\u586b\u4e94\u7ea7\u53f0\u9636\u7684 P2 \u817f\u505a\u654f\u611f\u6027\u68c0\u67e5**\uff08**\u96f6\u65b0\u589e\u8ba1\u7b97**\uff09\uff1a"
         "\u95ee\u201c\u82e5 P2 \u5355\u70b9\u91cc\u7684\u8fd9\u4e9b\u683c\u5b50\u6539\u7528\u5f1b\u8c6b\u540e\u80fd\u91cf\uff0c\u53f0\u9636\u7ed3\u8bba\u4f1a\u4e0d\u4f1a\u52a8\u201d\uff1b"

@@ -1,6 +1,6 @@
 ﻿"""Render ``docs/32_week21_report.md`` from the batch-A (docs/31) artefacts.
 
-Week 21 executes batch A of ``docs/31_plan_revision_expert_review.md`` -- five
+Round 21 executes batch A of ``docs/31_plan_revision_expert_review.md`` -- five
 items that add no new electronic structure and change no frozen definition:
 
 * R1 (+R10) -- the three arms were scored on different molecule sets, so their
@@ -33,7 +33,7 @@ OUT_DEFAULT = Path(os.environ.get("W21_REPORT_OUT") or (REPO / "docs" / "32_week
 MANIFEST = FIGDIR / "figure_manifest_week21.md"
 F42 = "F42_sigma_synthetic_phase_diagram.png"
 
-#: the sentence the terminal site quotes verbatim as the week-21 tag.  Kept here
+#: the sentence the terminal site quotes verbatim as the round-21 tag.  Kept here
 #: so the report and the site can never drift apart.  No markup: the site stores
 #: the plain text and a test strips markup from the report before comparing.
 TAG = ("把三臂对齐到同一批 10 个分子之后，ΔSCF 的 τ_b 仍是三者最高（0.911 vs 0.778 vs 0.689），"
@@ -87,7 +87,7 @@ def render(data: Path = W21) -> str:
     lines = []
     add = lines.append
 
-    add("# Week 21 报告 —— 批次 A：把结题前必须堵掉的五个统计/措辞漏洞堵上")
+    add("# Round 21 报告 —— 批次 A：把结题前必须堵掉的五个统计/措辞漏洞堵上")
     add("")
     add("> 上游：`docs/31_plan_revision_expert_review.md`（外部评审的可执行条目表 R1–R12）。")
     add("> 本轮只做**批次 A**（R1 + R10、R2、R3、R6、R4a）：全部为**纯分析**，")
@@ -109,7 +109,7 @@ def render(data: Path = W21) -> str:
     add("  但**两两差异的配对 95%% CI 全部跨 0**（配对置换 p = %.3f–%.3f）——**排序差异未达显著**。"
         % (min(item["permutation"]["p_value"] for item in paired.values()),
            max(item["permutation"]["p_value"] for item in paired.values())))
-    add("- **R2**：Week 9 的 ρ(std, τ_b) = %.3f 降级为「现象示意（10 点 / 5 台阶）」。合成数据相图给出机制侧的定量边界："
+    add("- **R2**：Round 9 的 ρ(std, τ_b) = %.3f 降级为「现象示意（10 点 / 5 台阶）」。合成数据相图给出机制侧的定量边界："
         % meas["spearman_shift_std_vs_tau_b"])
     add("  换到 std 轴，相图上的秩相关是 **%.3f**；氧化靶轴上 τ_b 均值跌破 0.8 于 std = %s eV、跌破 0.5 于 %s eV"
         % (synth["spearman_shift_std_vs_tau_b"],
@@ -226,7 +226,7 @@ def render(data: Path = W21) -> str:
     add("### 2.5 R10：小样本纪律")
     add("")
     add("- 所有关键对比改为报**配对差值分布**（本节 §2.3 是一次示范）；")
-    add("- 「Week 9 被迫统一到共同 10 分子」已写进 `docs/19_week9_report.md` §2.6；")
+    add("- 「Round 9 被迫统一到共同 10 分子」已写进 `docs/19_week9_report.md` §2.6；")
     add("- 子集敏感性：同一组秩相关在 native 与 common-10 上**同向** ——")
     add("  ρ(std, τ_b)：%s（native）vs %s（common-10）；ρ(|mean|, τ_b)：%s vs %s；ρ(std, f_unresolved)：%s vs %s。"
         % (_fmt(sens["native"]["spearman_shift_std_vs_tau_b"]),
@@ -340,7 +340,7 @@ def render(data: Path = W21) -> str:
                     for miss in score["misses"]) + "。")
     add("")
     add("**诚实边界**：这些分子的能量在仓库里已经存在，所以这是**样本外留出检验**、不是盲前瞻试验；")
-    add("真正按时间排序的是**规则**（Week 10 冻结、阈值从未被留出分子影响）。而且 n = %d 个预测，"
+    add("真正按时间排序的是**规则**（Round 10 冻结、阈值从未被留出分子影响）。而且 n = %d 个预测，"
         % score["n_predictions"])
     add("0.750 与 0.500 的差别在这个样本量上**不显著**——只能说方向与 §7.2 一致。")
     add("")

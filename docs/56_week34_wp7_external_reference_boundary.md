@@ -1,4 +1,4 @@
-# Week 34 / WP7：外部验证与结论边界
+# Round 34 / WP7：外部验证与结论边界
 
 > 阶段：下一阶段实施方案 WP7。产物目录 `outputs/week34/`，交付镜像
 > `..\成果输出（part2）\week34/`。数字由
@@ -97,7 +97,7 @@ UNDER THE PRE-REGISTERED DISCOVERY / VALIDATION CRITERIA
 
 ## 4. 排序一致性层：独立重算 vs 冻结值
 
-| 量 | 独立重算 | 冻结值（Week 25） | 绝对差 |
+| 量 | 独立重算 | 冻结值（Round 25） | 绝对差 |
 | --- | --- | --- | --- |
 | n_rows | 14 | 14 | 0 |
 | n_pairs | 21 | 21 | 0 |
@@ -159,8 +159,8 @@ UNDER THE PRE-REGISTERED DISCOVERY / VALIDATION CRITERIA
 - `NOT CLOSABLE != NO SUCH DATA EXIST ANYWHERE`：这是可被证伪的负结果。
 - within-series 表的 14 行 provenance 均为 `transcription_only_not_reverified_against_primary`：
   排序层的**输入本身**尚未回溯到一次可复现的原始测量。
-- 本阶段的 10 条主结论标签是**边界声明**，不是新的证据；Week 35 / Paper 必须沿用这些标签。
-- 下一步：Week 35 / Paper（论文主文收敛，七图结构，结果六节固定顺序）。
+- 本阶段的 10 条主结论标签是**边界声明**，不是新的证据；Round 35 / Paper 必须沿用这些标签。
+- 下一步：Round 35 / Paper（论文主文收敛，七图结构，结果六节固定顺序）。
 
 ## 10. 复现命令
 

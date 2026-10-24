@@ -114,5 +114,5 @@ def test_report_has_no_placeholder_or_double_percent_leftovers():
 
 def test_step_thirteen_lists_week21_candidates():
     text = m.render(m.W20_DEFAULT)
-    assert "## 12. 下一步（Week 21 候选）" in text
+    assert "## 12. 下一步（Round 21 候选）" in text
     assert "Gate 0 CLOSED、Gate 1 NOT CLOSED" in text

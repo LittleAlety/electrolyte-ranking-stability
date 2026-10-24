@@ -1,6 +1,6 @@
 """Render ``docs/34_week23_report.md`` from the Stage 24 artefacts (docs/31 batch C/D).
 
-Week 23 closes the revision plan with three work packages:
+Round 23 closes the revision plan with three work packages:
 
 * R5  -- wording revision (batch C) plus the optional n = 3 sign check on EC at GFN2-xTB.
 * R8  -- targeted two-guess: the missed-solution allowance, the soundness inequality and
@@ -53,7 +53,7 @@ def _gate1(data: Path) -> dict:
     # table: W25 later ingests the transcribed series into
     # ``data/anchors/within_series_ordering.csv`` and freezes it, while the live
     # re-evaluation lives in ``outputs/week25/series_rel_ordering_check.json``.
-    # Reading the frozen week-2 payload keeps this week-23 report a truthful
+    # Reading the frozen round-2 payload keeps this round-23 report a truthful
     # render of the state its own prose describes.
     frozen = json.loads(
         (root / "outputs" / "week2" / "series_rel_ordering_check.json").read_text(
@@ -111,7 +111,7 @@ def render(data: Path = W23) -> str:
 
     out = []
     add = out.append
-    add("# Week 23 报告（Stage 24：批次 C/D 收尾）")
+    add("# Round 23 报告（Stage 24：批次 C/D 收尾）")
     add("")
     add("> 上游：`docs/31_plan_revision_expert_review.md` 的「批次 C/D」——"
         "`R5`（措辞修订 + n = 3 符号检验）、`R8`（漏解靶向双腿）、"
@@ -191,7 +191,7 @@ def render(data: Path = W23) -> str:
     add("- `docs/12_week5_report.md`：§2.6 前加 R5 读法纪律 —— 还原轴 tau_b = -0.467 是**换号**"
         "但**不是精度比较**，禁止写成「加 Li+ 后电位变得更准」。")
     add("- `docs/10_week4_report.md`：L327「位移随介电常数饱和」→"
-        "「快速衰减（Week 22 的 R4b 表明它其实是几乎严格的 1/eps 幂律）」。")
+        "「快速衰减（Round 22 的 R4b 表明它其实是几乎严格的 1/eps 幂律）」。")
     add("")
     add("---")
     add("")
@@ -345,7 +345,7 @@ def render(data: Path = W23) -> str:
     add("")
     add("### 3.1 闭式判据：可以在花钱之前预判")
     add("")
-    add("- Week 10（Stage 11）把用了六周的 `sigma_ij` 化简为闭式：`%s`。"
+    add("- Round 10（Stage 11）把用了六周的 `sigma_ij` 化简为闭式：`%s`。"
         % sigma["theorems"]["T1_sigma_is_shift_difference"]["statement"])
     add("- 由此得到一条无量纲判据：`%s`（实测最大误差 z = 1 时 %s、z = 1.96 时 %s）。"
         % (sigma["theorems"]["T4_closed_form_unresolved"]["statement"],
@@ -363,7 +363,7 @@ def render(data: Path = W23) -> str:
     consts = [entry["mean_x_epsilon_mev"] for label, entry in dielectric["power_law"].items()
               if label != "1e6" and entry["n"] >= 12]
     prefactor = sum(consts) / len(consts) / 1000.0
-    add("- Week 22（R4b，附加诊断）测到 `abs(dE) x eps` 从 eps = 7 到 1000 都是常数"
+    add("- Round 22（R4b，附加诊断）测到 `abs(dE) x eps` 从 eps = 7 到 1000 都是常数"
         "（%s - %s meV），即残余几乎严格按 **1/eps** 衰减，prefactor 约 **%s eV/eps**。"
         % (_fmt(min(consts), 0), _fmt(max(consts), 0), _fmt(prefactor, 2)))
     add("- eps = 200 的残余最大只剩 **%s meV**，是氧化轴 delta_m（%s meV）的 **%s%%**。"
@@ -385,7 +385,7 @@ def render(data: Path = W23) -> str:
            _fmt(inc["d_ip_ev"]["2"]), _fmt(inc["d_ea_ev"]["2"]),
            _fmt(inc["d_ip_ev"]["3"]), _fmt(inc["d_ea_ev"]["3"])))
     add("- 两轴都**同号且绝对值更小** → 与「次线性、与饱和一致」相容；"
-        "但三点定不出渐近线，措辞只能是 consistent with saturation（Week 8 的 Stage 9 "
+        "但三点定不出渐近线，措辞只能是 consistent with saturation（Round 8 的 Stage 9 "
         "用 12 个分子、2 个点得到同一形状）。")
     add("- 工程读法：**第一配位壳必须算**（它贡献 %s eV 量级的氧化位移）；"
         "第二、第三壳只做**是否换号**的抽查，不必逐一进入冻结台阶。"

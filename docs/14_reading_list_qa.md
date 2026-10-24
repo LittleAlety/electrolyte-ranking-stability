@@ -537,5 +537,5 @@ Itkis 的 `p(C)` 群体分布（原文无群体分布，只有"值得考虑的 n
 - M1（Bard / Faulkner / White 教材）未提供 PDF，相关条目仅作概念性回答，并已逐条标注。
 - 抽取文本副本：`outputs/_week7_scratch/lit/*.txt`（`pymupdf`，每页以 `===== PAGE n =====` 分隔）；
   抽取脚本 `outputs/_week7_scratch/extract.py`。抽取造成的符号损坏见 §0.1。
-- 本文档为 Stage 0 / Week 7 交付物，回答对象是 `核心文件/ranking-electrolyte-materials-reading-list.md`。
+- 本文档为 Stage 0 / Round 7 交付物，回答对象是 `核心文件/ranking-electrolyte-materials-reading-list.md`。
   该 reading list 本身**未被修改**；两处需要更正之处以 §5「勘误」形式给出，供 PI 决定是否回改原文件。

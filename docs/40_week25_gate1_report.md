@@ -1,4 +1,4 @@
-# Week 25（W25-G1）报告 —— 溶液相锚点排序一致性判据的首次评估（负结果）
+# Round 25（W25-G1）报告 —— 溶液相锚点排序一致性判据的首次评估（负结果）
 
 - 命名说明：本周命名空间 `week25`（W25-G1）；仓库既有 `week22`（Stage 23）、`week22_hardening`（W22-H）、`week23`（Stage 24）、`week24_corealign`（W24-C / W24-D）一律不改动。
 - 对照对象：核心文件 `核心文件/ranking-electrolyte-materials-v2.md` §15.2（Solution redox anchors）与 §19 Stage 1 的 Gate 1。

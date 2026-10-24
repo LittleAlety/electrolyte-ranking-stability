@@ -1,6 +1,6 @@
-# Week 3 报告 —— Stage 2：廉价层 P0、覆盖检查、锚点核验、ORCA 就绪
+# Round 3 报告 —— Stage 2：廉价层 P0、覆盖检查、锚点核验、ORCA 就绪
 
-日期：2026-09-29。对应 v2 §7.1（先审计再冻结生产协议）、§19 Stage 2、计划 §10 的 Week 3–4。
+日期：2026-09-29。对应 v2 §7.1（先审计再冻结生产协议）、§19 Stage 2、计划 §10 的 Round 3–4。
 
 > 本报告只陈述**真实跑出来的**数字。P0 是轨道能代理量，**不是**真实氧化还原电位；
 > 本轮**没有** r2SCAN-3c 数据（ORCA 未安装），所有排序结论都只是「P0 内部」的预演。
@@ -37,9 +37,9 @@
   另对 10 个分子跑了独立 `--alpha` 作业做交叉确认（例：MPC 74.715048 vs 74.715051，一致）。
   **alpha / dipole 只作 auxiliary，不参与 P0 排序**（`scientific_definitions.yaml` 明确排除）。
 
-### 2.2 与 Week 2 的交叉可复现性
+### 2.2 与 Round 2 的交叉可复现性
 
-Week 2 的 12 个审计分子与 Week 3 重算结果逐一对齐：`p0_ox` 最大绝对偏差 **0.0063 eV**
+Round 2 的 12 个审计分子与 Round 3 重算结果逐一对齐：`p0_ox` 最大绝对偏差 **0.0063 eV**
 （仅 EA 一个分子，来自独立的 RDKit 嵌入/优化路径），其余 **0.0000 eV**。
 → 管线可复现，P0 定义没有在两次运行之间漂移。
 
@@ -123,12 +123,12 @@ Week 2 的 12 个审计分子与 Week 3 重算结果逐一对齐：`p0_ox` 最�
 | F2 | `outputs/figures/F2_p0_distributions_by_family.png` | 各 family 的 P0 分布，按氟化着色 |
 | F3 | `outputs/figures/F3_value_error_vs_rank_error.png` | **值误差 vs 排序误差**（本轮核心反直觉结论） |
 
-Week 3 专用图（`scripts/run_broad_pool_p0.py` 产出）：
+Round 3 专用图（`scripts/run_broad_pool_p0.py` 产出）：
 `outputs/week3/fig1_family_counts.png`、`fig2_mw_donor.png`、`fig3_p0_ox_fluorinated.png`。
 
 ---
 
-## 6. 下一步（Week 4–5）
+## 6. 下一步（Round 4–5）
 
 1. **安装 ORCA**（用户侧，见 `docs/07` §1–§3）→ 跑 `check_environment.py` 确认 FOUND；
 2. 用 `run_orca_job.py --dry-run` 生成 EC/PC/DMC 的 r2SCAN-3c 输入，肉眼确认关键词与 `%cpcm`；
@@ -136,7 +136,7 @@ Week 3 专用图（`scripts/run_broad_pool_p0.py` 产出）：
 4. 用 T1 结果重跑 F3（**值误差 vs 排序误差**），检验「P0 的排序是否被 r2SCAN-3c 保留」；
 5. 重评 Gate 1（气相锚点趋势 + SCF 稳定性 + state identity）。
 
-**后续进展（2026-09-29 回填）：** ORCA **6.1.1**（Windows AVX2 **msmpi** 构建）已安装并跑通（装到 `E:\ORCA\orca_6_1_1`，用 `msiexec /a` 做 administrative install，无需管理员权限，约 173 s；仓库内经 junction `.toolchain\orca\orca_6_1_1` 使用），`scripts\check_environment.py` 现输出 `orca FOUND ... version 6.1.1 [bundled]`。因此 §3 中 Gate 1 的 blocker ①「ORCA 未安装」**已解除** —— **Gate 1 现只剩 1 个 blocker：溶液锚点 `data/anchors/solution_redox_anchors.csv` 31 行仍全部为 `est`（不可回溯）**。同时 Week 4 的 T1 主扫描（core set 18 分子 × 3 电子态 r2SCAN-3c 气相单点 @ G1）已完成，**54/54 成功、0 失败**，详见 `docs/10_week4_report.md` 与 `outputs/week4/`；ORCA 细节见 `docs/07_orca_setup_and_runner.md` §10–§15 与 `docs/08_stage2_production_protocol.md` §2、§7。
+**后续进展（2026-09-29 回填）：** ORCA **6.1.1**（Windows AVX2 **msmpi** 构建）已安装并跑通（装到 `E:\ORCA\orca_6_1_1`，用 `msiexec /a` 做 administrative install，无需管理员权限，约 173 s；仓库内经 junction `.toolchain\orca\orca_6_1_1` 使用），`scripts\check_environment.py` 现输出 `orca FOUND ... version 6.1.1 [bundled]`。因此 §3 中 Gate 1 的 blocker ①「ORCA 未安装」**已解除** —— **Gate 1 现只剩 1 个 blocker：溶液锚点 `data/anchors/solution_redox_anchors.csv` 31 行仍全部为 `est`（不可回溯）**。同时 Round 4 的 T1 主扫描（core set 18 分子 × 3 电子态 r2SCAN-3c 气相单点 @ G1）已完成，**54/54 成功、0 失败**，详见 `docs/10_week4_report.md` 与 `outputs/week4/`；ORCA 细节见 `docs/07_orca_setup_and_runner.md` §10–§15 与 `docs/08_stage2_production_protocol.md` §2、§7。
 
 ---
 

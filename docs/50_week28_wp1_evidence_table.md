@@ -1,7 +1,7 @@
-# Week 28 / WP1：统一科学证据主表
+# Round 28 / WP1：统一科学证据主表
 
 **阶段**：下一阶段（评审实施方案）工作包 **WP1**
-**唯一变量 / 新增计算**：**零新增电子结构计算**。本阶段只做整理、口径冻结与一致性审计，全部数值来自 Week 1–27 的冻结产物。
+**唯一变量 / 新增计算**：**零新增电子结构计算**。本阶段只做整理、口径冻结与一致性审计，全部数值来自 Round 1–27 的冻结产物。
 **产物目录**：`outputs/week28/`（仓库内）；交付镜像 `..\成果输出（part2）\week28/`（仓库外）
 **生成器**：`scripts/build_week28_evidence_table.py`（确定性；`--check` 逐字节复核）
 **测试**：`tests/test_week28_evidence_table.py`（10 项）
@@ -10,9 +10,9 @@
 
 ## 0. 一句话结论
 
-把 Week 1–27 散落各处的物理量、状态身份、排序指标与计算成本收敛成**六张主表**（共 2074 行），
+把 Round 1–27 散落各处的物理量、状态身份、排序指标与计算成本收敛成**六张主表**（共 2074 行），
 每一行都能追到明确的 `molecule x model x charge state x motif` 与**具体来源字段**；并且在
-`all` scope / `z_only` / `z = 1.0` 下**逐位复现**了 Week 6 已冻结的 pair 数字
+`all` scope / `z_only` / `z = 1.0` 下**逐位复现**了 Round 6 已冻结的 pair 数字
 （354 个 pair，最大绝对误差 `0.000e+00` eV），证明这张主表是已发表数字的**同一个对象**，
 而不是并行的一套定义。
 
@@ -58,7 +58,7 @@ rung 注册表（R13 命名，逐条写清「模型」是什么）：
 | `C2` | 第一溶剂壳 `[Li(M)2]+`（配位数 2） | 优化后的 1:2 复合物 | 气相 | 昂贵 |
 
 两个 scope：
-`all` 不做 state-identity 过滤（Week 5/6 原始口径，只用于复核）；`primary` 是 R13 口径，
+`all` 不做 state-identity 过滤（Round 5/6 原始口径，只用于复核）；`primary` 是 R13 口径，
 C1/C2 的还原轴只让 `molecule_centered_redox` 进入主 ranking。
 当某对比不含条件态 rung、或两者候选集合相同时只输出 `all` 行（此时「没有 primary 行」≡「primary 与 all 相同」）。
 
@@ -73,7 +73,7 @@ C1/C2 的还原轴只让 `molecule_centered_redox` 进入主 ranking。
 | `p1v_vs_p1a_distinct` | **PASS** | 定义层几何策略与热化学都不同；经验层 12 个共同分子 `\|IP(P1a)-IP(P1v)\| > 0` **全部成立**，中位 0.3181 eV、最大 0.9503 eV，且**全部为负**（绝热弛豫降低 IP） |
 | `li_centered_not_misused_as_molecular` | **PASS** | C1 的 10 个候选里只有 **SN** 通过还原轴闸门；另外 9 个 Li-centered/mixed 被排除出 `primary`；旧 `all` scope 的还原排序 `tau_b = -0.4667` |
 | `status_vocabulary_separated`（附加） | **PASS** | `value_status` 只用 `ok / missing / not_converged / not_applicable`；`UNRESOLVED` 只作 pair 层 `decision_state`，从不进 `value_status` |
-| `frozen_number_reproduction`（附加） | **PASS** | 逐位复现 Week 6 的 6 组 stored pair（最大误差 `0.000e+00` eV，354 个 pair，mask 不一致 0）；并用 `tau_b`/`spearman` 复核 Week 4 的 4 组 P2a 数值 |
+| `frozen_number_reproduction`（附加） | **PASS** | 逐位复现 Round 6 的 6 组 stored pair（最大误差 `0.000e+00` eV，354 个 pair，mask 不一致 0）；并用 `tau_b`/`spearman` 复核 Round 4 的 4 组 P2a 数值 |
 
 ### 3.1 `li_centered_not_misused_as_molecular` 为什么不是空检查
 
@@ -99,10 +99,10 @@ C1/C2 的还原轴只让 `molecule_centered_redox` 进入主 ranking。
 3. **`ROBUST_INVERSION` 在 `z = 1.0` 下结构性不可检验。** `sigma_ij` 由两个模型共同定义，
    反向 pair 两侧同时过门槛需要 `z <= 1/√2 = 0.7071`；因此 `f_robust_inv = 0` **不是**排序稳定的
    证据。`pairwise_table.structurally_non_testable` 逐行标注，全部 1326 行为 `True`。
-4. **`P2` 在仓库里有两套同名含义。** Week 4 的 `p2_decision_stability.json` 把 “P2” 记为
-   CPCM(SMD, acetonitrile)，Week 6 的 `analyze_stage6.py` 把 “P2” 记为 bare CPCM ε=10。
+4. **`P2` 在仓库里有两套同名含义。** Round 4 的 `p2_decision_stability.json` 把 “P2” 记为
+   CPCM(SMD, acetonitrile)，Round 6 的 `analyze_stage6.py` 把 “P2” 记为 bare CPCM ε=10。
    两者各自正确但同名，跨周引用必踩坑。R13 的 `P2a` / `P2eps` 拆分消除歧义：主表分别登记为
-   `P2a` 与 `P2eps@10.0`，Week 6 的 `P1_to_P2` 对应 `P1v_to_P2eps10`。该映射已用 `tau_b` 复核。
+   `P2a` 与 `P2eps@10.0`，Round 6 的 `P1_to_P2` 对应 `P1v_to_P2eps10`。该映射已用 `tau_b` 复核。
 5. **信息覆盖度显著不对称。** 廉价层声明覆盖 58 个分子，昂贵层只到 18（`P1v`/`P2a`）
    或 10–12（`P1a`/`C0`/`C1`/`C2`/`P2eps`）。主表把 broad pool 的 P0 也登记进来
    （40 分子 × 2 轴 = 80 行显式 `missing`），因此 WP4/WP6 的信息预算可以直接从
@@ -128,15 +128,15 @@ C1/C2 的还原轴只让 `molecule_centered_redox` 进入主 ranking。
 | 复核项 | 独立重算结果 |
 | --- | --- |
 | `sigma_ev = abs(d_lower - d_upper) / sqrt(2)`（P0_to_P1v / oxidation / all，153 行） | 与表内 `sigma_ev` 最大绝对误差 `4.44e-16`（浮点噪声）；`resolved` 判据不一致 0 行 |
-| 对 Week 6 的 `z_only.P0_to_P1.oxidation`（66 个 pair） | 66/66 全部可见；最大绝对误差 `d_lower` 2.22e-16 / `d_upper` 4.44e-16 / `sigma` 1.11e-16 |
+| 对 Round 6 的 `z_only.P0_to_P1.oxidation`（66 个 pair） | 66/66 全部可见；最大绝对误差 `d_lower` 2.22e-16 / `d_upper` 4.44e-16 / `sigma` 1.11e-16 |
 | P1a 还原轴 | 12 行全部 `not_applicable`、`value` 全空 |
 | C1/C2 还原轴 `in_primary_ranking=True` | 只有 `SN`（C1 −3.207882 eV、C2 −2.818096 eV），标签均 `molecule_centered_redox` |
 | 状态一致性 | `ok` 但值为空 0 行；非 `ok` 却有数值 0 行；`UNRESOLVED` 不出现在 `value_status` |
 
 它提出的两条质疑已被采纳并修正：
 
-- **方向/符号**：`pairwise_table` 按字母序排 `i`/`j`，与 Week 6 的存储顺序可能相反（24 个 pair 反向并整体取负）。
-  已在数据字典 §5.3 写明；`frozen_number_reproduction` 用 Week 6 自己的顺序，因此仍是逐位相等。
+- **方向/符号**：`pairwise_table` 按字母序排 `i`/`j`，与 Round 6 的存储顺序可能相反（24 个 pair 反向并整体取负）。
+  已在数据字典 §5.3 写明；`frozen_number_reproduction` 用 Round 6 自己的顺序，因此仍是逐位相等。
 - **分母与声明范围不一致**：`declared_scope.C1` 原写作 12，与冻结声明（core 18）不符。
   已改为 18，并补 `declared_scope_source` 出处与 `coverage` 对账块（即事实 6、7）。
 
@@ -178,7 +178,7 @@ C1/C2 的还原轴只让 `molecule_centered_redox` 进入主 ranking。
   15 个 pair。主表只给点估计；bootstrap 区间沿用各周产物，不在本阶段重算。
 - **`primary` scope 的还原轴无法构成 pair。** `C0_to_C1` 与 `C1_to_C2` 的还原轴在闸门后只剩
   1 个候选，主表对这些组合显式给出 `skipped`，**不得**读成「稳定」或「零反转」。
-- **`all` scope 里的 Li-centered 数据不是结论。** 它只用于复核 Week 5/6 的冻结数字。
+- **`all` scope 里的 Li-centered 数据不是结论。** 它只用于复核 Round 5/6 的冻结数字。
 - **`state_registry` 的 G2 组只有 derived 数值。** `outputs/week4/t2_opt_freq.csv` 只存
   折算后的 `ip_g2_ev` / `ea_g2_ev`，没有逐态能量，因此这几行标 `energy_availability = derived_only`。
 - **`state_registry` 的 C1/C2 组有重复行（未携带上游 `job` 相位）。** 上游 `outputs/week5/c1_li_coordination.csv` 对同一 `(分子, motif, 电荷态)` 同时存有 `opt` 与 `sp` 两条记录（`final_energy_eh` 不同），而本表 schema 没有保留 `job` 字段，投影后成为无法区分的重复行：242 行里只有 186 个唯一 `state_id`（36 组重复），其中 51 行与另一行逐字段完全相同。该重复**不改变任何排序数字**（`property_table` 的 C1 取自 `c1_coord_shifts.csv`，键唯一；pair 构建只取双侧 `ok` 的行），但「每行对应一个可辨识计算对象」这一读法在 C1/C2 组需按本保留读。结构性修法（在 `state_registry` 增设 `job` 相位判别列并写进 `state_id`）已登记为后续改进，本阶段不改动冻结表。

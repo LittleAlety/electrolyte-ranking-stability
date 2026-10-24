@@ -6,7 +6,7 @@
 - Gate 0：修订登记并**重冻结**后仍 **CLOSED**（`scripts/freeze_gates.py` `evaluate_stage0`：所有 amendment `refrozen: true` 即闭合）
 
 本文件回答一个具体问题：**按外部评审的意见，这个仓库到底该改哪些东西、按什么优先级改、哪些不改。**
-评审的核心判断是：仓库已经是「相当完整的 decision-stability prototype」，下一阶段不该继续堆 Week 26/27/28，
+评审的核心判断是：仓库已经是「相当完整的 decision-stability prototype」，下一阶段不该继续堆 Round 26/27/28，
 而应补齐几个**物理定义缺口**、收缩叙事、提高可发表性。
 
 ---
@@ -34,7 +34,7 @@
 
 ### 问题
 
-仓库早期把 Week-4 的「r2SCAN-3c 三态垂直 IP/EA」标为 `P1 = gas-phase molecular redox thermodynamics`。
+仓库早期把 Round-4 的「r2SCAN-3c 三态垂直 IP/EA」标为 `P1 = gas-phase molecular redox thermodynamics`。
 但 v2 的 P1 定义为 **adiabatic** 自由能差
 
 ```
@@ -58,7 +58,7 @@ P1^repo = E(M+; G1) - E(M; G1)   →  vertical
 
 ### 实现
 
-- runner：`scripts/run_p1a_adiabatic.py`（12 分子 T2 子集；中性弛豫几何直接复用 Week-4 的 G2）。
+- runner：`scripts/run_p1a_adiabatic.py`（12 分子 T2 子集；中性弛豫几何直接复用 Round-4 的 G2）。
 - 产物：`outputs/phase2_p1a/p1a_adiabatic.csv` / `.json`、`outputs/phase2_p1a/geometry_relaxation/`。
 - 对照：`scripts/compare_vertical_adiabatic.py` → `outputs/phase2_p1a/p1v_vs_p1a.json`、`docs/p1v_vs_p1a.md`。
 - 关键物理结论（见 `docs/p1v_vs_p1a.md`）：**氧化轴可比较；还原轴因气相阴离子不束缚而按规则排除**——
@@ -70,7 +70,7 @@ P1^repo = E(M+; G1) - E(M; G1)   →  vertical
 
 ### 问题
 
-Week-5 报出 C0 → C1 还原轴 `τ_b = -0.467`、`f_robust_inv = 0`，容易被读成
+Round-5 报出 C0 → C1 还原轴 `τ_b = -0.467`、`f_robust_inv = 0`，容易被读成
 「Li⁺ 配位让还原排序翻转」。但同一周的 state-identity QC 显示：**12 个还原态里 11 个外加电子落在 Li 上**
 （`Li_centered_or_mixed_redox`）。当电子离开分子时，数值排序的变化**不是**同一 observable 的排序不稳定，
 而是 **observable identity failure**。

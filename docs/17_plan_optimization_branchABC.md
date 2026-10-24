@@ -32,7 +32,7 @@
 
 ## 2. 与 `docs/11_plan_alignment.md` 的关系
 
-`docs/11` 是 Week 5 结束时写的「计划对齐表」。本轮**不直接改写**它（它属于 Stage 2 冻结集合，改动会改变其摘要值），而是在 `docs/18_week8_report.md` 里新增一节「Stage 9 对齐」，并在重建交付包时把 `docs/16`/`docs/17`/`docs/18` 一并冻结。若 PI 希望 `docs/11` 同步，需下一轮显式授权。
+`docs/11` 是 Round 5 结束时写的「计划对齐表」。本轮**不直接改写**它（它属于 Stage 2 冻结集合，改动会改变其摘要值），而是在 `docs/18_week8_report.md` 里新增一节「Stage 9 对齐」，并在重建交付包时把 `docs/16`/`docs/17`/`docs/18` 一并冻结。若 PI 希望 `docs/11` 同步，需下一轮显式授权。
 
 ---
 
@@ -42,7 +42,7 @@
 - `config/scientific_definitions.yaml`：**0 改动**。
 - 目标量、family 定义、筛选方向、阈值、k/N 比例、bootstrap 种子集、splits 规则：**全部沿用**。
 
-因此本轮的 Stage 9 结果**可以**与 Week 4–7 的结果直接比较，不需要任何「口径变更」的护身符。
+因此本轮的 Stage 9 结果**可以**与 Round 4–7 的结果直接比较，不需要任何「口径变更」的护身符。
 
 ---
 
@@ -50,7 +50,7 @@
 
 1. **【本轮新增】Stage 9 的判据是否需要写进 prereg？**
    本轮把 Stage 9（显式微溶剂化）的判据实现为 `docs/18_week8_report.md` §2 的四个指标。由于 v2 §19 把 Stage 9 定义为 **optional**，我们没有把它写进 `config/prereg.yaml`。若 PI 希望把「C₂ 壳层鲁棒性」提升为一个**必报指标**，则需要走 `amendment_log`，并接受 **Gate 0 从 CLOSED 变为 NOT CLOSED** 的后果。
-2. **【Week 6 遗留】`delta_m` 是否 append 进 `config/prereg.yaml`？** 当前取候选值，Gate 0 保持 CLOSED。
-3. **【Week 4 遗留】Gate 1 NOT CLOSED**：唯一 blocker 是 `data/anchors/solution_redox_anchors.csv` 的 **31 行仍为 `method=est`**，缺主文献核验。主结论只依赖气相锚点。
-4. **【Week 7 遗留】`ranking._resolve_k` 口径偏差**：prereg §1 写 `max(1, floor(frac·N+0.5))`，代码用 `round(frac·N)`；N=18/40 两者一致，N=5 时 10% 退化为 k=0。见 `docs/15` §8 第 5 条。
+2. **【Round 6 遗留】`delta_m` 是否 append 进 `config/prereg.yaml`？** 当前取候选值，Gate 0 保持 CLOSED。
+3. **【Round 4 遗留】Gate 1 NOT CLOSED**：唯一 blocker 是 `data/anchors/solution_redox_anchors.csv` 的 **31 行仍为 `method=est`**，缺主文献核验。主结论只依赖气相锚点。
+4. **【Round 7 遗留】`ranking._resolve_k` 口径偏差**：prereg §1 写 `max(1, floor(frac·N+0.5))`，代码用 `round(frac·N)`；N=18/40 两者一致，N=5 时 10% 退化为 k=0。见 `docs/15` §8 第 5 条。
 5. **【本轮新增】reading list 勘误回改**：A2 作者名（补全 4 位）与「分支a-d 实为 A/B/C 三支」两条建议回改 reading list 原文。

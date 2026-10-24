@@ -1,4 +1,4 @@
-# 15 Week 7 报告：Stage 7（ML / direct vs Δ-learning）+ Stage 8（active-learning replay）
+# 15 Round 7 报告：Stage 7（ML / direct vs Δ-learning）+ Stage 8（active-learning replay）
 
 本报告对应 `核心文件/ranking-electrolyte-materials-v2.md` §11–§14 与
 `config/prereg.yaml` §5–§8。全部数字来自仓库内真实产物（`outputs/week7/*`），
@@ -42,7 +42,7 @@
 | --- | --- | --- | --- |
 | `M` 方法 | `P0` → `P1` | 18 | 无 |
 | `E` 环境 | `P1` → `P2` | 18 | 无 |
-| `C` 配位 | `C0` → `C1` | **10** | `EMC, DEC, PC, FEC, VC, TEGDME, EA, MA`（Week 5 未做 C1 的 8 个） |
+| `C` 配位 | `C0` → `C1` | **10** | `EMC, DEC, PC, FEC, VC, TEGDME, EA, MA`（Round 5 未做 C1 的 8 个） |
 
 两条筛选轴**分开报告**（v2 §4.1 禁止合并）：`ox = IP`、`red = −EA`，两者都是「越大越稳」。
 `P0` 层按 Koopmans 存 `p0_ox = −ε_HOMO`、`p0_red = +ε_LUMO`；因此 `P1_red − P0_red`
@@ -143,7 +143,7 @@ M·ox = −0.725）：直接学目标层时，最低复杂度基线会给出**�
 `C · X0 · red` 与 `C · X0+X1 · red` 上 direct 胜出（0.422 / 0.289 vs 0.022 / 0.200）。
 机制上说得通：还原轴涉及「额外电子进入哪个轨道」，Li⁺ 配位会**改变接受电子的位置**
 （C=O 的 π* 与 Li⁺ 的静电场竞争），位移因此不再是一个「平移量」而更像「换了一把尺子」。
-这个解释与 Week 4 §3.3「还原侧定性失效」、Week 6 T9「并入 `δ_m` 后还原轴双方均解析的 pair 数归零」是同一现象的三种观测。
+这个解释与 Round 4 §3.3「还原侧定性失效」、Round 6 T9「并入 `δ_m` 后还原轴双方均解析的 pair 数归零」是同一现象的三种观测。
 
 ---
 
@@ -269,12 +269,12 @@ M·ox = −0.725）：直接学目标层时，最低复杂度基线会给出**�
 5. **`_resolve_k` 的口径边界。** `prereg.yaml` §1 写的是 `k_abs = max(1, floor(frac·N+0.5))`，
    而 `src/electrolyte_ranking/ranking.py` 的 `_resolve_k` 用 `round(frac·N)`。
    在项目实际规模（core N = 18、broad N = 40）两者完全一致（`tests/test_stage7_ml.py`
-   有一条断言钉住这一点）；但在 N = 5 时 10% 会退化为 k = 0。此为 Week 1–6 冻结代码的
+   有一条断言钉住这一点）；但在 N = 5 时 10% 会退化为 k = 0。此为 Round 1–6 冻结代码的
    既有行为，本轮**未修改**，仅在此登记。
 6. **`E` 轴的 `X0+P1` 特征集含 `p1_*`**，即环境任务允许使用 P1 层（自由分子 DFT）信息。
    这不是泄漏（P1 确实比 P2 便宜），但报告里不能把它说成「只用廉价描述符」。
 7. **Gate 1 仍未关闭**：溶液相锚点 31 行仍为 `est`，本周所有结论只依赖气相锚点。
-8. **Week 6 遗留**：`delta_m` 是否 append 进 `config/prereg.yaml` 仍待 PI 裁决；Gate 0 保持 CLOSED。
+8. **Round 6 遗留**：`delta_m` 是否 append 进 `config/prereg.yaml` 仍待 PI 裁决；Gate 0 保持 CLOSED。
 
 ---
 

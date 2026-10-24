@@ -1,4 +1,4 @@
-# Week 35 / Paper：论文主文收敛包
+# Round 35 / Paper：论文主文收敛包
 
 > 阶段：下一阶段实施方案第八周（Paper）。产物目录 `outputs/week35/`，交付镜像
 > `..\成果输出（part2）\week35/`。数字由
@@ -7,7 +7,7 @@
 
 ## 0. 本轮解决的问题
 
-前七步把「物理机制 -> 决策可靠性 -> 最小信息预算」做成了可复核的闭环，Week 34 又定死了结论边界。
+前七步把「物理机制 -> 决策可靠性 -> 最小信息预算」做成了可复核的闭环，Round 34 又定死了结论边界。
 最后一步是把它们**收敛成一篇论文**。实施方案对这一周的验收是：主图、结果、讨论、局限与补充材料。
 
 本阶段不改 docx，而是产出一个**可校验的收敛包**，让 `论文/build_paper_docx.py` 的重建
@@ -49,7 +49,7 @@
 
 ## 3. 结论-轨道标签
 
-直接沿用 Week 34 / WP7 的 10 条，论文不新造标签：
+直接沿用 Round 34 / WP7 的 10 条，论文不新造标签：
 
 | 轨道 | 条数 | 内容 |
 | --- | --- | --- |
@@ -110,7 +110,7 @@
 target / designated reference model` 措辞（0 处）。收敛时必须显式补上，而不是简单改词；
 这一条是收敛包要暴露的问题，v6 时点论文源文件不在本阶段的写入范围。
 
-**现状**：该缺口已由 Week 36 的 v7 结题重建补齐（`naming_update_required` 由 `True` 变为 `False`）。
+**现状**：该缺口已由 Round 36 的 v7 结题重建补齐（`naming_update_required` 由 `True` 变为 `False`）。
 本表随论文生成器源码实时扫描，因此这里给出的是当前状态；v6 时点的记录与 v6 → v7 的溯源
 （生成器 sha256 `44c026c5…` → `89dd8811…`）保留在 `成果输出（part2）/week36/SUBMISSION.json`。
 
@@ -140,7 +140,7 @@ target / designated reference model` 措辞（0 处）。收敛时必须显式�
 4. 补入 WP1-WP7 的 16 个溯源数字与 13 条边界声明。
 5. 把 F57/F58 与 T6a/T6b 的详细推导放入 Fig. 2/4 局部面板或补充材料。
 
-> 状态（Week 36）：以上 5 项已由 v7 结题重建全部落地；`paper_build_handoff.json` 新增
+> 状态（Round 36）：以上 5 项已由 v7 结题重建全部落地；`paper_build_handoff.json` 新增
 > `required_edits_status` 逐条记录该状态。
 
 机器可读版本：`outputs/week35/paper_build_handoff.json`。

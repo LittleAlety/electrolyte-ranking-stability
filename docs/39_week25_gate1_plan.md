@@ -1,4 +1,4 @@
-# Week 25（W25-G1）计划 —— 溶液相锚点的排序一致性判据：首次评估
+# Round 25（W25-G1）计划 —— 溶液相锚点的排序一致性判据：首次评估
 
 - 命名空间：`week25`（W25-G1）；仓库既有 `week22`/`week22_hardening`/`week23`/`week24_corealign` 一律不改动。
 - 对照对象：核心文件 `核心文件/ranking-electrolyte-materials-v2.md` §15.2（Solution redox anchors）与 §19 Stage 1 的 **Gate 1**。
