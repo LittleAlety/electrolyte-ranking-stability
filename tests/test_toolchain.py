@@ -92,9 +92,12 @@ def _make_fake_tool(directory: Path, name: str, body: str) -> Path:
     payload = directory / f"{name}_payload.py"
     payload.write_text(body, encoding="utf-8")
     if os.name == "nt":
+        # cmd.exe parses a batch file in the OEM/ANSI code page, not UTF-8; a
+        # UTF-8 launcher under a non-ASCII checkout path becomes mojibake and
+        # cmd.exe reports "the system cannot find the path specified".
         launcher = directory / f"{name}.cmd"
         launcher.write_text(
-            f'@echo off\r\n"{sys.executable}" "{payload}" %*\r\n', encoding="utf-8"
+            f'@echo off\r\n"{sys.executable}" "{payload}" %*\r\n', encoding="mbcs"
         )
     else:
         launcher = directory / name

@@ -133,6 +133,8 @@ def test_a_legal_60_deg_methyl_rotor_is_accepted(btp):
 
 
 def test_one_hydrogen_moved_100a_is_refused_as_ring_broken(btp):
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+        pytest.skip("the machine-local work/wp2prod evidence layer (gitignored) is absent in this checkout")
     """THE user-reported case 2, on the real fixture that exposed it."""
     syms, xyz, adj, _singles, _mem = _real_v2(btp)
     broken = xyz.copy()
@@ -145,6 +147,10 @@ def test_one_hydrogen_moved_100a_is_refused_as_ring_broken(btp):
 
 
 def test_the_real_60_deg_probe_still_passes_the_reordered_gate(btp):
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+        pytest.skip("the machine-local work/wp2prod evidence layer (gitignored) is "
+                    "absent in this checkout; the builders' loud refusal is pinned by "
+                    "tests/test_clean_clone_dependencies.py")
     """No regression: the two registered real-fragment probes stay accepted."""
     for key in ("AN|M_plus|tors_3_0_1_2", "DMC|M_plus|tors_8_0_1_2"):
         syms, xyz, adj, singles, mem = _real_v2(btp, key)
@@ -356,6 +362,10 @@ def _staged_package(member):
 
 
 def test_the_repair_path_calls_the_gate(btp, monkeypatch):
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+        pytest.skip("the machine-local work/wp2prod evidence layer (gitignored) is "
+                    "absent in this checkout; the builders' loud refusal is pinned by "
+                    "tests/test_clean_clone_dependencies.py")
     """A spy proves production packaging actually invokes the gate."""
     called = []
     real = btp.validate_candidate_start
@@ -372,6 +382,10 @@ def test_the_repair_path_calls_the_gate(btp, monkeypatch):
 
 
 def test_a_bad_rotation_cannot_reach_the_manifest(btp, monkeypatch):
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+        pytest.skip("the machine-local work/wp2prod evidence layer (gitignored) is "
+                    "absent in this checkout; the builders' loud refusal is pinned by "
+                    "tests/test_clean_clone_dependencies.py")
     """Stub the rotation to move one H 100 A: the path must refuse it."""
     syms, _xyz, _adj, _singles, mem = _real_v2(btp)
 
@@ -388,6 +402,10 @@ def test_a_bad_rotation_cannot_reach_the_manifest(btp, monkeypatch):
 
 
 def test_the_second_packaging_path_also_calls_the_gate(btp, monkeypatch, tmp_path):
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+        pytest.skip("the machine-local work/wp2prod evidence layer (gitignored) is "
+                    "absent in this checkout; the builders' loud refusal is pinned by "
+                    "tests/test_clean_clone_dependencies.py")
     """_build_state is the other place candidate geometry reaches disk."""
     called = []
     real = btp.validate_candidate_start

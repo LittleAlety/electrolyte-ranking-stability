@@ -327,7 +327,11 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
     # 1. the rotation axis itself must be a registered SINGLE bond
     if rotated_bond is not None:
         axis = tuple(sorted((int(rotated_bond[0]), int(rotated_bond[1]))))
-        if axis[0] == axis[1] or axis[1] >= len(symbols):
+        # A negative index is NOT a legal axis: Python/numpy would silently read
+        # it from the end, so it must be malformed_input rather than falling
+        # through to the bond-registry gates (measured 2026-10-24 by the
+        # independent challenger probe: (-1, 1) reached missing_single_bond_registry).
+        if axis[0] < 0 or axis[0] == axis[1] or axis[1] >= len(symbols):
             return {"accepted": False, "reason": "malformed_input",
                     "detail": {"rotated_bond": list(rotated_bond)}}
         if registered_single_bonds is None:
@@ -648,7 +652,23 @@ def select_candidates(symbols, source_coords, adjacency, candidates, *,
                             "reason": verdict["reason"], "detail": verdict["detail"]})
             continue
         if max_keep is not None and len(accepted) >= max_keep:
-            break
+            # The cap must not make candidates vanish.  Every input has to leave
+            # this function either accepted or refused, else the selection ledger
+            # under-counts silently (measured 2026-10-24 by the independent
+            # challenger probe: max_keep=1 over 6 raw gave accepted=1, refused=0,
+            # i.e. accountable 1/6).  A break here also skipped the gate entirely
+            # for the remaining candidates.
+            refused.append({
+                "kind": cand["kind"],
+                "label": cand.get("mode") or cand.get("direction"),
+                "reason": "max_keep_reached",
+                "detail": {
+                    "max_keep": max_keep,
+                    "accepted_before_cap": len(accepted),
+                    "note": "selection cap reached; accounted as refused, not dropped",
+                },
+            })
+            continue
         record = {
             "kind": cand["kind"],
             "label": cand.get("mode") or cand.get("direction"),

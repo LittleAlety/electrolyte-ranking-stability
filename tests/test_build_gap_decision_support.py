@@ -4,6 +4,7 @@ import importlib.util
 import math
 import sys
 from pathlib import Path
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "scripts" / "wp_production" / "build_gap_decision_support.py"
@@ -60,6 +61,9 @@ def test_bound_is_rt_ln_and_zero_means_weak_evidence():
 
 
 def test_check_is_read_only_and_detects_drift():
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+        pytest.skip("needs the COMPLETE machine-local work/wp2prod layer: a PARTIAL work/ "
+                    "(created by other tests) silently changes the recomputed index")
     m = _m()
     if m.OUT_CSV.is_file():
         before = m.OUT_CSV.read_bytes()

@@ -116,9 +116,14 @@ def _make_fake_orca(
         encoding="utf-8",
     )
     if os.name == "nt":
+        # cmd.exe parses a batch file in the OEM/ANSI code page, not UTF-8.  This
+        # checkout lives under a non-ASCII path, so a UTF-8 launcher makes cmd.exe
+        # misread the interpreter path and answer "the system cannot find the path
+        # specified" (measured 2026-10-24: rc=1, GBK-decoded stderr, 11 tests red).
+        # mbcs writes exactly the bytes cmd.exe expects.
         launcher = directory / "orca.cmd"
         launcher.write_text(
-            f'@echo off\r\n"{sys.executable}" "{payload}" %*\r\n', encoding="utf-8"
+            f'@echo off\r\n"{sys.executable}" "{payload}" %*\r\n', encoding="mbcs"
         )
     else:
         launcher = directory / "orca"

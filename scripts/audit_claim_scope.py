@@ -75,6 +75,7 @@ FLAGGED_TERMS = (
 GUARD_MARKERS = (
     "\u7981\u6b62",        # forbidden
     "\u4e0d\u5f97",        # must not
+    "\u4e0d\u8981",        # do not (imperative prohibition, e.g. README 引用许可句)
     "\u4e0d\u79f0",        # is not called
     "\u4e0d\u7b49",        # is not equal to
     "\u4e0d\u662f",        # is not

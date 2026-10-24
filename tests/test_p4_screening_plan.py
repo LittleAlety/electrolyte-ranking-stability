@@ -196,6 +196,10 @@ def test_a_methyl_rotor_seed_would_be_rejected_by_the_plan_rules(plan):
 # ---- formal immutable P4 xTB payload --------------------------------------
 
 def test_formal_package_is_deterministic_and_rebuilds_all_eight_candidates(btp):
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+        pytest.skip("the machine-local work/wp2prod evidence layer (gitignored) is "
+                    "absent in this checkout; the builders' loud refusal is pinned by "
+                    "tests/test_clean_clone_dependencies.py")
     first = btp.build_p4_screening_files()
     second = btp.build_p4_screening_files()
     assert first == second
@@ -213,6 +217,10 @@ def test_formal_package_is_deterministic_and_rebuilds_all_eight_candidates(btp):
 
 
 def test_formal_package_derives_charge_spin_and_cores_from_authority(btp, sub, tmp_path):
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+        pytest.skip("the machine-local work/wp2prod evidence layer (gitignored) is "
+                    "absent in this checkout; the builders' loud refusal is pinned by "
+                    "tests/test_clean_clone_dependencies.py")
     package = tmp_path / "pkg"
     btp.write_p4_screening_package(package)
     manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
@@ -237,6 +245,10 @@ def test_formal_package_derives_charge_spin_and_cores_from_authority(btp, sub, t
     ("EC|LiM_2plus", "multiplicity", 1),
 ])
 def test_formal_builder_refuses_static_identity_drift(btp, tmp_path, target, field, bad):
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+        pytest.skip("the machine-local work/wp2prod evidence layer (gitignored) is "
+                    "absent in this checkout; the builders' loud refusal is pinned by "
+                    "tests/test_clean_clone_dependencies.py")
     changed = json.loads(btp.P4_SCREENING_PLAN.read_text(encoding="utf-8"))
     changed["states"][target][field] = bad
     path = tmp_path / "bad_plan.json"
@@ -246,6 +258,10 @@ def test_formal_builder_refuses_static_identity_drift(btp, tmp_path, target, fie
 
 
 def test_formal_package_hash_inventory_is_exact(btp):
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+        pytest.skip("the machine-local work/wp2prod evidence layer (gitignored) is "
+                    "absent in this checkout; the builders' loud refusal is pinned by "
+                    "tests/test_clean_clone_dependencies.py")
     files = btp.build_p4_screening_files()
     attempts = json.loads(files["attempts_ledger.json"])["attempts"]
     assert len(attempts) == 8
@@ -263,6 +279,10 @@ def test_formal_package_hash_inventory_is_exact(btp):
 
 
 def test_formal_package_check_is_strictly_read_only(btp, tmp_path):
+    if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+        pytest.skip("the machine-local work/wp2prod evidence layer (gitignored) is "
+                    "absent in this checkout; the builders' loud refusal is pinned by "
+                    "tests/test_clean_clone_dependencies.py")
     package = tmp_path / "pkg"
     btp.write_p4_screening_package(package)
     before = {str(path.relative_to(package)): (path.read_bytes(), path.stat().st_mtime_ns)

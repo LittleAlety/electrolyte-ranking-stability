@@ -217,9 +217,12 @@ def test_probe_tool_reads_an_orca_version_banner(tmp_path: Path) -> None:
     payload = tmp_path / "orca_payload.py"
     payload.write_text("print('Program Version 5.0.4 - RELEASE')\n", encoding="utf-8")
     if os.name == "nt":
+        # cmd.exe parses a batch file in the OEM/ANSI code page, not UTF-8; a
+        # UTF-8 launcher under a non-ASCII checkout path becomes mojibake and
+        # cmd.exe reports "the system cannot find the path specified".
         launcher = tmp_path / "orca.cmd"
         launcher.write_text(
-            f'@echo off\r\n"{sys.executable}" "{payload}" %*\r\n', encoding="utf-8"
+            f'@echo off\r\n"{sys.executable}" "{payload}" %*\r\n', encoding="mbcs"
         )
     else:
         launcher = tmp_path / "orca"

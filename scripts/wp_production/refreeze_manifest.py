@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -48,17 +49,45 @@ def _rows(manifest: Path) -> list[tuple[str, str]]:
     return out
 
 
+def is_deliberately_ignored(rel: str) -> bool:
+    """True when rel is **excluded on purpose** (matched by .gitignore).
+
+    A frozen registry may legitimately name machine-local artifacts that are
+    deliberately not shipped (measured 2026-10-23: outputs/week3/SHA256SUMS
+    lists 18 *.cpcm / *.property.txt ORCA demo files excluded by
+    .gitignore:45).  Their absence in a clean clone is **not drift**.
+
+    The distinction that matters is *ignored* vs *merely absent*: a path that a
+    repository is supposed to ship but no longer has is real drift and must
+    still fail.  git check-ignore answers exactly that.  Anything git cannot
+    answer (not a repository, git missing) counts as NOT ignored, so the gate
+    keeps failing loudly.
+    """
+    try:
+        out = subprocess.run(["git", "-C", str(REPO), "check-ignore", "-q", rel],
+                             capture_output=True, check=False)
+    except OSError:
+        return False
+    return out.returncode == 0
+
+
 def classify(manifest: Path, drop: set[str] | None = None) -> dict:
     drop = drop or set()
     changed = {"eol_recalibration": [], "content_change": [], "missing": [],
-               "dropped": sorted(drop)}
+               "external_machine_local": [], "dropped": sorted(drop)}
     lines = []
     for old, rel in _rows(manifest):
         if rel in drop:
             continue          # self-referential: cannot be frozen here
         target = REPO / rel
         if not target.is_file():
-            changed["missing"].append(rel)
+            # Never shipped => absent by construction, not "gone".  When git
+            # cannot answer (no repo), fall back to counting it as missing so
+            # the gate still fails loudly.
+            if is_deliberately_ignored(rel):
+                changed["external_machine_local"].append(rel)
+            else:
+                changed["missing"].append(rel)
             lines.append("%s  %s" % (old, rel))
             continue
         new = sha256_artifact(target)
@@ -91,14 +120,17 @@ def main(argv=None) -> int:
     n_eol = len(changed["eol_recalibration"])
     n_content = len(changed["content_change"])
     n_missing = len(changed["missing"])
+    n_external = len(changed["external_machine_local"])
     n_dropped = len(changed["dropped"])
 
-    print("%s: eol=%d content=%d missing=%d dropped=%d"
-          % (args.manifest, n_eol, n_content, n_missing, n_dropped))
+    print("%s: eol=%d content=%d missing=%d dropped=%d external=%d"
+          % (args.manifest, n_eol, n_content, n_missing, n_dropped, n_external))
     for rel in changed["content_change"][:20]:
         print("   content_change: %s" % rel)
     for rel in changed["missing"][:20]:
         print("   missing       : %s" % rel)
+    for rel in changed["external_machine_local"][:5]:
+        print("   not shipped   : %s (gitignored: absent in a clean clone by design)" % rel)
 
     if args.check:
         if n_missing:

@@ -209,3 +209,56 @@ def test_the_distance_fingerprint_is_rigid_motion_invariant(btp):
     deformed = coords.copy()
     deformed[2] = deformed[2] + np.array([0.0, 0.0, 0.5])
     assert btp._distance_fingerprint(deformed) != btp._distance_fingerprint(coords)
+
+
+def test_the_selection_cap_refuses_instead_of_dropping(btp, reg):
+    """A cap may stop accepting, but no candidate may leave unaccounted.
+
+    Regression: the loop used to ``break`` at the cap, so the remaining
+    candidates appeared in NEITHER ``accepted`` nor ``refused`` and the
+    selection ledger under-counted (measured 2026-10-24 by the independent
+    challenger probe: max_keep=1 over 6 raw candidates gave accepted=1,
+    refused=0 -- accountable 1/6).
+    """
+    syms, coords, adj, singles, sha = _state(btp, reg, "DOL", "LiM_2plus")
+    cands = [c for c in btp.ring_pucker_candidates(syms, coords, adj)
+             if abs(c["amplitude_a"]) <= 0.40]
+    assert len(cands) > 1, "the fixture must offer more than one candidate"
+
+    unbounded = btp.select_candidates(syms, coords, adj, cands,
+                                      registered_single_bonds=singles, source_sha256=sha)
+    assert len(unbounded["accepted"]) > 1, "the cap cannot bind on this fixture"
+
+    capped = btp.select_candidates(syms, coords, adj, cands,
+                                   registered_single_bonds=singles,
+                                   source_sha256=sha, max_keep=1)
+    assert len(capped["accepted"]) == 1
+    accounted = len(capped["accepted"]) + len(capped["refused"])
+    assert accounted == len(cands), (
+        "the cap dropped %d of %d candidates without accounting"
+        % (len(cands) - accounted, len(cands)))
+    assert "max_keep_reached" in {r["reason"] for r in capped["refused"]}
+
+
+def test_a_negative_rotation_axis_index_is_malformed_input(btp, reg):
+    """A negative index would silently read an atom from the end of the list.
+
+    Regression: only ``axis[1] >= len(symbols)`` was range-checked, so
+    ``(-1, 1)`` fell through to the bond-registry gates instead of being
+    refused as malformed (measured 2026-10-24 by the independent challenger
+    probe: (-1, 1) returned missing_single_bond_registry).
+    """
+    syms, coords, adj, singles, sha = _state(btp, reg, "DMC", "LiM_2plus")
+    for bad in ((-1, 1), (0, 99), (2, 2)):
+        verdict = btp.validate_candidate_start(
+            syms, coords, coords.copy(), adj, rotated_bond=bad)
+        assert verdict["accepted"] is False, (bad, verdict)
+        assert verdict["reason"] == "malformed_input", (bad, verdict)
+
+    out = btp.select_candidates(
+        syms, coords, adj,
+        [{"kind": "torsion", "mode": "tors_0_1_2_3", "rotated_bond": (-1, 1),
+          "coords": coords.copy(), "moved_atoms": []}],
+        registered_single_bonds=singles, source_sha256=sha)
+    assert out["accepted"] == []
+    assert [r["reason"] for r in out["refused"]] == ["malformed_input"]
