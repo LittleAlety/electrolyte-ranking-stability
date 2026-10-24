@@ -356,16 +356,34 @@ WEEKS = [
      "Gate 1 排序层判据的状态从 \"无数据（no_within_series_values）\" 变为 \"已评估且不一致（ordering_disagrees）\"：7 个同系列溶剂、21 对给出 Kendall τ_b = 0.4286 < 0.90，判据首次可评但未通过；还原轴只有 3 对旁证；本周零新增电子结构计算。"),
 
     # ---- 阶段二：评审实施方案 WP1-WP7 + Paper（week28-36） ----
-    (28, "docs/50_week28_wp1_evidence_table.md", "WP1 · 证据主表", "two", "统一科学证据主表"),
-    (29, "docs/51_week29_wp2_physics_response.md", "WP2 · RQ1", "two", "哪些电子结构与介质物理改变候选排序"),
-    (30, "docs/52_week30_wp3_coordination_mechanism.md", "WP3 · RQ2", "two", "Li+ 配位条件态机制与状态身份"),
-    (31, "docs/53_week31_wp4_decision_identifiability.md", "WP4 · RQ3", "two", "决策可识别性与筛选稳健性"),
-    (32, "docs/54_week32_wp5_delta_learning.md", "WP5 · RQ4a", "two", "Δ-learning 与跨家族泛化"),
-    (33, "docs/55_week33_wp6_active_learning_budget.md", "WP6 · RQ4b", "two", "最小昂贵信息预算（主动学习）"),
-    (34, "docs/56_week34_wp7_external_reference_boundary.md", "WP7 · 边界", "two", "外部验证与结论边界（Gate 1 复核）"),
-    (35, "docs/57_week35_paper_convergence.md", "Paper", "two", "论文主文收敛包（七图 / 六节 / 数字溯源 / 边界声明）"),
+    (28, "docs/50_week28_wp1_evidence_table.md", "WP1 · 证据主表", "two",
+     "把 Week 1–27 散落产物收敛成**六张主表（2074 行）**，每行可追到 molecule × model × charge state × motif；"
+     "并逐位复现 Week 6 的 **354 个 pair**（最大绝对误差 **0.000e+00 eV**）（已完成）"),
+    (29, "docs/51_week29_wp2_physics_response.md", "WP2 · RQ1", "two",
+     "用冻结主表回答「哪些模型变化改变排序」：**5 个对比**里 ROBUST_INVERSION 恒为 0，且这是**结构性**的；"
+     "Top-k / Jaccard / regret / τ / ρ 复现 Week 28，5 个指标最大绝对差 **0.000e+00**（已完成）"),
+    (30, "docs/52_week30_wp3_coordination_mechanism.md", "WP3 · RQ2", "two",
+     "Li+ 配位条件态 C1 / C2 按电子状态身份拆分：还原态 **9/10** 的电子落在 Li 上"
+     "（`li_centered_dominates_c1_reduction`），据此把「描述符回归只在 R13 主集合上做」写成可复核断言（已完成）"),
+    (31, "docs/53_week31_wp4_decision_identifiability.md", "WP4 · RQ3", "two",
+     "三套并列分析（而非只看 `f_robust_inv`）：全局排序 τ_b / ρ、统计分辨率 unresolved / pairwise、"
+     "筛选决策 Top-k / regret，分别落地为 `identifiability_summary`、`resolution_curve`、"
+     "`selection_uncertainty`、`decision_classes`（已完成）"),
+    (32, "docs/54_week32_wp5_delta_learning.md", "WP5 · RQ4a", "two",
+     "Δ-learning 对 direct：LOFO 下 **6/8** 个（任务 · 特征集 · 轴）组合的 τ_b 更高，且 **6/6** 个更优组合"
+     "不劣于 direct 的筛选指标；random / group / LOFO 三种拆分的符号一致（已完成）"),
+    (33, "docs/55_week33_wp6_active_learning_budget.md", "WP6 · RQ4b", "two",
+     "昂贵标签预算：24 条种子曲线中 **20 条单调不减**；median τ_b 达 0.80 的预算点上，多数组合在 "
+     "**n_T = 12–15** 已覆盖 8/8 家族；多种子重复 20 次、报 2.5/97.5 百分位（已完成）"),
+    (34, "docs/56_week34_wp7_external_reference_boundary.md", "WP7 · 边界", "two",
+     "只回答「结论到哪儿为止」，不新增物理：排序一致性 τ_b = **0.4286** / n_pairs = **21**"
+     "（一致 15 / 不一致 6）判 `ordering_disagrees`；`min_tau_b ≥ 0.90` 是**决定性否决项**（已完成）"),
+    (35, "docs/57_week35_paper_convergence.md", "Paper", "two",
+     "论文收敛包（不改 docx，让重建变成机械操作）：C1–C8 载荷各自 checks 全部通过，"
+     "C9 核对**七图 7/7、共 21 个**齐备（已完成）"),
     (36, "deliverables/part2/01_结题论文与提交/SUBMISSION_评审阶段_WP1-WP7.json", "结题提交", "two",
-     "论文 v7 成品 + 生成与溯源脚本 + 独立数字审计 + WP1–WP7 对照映射（仓库内没有 outputs/week36：成品由 scripts/build_week36_final_submission.py 生成到交付层）"),
+     "论文 v7 成品 + 生成与溯源脚本 + 独立数字审计 + WP1–WP7 对照映射（已完成；仓库内没有 outputs/week36："
+     "成品由 `scripts/build_week36_final_submission.py` 生成到交付层）"),
 
     # ---- 阶段三：physics_completion_v1 WP0-WP6（week37-44）+ 四态恢复轮（week45-48） ----
     (37, "docs/58_week37_wp0_definition_migration.md", "WP0 · 定义迁移", "three",

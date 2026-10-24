@@ -11,7 +11,7 @@ window.HB = {
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-24T09:08:43Z",
+  "generated_at_utc": "2026-10-24T09:16:14Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -775,7 +775,7 @@ window.HB = {
    "label": "Week 28",
    "stage": "WP1 · 证据主表",
    "phase": "two",
-   "tag": "统一科学证据主表",
+   "tag": "把 Week 1–27 散落产物收敛成**六张主表（2074 行）**，每行可追到 molecule × model × charge state × motif；并逐位复现 Week 6 的 **354 个 pair**（最大绝对误差 **0.000e+00 eV**）（已完成）",
    "summary": "把 Week 1–27 散落各处的物理量、状态身份、排序指标与计算成本收敛成六张主表（共 2074 行）， 每一行都能追到明确的 molecule x model x charge state x motif 与具体来源字段；并且在 all scope / z_only / z = 1.0 下逐位复现了 Week 6 已冻结的 pair 数字 （354 个 pair，最大绝对误差 0.000e+00 eV），证明这张主表是已发表数字的同一个对象， 而不是并行的一套定义。 这一条是本阶段最重要的事实：下一次有人认为主表与旧结论不一致时，可以直接跑 --check 与 frozen_number_reproduction 来定位，而不必靠记忆。",
    "sections": [
     "0. 一句话结论",
@@ -798,7 +798,7 @@ window.HB = {
    "label": "Week 29",
    "stage": "WP2 · RQ1",
    "phase": "two",
-   "tag": "哪些电子结构与介质物理改变候选排序",
+   "tag": "用冻结主表回答「哪些模型变化改变排序」：**5 个对比**里 ROBUST_INVERSION 恒为 0，且这是**结构性**的；Top-k / Jaccard / regret / τ / ρ 复现 Week 28，5 个指标最大绝对差 **0.000e+00**（已完成）",
    "summary": "Week 28（WP1）把 Week 1–27 的物理量、状态身份、排序指标与成本收敛成一张版本冻结的主表， 并逐位复现了 Week 6 的 354 个 stored pair。WP2 用这张主表回答 RQ1： 从极廉价代理量 P0 到电子结构 P1v/P1a，再到固定连续介质 P2a，哪些模型变化会 改变候选排序？变化发生在哪些候选上，是否超出原始数据的分辨能力？",
    "sections": [
     "0. 本轮解决的问题",
@@ -819,7 +819,7 @@ window.HB = {
    "label": "Week 30",
    "stage": "WP3 · RQ2",
    "phase": "two",
-   "tag": "Li+ 配位条件态机制与状态身份",
+   "tag": "Li+ 配位条件态 C1 / C2 按电子状态身份拆分：还原态 **9/10** 的电子落在 Li 上（`li_centered_dominates_c1_reduction`），据此把「描述符回归只在 R13 主集合上做」写成可复核断言（已完成）",
    "summary": "WP2 处理 Axis-A 阶梯；WP3 处理电解液化学最有特色的一层 —— Li+ 配位条件态 C1 = [LiM]+ 与第一溶剂壳 C2 = [Li(M)2]+。核心响应量沿用 v2 定义 ΔΔG_coord^ox/red = ΔG_redox^{C1} − ΔG_redox^{C0}，但必须按电子状态身份拆分。 评审给出一条硬约束：不能用当前 C1 的全部还原数据建立一个统一的分子还原回归模型， 因为其中包含不同的电子接受中心。本阶段据此把「描述符回归只在 R13 主集合上做」写成 可复核的断言（descriptor_regression_is_primary_only）。",
    "sections": [
     "0. 本轮解决的问题",
@@ -841,7 +841,7 @@ window.HB = {
    "label": "Week 31",
    "stage": "WP4 · RQ3",
    "phase": "two",
-   "tag": "决策可识别性与筛选稳健性",
+   "tag": "三套并列分析（而非只看 `f_robust_inv`）：全局排序 τ_b / ρ、统计分辨率 unresolved / pairwise、筛选决策 Top-k / regret，分别落地为 `identifiability_summary`、`resolution_curve`、`selection_uncertainty`、`decision_classes`（已完成）",
    "summary": "WP2 说清了「哪些物理改变排序」，WP3 说清了「Li+ 配位怎样改变机理」。WP4 处理决定这套分析 有没有用的那一步：面对一次 Top-k 筛选决策，我们到底知道多少。评审明确要求三套并列分析， 而不是只依赖 f_robust_inv： 评审还点出一个代数陷阱：在 σ_ij = |d_lower − d_upper| / √2 的约定下，若 z > 1/√2， 反向 pair 无法两侧同时通过稳健判据。本阶段把它写成断言而不是结论（见第 3 节）。",
    "sections": [
     "0. 本轮解决的问题",
@@ -864,7 +864,7 @@ window.HB = {
    "label": "Week 32",
    "stage": "WP5 · RQ4a",
    "phase": "two",
-   "tag": "Δ-learning 与跨家族泛化",
+   "tag": "Δ-learning 对 direct：LOFO 下 **6/8** 个（任务 · 特征集 · 轴）组合的 τ_b 更高，且 **6/6** 个更优组合不劣于 direct 的筛选指标；random / group / LOFO 三种拆分的符号一致（已完成）",
    "summary": "WP4 把「一次 Top-k 筛选到底知道多少」讲清楚了。WP5（RQ4 前半）换一个问法：**能不能用更少的 昂贵标签，得到同样的筛选决策**。具体是三个问题： Q1 Δ-learning（预测位移 Δ = P_T − P_cheap）是否比 direct model 更省标签？ Q2 这个优势是否在「留一家族」（LOFO）下保留？ Q3 优势是否真正转化为筛选收益（Top-k overlap 不降且 selection regret 不升）？ 本阶段不重跑 Stage 7 管线，而是用它的逐分子 out-of-fold 预测独立重算 MAE / Kendall τ_b / Top-20% overlap / Jaccard / selection regret，先与冻结结果逐位对账（见第 6 节），再做比较。 三种拆分口径：random（KFold，多种子取均值）、group（leave-one-group-out，按 group_key 脚手架分组）、lofo（leave-one-family-out，按 family 留一家族）。两种模型形状：direct （直接回归目标）与 shift（回归位移 Δ，再加回便宜参考）。模型 6 个：constant（家族均值 基线）、ridge、krr、gpr、rf、gbdt。 三层表述纪律贯穿本文件，三者不得混写：",
    "sections": [
     "0. 本轮解决的问题",
@@ -887,7 +887,7 @@ window.HB = {
    "label": "Week 33",
    "stage": "WP6 · RQ4b",
    "phase": "two",
-   "tag": "最小昂贵信息预算（主动学习）",
+   "tag": "昂贵标签预算：24 条种子曲线中 **20 条单调不减**；median τ_b 达 0.80 的预算点上，多数组合在 **n_T = 12–15** 已覆盖 8/8 家族；多种子重复 20 次、报 2.5/97.5 百分位（已完成）",
    "summary": "WP5 说明「便宜参考层 + 学到的位移」能否替代直接预测。WP6 换一个更贴近预算的问法： 要用多少张昂贵标签，才能把筛选决策恢复到可接受水平，即 n_T -> { tau_b, O_k, R_k } n_T = 已获得的昂贵目标标签数量 实施方案给出的硬要求，本阶段逐条落地： - 四条冻结 acquisition baseline：random / diversity / uncertainty / ranking_aware； - 固定候选池、target、初始预算（4）、批次（1）与随机种子，每轮只暴露已查询标签； - 标准化与模型拟合只在当轮可见数据内完成（Stage 8 已保证，本阶段只审计不重跑）； - 多种子重复（20 次）报 median 与 2.5/97.5 百分位； - 成功标准必须预先定义、对全部单元格一律适用，且要求在多数重复中成立，而不是只在 中位数曲线上成立； - 分别考虑池内插值（in-pool）与 family-held-out 两种情景。 三层表述纪律贯穿本文件：模型事实（al_protocol_audit、budget_curves、 curve_reconciliation）/ 统计判定（success_criteria、success_budget、 strategy_comparison）/ 材料意义（family_coverage、holdout_vs_inpool）。",
    "sections": [
     "0. 本轮解决的问题",
@@ -911,7 +911,7 @@ window.HB = {
    "label": "Week 34",
    "stage": "WP7 · 边界",
    "phase": "two",
-   "tag": "外部验证与结论边界（Gate 1 复核）",
+   "tag": "只回答「结论到哪儿为止」，不新增物理：排序一致性 τ_b = **0.4286** / n_pairs = **21**（一致 15 / 不一致 6）判 `ordering_disagrees`；`min_tau_b ≥ 0.90` 是**决定性否决项**（已完成）",
    "summary": "WP1–WP6 把「哪些缺失物理会改变筛选决策、候选能不能被分辨、便宜模型能不能学到位移、最少要花 多少昂贵标签」做成了内部可复核的闭环。这些结论都成立在 designated computational target 之下。WP7 不新增任何物理结论，只回答一个边界问题：这些结论到哪儿为止？ 实施方案对 WP7 有三条硬要求： - Gate 1 不能因为内部结果丰富就被跳过，也不应强迫其关闭。 - **下一步优先是对现有外部 anchors 做条件一致性与 provenance 复核，而不是为了提高 tau 人为筛掉不一致数据。** - 每个主结论必须注明它属于 Track A、Track B，还是需要进一步验证的推断。 三层表述纪律贯穿本文件：模型事实（anchor_inventory、 anchor_row_audit、ordering_recheck）/ 统计判定 （gate1_status、gate1_components、track_separation）/ 材料意义（claim_track_assignment、wp7_acceptance）。",
    "sections": [
     "0. 本轮解决的问题",
@@ -934,7 +934,7 @@ window.HB = {
    "label": "Week 35",
    "stage": "Paper",
    "phase": "two",
-   "tag": "论文主文收敛包（七图 / 六节 / 数字溯源 / 边界声明）",
+   "tag": "论文收敛包（不改 docx，让重建变成机械操作）：C1–C8 载荷各自 checks 全部通过，C9 核对**七图 7/7、共 21 个**齐备（已完成）",
    "summary": "前七步把「物理机制 -> 决策可靠性 -> 最小信息预算」做成了可复核的闭环，Week 34 又定死了结论边界。 最后一步是把它们收敛成一篇论文。实施方案对这一周的验收是：主图、结果、讨论、局限与补充材料。 本阶段不改 docx，而是产出一个可校验的收敛包，让 论文/build_paper_docx.py 的重建 变成机械操作。它回答四个问题： 1. 七张主图各自对应哪个科学问题，各自的资产是否真的在磁盘上？ 2. 结果部分按什么顺序组织？ 3. 每个主结论属于哪条轨道？ 4. 哪些边界声明必须在论文里出现？",
    "sections": [
     "0. 本轮解决的问题",
@@ -959,7 +959,7 @@ window.HB = {
    "label": "Week 36",
    "stage": "结题提交",
    "phase": "two",
-   "tag": "论文 v7 成品 + 生成与溯源脚本 + 独立数字审计 + WP1–WP7 对照映射（仓库内没有 outputs/week36：成品由 scripts/build_week36_final_submission.py 生成到交付层）",
+   "tag": "论文 v7 成品 + 生成与溯源脚本 + 独立数字审计 + WP1–WP7 对照映射（已完成；仓库内没有 outputs/week36：成品由 `scripts/build_week36_final_submission.py` 生成到交付层）",
    "summary": "\"stage\": \"Week 36 / Final submission\", \"label\": \"结题提交：论文 v7 成品 + 生成/溯源脚本 + 独立审计 + WP1-WP7 对照\", \"gate_status\": \"Gate 0 CLOSED；Gate 1 NOT CLOSED 且 NOT CLOSABLE（结题提交只冻结既有结论：不复核、不关闭、不跳过；零新增电子结构计算、零数据剔除、零阈值改动）\", \"discipline\": \"三层表述（模型事实 / 统计判定 / 材料意义）不得混写；方向 ox = IP、red = -EA（均 maximise）；sigma_ij = |d_lower - d_upper| / sqrt(0.5)；主结论带 Track A / Track B / 待验证推断标签；措辞只用 designated computational target / designated reference model，Gate 1 闭合前禁用 validated target；NOT CLOSABLE 不等于 NO SUCH DATA EXIST ANYWHERE。",
    "sections": []
   },
