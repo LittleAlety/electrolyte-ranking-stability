@@ -54,7 +54,7 @@ def ridge_predict(features, visible, labels, query) -> np.ndarray:
     X = _standardise(features, visible)
     M = np.hstack([X[visible], np.ones((len(visible), 1))])
     y = np.asarray([labels[j] for j in visible], dtype=float)
-    lam = RIDGE_LAMBMA if False else RIDGE_LAMBDA
+    lam = RIDGE_LAMBDA
     w = np.linalg.solve(M.T @ M + lam * np.eye(M.shape[1]), M.T @ y)
     Q = np.hstack([X[query], np.ones((len(query), 1))])
     return Q @ w

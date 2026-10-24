@@ -14,10 +14,25 @@
 | 生产系综 | **accepted 44/48** · provisional 0 · limited 4 | [系综标签](outputs/physics_completion/ensembles/production_ensemble_labels.csv) |
 | 全成员前沿 / 身份登记 | 解析 80/80 · 证据表标记 verified 80/80；不代表独立完整科学身份 QC | [前沿报告](outputs/physics_completion/frontier/frontier_localization.md) · [证据表](outputs/physics_completion/frontier/frontier_identity_evidence.csv) |
 | 现有合规总体项 | **blocked_on_production**（不是完整 v3 严格目标证书） | [合规台账](outputs/physics_completion/compliance/plan_compliance.md) |
+| **逐项严格总闸门** | **未通过** · 缺口 `ensemble_not_48_accepted`、`wp5_full_target_pool_evaluated` | [strict_readiness_wiring](scripts/wp_production/strict_readiness_wiring.py) |
 
 未 accepted：`DMC/M_plus`、`DMC/LiM_2plus`、`DOL/LiM_2plus`、`EC/LiM_2plus`。
 
-工程检查通过不等于科学完成；完整身份、正式 WP5 与触发后的 WP6 仍须单独核验。覆盖探针修复：错误第二批 3747724 已取消；旧 11 个探针仅发生刚体变化，不计独立新构象。真正片段扭转预检仅 DMC/LiM_2plus 一条通过，已提交 **3748336**；EC 两条因中心双键拒绝。[修复与证据记录](docs/hpc_batch2_repair_20261022.md)。已提交不代表新盆地或验收通过。
+**四态现状（逐态一行，勿读成"只差四态"）**：`DMC/M_plus`、`DMC/LiM_2plus` = `unresolved_qc`（`draft_torsion_probe`：各有 **7 个从未被合法探过的登记二面角**，去重后为 2 个 / 1 个重骨架操作＋5 个可声明配位探针）；`DOL/LiM_2plus`、`EC/LiM_2plus` = `search_exhausted`（**筛选级单盆地、0 个登记扭转**；路线是合法环形变＋声明式 Li 配位探针，而环 pucker 的合法位移只有 0.02–0.08 Å，放大到能到达别的盆地就会断环）。[路由表](outputs/physics_completion/recovery/probe_routes.csv)
+
+**筛选轮打包就绪但未提交**：`work/hpc_four_state_p4_xtb_screening_v1` · **8 任务** · `xtb_screening_v1` · **2 核 × 2 h** · `submitted=False` · gate **HOLD**。包内每任务含 `geom.xyz` / `job.inp` / `cores.txt` /`inputs.sha256` / `candidate.json`，`candidate_gate_contract=validate_candidate_start_v2`，并附 `PACKAGE_SHA256SUMS` 与确定性重建锁 `selection.lock.json`。**未提交**是因为一次性授权尚未由用户发出——工程就绪不等于执行授权。
+
+**干净环境复现（工程可复现性）**：`work/` 是 gitignored 的机器本地层（约 12 GB，干净克隆没有）。依赖它的**构建器会响亮拒绝**（不是静默降级），依赖它的**测试会带理由跳过**（`tests/test_clean_clone_dependencies.py` 钉住拒绝侧）。
+
+**五分钟自证**（任一条都可独立复核）：
+
+```bash
+.venv/Scripts/python.exe -B docs/handoffs/four_state_recovery_20261023/preflight.py   # 0=契约一致（不等于可提交）
+pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1                          # 79 步 + OFFLINE CLOSURE GREEN
+pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1 -Commit                  # 仅当全部一致才提交
+```
+
+工程检查通过不等于科学完成；完整身份、正式 WP5 与触发后的 WP6 仍须单独核验。
 
 **先读**：[项目导航 / 下一步 / 核心代码](docs/PROJECT_GUIDE.md) · [当前恢复报告](outputs/physics_completion/recovery/strict_recovery_v1_report.md) · [科学协议](docs/physics_completion_protocol.md) · [目录地图](docs/65_repo_layout.md)
 

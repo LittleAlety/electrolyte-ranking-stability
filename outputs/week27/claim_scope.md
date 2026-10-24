@@ -23,11 +23,11 @@
 | --- | --- | --- | --- |
 | `README.md:3` | definitive | **guarded** | > **Scope.** This repository does not establish a definitive electrolyte-solvent ranking. It studies the stability, instability, and information cost of ranking decisions under progressively more real |
 | `README.md:5` | leaderboard_zh | **guarded** | > 本仓库**不**给出「18 个溶剂谁最好」的最终排行榜；它研究的是**排序决策**在逐步更真实的计算模型下的**稳定性 / 不稳定性 / 信息成本**。任何把本仓库引用成「最终性能排行榜」的读法都是误读。 |
-| `README.md:35` | validated | **guarded** | > （R13 起：Gate 1 闭合前不称 *validated* target；外部有效性单独作为 negative result 报告，见 `docs/gate1_negative_result.md`。） |
-| `README.md:41` | prove_zh | **guarded** | \| robust inversion \| **0 observed** \| 在 20 个 (台阶, 轴) 组合中，没有任何 pair 被**反向证明**（1σ 主口径） \| |
-| `README.md:133` | prove_zh | **guarded** | - 证明并数值验证 4 条恒等式（T1–T4）+ 1 条精确分解（T5）；判据 `f_unresolved(z) = Pr(q_ij > √2/z)`，闭式与实测在 20 个点上误差**精确为 0**（`outputs/week10/stage11_sigma_anatomy.json`）。 |
-| `README.md:183` | prove_zh | **guarded** | - 结论：「身份差异多数是真的，但单点上的能量偏好多数是假象」；0.02 Å 阈值只是描述列，不是「同一驻点」的证明。 |
-| `README.md:250` | validated | **guarded** | \| 🔴 P0 \| Gate 1 双轨、停用 validated target \| `target_naming`、`docs/gate1_negative_result.md` \| |
+| `README.md:50` | validated | **guarded** | > （R13 起：Gate 1 闭合前不称 *validated* target；外部有效性单独作为 negative result 报告，见 `docs/gate1_negative_result.md`。） |
+| `README.md:56` | prove_zh | **guarded** | \| robust inversion \| **0 observed** \| 在 20 个 (台阶, 轴) 组合中，没有任何 pair 被**反向证明**（1σ 主口径） \| |
+| `README.md:148` | prove_zh | **guarded** | - 证明并数值验证 4 条恒等式（T1–T4）+ 1 条精确分解（T5）；判据 `f_unresolved(z) = Pr(q_ij > √2/z)`，闭式与实测在 20 个点上误差**精确为 0**（`outputs/week10/stage11_sigma_anatomy.json`）。 |
+| `README.md:198` | prove_zh | **guarded** | - 结论：「身份差异多数是真的，但单点上的能量偏好多数是假象」；0.02 Å 阈值只是描述列，不是「同一驻点」的证明。 |
+| `README.md:265` | validated | **guarded** | \| 🔴 P0 \| Gate 1 双轨、停用 validated target \| `target_naming`、`docs/gate1_negative_result.md` \| |
 | `FINAL_CONCLUSIONS.md:5` | leaderboard_zh | **guarded** | > **Scope**：本仓库不建立电解液溶剂的最终排行榜（见 `README.md` 顶部 Scope）。 |
 | `FINAL_CONCLUSIONS.md:9` | prove_zh | **guarded** | 1. **`f_robust_inv = 0` 不等于「排序稳定」。** Stage 10 的 20 个 (台阶, 轴) 组合里，robust inversion 最大值 = **0 observed**（没有任何 pair 被**反向证明**），同一批数据 `f_unresolved` 最高 **80.0%**（证据**不足以判定**方向）。正确读法：「不可判定主导」。唯一真正出现 robust |
 | `FINAL_CONCLUSIONS.md:121` | validated | **guarded** | **不能声称的**：任何形式的绝对性能排名、排序规律的普适性、大规模筛选能力、`validated target` 一类措辞（Gate 1 闭合前禁用）。 |

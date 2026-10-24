@@ -648,9 +648,34 @@ def build_rows(progress=None):
     formal_statuses = Counter(r.get("stop_budget_status", "") for r in formal_ab)
     formal_models = sorted({r.get("executed_model", "") for r in formal_ab if r})
     formal_invalid = formal_statuses.get("invalid_input", 0)
+    #: The formal index declares how many rows each AB table must carry; a
+    #: consumer that never checks the declared row count can be silenced by a
+    #: truncated half-written table.  `--check` recomputes both sides, so a
+    #: mismatch flips the item to not_satisfied instead of passing quietly.
+    formal_index_path = (
+        "outputs/physics_completion/active_learning/blind_replay/AB_index.json")
+    formal_declared_rows = None
+    formal_index = {}
+    _idx_src = REPO / formal_index_path
+    if _idx_src.is_file():
+        try:
+            formal_index = json.loads(_idx_src.read_text(encoding="utf-8"))
+            declared = (formal_index.get("rows") or {}).get("AB_axis_endpoint")
+            formal_declared_rows = int(declared) if declared is not None else None
+        except (ValueError, TypeError):
+            formal_declared_rows = None
+    formal_rows_complete = (formal_declared_rows is not None
+                            and len(formal_ab) == formal_declared_rows)
+    #: `model_is` is the formal table's own label for what each executed_model
+    #: is; a row whose executed_model claims to be formal while its model_is
+    #: says baseline (or vice versa) must fail the consumption item.
+    formal_model_kinds = Counter(r.get("model_is", "") for r in formal_ab)
+    formal_kind_ok = all(
+        (r.get("executed_model") == "knn_baseline") ==
+        (r.get("model_is") == "baseline_not_formal")
+        for r in formal_ab)
     sb = read_rows("outputs/physics_completion/active_learning/success_budget.csv")
     rounds = read_rows("outputs/physics_completion/active_learning/round_diagnostics.csv")
-    sb_cols = {c.lower() for c in (sb[0].keys() if sb else [])}
     has_o3 = bool(rounds) and all("O_3" in r for r in rounds)
     fixed_r3 = bool(rounds) and {r.get("regret_threshold_ev") for r in rounds} == {"0.10"}
     endpoint_statuses = Counter(r.get("new_endpoint_status", "") for r in sb)
@@ -659,9 +684,12 @@ def build_rows(progress=None):
         "wp5_task_separation", "9",
         "任务 A（预测 free Gox）与任务 B（预测配位位移）分开，C 特征集不出现 X2",
         "satisfied" if ml and sb else "not_satisfied",
-        "ml_rows=%d budget_rows=%d" % (len(ml), len(sb)),
-        "outputs/physics_completion/ml/; outputs/physics_completion/active_learning/",
-        "src/electrolyte_ranking/wp5.py 硬约束 C 任务特征集不出现 X2。",
+        "ml_rows=%d legacy_budget_rows=%d; source_kind=legacy_success_budget" % (
+            len(ml), len(sb)),
+        "outputs/physics_completion/ml/; outputs/physics_completion/active_learning/success_budget.csv",
+        "src/electrolyte_ranking/wp5.py 硬约束 C 任务特征集不出现 X2；"
+        "budget_rows 一词只数 legacy 表（旧 18 池、非盲），正式 A/B 行数见 "
+        "wp5_formal_ab_source_consumed 的 formal_rows。",
     ))
     out.append(item(
         "wp5_new_endpoint_in_budget", "9",
@@ -677,15 +705,24 @@ def build_rows(progress=None):
     out.append(item(
         "wp5_formal_ab_source_consumed", "9",
         "正式严格目标 A/B 回放（blind_replay/AB_*）按自身路径被消费，"
-        "行集合完整且不含结构非法的停止预算行",
+        "行集合完整（与 AB_index.json 声明行数一致）、模型身份与 model_is 自洽、"
+        "且不含结构非法的停止预算行",
         "satisfied" if (formal_ab and formal_models
-                        and formal_invalid == 0) else "not_satisfied",
-        "formal_rows=%d models=%s invalid=%d identity_fields=%s" % (
-            len(formal_ab), ",".join(formal_models) or "none", formal_invalid,
+                        and formal_invalid == 0
+                        and formal_rows_complete
+                        and formal_kind_ok) else "not_satisfied",
+        "formal_rows=%d declared_rows=%s rows_complete=%s models=%s invalid=%d "
+        "model_is=%s identity_fields=%s" % (
+            len(formal_ab),
+            "unknown" if formal_declared_rows is None else str(formal_declared_rows),
+            str(formal_rows_complete).lower(),
+            ",".join(formal_models) or "none", formal_invalid,
+            ",".join("%s:%d" % kv for kv in sorted(formal_model_kinds.items())) or "none",
             "executed_model,prediction_model,acquisition_model"),
         "outputs/physics_completion/active_learning/blind_replay/AB_axis_endpoint.csv; "
-        "outputs/physics_completion/active_learning/blind_replay/AB_index.json",
-        "本项只问「正式源被正确消费」：行集合完整、模型身份齐全、"
+        + formal_index_path,
+        "本项只问「正式源被正确消费」：行数与 AB_index.json 的声明一致（半写/截断表不放过）、"
+        "每行 executed_model 与其 model_is 自洽（基线不得被当正式模型报告）、"
         "**没有 invalid_input**（坏输入不是「没达到」）。"
         "是否真的达到停止预算是另一项，不得混为一谈；"
         "legacy 数字单独加 legacy_ 前缀，二者不得混淆。",
@@ -706,12 +743,19 @@ def build_rows(progress=None):
     out.append(item(
         "wp5_two_consecutive_points", "9",
         "至少 16/20 回放在两个连续预算点达标才报经验停止预算；12 标签池回放",
-        "partial" if sb and all(r.get("required_consecutive_budget_points") == "2" for r in sb) else "not_satisfied",
-        "rule=16/20 for 2 consecutive points; legacy_computed=%d legacy_blocked=%d; "
-        "replay_pool=legacy_18_not_blind; source_kind=legacy_success_budget"
-        % (endpoint_statuses["computed"], endpoint_statuses["blocked"]),
-        "outputs/physics_completion/active_learning/success_budget.csv; outputs/physics_completion/active_learning/round_diagnostics.csv",
-        "连续两点判据已实现；能严格恢复固定 k=3 的场景给结果，其余场景显式 blocked。旧回放仍非盲，不能冒充新 12 标签池。",
+        "partial" if (sb and all(r.get("required_consecutive_budget_points") == "2" for r in sb)
+                      and formal_reached) else "not_satisfied",
+        "rule=16/20 for 2 consecutive points; formal_reached=%d of %d formal rows; "
+        "legacy_computed=%d legacy_blocked=%d; "
+        "replay_pool=legacy_18_not_blind; source_kind=legacy_success_budget; "
+        "formal_source=blind_replay/AB_axis_endpoint.csv" % (
+            formal_reached, len(formal_ab),
+            endpoint_statuses["computed"], endpoint_statuses["blocked"]),
+        "outputs/physics_completion/active_learning/success_budget.csv; "
+        "outputs/physics_completion/active_learning/round_diagnostics.csv",
+        "连续两点判据在正式 A/B 回放里真正跑过并按联合口径计 reached（见 formal_reached；"
+        "legacy_computed 只数旧 18 池可严格恢复固定 k=3 的场景，其余显式 blocked，"
+        "两者口径不同不得相加）。旧回放仍非盲，不能冒充新 12 标签池。",
     ))
     cost = read_rows("outputs/physics_completion/cost/cost_ledger.csv")
     missing = count(cost, lambda r: r.get("status") == "MISSING")

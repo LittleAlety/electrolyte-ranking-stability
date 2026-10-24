@@ -715,6 +715,51 @@ def anti_misread_block() -> "list[str]":
     ]
 
 
+def _strict_gate_snapshot() -> str:
+    """逐项严格闸门，从产物**机械推导**；任何异常都返回"无法判定"，绝不默认通过。"""
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "readme_strict_wiring", REPO / "scripts/wp_production/strict_readiness_wiring.py")
+        wiring = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(wiring)
+        spec2 = importlib.util.spec_from_file_location(
+            "readme_strict_readiness", REPO / "scripts/wp_production/strict_readiness.py")
+        strict = importlib.util.module_from_spec(spec2)
+        spec2.loader.exec_module(strict)
+        checks = wiring.derive_checks()
+        with (REPO / "outputs/physics_completion/ensembles/production_ensemble_labels.csv").open(
+                encoding="utf-8-sig", newline="") as handle:
+            labels = list(csv.DictReader(handle))
+        verdict = strict.strict_readiness(
+            labels, {(r["name"], r["state"]) for r in labels}, checks)
+        gaps = list(verdict.get("blocked_by") or [])
+        if not gaps:
+            return "**通过**（六项证据与动态触发全部满足）"
+        return "**未通过** · 缺口 " + "、".join("`%s`" % g for g in gaps)
+    except Exception as exc:                      # fail-closed: never read as pass
+        return "**无法判定**（推导失败：%s）" % type(exc).__name__
+
+
+def _p4_package_snapshot() -> str:
+    """筛选轮专属版本包的真实状态（`work/` 为机器本地层，干净克隆不可见）。"""
+    rel = "work/hpc_four_state_p4_xtb_screening_v1/manifest.json"
+    path = REPO / rel
+    if not path.is_file():
+        return ("`work/hpc_four_state_p4_xtb_screening_v1`（**机器本地层，此检出中不可见**；"
+                "干净克隆看不到，属声明式缺失而非零结果）")
+    try:
+        doc = rd(rel)
+    except Exception as exc:
+        return "manifest 读取失败（%s）" % type(exc).__name__
+    gate = str(doc.get("submission_gate") or "")
+    gate_short = gate.split("--")[0].strip() or gate[:40]
+    return ("`work/hpc_four_state_p4_xtb_screening_v1` · **%s 任务** · `%s` · **%s 核 × %s h** · "
+            "`submitted=%s` · gate **%s**"
+            % (doc.get("task_count", "?"), doc.get("resource_profile", "?"),
+               doc.get("cores_per_task", "?"), doc.get("wall_hours_per_task", "?"),
+               doc.get("submitted"), gate_short))
+
+
 def current_progress_block() -> "list[str]":
     """Current tracked evidence first; never infer completion from row count."""
     label_path = "outputs/physics_completion/ensembles/production_ensemble_labels.csv"
@@ -746,6 +791,8 @@ def current_progress_block() -> "list[str]":
         f"{frontier['registered_verified']}/{frontier['total']}"
         if frontier["available"] else "来源缺失或成员集不一致；不可认证"
     )
+    strict_gate = _strict_gate_snapshot()
+    p4_package = _p4_package_snapshot()
     return [
         "## 当前工作入口（与历史阶段分开）", "",
         "本阶段：12 分子 × 4 主态，wB97X-D4/def2-TZVPD + SMD；解析梯度优化 / AnFreq。"
@@ -759,12 +806,30 @@ def current_progress_block() -> "list[str]":
         "[前沿报告](outputs/physics_completion/frontier/frontier_localization.md) · "
         "[证据表](outputs/physics_completion/frontier/frontier_identity_evidence.csv) |",
         f"| 现有合规总体项 | **{overall}**（不是完整 v3 严格目标证书） | "
-        "[合规台账](outputs/physics_completion/compliance/plan_compliance.md) |", "",
+        "[合规台账](outputs/physics_completion/compliance/plan_compliance.md) |",
+        f"| **逐项严格总闸门** | {strict_gate} | "
+        "[strict_readiness_wiring](scripts/wp_production/strict_readiness_wiring.py) |", "",
         f"未 accepted：{remaining}。", "",
-        "工程检查通过不等于科学完成；完整身份、正式 WP5 与触发后的 WP6 仍须单独核验。"
-        "覆盖探针修复：错误第二批 3747724 已取消；旧 11 个探针仅发生刚体变化，不计独立新构象。"
-        "真正片段扭转预检仅 DMC/LiM_2plus 一条通过，已提交 **3748336**；EC 两条因中心双键拒绝。"
-        "[修复与证据记录](docs/hpc_batch2_repair_20261022.md)。已提交不代表新盆地或验收通过。", "",
+        "**四态现状（逐态一行，勿读成\"只差四态\"）**：`DMC/M_plus`、`DMC/LiM_2plus` = `unresolved_qc`"
+        "（`draft_torsion_probe`：各有 **7 个从未被合法探过的登记二面角**，去重后为 2 个 / 1 个重骨架操作"
+        "＋5 个可声明配位探针）；`DOL/LiM_2plus`、`EC/LiM_2plus` = `search_exhausted`"
+        "（**筛选级单盆地、0 个登记扭转**；路线是合法环形变＋声明式 Li 配位探针，"
+        "而环 pucker 的合法位移只有 0.02–0.08 Å，放大到能到达别的盆地就会断环）。"
+        "[路由表](outputs/physics_completion/recovery/probe_routes.csv)", "",
+        f"**筛选轮打包就绪但未提交**：{p4_package}。包内每任务含 `geom.xyz` / `job.inp` / `cores.txt` /"
+        "`inputs.sha256` / `candidate.json`，`candidate_gate_contract=validate_candidate_start_v2`，"
+        "并附 `PACKAGE_SHA256SUMS` 与确定性重建锁 `selection.lock.json`。"
+        "**未提交**是因为一次性授权尚未由用户发出——工程就绪不等于执行授权。", "",
+        "**干净环境复现（工程可复现性）**：`work/` 是 gitignored 的机器本地层（约 12 GB，干净克隆没有）。"
+        "依赖它的**构建器会响亮拒绝**（不是静默降级），依赖它的**测试会带理由跳过**"
+        "（`tests/test_clean_clone_dependencies.py` 钉住拒绝侧）。", "",
+        "**五分钟自证**（任一条都可独立复核）：", "",
+        "```bash",
+        ".venv/Scripts/python.exe -B docs/handoffs/four_state_recovery_20261023/preflight.py   # 0=契约一致（不等于可提交）",
+        "pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1                          # 79 步 + OFFLINE CLOSURE GREEN",
+        "pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1 -Commit                  # 仅当全部一致才提交",
+        "```", "",
+        "工程检查通过不等于科学完成；完整身份、正式 WP5 与触发后的 WP6 仍须单独核验。", "",
         "**先读**：[项目导航 / 下一步 / 核心代码](docs/PROJECT_GUIDE.md) · "
         "[当前恢复报告](outputs/physics_completion/recovery/strict_recovery_v1_report.md) · "
         "[科学协议](docs/physics_completion_protocol.md) · [目录地图](docs/65_repo_layout.md)", "",

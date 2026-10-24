@@ -44,6 +44,55 @@ def test_formal_ab_source_is_read_by_its_own_path():
            ).read_text(encoding="utf-8")
     assert "blind_replay/AB_axis_endpoint.csv" in src
     assert "blind_replay/AB_index.json" in src
+    # and the compliance module never reads the legacy tables under the
+    # blind_replay path or the formal tables under the legacy names: the
+    # two namespaces must not be bridged anywhere in the consumer.
+    legacy_reads = [line for line in src.splitlines()
+                    if "success_budget.csv" in line or "round_diagnostics.csv" in line]
+    assert legacy_reads, "the legacy reads must stay visible (and labelled), not deleted"
+    for line in legacy_reads:
+        assert "blind_replay" not in line, line
+
+
+def test_formal_row_count_is_verified_against_the_declared_index():
+    """行集合完整 must be a real check, not prose.
+
+    A truncated half-written AB table (fewer rows than AB_index.json declares)
+    must flip the consumption item to not_satisfied instead of passing quietly.
+    The rebuild recomputes both sides, so this also pins the current disk state.
+    """
+    import csv as _csv
+    import json as _json
+    base = REPO / "outputs" / "physics_completion" / "active_learning" / "blind_replay"
+    rows = list(_csv.DictReader((base / "AB_axis_endpoint.csv").open(encoding="utf-8")))
+    index = _json.loads((base / "AB_index.json").read_text(encoding="utf-8"))
+    declared = index["rows"]["AB_axis_endpoint"]
+    assert len(rows) == declared, (len(rows), declared)
+    items = _items()
+    consumed = items["wp5_formal_ab_source_consumed"]
+    assert "rows_complete=true" in consumed["measured"], consumed["measured"]
+    assert ("declared_rows=%d" % declared) in consumed["measured"], consumed["measured"]
+
+
+def test_formal_model_is_labels_are_consistent_and_reported():
+    """A baseline row must never present itself as a formal model.
+
+    model_is is the formal table's own vocabulary; the consumer must check
+    executed_model <-> model_is coherence and publish the kind census so a
+    reader sees 8 baseline rows vs 24 formal rows, not a bare model list.
+    """
+    import csv as _csv
+    base = REPO / "outputs" / "physics_completion" / "active_learning" / "blind_replay"
+    rows = list(_csv.DictReader((base / "AB_axis_endpoint.csv").open(encoding="utf-8")))
+    for r in rows:
+        if r["executed_model"] == "knn_baseline":
+            assert r["model_is"] == "baseline_not_formal", r
+        else:
+            assert r["model_is"] == "formal_frozen_predictor", r
+    items = _items()
+    consumed = items["wp5_formal_ab_source_consumed"]
+    assert "model_is=baseline_not_formal:" in consumed["measured"], consumed["measured"]
+    assert "formal_frozen_predictor:" in consumed["measured"], consumed["measured"]
 
 
 def test_formal_item_reports_the_executed_models_and_stop_status():
@@ -67,15 +116,46 @@ def test_invalid_input_can_never_satisfy_the_formal_item():
            ).read_text(encoding="utf-8")
     assert "formal_invalid == 0" in src
     assert "invalid_input" in src
+    # a truncated table (rows < declared) must also fail the same item
+    assert "formal_rows_complete" in src
+    # and the model-kind coherence gate is part of the same verdict
+    assert "formal_kind_ok" in src
 
 
 def test_legacy_derived_numbers_are_labelled():
     items = _items()
     tagged = [r for r in items.values() if "source_kind=legacy" in r["measured"]]
-    assert len(tagged) >= 3, [r["item_id"] for r in tagged]
+    assert len(tagged) >= 4, [r["item_id"] for r in tagged]
     # and no legacy-derived measured string may pass off a bare count as formal
     for r in tagged:
-        assert re.search(r"legacy_(rounds|computed|blocked)=", r["measured"]), r
+        assert re.search(r"legacy_(rounds|computed|blocked|budget_rows)=", r["measured"]), r
+    # the task-separation item reads the legacy success_budget table too, so
+    # its count must be prefixed as well -- a bare `budget_rows=` would read
+    # as a formal number.
+    separation = items["wp5_task_separation"]
+    assert "legacy_budget_rows=" in separation["measured"], separation["measured"]
+    assert re.search(r"(?<!legacy_)budget_rows=", separation["measured"]) is None
+
+
+def test_the_consecutive_points_item_reports_both_sources_separately():
+    """The 16/20 rule now has a formal side; the two censuses must not merge.
+
+    formal_reached counts blind_replay/AB_axis_endpoint.csv rows with
+    stop_budget_status=computed (the 12-label-pool joint rule); legacy_computed
+    counts the old 18-pool rows recoverable at exactly k=3.  Mixing them into
+    one number would inflate either side.
+    """
+    items = _items()
+    row = items["wp5_two_consecutive_points"]
+    assert "formal_reached=" in row["measured"], row["measured"]
+    assert "legacy_computed=" in row["measured"], row["measured"]
+    assert "formal_source=blind_replay/AB_axis_endpoint.csv" in row["measured"]
+    # the formal side really is the AB table's own count
+    import csv as _csv
+    base = REPO / "outputs" / "physics_completion" / "active_learning" / "blind_replay"
+    ab = list(_csv.DictReader((base / "AB_axis_endpoint.csv").open(encoding="utf-8")))
+    reached = sum(1 for r in ab if r["stop_budget_status"] == "computed")
+    assert ("formal_reached=%d of %d formal rows" % (reached, len(ab))) in row["measured"]
 
 
 def test_legacy_builder_declares_its_namespace():
