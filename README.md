@@ -8,6 +8,8 @@
 
 本阶段：12 分子 × 4 主态，wB97X-D4/def2-TZVPD + SMD；解析梯度优化 / AnFreq。以下读自版本化产物，不代表实时超算队列。
 
+**轮次口径**：本仓库的「轮次」在正文里统一写作 `Round`（它是工作轮次，**不是日历周**）；历史产物与文件名仍保留 `weekNN` 前缀（如 `outputs/week25/`、`docs/40_week25_gate1_report.md`），两者指同一编号。
+
 | 验收层 | 当前快照 | 权威来源 |
 | --- | --- | --- |
 | primary 优化 / 频率 QC | 48/48（全成员身份另列） | [主态账本](outputs/physics_completion/free_states/production_ledger.csv) |
@@ -20,7 +22,7 @@
 
 **四态现状（逐态一行，勿读成"只差四态"）**：`DMC/M_plus`、`DMC/LiM_2plus` = `unresolved_qc`（`draft_torsion_probe`：各有 **7 个从未被合法探过的登记二面角**，去重后为 2 个 / 1 个重骨架操作＋5 个可声明配位探针）；`DOL/LiM_2plus`、`EC/LiM_2plus` = `search_exhausted`（**筛选级单盆地、0 个登记扭转**；路线是合法环形变＋声明式 Li 配位探针，而环 pucker 的合法位移只有 0.02–0.08 Å，放大到能到达别的盆地就会断环）。[路由表](outputs/physics_completion/recovery/probe_routes.csv)
 
-**筛选轮打包就绪但未提交**：`work/hpc_four_state_p4_xtb_screening_v1`（**机器本地层，此检出中不可见**；干净克隆看不到，属声明式缺失而非零结果）。包内每任务含 `geom.xyz` / `job.inp` / `cores.txt` /`inputs.sha256` / `candidate.json`，`candidate_gate_contract=validate_candidate_start_v2`，并附 `PACKAGE_SHA256SUMS` 与确定性重建锁 `selection.lock.json`。**未提交**是因为一次性授权尚未由用户发出——工程就绪不等于执行授权。
+**筛选轮打包就绪但未提交**：`work/hpc_four_state_p4_xtb_screening_v1` · **8 任务** · `xtb_screening_v1` · **2 核 × 2 h** · `submitted=False` · gate **HOLD**。包内每任务含 `geom.xyz` / `job.inp` / `cores.txt` /`inputs.sha256` / `candidate.json`，`candidate_gate_contract=validate_candidate_start_v2`，并附 `PACKAGE_SHA256SUMS` 与确定性重建锁 `selection.lock.json`。**未提交**是因为一次性授权尚未由用户发出——工程就绪不等于执行授权。
 
 **干净环境复现（工程可复现性）**：`work/` 是 gitignored 的机器本地层（约 12 GB，干净克隆没有）。依赖它的**构建器会响亮拒绝**（不是静默降级），依赖它的**测试会带理由跳过**（`tests/test_clean_clone_dependencies.py` 钉住拒绝侧）。
 
