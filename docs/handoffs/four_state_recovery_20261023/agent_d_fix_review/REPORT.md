@@ -30,14 +30,29 @@
 
 **总结行：14 项挑战，14 项未被证伪，0 缺陷，退出码 0。**
 
-## 3. 唯一保留观察（Important，非缺陷）
-- `torsion_freedom_registry.csv` 的解析路径是**下一个值得盯的**索引来源：本次扫描确认它当前
-  无法被调用方以负数触达，但 registry 是外部数据文件，若将来登记表出现负号原子号，护栏不在那一层。
-  **最小修法（未实施）**：在 registry 解析处对原子号显式断言 `>= 0`，把 fail-closed 下沉到数据入口。
-- 该观察不阻塞本次 P4 提交；已在 `P4_SUBMIT_RUNBOOK_20261024.md` 之外单独留档，供下一轮决定是否下沉。
+## 3. 保留观察——**已用实测关闭**（无需改代码）
+- 原观察：`torsion_freedom_registry.csv` 的解析路径是索引护栏的剩余缺口。
+- **实测结论（`work/_registry_guard_probe.py`，6/6 符合预期，退出码 0；把 `REGISTRY` 指向
+  `work/` 里的临时 CSV，真实登记表未被触碰）：**
+
+  | 输入 `detail` | 期望 | 实测 |
+  |---|---|---|
+  | `0-1-2-3 direction`（合法） | 正常返回 | returned 1 row |
+  | `-1-2-3-4 direction`（前导负号） | 响亮失败 | `ValueError: invalid literal for int()` |
+  | `1--2-3-4 direction`（内嵌负号） | 响亮失败 | `ValueError` |
+  | 空 `detail` | 响亮失败 | `ValueError` |
+  | `0-1-2-x`（非数字） | 响亮失败 | `ValueError: ... 'x'` |
+
+  消费点复核：`rotated_bond=(-1, 2)` → **`malformed_input`**（第 2 节修复的护栏）。
+- **结论**：registry 解析路径对本类畸形输入**本就是 fail-closed（响亮报错）**，消费点又已被
+  显式护栏覆盖 → **不存在静默缺口，无需再加断言**，故本轮未改动生成器、未触发包重建。
+- 该结论取代先前「最小修法（未实施）」的措辞；先前措辞已失效。
 
 ## 4. 未覆盖范围
 - 未改动、未评价 `select_candidates` 之外的候选生成器语义（环褶皱振幅集合、Li 位移 offset 量级）——
   那属 Agent A 的科学面，见 `agent_a_candidate_review/REPORT.md`。
 - 未运行任何 ORCA/xTB 计算，未触网，未提交任何作业。
 - 未复核 registry 数据本身的**内容正确性**（只复核了索引护栏缺口）。
+- 附带澄清（供 A 的科学面引用）：`registered_single_bonds` **不来自** registry CSV，
+  而来自 `_topology_for_member()` 用 **RDKit 中性 SMILES** 推出的单键集合 —— 这正是
+  「单键证据来自中性拓扑、在阳离子态被削弱」这一判断的代码级出处。
