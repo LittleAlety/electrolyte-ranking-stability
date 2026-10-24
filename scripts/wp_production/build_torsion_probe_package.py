@@ -656,8 +656,10 @@ def select_candidates(symbols, source_coords, adjacency, candidates, *,
             # this function either accepted or refused, else the selection ledger
             # under-counts silently (measured 2026-10-24 by the independent
             # challenger probe: max_keep=1 over 6 raw gave accepted=1, refused=0,
-            # i.e. accountable 1/6).  A break here also skipped the gate entirely
-            # for the remaining candidates.
+            # i.e. accountable 1/6).  The old ``break`` also stopped gating the
+            # tail entirely; ``continue`` keeps the gate running on every
+            # candidate, so a candidate that fails is still refused for its TRUE
+            # reason and only a gate-passing one is capped.
             refused.append({
                 "kind": cand["kind"],
                 "label": cand.get("mode") or cand.get("direction"),
@@ -665,7 +667,9 @@ def select_candidates(symbols, source_coords, adjacency, candidates, *,
                 "detail": {
                     "max_keep": max_keep,
                     "accepted_before_cap": len(accepted),
-                    "note": "selection cap reached; accounted as refused, not dropped",
+                    "gate_reason": verdict["reason"],
+                    "gate_evaluated": True,
+                    "note": "cap reached after passing the gate; accounted as refused, not dropped",
                 },
             })
             continue

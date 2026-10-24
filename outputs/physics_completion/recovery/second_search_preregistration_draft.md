@@ -25,7 +25,7 @@
 
 **更关键的是：这个态本来就不缺盆地**——它的 `limitation_reason` 是 `species_drift_unrecoverable`（`n_unique=2`），结构表显示 `EMC|M_plus|4` 是 `candidate_bond_graph_changed`：该盆地在生产级优化时**键图改变、重排成别的物种**。冻结协议对身份改变明令「直接判失败、不重试」，所以换任何搜索方法都补不上它。
 
-**后果**：WP3 的 R4 阶梯里那 2 对（EMC vs GBL、EMC vs SL）**永久停在 limited**，WP3 的 R4 上限就是 8/12 computed。这是化学结论，不是预算或方法问题。
+**后果（2026-10-23 更新，此前口径已作废）**：早先由此断言「WP3 的 R4 阶梯里那 2 对（EMC vs GBL、EMC vs SL）**永久停在 limited**、R4 上限就是 8/12 computed」。**该断言已过时**：`EMC|M_plus` 后来经**覆盖复核 `qualified_all`**（计入 primary 的 ready 行）放行（系综 39→41），R4 那 2 对随即可以计算。当前 `closure/flip_persistence.csv` 实测为 **6 个 rung × 2 对 = 12 格**：**10 `computed` + 2 `computed_screen_only`**，其中 **`R4` 两对均为 `computed`**、`R4_screen` 仅筛选级。**漂移结论本身的适用范围也随之收窄**：它只说明「该*失败尝试*的起点会重排成别的物种、重试无法恢复身份」，**不等于**「该态没有别的盆地」——后者要由覆盖复核判定。
 
 ## 剩余 5 态：候选方法变更（每项都需单独版本化登记，组合由用户裁决）
 
