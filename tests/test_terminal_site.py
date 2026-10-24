@@ -304,7 +304,11 @@ def test_copied_figures_are_byte_identical_to_the_repository_copies():
 def test_every_week_points_at_a_report_that_exists():
     for week in _payload()["weeks"]:
         assert (REPO_ROOT / week["doc"]).exists(), week["doc"] + " is missing"
-        assert week["summary"].strip(), "week %d has no summary" % week["n"]
+        # Weekly reports carry a "## 0. 一句话结论" section the card quotes; the
+        # recovery-round entries point at handoff contracts, whose section 0 is
+        # a table or absent -- those are checked for existence and labels only.
+        if re.match(r"docs/\d+_", week["doc"]):
+            assert week["summary"].strip(), "week %d has no summary" % week["n"]
         assert week["stage"].strip() and week["title"].strip()
 
 
@@ -634,7 +638,11 @@ def test_argument_timeline_has_one_row_per_stage_with_a_link():
     assert [int(n) for n, _ in rows] == [w["n"] for w in weeks], (
         "the timeline is not in stage order")
     for number, row in rows:
-        assert re.search(r">Week ", row), "stage %s row lost its week label" % number
+        # Entries before the recovery round are labelled "Week N"; the recovery
+        # round carries its own date label (no week number was ever issued for
+        # it).  Both must render a non-empty label and keep a report link.
+        assert re.search(r'class="tl-wk"[^>]*>[^<]+<', row), (
+            "stage %s row lost its label" % number)
         hrefs = re.findall(r'href="([^"]+)"', row)
         assert any("/blob/main/" in h for h in hrefs), (
             "stage %s row carries no report link" % number)
@@ -653,7 +661,8 @@ def test_index_html_static_numbers_track_the_payload():
         "js-orca": str(counts["orca_out"]),
         "js-tests": str(counts["tests_passed"]),
         "js-latest-week": str(last["n"]),
-        "js-latest": "Week %d / %s" % (last["n"], last["stage"]),
+        "js-latest": "%s / %s" % (last.get("label") or "Week %d" % last["n"],
+                                   last["stage"]),
     }
     seen = {key: [] for key in expected}
     for match in re.finditer(r'<span class="(js-[a-z-]+)">([^<]*)</span>', html):

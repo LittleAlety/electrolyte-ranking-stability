@@ -315,8 +315,9 @@ PHASES = [
      "从 GFN2-xTB 廉价代理走到 r2SCAN-3c，用「唯一变量纪律」逐层追问哪一级会改写筛选决策。"),
     ("two", "阶段二 · 评审实施方案", "WP1–WP7 + 论文 v7 结题",
      "把散落产物收敛成可复核的证据主表，回答 RQ1–RQ4，并把结论边界定死。"),
-    ("three", "阶段三 · physics_completion_v1", "WP0–WP6 物理证据补强与决策预算",
-     "追问「哪些缺失物理会改变候选选择、这种变化是否超过独立方法敏感性、恢复选择需要多少额外信息」。"),
+    ("three", "阶段三 · physics_completion_v1", "WP0–WP6 + 四态恢复轮（week37–48）",
+     "追问「哪些缺失物理会改变候选选择、这种变化是否超过独立方法敏感性、恢复选择需要多少额外信息」。"
+     "week45 起进入四态恢复轮：把生产系综从 44/48 推向 48/48，并把「工程就绪」与「执行授权」分开登记。"),
 ]
 
 WEEKS = [
@@ -366,16 +367,45 @@ WEEKS = [
     (36, "deliverables/part2/01_结题论文与提交/SUBMISSION_评审阶段_WP1-WP7.json", "结题提交", "two",
      "论文 v7 成品 + 生成与溯源脚本 + 独立数字审计 + WP1–WP7 对照映射（仓库内没有 outputs/week36：成品由 scripts/build_week36_final_submission.py 生成到交付层）"),
 
-    # ---- 阶段三：physics_completion_v1 WP0-WP6（week37-44） ----
-    (37, "docs/58_week37_wp0_definition_migration.md", "WP0 · 定义迁移", "three", "把仓库外执行方案登记为可追溯新批次，只登记定义与样本（零新增电子结构计算）"),
-    (38, "docs/59_week38_wp1_method_audit.md", "WP1 · 方法审计", "three", "矩阵与规则冻结并本机实测：128 个单点全部收敛 + 32 格阳离子弛豫腿"),
-    (39, "docs/60_week39_wp2_free_energy_labels.md", "WP2 · 自由能标签", "three", "48 行生产模板中已登记 43/48 个主态的真实 Opt+Freq 账本行（缺值不写 0）"),
-    (40, "docs/61_week40_wp3_pair_evidence_mechanism.md", "WP3 · 排序与机制", "three", "三态判据与保守区间协议已冻结，并在既有 rung（P1v→P1a 氧化，n=12）上逐对复算"),
-    (41, "docs/62_week41_wp4_anchor_comparability.md", "WP4 · 锚点可比性", "three", "既有锚点三级分类完成；7 个氧化锚点逐条重算，旧结论原样保留"),
-    (42, "docs/63_week42_wp5_delta_learning_active_query.md", "WP5 · 增量学习与主动查询", "three", "任务定义、泄漏防线与成功端点在回放前冻结；既有 Δ-learning / AL 表已复算"),
-    (43, "docs/64_week43_wp6_explicit_ligand_and_paper.md", "WP6 · 显式配体", "three", "可选 WP6 协议已登记；Li 配对 complete >= 9/12 且生产系综 = 48/48 时自动升级为计划内"),
+    # ---- 阶段三：physics_completion_v1 WP0-WP6（week37-44）+ 四态恢复轮（week45-48） ----
+    (37, "docs/58_week37_wp0_definition_migration.md", "WP0 · 定义迁移", "three",
+     "把仓库外执行方案登记为可追溯新批次：7 个量名 / 方向 / 状态身份 + 5 条历史结论迁移，"
+     "样本 12 主集 · 8 方法集 · 4 采样集；**零新增电子结构计算**（已完成）"),
+    (38, "docs/59_week38_wp1_method_audit.md", "WP1 · 方法审计", "three",
+     "4 设定 × 4 状态 × 8 分子 = **128 个单点全部收敛**，另 32 格阳离子弛豫腿；"
+     "泛函效应中位 0.369 eV ≫ 基组效应 0.027 eV；EMC|GBL 与 EMC|SL 两个冻结翻转在方法轴 certified=True（已完成）"),
+    (39, "docs/60_week39_wp2_free_energy_labels.md", "WP2 · 自由能标签", "three",
+     "**48/48 个主态**登记真实 Opt+Freq 账本行（已知成本小计 557.18 core-hours；60 条已生产账本行含主态与"
+     "额外 def2-TZVPD 中性腿）；未完成的腿保持空串、未写 0（已完成；生产系综层见 week45 起）"),
+    (40, "docs/61_week40_wp3_pair_evidence_mechanism.md", "WP3 · 排序与机制", "three",
+     "P1v→P1a 氧化轴 n=12、**66 pair** 逐对复算：STABLE **55** / UNRESOLVED **9** / ROBUST_INVERSION **2**；"
+     "2 个机制案例、翻转阶梯 12 行（10 生产 + 2 筛选）（已完成）"),
+    (41, "docs/62_week41_wp4_anchor_comparability.md", "WP4 · 锚点可比性", "three",
+     "87 行锚点三级分类：tier_1 **0** / tier_2 14 / tier_3 73；7 个氧化锚点逐条重算 τ_b = **0.4286**；"
+     "按 v1.1 决断永久归入 `validation_limitation`（已完成，结论为负）"),
+    (42, "docs/63_week42_wp5_delta_learning_active_query.md", "WP5 · 增量学习与主动查询", "three",
+     "任务定义、泄漏防线与成功端点在回放前冻结；既有 Δ-learning / 主动查询表已复算，验收 **8/8 通过**"
+     "（已完成；正式 A/B 回放的池覆盖情况见「当前工作入口」）"),
+    (43, "docs/64_week43_wp6_explicit_ligand_and_paper.md", "WP6 · 显式配体", "three",
+     "R=DME 协议已登记，验收 **4/4 通过**；升级门槛 = Li 配对 ≥9/12 + 生产系综 48/48（当前未满足）"
+     "→ `blocked_on_production`（**未触发**）"),
     (44, "deliverables/part2/01_结题论文与提交/SUBMISSION_物理补全批次.json", "结题提交包", "three",
-     "结题提交包：收结题报告、协议、配置、样本、锚点审计、仓库骨架图、生成器源码、测试与全部 outputs/physics_completion/**"),
+     "结题提交包：结题报告、协议、配置、样本、锚点审计、仓库骨架图、生成器源码、测试与全部 "
+     "`outputs/physics_completion/**`（已完成；week45–48 的恢复轮证据不在包内）"),
+    (45, "docs/PROJECT_GUIDE.md", "探针世代与接线", "three",
+     "交接包六项契约缺口全部闭合（探针 **9 PASS/6 FAIL → 15 PASS/0 FAIL**）；决定性缺口是探针成员从未登记为"
+     "系综候选 → 接线后系综 **43 → 44/48** accepted（已完成）", "2026-10-22"),
+    (46, "docs/handoffs/four_state_recovery_20261023/P3_CANDIDATES_20261023.md", "四态分流诊断 + 候选池", "three",
+     "四态逐态分流：DMC 两态 `unresolved_qc`（7 个从未被合法探过的二面角 → 去重后 **2 个重骨架**，"
+     "heavy 0.2743 / 0.2432 Å）；DOL、EC `search_exhausted`（环 pucker 位移仅 **0.0199–0.0771 Å**，"
+     "远低于 0.35 Å 盆地分离规则）。候选池每态接受 3 / 1+3 / 9 / 9（已完成）", "2026-10-23"),
+    (47, "docs/handoffs/four_state_recovery_20261023/P4_SUBMISSION_GATE_20261023.md", "提交门与筛选包", "three",
+     "受保护提交器内部加入 core-hour 不变量与核数 / 输入校验；8 任务 × 2 核 × 2 h = **32 core-hours** 筛选包"
+     "生成并通过只读复核（`P4 SCREENING PACKAGE OK`），但 `submission_gate=HOLD`、`submitted=false` —— "
+     "**工程就绪 ≠ 执行授权**（未提交，等一次性授权）", "2026-10-23"),
+    (48, "docs/handoffs/four_state_recovery_20261023/README.md", "并行清障与独立审计", "three",
+     "`cost_scope` 接入使严格缺口 **3 → 2**（余 `ensemble_not_48_accepted`、`wp5_full_target_pool_evaluated`）；"
+     "独立审计门 probe **63 检查 / 58 过 / 5 未过**，尚未分诊（进行中）", "2026-10-24"),
 ]
 
 PIPELINE = [
@@ -467,7 +497,9 @@ def body_lines(lines):
 def week_payload():
     cache = {}
     payload = []
-    for week, doc, stage, phase, tag in WEEKS:
+    for entry in WEEKS:
+        week, doc, stage, phase, tag = entry[:5]
+        label = entry[5] if len(entry) > 5 else week_label(week)
         path = os.path.join(REPO, doc)
         if doc not in cache:
             if not os.path.exists(path):
@@ -501,7 +533,7 @@ def week_payload():
                 body.append(line)
         summary = clip(" ".join(body_lines(body)), 640)
         payload.append({
-            "n": week, "doc": doc, "title": title,
+            "n": week, "doc": doc, "title": title, "label": label,
             "stage": stage, "phase": phase, "tag": tag, "summary": summary,
             "sections": sections[:14],
         })
@@ -763,6 +795,18 @@ def esc(text):
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def tag_html(text):
+    """Render a stage one-liner as prose, not as literal markdown.
+
+    The one-liners carry ``**emphasis**`` and `` `code` `` markers.  They land in
+    a plain-text node, so without this conversion a reader sees the asterisks and
+    the back-ticks themselves.
+    """
+    html = esc(text)
+    html = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", html)
+    return re.sub(r"`([^`]+)`", r"<code>\1</code>", html)
+
+
 def week_label(n):
     """Weeks 1 and 2 share one report, so the first row names both."""
     return "Week 1\u20132" if n == 1 else "Week %d" % n
@@ -838,13 +882,14 @@ def render_hero_links(payload):
             '      <a class="hero-link" href="#data"><h4>数据与代码</h4>'
             "<p>源码 <code>src/</code>、生成器 <code>scripts/</code>、周报 <code>docs/</code>。</p></a>\n"
             '      <a class="hero-link" id="card-report-latest" href="%s/blob/main/%s">'
-            '<h4>历史阶段交付</h4><p><span class="js-latest-week">%d</span> · '
-            '<span class="js-latest">Week %d / %s</span></p></a>\n'
+            '<h4>最新阶段</h4><p><span class="js-latest-week">%d</span> · '
+            '<span class="js-latest">%s / %s</span></p></a>\n'
             '      <a class="hero-link" href="%s" rel="noopener"><h4>GitHub 仓库</h4>'
             "<p>源码、测试与全部生成器。</p></a>\n"
             "    </nav>"
             % (REPO_URL, len(payload["weeks"]), len(payload["figures"]), REPO_URL, last["doc"],
-               last["n"], last["n"], last["stage"], REPO_URL))
+               last["n"], last.get("label") or week_label(last["n"]),
+               last["stage"], REPO_URL))
 
 
 def _progress_percent(done, total):
@@ -985,8 +1030,9 @@ def render_argument_timeline(payload):
                 ' <span class="tl-stage">%s</span></span>\n'
                 '          <p class="tl-tag">%s</p>\n'
                 "        </li>"
-                % (w["n"], REPO_URL, w["doc"], week_label(w["n"]),
-                   esc(w["stage"]), esc(w["tag"])))
+                % (w["n"], REPO_URL, w["doc"],
+                   w.get("label") or week_label(w["n"]),
+                   esc(w["stage"]), tag_html(w["tag"])))
         body = ('  <div class="phase">\n'
                 '    <h3>%s</h3>\n'
                 '    <p class="eyebrow">%s</p>\n'
