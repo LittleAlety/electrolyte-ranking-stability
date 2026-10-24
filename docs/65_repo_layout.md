@@ -8,8 +8,9 @@
 
 ## 1. 顶层
 
-新读者先看 [PROJECT_GUIDE.md](PROJECT_GUIDE.md)：权威账本、后续安排、核心实现和网页维护入口。
-根 README 与 Pages 当前进度由生成器读取账本；历史周报与当前生产不混为同一验收快照。
+新读者先看 [PROJECT_GUIDE.md](PROJECT_GUIDE.md)：权威账本、后续安排、核心实现和网页维护入口；
+历史研究按主题从 [progress/README.md](progress/README.md) 进入。根 README 与 Pages 当前进度由生成器读取账本；
+历史周报与当前生产不混为同一验收快照。
 发布层将 primary、系综 accepted、前沿解析与身份证据登记分层展示；前沿分母由当前
 `production_ensemble_weights.csv` 的成员集推导，并与 `frontier_localization.csv`、
 `frontier_identity_evidence.csv` 交叉核对及登记源字节哈希。`verified` 仅是证据表标记，
@@ -21,7 +22,7 @@
 | --- | --- | --- |
 | `config/` | 版本化配置：`scientific_definitions.yaml`（旧定义，冻结）、`physics_completion_v1.yaml`（新阶段 WP0-WP6 的量名 / 样本 / 预算 / 停止规则）、`prereg.yaml` | 是（week37 收录 v1） |
 | `data/` | 输入与参考：`anchors/`（氧化锚点及其原始复核）、`metadata/`（样本集）、`references/`、`structures/` | 是 |
-| `docs/` | 文档：`NN_*.md` 按编号区间分段（见 §2.2），协议、结论迁移表、结题报告、本骨架图；`docs/assets/` 是终端站点的静态资源；站点入口三件在 `docs/` 顶层：`index.html`、`404.html`、`.nojekyll` | 是 |
+| `docs/` | 文档：`NN_*.md` 保留历史稳定链接，`progress/` 按研究主题分散原 README 周志，另含协议、结论迁移表、结题报告和本骨架图；`docs/assets/` 是终端站点的静态资源；站点入口三件在 `docs/` 顶层：`index.html`、`404.html`、`.nojekyll` | 是 |
 | `outputs/` | 全部产物：`weekNN/` 逐阶段载荷 + `manifest.json`、`physics_completion/` 新阶段、`figures/`、`gate1/`、`state_identity/`、`decision_state/`、`phase2_p1a/`、`smoke/`、`_tools/`、`_weekNN_scratch/` | 是（镜像到仓库外 `成果输出（part2）`） |
 | `scripts/` | 入口脚本：顶层扁平入口 + `wp_production/` 生产子包 | 源码；生成器与关键测试随 week44 收录 |
 | `src/electrolyte_ranking/` | 可复用库（17 个模块）：`orca`、`xtb`、`qc`、`provenance`、`uncertainty`、`ranking`、`robustness`、`decision_state`、`paper`、`toolchain`、`pc_batch`、`wp2`、`wp3`、`wp4`、`wp5`、`wp6`、`wp7`（`wp2`–`wp7` 属**旧** WP 编号，见 §2.1） | 部分（`pc_batch.py` 随 week44 收录） |
@@ -31,7 +32,7 @@
 | `deliverables/` | **交付镜像入库副本**：`part1/`（Stage 0–24 / week1–week25）与 `part2/`（评审实施方案 WP1–WP7 + physics_completion_v1 批次），各含 9 类「按成果种类」目录 + `README.md` + `进度说明.md` + `SHA256SUMS_新结构.txt` + 路径映射表。与仓库外 `成果输出（part1）/`、`成果输出（part2）/` 内容一致，入库是为了让 GitHub 上可直接浏览交付件 | 是 |
 | `.toolchain/`、`.venv/`、`.mamba/` | 本机工具链与运行环境（**不入库**）：`.toolchain/xtb/xtb-6.7.1/bin/xtb.exe`、`.venv/`（收口链用的解释器）、`.mamba/`；ORCA 在仓库外 `E:\orca_6_1_1\orca.exe`（定位见 `src/electrolyte_ranking/toolchain.py`）。骨架测试按 `startswith(".")` 跳过点目录，因此本行是人读登记 | 否 |
 
-顶层文件：`README.md`（由 `scripts/build_github_readme.py` 确定性生成的逐周日志，**不要手改**）、
+顶层文件：`README.md`（由 `scripts/build_github_readme.py` 确定性生成的项目入口，**不要手改**）、
 `计划.md`（研究计划 v1）、`FINAL_CONCLUSIONS.md`、`pyproject.toml`、
 `.gitattributes`（`* text=auto eol=lf`）、`.gitignore`、`.env.example`。
 
@@ -54,7 +55,7 @@
 
 | 阶段 | 周目录 | WP | 说明 |
 | --- | --- | --- | --- |
-| 计划 v1：代理量 → 决策稳定性 | `outputs/week1..week23` | 早期 stage | 逐周日志见 `README.md` |
+| 计划 v1：代理量 → 决策稳定性 | `outputs/week1..week23` | 早期 stage | 主题日志见 `docs/progress/`；冻结周报仍在 `docs/NN_*.md` |
 | 主协变对齐 | `outputs/week24_corealign` | Week 24 | 目录名不是 `week24/`，是历史命名 |
 | 论文 v6 阶段 | `outputs/week25..week35` | Week 25-35 | 其中 `week28..week34` = **评审实施方案 WP1-WP7**（`docs/50`-`56`） |
 | 论文 v7 结题 | 仅镜像 `成果输出（part2）/week36` | Week 36 | 仓库内没有 `outputs/week36/`；由 `scripts/build_week36_final_submission.py` 生成 |
@@ -95,6 +96,7 @@ week36 与 week44 只存在于 part2 镜像。
 不带数字前缀的文档（`claim_migration.md`、`gate1_negative_result.md`、
 `physics_completion_final_report.md`、`physics_completion_protocol.md`、
 `state_identity_protocol.md`、`p1v_vs_p1a.md`）是跨阶段的结论 / 协议，不受区间约束。
+`docs/progress/` 是面向读者的主题日志层，只引用上述稳定文档与 `outputs/` 证据，不复制机器可读数字源。
 
 ## 3. `scripts/` 约定
 

@@ -877,16 +877,73 @@ def build_readme() -> str:
         f"**tau_b = {fnum(g1_tau, 4)} < 0.90**、**n_pairs = {fint(g1_pairs)}**，判 **`{g1_reason}`**"
         f"（一致 {fint(dig(g1, 'concordant'))} / 不一致 {fint(dig(g1, 'discordant'))}）（`outputs/week25/series_rel_ordering_check.json`）。**绝对标定层**：溶液相锚点 31 行 `est` 按 R7 裁决记为 **limitation**，不再单列 blocker。**可闭合性**：判 **NOT CLOSABLE**（预注册要求的同装置 / 同判据 / ≥ 7 分子同源序列在公开文献中不存在，最长 k = 1），作为 negative result 记录，不事后救援。 |"
     )
-    lines = [status if ln.startswith("**项目状态**") else ln for ln in HEAD]
-    lines[6:6] = current_progress_block()
-    lines = [gate1_row if ln.startswith("| Gate 1（方法") else ln for ln in lines]
-    anchor = next(i for i, ln in enumerate(lines) if ln.startswith("**项目状态**"))
-    lines[anchor + 1:anchor + 1] = [""] + anti_misread_block()
-    lines.extend(weekly_log())
-    lines.extend(R13_HEAD)
-    lines.extend(r13_log())
-    lines.extend(TAIL)
-    lines.extend(new_batch_block())
+    lines = HEAD[:6]
+    lines.extend(current_progress_block())
+    lines.extend([
+        status, "",
+    ])
+    lines.extend(anti_misread_block())
+    lines.extend([
+        "",
+        "## 这个仓库回答什么", "",
+        "本项目把电解液候选的排序看成一个需要审计的**决策过程**，而不是一张静态排行榜。"
+        "研究主线是 `cheap proxy → designated computational target → uncertainty-aware rank change → mechanism → minimal budget`。", "",
+        "- **排序何时可信**：同时报告 `STABLE / UNRESOLVED / ROBUST_INVERSION`，不把证据不足误写成稳定。",
+        "- **哪一层改变了决定**：分离方法、环境、几何、配位与显式第一溶剂壳的影响。",
+        "- **为什么改变**：核心观察是位移的离散度比平均位移更能解释排序改写。",
+        "- **需要算多少**：用预注册判据、Δ-learning 与主动查询估计达到指定决策分辨率的信息成本。", "",
+        "核心边界：core set = **18**、broad pool = **40**；它们支持方法学与机制层面的 proof-of-concept，"
+        "不支持对整个电解液化学空间作普适排名。", "",
+        "## 从哪里开始", "",
+        "| 你要找的内容 | 入口 |",
+        "| --- | --- |",
+        "| 当前任务、下一步与核心代码 | [项目导航](docs/PROJECT_GUIDE.md) |",
+        "| 按研究主题拆分的历史进度 | [进度与日志索引](docs/progress/README.md) |",
+        "| 10 个研究问题的结论矩阵 | [最终结论](FINAL_CONCLUSIONS.md) |",
+        "| 当前生产批次科学协议 | [physics completion 协议](docs/physics_completion_protocol.md) |",
+        "| 目录、权威产物与复现边界 | [仓库地图](docs/65_repo_layout.md) |",
+        "| 脚本用途与入口 | [脚本索引](scripts/README.md) |", "",
+        "周次现在只作为历史定位符，不再承担仓库导航职责。原始 `outputs/week*`、编号周报与交付镜像均保留原位；"
+        "新的主题日志只做索引和解释，不复制或改写证据。", "",
+        "## Gate 与声明边界", "",
+        "| Gate | 状态 | 解释 |",
+        "| --- | --- | --- |",
+        "| Gate 0：定义冻结 | **CLOSED** | 定义、阈值与 amendment 记录已冻结。 |",
+        gate1_row,
+        "| 严格生产总闸门 | **未通过** | 当前缺口以 README 顶部的逐项严格总闸门为准。 |", "",
+        "**0 robust inversions ≠ 0 ranking instability.** 大量 pair 仍为 `UNRESOLVED`；"
+        "零次稳健反转不能单独作为“排序稳定”的证据。", "",
+        "**NOT CLOSABLE ≠ NO SUCH DATA EXIST ANYWHERE.** 这里的 NOT CLOSABLE 只表示："
+        "在预注册的检索和验证标准下，没有定位到足以闭合 Gate 1 的同源序列；未来若出现合格数据，该判断可被证伪。", "",
+        "## 快速复核", "",
+        "```powershell",
+        "python scripts/build_github_readme.py --check",
+        "python -m pytest tests/test_repo_layout.py tests/test_terminal_site.py -q",
+        "pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1",
+        "git diff --check",
+        "```", "",
+        "`finalize_wp2.ps1` 是当前生产链的一致性检查入口；不带 `-Commit` 不会提交计算。"
+        "ORCA / xTB 计算只在受控环境运行，本地复核主要读取已版本化的账本和派生产物。", "",
+        "## 目录约定", "",
+        "| 路径 | 角色 |",
+        "| --- | --- |",
+        "| `config/` | 冻结定义、预注册阈值与批次配置 |",
+        "| `data/` | 元数据与外部锚点 |",
+        "| `src/electrolyte_ranking/` | 可复用的排序、QC、不确定性与 provenance 库 |",
+        "| `scripts/` | 构建、审计、分析与收口入口 |",
+        "| `outputs/` | 版本化证据；历史周目录保持不动 |",
+        "| `docs/` | 协议、主题日志、交接与解释性文档 |",
+        "| `deliverables/` | 对外交付镜像 |",
+        "| `work/` | 本机临时计算层；不作为 GitHub 可复现证据 |", "",
+        "## 维护规则", "",
+        "- README 由 `scripts/build_github_readme.py` 确定性生成；不要直接手改派生数字。",
+        "- 新进展先写入对应主题日志，再把机器可读证据放入稳定的 `outputs/` 主题路径。",
+        "- 历史 `week*` 路径只归档，不再继续扩展新的周次导航。",
+        "- 任何结论都应给出 evidence path、适用样本、判据和 limitation。", "",
+        "## 引用与许可", "",
+        "引用本仓库时，请把它描述为**排序决策稳定性与信息成本研究**，不要描述成最终溶剂性能排行榜。"
+        "若需复核具体数字，从 [最终结论](FINAL_CONCLUSIONS.md) 或 [主题日志](docs/progress/README.md) 进入对应冻结产物。", "",
+    ])
     text = "\n".join(lines)
     if not text.endswith("\n"):
         text += "\n"
