@@ -20,6 +20,19 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+# --- declared dependency on the gitignored `work/` layer (step 12) -----------
+# The counterexample fixtures are shipped inside the machine-local support
+# package work/deepseek_support_20261022/ (gitignored).  A clean clone does not
+# have them, so the need is DECLARED here instead of failing.
+import pytest as _pytest_work_layer
+
+if not (Path(__file__).resolve().parents[1] / "work" / "deepseek_support_20261022").is_dir():
+    _pytest_work_layer.skip(
+        "the machine-local work/deepseek_support_20261022 fixtures are absent in this checkout",
+        allow_module_level=True,
+    )
+# ---------------------------------------------------------------------------
+
 REPO = Path(__file__).resolve().parents[1]
 BUNDLE = REPO / "work" / "deepseek_support_20261022"
 CASES = BUNDLE / "contract_cases.json"

@@ -14,6 +14,21 @@ import json
 import sys
 from pathlib import Path
 
+# --- declared dependency on the gitignored `work/` layer (step 12) -----------
+# A clean clone has no `work/` (raw ledgers/logs/geometries, 12 GB, untracked).
+# The builders refuse loudly when it is missing (pinned by
+# test_clean_clone_dependencies.py), so a test consuming a dev-tree fixture
+# declares the need and skips WITH A REASON -- never silently passing.
+import pytest as _pytest_work_layer
+
+if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+    _pytest_work_layer.skip(
+        "the machine-local work/wp2prod evidence layer (gitignored) is absent in this checkout; "
+        "the builders' loud refusal is pinned by test_clean_clone_dependencies.py",
+        allow_module_level=True,
+    )
+# ---------------------------------------------------------------------------
+
 REPO = Path(__file__).resolve().parents[1]
 MOD = REPO / "scripts" / "wp_production" / "build_probe_routes.py"
 OUT = REPO / "outputs" / "physics_completion" / "recovery" / "probe_routes.csv"

@@ -14,6 +14,8 @@ It also pins the two things that could silently ruin the round:
   the P3 pool would be an invented start.
 """
 import importlib.util
+import csv
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -48,9 +50,28 @@ def sub():
     return _load("submit_hpc_batch")
 
 
+@pytest.fixture(scope="module")
+def btp():
+    return _load("build_torsion_probe_package")
+
+
 def _all_seeds(plan):
     return [(key, seed) for key, st in plan["states"].items()
             for seed in st["screening_seeds"]]
+
+
+def _authoritative_identities():
+    ledger = REPO / "outputs" / "physics_completion" / "free_states" / "production_ledger.csv"
+    with ledger.open(encoding="utf-8", newline="") as fh:
+        rows = csv.DictReader(fh)
+        return {
+            "%s|%s" % (row["name"], row["state"]): {
+                "mol_id": row["record_id"],
+                "charge": int(row["charge"]),
+                "multiplicity": int(row["multiplicity"]),
+            }
+            for row in rows
+        }
 
 
 # ---- the round's boundary -------------------------------------------------
@@ -58,6 +79,17 @@ def _all_seeds(plan):
 def test_the_plan_is_marked_unsubmitted(plan):
     assert plan["submitted"] is False
     assert "HOLD" in plan["submission_gate"]
+
+
+def test_p3_and_p4_state_identities_match_the_production_ledger(plan, pool):
+    """Never screen the right geometry under the wrong electronic state."""
+    authoritative = _authoritative_identities()
+    assert set(plan["states"]) <= set(authoritative)
+    for state_key, state_plan in plan["states"].items():
+        expected = authoritative[state_key]
+        assert {key: state_plan[key] for key in expected} == expected, state_key
+        p3_state = pool["states"][state_key]
+        assert {key: p3_state[key] for key in expected} == expected, state_key
 
 
 def test_the_plan_uses_eight_tasks_and_fits_the_32_core_hour_cap(plan):
@@ -122,8 +154,10 @@ def test_each_state_covers_more_than_one_degree_of_freedom(plan, pool):
 
 def test_the_plan_matches_the_submitter_allocation(plan, sub):
     """The plan's core count must equal what the protected submitter allocates."""
-    assert plan["cores_per_task"] == sub.CORES_PER_TASK
-    assert plan["wall_hours_per_task"] <= sub.WALL_HOURS
+    profile = sub.RESOURCE_PROFILES[plan["resource_profile"]]
+    assert profile["engine"] == "xtb"
+    assert plan["cores_per_task"] == profile["cores"] == 2
+    assert plan["wall_hours_per_task"] == profile["wall_hours"] == 2
 
 
 def test_the_plan_builds_a_package_the_submitter_gate_accepts(plan, sub, tmp_path):
@@ -157,3 +191,89 @@ def test_a_methyl_rotor_seed_would_be_rejected_by_the_plan_rules(plan):
     seeds = [s for _k, s in _all_seeds(plan)]
     assert all(s["heavy_pair_change_a"] > 1e-5 for s in seeds)
     assert not any(s["probe_class"] == "methyl_rotor" for s in seeds)
+
+
+# ---- formal immutable P4 xTB payload --------------------------------------
+
+def test_formal_package_is_deterministic_and_rebuilds_all_eight_candidates(btp):
+    first = btp.build_p4_screening_files()
+    second = btp.build_p4_screening_files()
+    assert first == second
+    assert len([path for path in first if path.endswith("/geom.xyz")]) == 8
+    manifest = json.loads(first["manifest.json"])
+    assert len(manifest["tasks"]) == 8
+    assert manifest["batches"] == [{
+        "array": "0-7%2", "batch": 1, "count": 8,
+        "list_sha256": hashlib.sha256(first["batch_1.txt"]).hexdigest(),
+        "script_sha256": hashlib.sha256(first["batch_1.sbatch"]).hexdigest(),
+    }]
+    assert b"#SBATCH --array=0-7%2\n" in first["batch_1.sbatch"]
+    assert b"batch_1.txt" in first["batch_1.sbatch"]
+    assert b"orca" not in first["batch_1.sbatch"].lower()
+
+
+def test_formal_package_derives_charge_spin_and_cores_from_authority(btp, sub, tmp_path):
+    package = tmp_path / "pkg"
+    btp.write_p4_screening_package(package)
+    manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
+    listing = (package / "batch_1.txt").read_text(encoding="utf-8").splitlines()
+    authoritative = btp._p4_authoritative_identities()
+    for task in manifest["tasks"]:
+        identity = authoritative[task["state_key"]]
+        assert task["record_id"] == identity["record_id"]
+        assert task["mol_id"] == identity["mol_id"]
+        assert task["charge"] == identity["charge"]
+        assert task["multiplicity"] == identity["multiplicity"]
+        assert task["spin"] == identity["multiplicity"] - 1
+        text = (package / task["task_path"] / "job.inp").read_text(encoding="utf-8")
+        assert text == "$chrg %d\n$spin %d\n" % (identity["charge"], identity["multiplicity"] - 1)
+        assert "%pal" not in text.lower()
+    assert sub.declared_task_cores(package, listing, engine="xtb") == 2
+
+
+@pytest.mark.parametrize("target,field,bad", [
+    ("DOL|LiM_2plus", "mol_id", "C07|LiM_2plus"),
+    ("DMC|LiM_2plus", "charge", 1),
+    ("EC|LiM_2plus", "multiplicity", 1),
+])
+def test_formal_builder_refuses_static_identity_drift(btp, tmp_path, target, field, bad):
+    changed = json.loads(btp.P4_SCREENING_PLAN.read_text(encoding="utf-8"))
+    changed["states"][target][field] = bad
+    path = tmp_path / "bad_plan.json"
+    path.write_text(json.dumps(changed), encoding="utf-8")
+    with pytest.raises(ValueError, match="electronic identity drift"):
+        btp.build_p4_screening_files(p4_path=path)
+
+
+def test_formal_package_hash_inventory_is_exact(btp):
+    files = btp.build_p4_screening_files()
+    attempts = json.loads(files["attempts_ledger.json"])["attempts"]
+    assert len(attempts) == 8
+    assert len({row["attempt_id"] for row in attempts}) == 8
+    assert all(row["status"] == "planned" and row["cores"] == 2
+               and row["wall_hours_reserved"] == 2 for row in attempts)
+    lines = files["PACKAGE_SHA256SUMS"].decode("utf-8").splitlines()
+    inventory = {}
+    for line in lines:
+        digest, rel = line.split("  ", 1)
+        inventory[rel] = digest
+    assert set(inventory) == set(files) - {"PACKAGE_SHA256SUMS"}
+    assert all(inventory[rel] == hashlib.sha256(files[rel]).hexdigest()
+               for rel in inventory)
+
+
+def test_formal_package_check_is_strictly_read_only(btp, tmp_path):
+    package = tmp_path / "pkg"
+    btp.write_p4_screening_package(package)
+    before = {str(path.relative_to(package)): (path.read_bytes(), path.stat().st_mtime_ns)
+              for path in package.rglob("*") if path.is_file()}
+    assert btp.check_p4_screening_package(package) == []
+    after = {str(path.relative_to(package)): (path.read_bytes(), path.stat().st_mtime_ns)
+             for path in package.rglob("*") if path.is_file()}
+    assert after == before
+    victim = next(package.glob("tasks/*/*/job.inp"))
+    victim.write_bytes(b"$chrg 999\n$spin 999\n")
+    corrupt = victim.read_bytes(), victim.stat().st_mtime_ns
+    problems = btp.check_p4_screening_package(package)
+    assert any(item.startswith("changed:tasks/") for item in problems)
+    assert (victim.read_bytes(), victim.stat().st_mtime_ns) == corrupt

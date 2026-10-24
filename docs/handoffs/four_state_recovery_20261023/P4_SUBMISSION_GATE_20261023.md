@@ -11,39 +11,54 @@
 |---|---|
 | 受保护提交器 | `scripts/wp_production/submit_hpc_batch.py`（**已存在**，走命令桥、要求 pwsh 7） |
 | 它已具备的保护 | 重复批次拒绝（reservation 文件 + journal）、`doctor` 前置、**账户级远端提交锁**、**实时 `squeue` 余量**（`MAX_ACTIVE_PENDING=20`）、批次清单与 manifest 计数一致 |
-| **它固定的资源** | `--cores 4 --time 24:00:00` |
-| 该固定值是否适用于本轮 | **适用**：项目生产腿口径即 **4 核 / 24h**（sacct 实测每条生产腿 `AllocCPUS=4`；冻结协议相同）。计划里的「16 核 × 4h」是**预算上限示意**，且计划明令「**若 16 核×4h 不够，先停止、提交诊断，不暗改 24h**」 → **本次不改核心数与时长** |
+| 版本化资源 | 历史/ORCA 包缺 profile 时保持 `orca_production_v1`＝4核/24h/800 core-hours；本轮筛选必须显式 `xtb_screening_v1`＝2核/2h/32 core-hours |
+| 资源能否由 CLI 放宽 | **不能**。profile 随被哈希的 manifest 进入提交；未知 profile、CLI cap 与 profile 不一致、引擎与输入格式不一致均在 bridge 前拒绝 |
 
 ## 2. 本轮新增（都在提交器**内部**，外层脚本无法绕开）
 
-1. **`declared_task_cores(package, listing)`**：读取每个任务 `job.inp` 的
-   `%pal nprocs N`，要求**所有任务一致**且**等于分配核数**；缺声明、缺 `job.inp`、
-   不一致 → **拒收**。落实计划的「**输入核数与 allocation 一致**」与 `AGENTS.md` 的
-   「`%pal nprocs` 必须等于 `--cores`」。
+1. **`submission_resources(...)` + `declared_task_cores(...)`**：ORCA profile 只接受
+   `%pal nprocs N`；xtB profile 拒绝 `%pal`，要求 `$chrg/$spin` 与 `cores.txt`。
+   所有任务核数必须一致且等于 profile 分配核数；缺声明、缺输入、引擎错配均拒收。
 2. **`committed_core_hours(attempts)`**：核心小时不变量，三条规则——
    - **未结束**（`pending`/`running`/`submitting`）按**全额预留**计（`cores × wall_hours_reserved`）：
      未完成的作业**不能**释放剩余额度；
    - **已结束**按 Slurm **allocation 去重**后计一次实测值：**共享作业不得按腿重复计费**；
    - 终态却**缺来源**（无 `slurm_allocation_id` 或无 `measured_core_hours`）→ **`ValueError`**，
      **绝不当作 0**。
-3. **`budget_headroom(...)`**：`committed + reserved ≤ cap`（默认 **800**）在**提交临界区内**校验，
+3. **`budget_headroom(...)`**：`committed + reserved ≤ profile cap` 在**提交临界区内**校验，
    超额即拒；通过时把 `committed/reserved/cap/remaining_after` 写进提交 journal 记录。
-4. **CLI**：`--attempts-ledger JSON`、`--budget-cap-core-hours`（默认 800）。
-   **未给 ledger 时**：不静默跳过，而是**打印 NOTE 声明"预算不变量未校验"**，并在 journal 里记
-   `budget_checked=false`（可审计）。
+4. **CLI**：`--budget-cap-core-hours` 仅作一致性断言，不能覆盖 profile。显式
+   `xtb_screening_v1` **强制要求** `--attempts-ledger`，缺失即在 doctor/bridge 前拒绝；
+   历史 ORCA 包仍保留无 ledger 时打印 NOTE、journal 记 `budget_checked=false` 的兼容行为。
 
-## 3. 测试（`tests/test_submit_budget_gate.py`，12 项 + 1 声明式 skip）
+## 3. 测试
 
 覆盖：未结束按全额预留、**共享 allocation 只计一次**、终态缺来源即报错、planned/rejected 不计费、
 cap 含在飞额度、`committed+reserved>cap` 拒收、声明核数读取、任务间核数不一致拒收、
-缺声明拒收、缺输入拒收，并钉住「本项目口径 = 4 核 / 24h，默认上限 800」（**防止被悄悄改成 16 核**）。
+缺声明拒收、缺输入拒收，并钉住 ORCA＝4核/24h/800 与 xtB＝2核/2h/32 两套协议。
+八任务 xtB 贯通测试同时断言 bridge 参数、`reserved=32`、`cap=32` 与
+`budget_checked=true`；缺账本、cap 覆盖、引擎错配和未知 profile 均有负测。
 
 **既有夹具的处理**：契约收紧使 `tests/test_submit_hpc_batch.py` 的三个夹具（只有
 manifest/script/list、无 `job.inp`）失效 → 按项目纪律**修夹具**（补上声明 `%pal nprocs 4` 的
 `job.inp`），**不改回契约**。
 
-## 4. 尚未做（P4 的剩余部分）
+## 4. 专属版本包（已生成，仍为 HOLD）
 
-- **专属版本包的正式生成**（manifest/几何/来源/预检/预算）——待 P3 候选选定后建包；
-- **提交本身**：仍须过「授权 + 预算 + 输入 + 实时队列」四门，且**只经命令桥**；
-  **本轮未提交任何作业**。
+- 本地包：`work/hpc_four_state_p4_xtb_screening_v1/`，共 8 个任务；单数组
+  `0-7%2`，一次锁定 `8 × 2核 × 2小时 = 32 core-hours`。
+- 身份来源：`production_ledger.csv`；P3/P4 的 `record_id/charge/multiplicity` 任一漂移即拒绝。
+  三个 `LiM_2plus` 均按权威态 `charge=2, multiplicity=2, spin=1`，不再沿用旧 scratch
+  生成器错误的 `1/1`。
+- 每条任务均从锁定源几何重建，重新经过候选 gate，并同时锁定 raw geometry SHA256 与
+  distance fingerprint；根 `PACKAGE_SHA256SUMS` 对不可变输入做完整清单闭包。
+- 生成与只读复核：
+
+  ```powershell
+  .\.venv\Scripts\python.exe scripts\wp_production\build_torsion_probe_package.py --build-p4-screening
+  .\.venv\Scripts\python.exe scripts\wp_production\build_torsion_probe_package.py --check-p4-screening
+  ```
+
+- **提交仍未做**：`manifest.json` 与 selection lock 均为 `submission_gate=HOLD`、
+  `submitted=false`。上传前还须远端逐文件核对 `PACKAGE_SHA256SUMS`，提交只允许走命令桥与
+  `submit_hpc_batch.py --attempts-ledger ...`，不得裸 SSH 或绕过预算门。

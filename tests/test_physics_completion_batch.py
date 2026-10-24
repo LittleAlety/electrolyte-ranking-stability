@@ -14,6 +14,21 @@ from pathlib import Path
 import build_physics_completion_batch as batch
 from electrolyte_ranking import pc_batch as PB
 
+# --- declared dependency on the gitignored `work/` layer (step 12) -----------
+# A clean clone has no `work/` (raw ledgers/logs/geometries, 12 GB, untracked).
+# The builders refuse loudly when it is missing (pinned by
+# test_clean_clone_dependencies.py), so a test consuming a dev-tree fixture
+# declares the need and skips WITH A REASON -- never silently passing.
+import pytest as _pytest_work_layer
+
+if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
+    _pytest_work_layer.skip(
+        "the machine-local work/wp2prod evidence layer (gitignored) is absent in this checkout; "
+        "the builders' loud refusal is pinned by test_clean_clone_dependencies.py",
+        allow_module_level=True,
+    )
+# ---------------------------------------------------------------------------
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 

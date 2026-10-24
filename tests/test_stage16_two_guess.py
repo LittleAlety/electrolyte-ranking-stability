@@ -50,6 +50,19 @@ import analyze_stage16_catalogue as s16a  # noqa: E402
 import build_stage16_predictor as s16b  # noqa: E402
 import run_stage16_catalogue as runner  # noqa: E402
 
+# --- declared dependency on the gitignored `work/` layer (step 12) -----------
+# A clean clone has no `work/`: raw ledgers, logs and geometries live there and
+# are 12 GB, so they are not tracked.  The builders REFUSE loudly when it is
+# missing (pinned by test_clean_clone_dependencies.py); a test that consumes a
+# dev-tree fixture therefore declares the need and skips WITH A REASON instead
+# of failing -- and never silently passes.
+pytestmark = pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir(),
+    reason="the machine-local work/wp2prod evidence layer (gitignored) is absent in this checkout; "
+           "the builders' loud refusal is pinned by test_clean_clone_dependencies.py",
+)
+# ---------------------------------------------------------------------------
+
 WEEK15 = REPO_ROOT / "outputs" / "week15"
 GAS_DIR = REPO_ROOT / "outputs" / "week4" / "orca"
 

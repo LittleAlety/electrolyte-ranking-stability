@@ -201,6 +201,40 @@ def test_a_carbonyl_bond_is_not_a_rotor(btp):
     assert verdict["reason"] == "not_a_single_bond_rotor", verdict
 
 
+def test_a_declared_torsion_without_single_bond_registry_is_refused(btp):
+    """A caller may not omit bond-order evidence and thereby bypass the C=O gate."""
+    syms, xyz = _ideal_ethane()
+    adj = _adjacency(syms, xyz)
+    verdict = btp.validate_candidate_start(
+        syms, xyz, _rotate_methyl(xyz, 60.0), adj,
+        rotated_bond=(0, 1))
+    assert verdict["accepted"] is False, verdict
+    assert verdict["reason"] == "missing_single_bond_registry", verdict
+
+
+@pytest.mark.parametrize(
+    ("rotated_bond", "registered_single_bonds"),
+    [
+        (None, {(0, 1)}),
+        ((0, 1), None),
+    ],
+)
+def test_torsion_selector_requires_axis_and_single_bond_registry(
+        btp, rotated_bond, registered_single_bonds):
+    """The generic P3 selector must fail closed before a manifest can be built."""
+    syms, xyz = _ideal_ethane()
+    adj = _adjacency(syms, xyz)
+    candidate = {"kind": "torsion", "mode": "missing-axis-and-registry",
+                 "coords": _rotate_methyl(xyz, 60.0)}
+    if rotated_bond is not None:
+        candidate["rotated_bond"] = rotated_bond
+    selected = btp.select_candidates(
+        syms, xyz, adj, [candidate],
+        registered_single_bonds=registered_single_bonds)
+    assert selected["accepted"] == [], selected
+    assert selected["refused"][0]["reason"] == "missing_single_bond_registry", selected
+
+
 def test_a_new_covalent_contact_is_refused(btp):
     """A collision that creates a bond is not a conformer."""
     syms, xyz = _ideal_ethane()

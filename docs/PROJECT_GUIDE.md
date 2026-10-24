@@ -23,7 +23,8 @@
 生成器从权重、前沿和身份证据三表交叉核对；本文日期快照不等同于实时队列。
 **契约探针**：`pwsh -NoProfile -File work/deepseek_support_20261022/run_preflight.ps1`
 （0=全过 / 1=复现缺口 / 2=源码在运行期间变化须重跑）。当前 **15 PASS / 0 FAIL**，
-入口与六项缺口详见 [交接包说明](../work/deepseek_support_20261022/README.md)。
+入口与六项缺口见交接包说明（`work/deepseek_support_20261022/README.md`）——该目录是
+**机器本地层且已 gitignore**，干净克隆中不存在，因此这里不给可点击链接（避免发布页死链）。
 
 ## 2. 接下来怎么做（按依赖，不按口头完成度）
 

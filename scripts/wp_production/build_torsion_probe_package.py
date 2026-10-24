@@ -47,6 +47,12 @@ RECOVERY = REPO / "outputs" / "physics_completion" / "recovery"
 
 REGISTRY = RECOVERY / "torsion_freedom_registry.csv"
 OUT_PKG = REPO / "work" / "hpc_torsion_probe_v1"
+P4_HANDOFF = REPO / "docs" / "handoffs" / "four_state_recovery_20261023"
+P3_CANDIDATES = P4_HANDOFF / "P3_CANDIDATES_20261023.json"
+P4_SCREENING_PLAN = P4_HANDOFF / "P4_SCREENING_PLAN_20261023.json"
+PRODUCTION_LEDGER = (REPO / "outputs" / "physics_completion" / "free_states"
+                     / "production_ledger.csv")
+P4_SCREENING_PACKAGE = REPO / "work" / "hpc_four_state_p4_xtb_screening_v1"
 
 #: fixed rotation applied to every eligible dihedral (degrees)
 SCAN_OFFSET_DEG = 60.0
@@ -273,6 +279,9 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
     Refusal reasons, in evaluation order:
 
     ``malformed_input``            shape/finiteness/composition unusable;
+    ``missing_single_bond_registry`` a torsion axis was declared without the
+                                   registered bond-order evidence needed to
+                                   prove that it is a true single bond;
     ``not_a_single_bond_rotor``    the rotated bond is not a registered single
                                    bond (C=O / aromatic) -- a pseudo-torsion;
     ``rigid_transformation``       no pair distance moved: the same structure;
@@ -321,7 +330,11 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
         if axis[0] == axis[1] or axis[1] >= len(symbols):
             return {"accepted": False, "reason": "malformed_input",
                     "detail": {"rotated_bond": list(rotated_bond)}}
-        if registered_single_bonds is not None and axis not in registered_single_bonds:
+        if registered_single_bonds is None:
+            return {"accepted": False, "reason": "missing_single_bond_registry",
+                    "detail": {"rotated_bond": list(axis),
+                               "note": "torsion axes require registered bond-order evidence"}}
+        if axis not in registered_single_bonds:
             return {"accepted": False, "reason": "not_a_single_bond_rotor",
                     "detail": {"rotated_bond": list(axis),
                                "note": "C=O / aromatic bonds are not free rotors"}}
@@ -531,6 +544,11 @@ def ring_pucker_candidates(symbols, coords, adjacency, *,
         centre = xyz0[ring].mean(axis=0)
         _, _, vt = np.linalg.svd(xyz0[ring] - centre)
         normal = vt[-1]                            # out-of-plane direction
+        # SVD singular vectors are sign-indeterminate.  Canonicalize the sign so
+        # a preregistered +amplitude produces identical bytes across LAPACK builds.
+        pivot = int(np.argmax(np.abs(normal)))
+        if normal[pivot] < 0:
+            normal = -normal
         modes = (("envelope", [ring[0]]),
                  ("twist", [ring[0], ring[len(ring) // 2]]),
                  ("envelope2", [ring[len(ring) // 3]]))
@@ -605,6 +623,19 @@ def select_candidates(symbols, source_coords, adjacency, candidates, *,
     for cand in candidates:
         declared = cand["kind"] == "li_coordination"
         rotated_bond = cand.get("rotated_bond")
+        if cand["kind"] == "torsion" and (
+                rotated_bond is None or registered_single_bonds is None):
+            refused.append({
+                "kind": cand["kind"],
+                "label": cand.get("mode") or cand.get("direction"),
+                "reason": "missing_single_bond_registry",
+                "detail": {
+                    "rotated_bond": (None if rotated_bond is None
+                                     else list(rotated_bond)),
+                    "note": "torsion candidates require an axis and registered bond-order evidence",
+                },
+            })
+            continue
         verdict = validate_candidate_start(
             symbols, xyz0, cand["coords"], adjacency,
             prior_starts=[a["coords"] for a in accepted],
@@ -839,6 +870,257 @@ def _build_state(name: str, state: str, charge: int, mult: int) -> list[dict]:
     return members
 
 
+def _json_bytes(payload) -> bytes:
+    return (json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def _p4_authoritative_identities() -> dict:
+    """Read electronic identities from the production ledger, never a scratch plan."""
+    identities = {}
+    with PRODUCTION_LEDGER.open(encoding="utf-8", newline="") as fh:
+        for row in csv.DictReader(fh):
+            key = "%s|%s" % (row["name"], row["state"])
+            if key in identities:
+                raise ValueError("duplicate production-ledger identity: %s" % key)
+            identities[key] = {
+                "record_id": row["record_id"],
+                "mol_id": row["mol_id"],
+                "charge": int(row["charge"]),
+                "multiplicity": int(row["multiplicity"]),
+            }
+    return identities
+
+
+def _p4_candidate_from_seed(symbols, coords, adjacency, singles, seed):
+    """Deterministically rebuild one P4 geometry from preregistered parameters."""
+    kind, label = seed["kind"], str(seed["label"])
+    if kind == "torsion":
+        if not label.startswith("tors_"):
+            raise ValueError("malformed torsion label: %s" % label)
+        dihedral = tuple(int(v) for v in label[5:].split("_"))
+        if len(dihedral) != 4:
+            raise ValueError("malformed torsion label: %s" % label)
+        rotated, audit = rotate_fragment(
+            coords, dihedral, adjacency, single_bonds=singles,
+            degrees=SCAN_OFFSET_DEG)
+        return {"kind": kind, "mode": label, "coords": rotated,
+                "moved_atoms": audit["moving_indices"],
+                "rotated_bond": (dihedral[1], dihedral[2])}
+    if kind == "ring_pucker":
+        matches = [cand for cand in ring_pucker_candidates(symbols, coords, adjacency)
+                   if cand["mode"] == label
+                   and abs(cand["amplitude_a"]) == abs(seed.get("amplitude_a"))
+                   and _distance_fingerprint(cand["coords"])
+                   == seed.get("result_distance_fingerprint")]
+    elif kind == "li_coordination":
+        matches = [cand for cand in li_coordination_candidates(symbols, coords, adjacency)
+                   if cand["direction"] == label
+                   and cand["offset_a"] == seed.get("offset_a")]
+    else:
+        raise ValueError("unsupported P4 candidate kind: %s" % kind)
+    if len(matches) != 1:
+        raise ValueError("P4 seed does not reconstruct uniquely: %s/%s" % (kind, label))
+    return matches[0]
+
+
+def _p4_xyz_bytes(symbols, coords, *, state_key, candidate_id, source_sha) -> bytes:
+    text = "%d\n%s %s source_sha256=%s\n" % (
+        len(symbols), state_key, candidate_id, source_sha)
+    text += "".join("%-2s %14.9f %14.9f %14.9f\n" % (s, p[0], p[1], p[2])
+                    for s, p in zip(symbols, coords))
+    return text.encode("utf-8")
+
+
+def _p4_batch_script() -> bytes:
+    lines = [
+        "#!/bin/bash", "#SBATCH --job-name=p4_xtb_screen",
+        "#SBATCH --array=0-7%2", "#SBATCH --nodes=1", "#SBATCH --ntasks=1",
+        "#SBATCH --cpus-per-task=2", "#SBATCH --time=02:00:00",
+        "#SBATCH --output=slurm-%A_%a.out", "#SBATCH --error=slurm-%A_%a.err",
+        "set -euo pipefail", 'ROOT=$(cd "$(dirname "$0")" && pwd)',
+        'TASK=$(sed -n "$((SLURM_ARRAY_TASK_ID+1))p" "$ROOT/batch_1.txt")',
+        'test -n "$TASK"', 'cd "$ROOT/$TASK"',
+        "source ~/project/soft/xtb/env.sh",
+        'export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK}"',
+        "date -u +%Y-%m-%dT%H:%M:%SZ > started.utc", "set +e",
+        "~/project/soft/xtb/bin/xtb geom.xyz --input job.inp --gfn 2 --opt tight > xtbopt.log 2> stderr.log",
+        "rc=$?", "set -e",
+        'if [ "$rc" -eq 0 ] && [ -f .xtboptok ] && [ -s xtbopt.xyz ]; then',
+        "  date -u +%Y-%m-%dT%H:%M:%SZ > normal_termination.utc", "fi",
+        'exit "$rc"', "",
+    ]
+    return "\n".join(lines).encode("utf-8")
+
+
+def _p4_plan_inputs(p3_path=P3_CANDIDATES, p4_path=P4_SCREENING_PLAN):
+    p3_path, p4_path = Path(p3_path), Path(p4_path)
+    p3_bytes, p4_bytes = p3_path.read_bytes(), p4_path.read_bytes()
+    return p3_bytes, p4_bytes, json.loads(p3_bytes), json.loads(p4_bytes)
+
+
+def build_p4_screening_files(*, p3_path=P3_CANDIDATES,
+                             p4_path=P4_SCREENING_PLAN) -> dict[str, bytes]:
+    """Render the immutable P4 xTB payload in memory for write and read-only check."""
+    p3_bytes, p4_bytes, p3, plan = _p4_plan_inputs(p3_path, p4_path)
+    identities = _p4_authoritative_identities()
+    if "HOLD" not in plan.get("submission_gate", "") or plan.get("submitted") is not False:
+        raise ValueError("P4 selection is not in the required unsubmitted HOLD state")
+    required = {"resource_profile": "xtb_screening_v1", "cores_per_task": 2,
+                "wall_hours_per_task": 2, "task_count": 8,
+                "budget_core_hours": 32, "budget_cap_core_hours": 32,
+                "array_max_concurrent": 2}
+    for key, expected in required.items():
+        if plan.get(key) != expected:
+            raise ValueError("P4 frozen resource contract mismatch: %s" % key)
+    if set(plan.get("states", {})) != set(p3.get("states", {})):
+        raise ValueError("P3/P4 state sets disagree")
+
+    files = {"selection.lock.json": p4_bytes}
+    tasks, task_records, attempts = [], [], []
+    for state_key in sorted(plan["states"]):
+        state_plan, p3_state = plan["states"][state_key], p3["states"][state_key]
+        identity = identities.get(state_key)
+        if identity is None:
+            raise ValueError("state absent from production ledger: %s" % state_key)
+        legacy_expected = {"mol_id": identity["record_id"],
+                           "charge": identity["charge"],
+                           "multiplicity": identity["multiplicity"]}
+        for source in (state_plan, p3_state):
+            got = {key: source.get(key) for key in legacy_expected}
+            if got != legacy_expected:
+                raise ValueError("electronic identity drift for %s: %r != %r"
+                                 % (state_key, got, legacy_expected))
+        source_path = REPO / state_plan["source_geometry"]
+        source_sha = _sha(source_path.read_bytes())
+        if source_sha != state_plan["source_geometry_sha256"]:
+            raise ValueError("source geometry hash drift: %s" % state_key)
+        symbols, coords, _comment = _read_xyz(source_path)
+        name = state_key.split("|", 1)[0]
+        adjacency, singles = _topology_for_member(name, symbols)
+        prior = []
+        seeds = state_plan.get("screening_seeds", [])
+        if len(seeds) != 2:
+            raise ValueError("P4 requires exactly two starts per state: %s" % state_key)
+        for ordinal, seed in enumerate(seeds, start=1):
+            candidate = _p4_candidate_from_seed(symbols, coords, adjacency, singles, seed)
+            verdict = validate_candidate_start(
+                symbols, coords, candidate["coords"], adjacency,
+                prior_starts=prior, registered_single_bonds=singles,
+                rotated_bond=candidate.get("rotated_bond"),
+                declared_li_change=(candidate["kind"] == "li_coordination"))
+            if not verdict["accepted"]:
+                raise ValueError("P4 candidate gate rejected %s/%s: %s"
+                                 % (state_key, ordinal, verdict["reason"]))
+            fingerprint = _distance_fingerprint(candidate["coords"])
+            if fingerprint != seed["result_distance_fingerprint"]:
+                raise ValueError("P4 candidate fingerprint drift: %s/%s" % (state_key, ordinal))
+            prior.append(candidate["coords"])
+            clean_label = "".join(ch if ch.isalnum() or ch in "_-" else "_"
+                                  for ch in str(seed["label"]))
+            candidate_id = "p4_%02d_%s_%s" % (ordinal, seed["kind"], clean_label)
+            task_rel = "tasks/%s/%s" % (state_key.replace("|", "__"), candidate_id)
+            xyz_bytes = _p4_xyz_bytes(symbols, candidate["coords"], state_key=state_key,
+                                      candidate_id=candidate_id, source_sha=source_sha)
+            spin = identity["multiplicity"] - 1
+            input_bytes = ("$chrg %d\n$spin %d\n" % (identity["charge"], spin)).encode("utf-8")
+            cores_bytes = b"2\n"
+            candidate_record = {
+                "candidate_id": candidate_id, "state_key": state_key, **identity,
+                "spin": spin, "kind": seed["kind"], "label": seed["label"],
+                "amplitude_a": seed.get("amplitude_a"),
+                "offset_a": seed.get("offset_a"),
+                "source_geometry": state_plan["source_geometry"],
+                "source_geometry_sha256": source_sha,
+                "candidate_geometry_sha256": _sha(xyz_bytes),
+                "result_distance_fingerprint": fingerprint,
+                "gate_reason": verdict["reason"],
+            }
+            candidate_bytes = _json_bytes(candidate_record)
+            task_files = {"geom.xyz": xyz_bytes, "job.inp": input_bytes,
+                          "cores.txt": cores_bytes, "candidate.json": candidate_bytes}
+            for filename, data in task_files.items():
+                files[task_rel + "/" + filename] = data
+            files[task_rel + "/inputs.sha256"] = "".join(
+                "%s  %s\n" % (_sha(data), filename)
+                for filename, data in sorted(task_files.items())).encode("utf-8")
+            tasks.append(task_rel)
+            task_records.append({**candidate_record, "task_path": task_rel,
+                                 "job_input_sha256": _sha(input_bytes),
+                                 "cores_file_sha256": _sha(cores_bytes),
+                                 "candidate_record_sha256": _sha(candidate_bytes)})
+            attempt_id = state_key.replace("|", "__") + "__" + candidate_id
+            attempts.append({"attempt_id": attempt_id, "state_key": state_key,
+                             "stage": "xtb_screening", "start_id": candidate_id,
+                             "status": "planned", "cores": 2,
+                             "wall_hours_reserved": 2})
+    if len(tasks) != 8 or len(tasks) != len(set(tasks)):
+        raise ValueError("P4 task set must contain eight unique tasks")
+    task_list = ("\n".join(tasks) + "\n").encode("utf-8")
+    files.update({"tasks.txt": task_list, "batch_1.txt": task_list,
+                  "batch_1.sbatch": _p4_batch_script()})
+    files["attempts_ledger.json"] = _json_bytes({
+        "schema_version": 1, "campaign_id": "four_state_recovery_p4_xtb_v1",
+        "scope": "P4 GFN2-xTB screening; planned reservations only",
+        "attempts": attempts})
+    manifest = {
+        "schema_version": 1, "campaign_id": "four_state_recovery_p4_xtb_v1",
+        "package": P4_SCREENING_PACKAGE.name, "resource_profile": "xtb_screening_v1",
+        "engine": "xtb", "method": "GFN2-xTB --opt tight",
+        "cores_per_task": 2, "wall_hours_per_task": 2, "task_count": 8,
+        "budget_cap_core_hours": 32, "array_max_concurrent": 2,
+        "submission_gate": "HOLD", "submitted": False,
+        "p3_candidates_sha256": _sha(p3_bytes),
+        "p4_selection_sha256": _sha(p4_bytes),
+        "production_ledger_sha256": _sha(PRODUCTION_LEDGER.read_bytes()),
+        "generator_sha256": _sha(Path(__file__).read_bytes()),
+        "candidate_gate_contract": "validate_candidate_start_v2",
+        "batches": [{"batch": 1, "count": 8, "array": "0-7%2",
+                     "list_sha256": _sha(files["batch_1.txt"]),
+                     "script_sha256": _sha(files["batch_1.sbatch"])}],
+        "tasks": task_records}
+    files["manifest.json"] = _json_bytes(manifest)
+    files["PACKAGE_SHA256SUMS"] = "".join(
+        "%s  %s\n" % (_sha(data), path) for path, data in sorted(files.items())
+    ).encode("utf-8")
+    return files
+
+
+def write_p4_screening_package(output_package=P4_SCREENING_PACKAGE):
+    output_package = Path(output_package)
+    if output_package.exists():
+        raise ValueError("P4 package already exists; refusing overwrite")
+    files = build_p4_screening_files()
+    for rel, data in files.items():
+        target = output_package / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("xb") as fh:
+            fh.write(data)
+    return {"package": str(output_package), "files": len(files), "tasks": 8}
+
+
+def check_p4_screening_package(output_package=P4_SCREENING_PACKAGE) -> list[str]:
+    """Pure read-only check: report drift but never repair or recreate a file."""
+    output_package = Path(output_package)
+    expected = build_p4_screening_files()
+    problems = []
+    for rel, data in expected.items():
+        path = output_package / rel
+        if not path.is_file():
+            problems.append("missing:" + rel)
+        elif path.read_bytes() != data:
+            problems.append("changed:" + rel)
+    if output_package.is_dir():
+        actual = {str(path.relative_to(output_package)).replace("\\", "/")
+                  for path in output_package.rglob("*") if path.is_file()}
+        mutable = {path for path in actual
+                   if path == "submission_journal.json"
+                   or (path.startswith(".batch_") and path.endswith(".submission.lock"))
+                   or path.startswith("attempts/")}
+        for rel in sorted(actual - set(expected) - mutable):
+            problems.append("unexpected:" + rel)
+    return problems
+
+
 def main(argv=None) -> int:
     import sys
     sys.path.insert(0, str(HERE))
@@ -848,7 +1130,22 @@ def main(argv=None) -> int:
     ap.add_argument("--repair-original-batch", type=int)
     ap.add_argument("--source-package", type=Path, default=OUT_PKG)
     ap.add_argument("--out-package", type=Path)
+    ap.add_argument("--build-p4-screening", action="store_true")
+    ap.add_argument("--check-p4-screening", action="store_true")
     args = ap.parse_args(argv)
+    if args.build_p4_screening and args.check_p4_screening:
+        ap.error("choose exactly one P4 package action")
+    if args.build_p4_screening:
+        result = write_p4_screening_package(args.out_package or P4_SCREENING_PACKAGE)
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+    if args.check_p4_screening:
+        problems = check_p4_screening_package(args.out_package or P4_SCREENING_PACKAGE)
+        if problems:
+            print("STALE P4 SCREENING PACKAGE: " + "; ".join(problems))
+            return 1
+        print("P4 SCREENING PACKAGE OK")
+        return 0
     if args.repair_original_batch is not None:
         if args.out_package is None:
             ap.error("repair requires a new --out-package")

@@ -21,6 +21,18 @@ DEFAULT_BRIDGE = Path(r"E:\软件\超算连接\hpc\hpc.ps1")
 MAX_ACTIVE_PENDING = 20
 CORES_PER_TASK = 4                  # project production allocation (sacct: AllocCPUS=4)
 WALL_HOURS = 24
+RESOURCE_PROFILES = {
+    # Missing resource_profile remains the historical ORCA contract so every
+    # existing, already-versioned package keeps identical submission semantics.
+    "orca_production_v1": {"engine": "orca", "cores": 4, "wall_hours": 24,
+                           "budget_cap_core_hours": "800",
+                           "attempts_ledger_required": False},
+    # The frozen recovery plan caps the GFN2 screening layer at 2 cores/task.
+    "xtb_screening_v1": {"engine": "xtb", "cores": 2, "wall_hours": 2,
+                         "budget_cap_core_hours": "32",
+                         "attempts_ledger_required": True},
+}
+DEFAULT_RESOURCE_PROFILE = "orca_production_v1"
 ORCA_NPROCS_RE = re.compile(r"%pal\s+nprocs\s+(\d+)", re.I)
 DEFAULT_BUDGET_CAP_CORE_HOURS = "800"
 REMOTE_SUBMISSION_LOCK = "~/project/electrolyte_wp2/.wp2_submit.lock"
@@ -101,6 +113,23 @@ def _load_package(package: Path, batch: int):
     return count, script, listing, manifest_path
 
 
+def submission_resources(manifest_path: Path) -> dict:
+    """Resolve an immutable, manifest-declared resource profile.
+
+    Callers cannot override this at the CLI: the resource identity travels with
+    the hashed package manifest.  Unknown profiles fail closed.  Manifests from
+    the pre-profile era retain the historical ORCA 4-core/24-hour allocation.
+    """
+    try:
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("package manifest is missing or malformed") from exc
+    name = manifest.get("resource_profile", DEFAULT_RESOURCE_PROFILE)
+    if name not in RESOURCE_PROFILES:
+        raise ValueError("unknown manifest resource_profile: %r" % name)
+    return {"name": name, **RESOURCE_PROFILES[name]}
+
+
 def _write_journal(path: Path, payload):
     temporary = path.with_name(path.name + ".tmp.%d" % os.getpid())
     temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
@@ -167,7 +196,7 @@ def collect_sacct(attempt_dir, *, runner=default_runner, bridge=DEFAULT_BRIDGE):
     return {"state": state, "exit_code": exit_code, "path": str(target)}
 
 
-def declared_task_cores(package: Path, listing) -> int:
+def declared_task_cores(package: Path, listing, *, engine=None) -> int:
     """The core count every task's ORCA input declares (``%pal nprocs N``).
 
     ``listing`` may be the batch list FILE (what ``_load_package`` returns) or an
@@ -189,6 +218,11 @@ def declared_task_cores(package: Path, listing) -> int:
             raise ValueError("task input missing: %s/job.inp" % rel)
         text = inp.read_text(encoding="utf-8")
         match = ORCA_NPROCS_RE.search(text)
+        if engine == "xtb" and match is not None:
+            raise ValueError("xtB resource profile refuses ORCA %%pal input: %s" % rel)
+        if engine == "xtb" and not (re.search(r"(?im)^\s*\$chrg\b", text)
+                                     and re.search(r"(?im)^\s*\$spin\b", text)):
+            raise ValueError("xtB task input lacks $chrg/$spin contract: %s" % rel)
         if match is not None:
             cores.add(int(match.group(1)))
             continue
@@ -196,6 +230,8 @@ def declared_task_cores(package: Path, listing) -> int:
         # they must declare their core count explicitly instead.  Fail closed:
         # without a declaration the resource is unknown.
         declared = package / rel / "cores.txt"
+        if engine == "orca":
+            raise ValueError("ORCA resource profile requires %%pal nprocs: %s" % rel)
         if declared.is_file():
             value = declared.read_text(encoding="utf-8").strip()
             if not value.isdigit() or int(value) < 1:
@@ -253,7 +289,7 @@ def budget_headroom(attempts, *, cap, cores, wall_hours, task_count) -> dict:
 
 def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
                  bridge=DEFAULT_BRIDGE, user="pengqihang",
-                 attempts_ledger=None, budget_cap_core_hours=DEFAULT_BUDGET_CAP_CORE_HOURS):
+                 attempts_ledger=None, budget_cap_core_hours=None):
     package = Path(package).resolve()
     bridge = Path(bridge)
     if not USER_RE.fullmatch(user):
@@ -261,6 +297,15 @@ def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
     if not remote_workdir or any(ch in remote_workdir for ch in "\r\n"):
         raise ValueError("invalid remote workdir")
     count, script, listing, manifest_path = _load_package(package, batch)
+    resources = submission_resources(manifest_path)
+    profile_cap = resources["budget_cap_core_hours"]
+    if budget_cap_core_hours is not None and str(budget_cap_core_hours) != profile_cap:
+        raise ValueError("CLI budget cap %s disagrees with manifest resource profile cap %s"
+                         % (budget_cap_core_hours, profile_cap))
+    effective_budget_cap = profile_cap
+    if resources["attempts_ledger_required"] and attempts_ledger is None:
+        raise ValueError("resource profile %s requires an attempts ledger"
+                         % resources["name"])
     journal_path = package / "submission_journal.json"
     reservation_path = package / (".batch_%d.submission.lock" % batch)
     if journal_path.exists():
@@ -294,18 +339,18 @@ def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
                              % (count, headroom))
 
         # the input's declared core count must match what we allocate
-        declared_cores = declared_task_cores(package, listing)
-        if declared_cores != CORES_PER_TASK:
+        declared_cores = declared_task_cores(package, listing, engine=resources["engine"])
+        if declared_cores != resources["cores"]:
             raise ValueError(
                 "task inputs declare %d cores but the protected submitter allocates %d; "
                 "refusing to silently change the resource (version the submitter instead)"
-                % (declared_cores, CORES_PER_TASK))
+                % (declared_cores, resources["cores"]))
 
         budget_record = {"budget_checked": False}
         if attempts_ledger is not None:
             budget_record = budget_headroom(
-                attempts_ledger, cap=budget_cap_core_hours, cores=CORES_PER_TASK,
-                wall_hours=WALL_HOURS, task_count=count)
+                attempts_ledger, cap=effective_budget_cap, cores=resources["cores"],
+                wall_hours=resources["wall_hours"], task_count=count)
             budget_record["budget_checked"] = True
         else:
             print("NOTE: no --attempts-ledger given; the core-hour budget invariant "
@@ -313,7 +358,9 @@ def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
 
         record = {
             "batch": batch, "batch_count": count, "observed_active_pending": active_pending,
-            "declared_task_cores": declared_cores, **budget_record,
+            "resource_profile": resources["name"], "resource_engine": resources["engine"],
+            "declared_task_cores": declared_cores,
+            "allocated_wall_hours": resources["wall_hours"], **budget_record,
             "headroom_before_submit": headroom, "remote_workdir": remote_workdir,
             "remote_submission_lock": REMOTE_SUBMISSION_LOCK,
             "batch_script_sha256": sha256(script), "batch_list_sha256": sha256(listing),
@@ -329,7 +376,9 @@ def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
                              % batch) from exc
         journal["submissions"].append(record)
         _write_journal(journal_path, journal)
-        result = runner([str(bridge), "submit", str(script), "--cores", "4", "--time", "24:00:00",
+        wall = "%02d:00:00" % resources["wall_hours"]
+        result = runner([str(bridge), "submit", str(script), "--cores",
+                         str(resources["cores"]), "--time", wall,
                          "--workdir", remote_workdir])
         combined = "\n".join(part for part in (result.stdout, result.stderr) if part)
         if result.returncode != 0:
@@ -368,8 +417,8 @@ def main(argv=None):
     parser.add_argument("--collect-sacct", type=Path, metavar="ATTEMPT_DIR")
     parser.add_argument("--attempts-ledger", type=Path, metavar="JSON",
                         help="attempt ledger; enables the core-hour budget invariant")
-    parser.add_argument("--budget-cap-core-hours", default=DEFAULT_BUDGET_CAP_CORE_HOURS,
-                        help="hard cap for committed+reserved core-hours (default 800)")
+    parser.add_argument("--budget-cap-core-hours",
+                        help="optional assertion; must equal the manifest profile's hard cap")
     parser.add_argument("--bridge", type=Path, default=DEFAULT_BRIDGE)
     parser.add_argument("--user", default="pengqihang")
     args = parser.parse_args(argv)

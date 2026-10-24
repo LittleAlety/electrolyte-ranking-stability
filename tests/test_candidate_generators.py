@@ -22,6 +22,19 @@ import numpy as np
 
 import pytest
 
+# --- declared dependency on the gitignored `work/` layer (step 12) -----------
+# A clean clone has no `work/`: raw ledgers, logs and geometries live there and
+# are 12 GB, so they are not tracked.  The builders REFUSE loudly when it is
+# missing (pinned by test_clean_clone_dependencies.py); a test that consumes a
+# dev-tree fixture therefore declares the need and skips WITH A REASON instead
+# of failing -- and never silently passes.
+pytestmark = pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir(),
+    reason="the machine-local work/wp2prod evidence layer (gitignored) is absent in this checkout; "
+           "the builders' loud refusal is pinned by test_clean_clone_dependencies.py",
+)
+# ---------------------------------------------------------------------------
+
 REPO = Path(__file__).resolve().parents[1]
 PROD = REPO / "scripts" / "wp_production"
 sys.path.insert(0, str(PROD))

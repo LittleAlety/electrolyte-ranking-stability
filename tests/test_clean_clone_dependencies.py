@@ -61,6 +61,12 @@ def test_the_budget_accounting_refuses_a_missing_layer(tmp_path, monkeypatch):
 
 
 def test_the_budget_accounting_still_reports_the_real_figure():
+    if not (Path(__file__).resolve().parents[1] / "work").is_dir():
+        pytest.skip(
+            "the machine-local work/ layer (gitignored) is absent in this checkout; "
+            "this test pins the dev-tree figure, the refusal side is covered by "
+            "the sibling clean-clone tests",
+        )
     m = _load("build_recovery_budget_accounting")
     doc = m.collect()
     # measured: the batch total is 186.9933... core-hours (printed as 187.0/600)
@@ -71,6 +77,12 @@ def test_the_budget_accounting_still_reports_the_real_figure():
 # ---- normal behaviour is unchanged ---------------------------------------
 
 def test_the_cost_builder_still_builds_from_the_real_layer():
+    if not (Path(__file__).resolve().parents[1] / "work").is_dir():
+        pytest.skip(
+            "the machine-local work/ layer (gitignored) is absent in this checkout; "
+            "this test pins the dev-tree figure, the refusal side is covered by "
+            "the sibling clean-clone tests",
+        )
     m = _load("build_ensemble_cost_by_family")
     rows = m.build_rows()
     assert len(rows) == 190
@@ -78,6 +90,12 @@ def test_the_cost_builder_still_builds_from_the_real_layer():
 
 
 def test_the_probe_exclusion_source_still_lists_the_refusals():
+    if not (Path(__file__).resolve().parents[1] / "work").is_dir():
+        pytest.skip(
+            "the machine-local work/ layer (gitignored) is absent in this checkout; "
+            "this test pins the dev-tree figure, the refusal side is covered by "
+            "the sibling clean-clone tests",
+        )
     m = _load("build_coverage_reviews")
     got = m._rejected_probe_members()
     # measured: EC's two C=O dihedrals (refused) + DMC/LiM_2plus tors_7

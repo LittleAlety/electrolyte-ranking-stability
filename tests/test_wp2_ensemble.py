@@ -78,6 +78,12 @@ def test_parse_enso_counts_the_plural_wording_too():
 
 
 def test_every_row_comes_from_one_of_the_two_registered_pools():
+    if not (Path(__file__).resolve().parents[1] / "work").is_dir():
+        pytest.skip(
+            "the machine-local work/ layer (gitignored) is absent in this checkout; "
+            "this test pins the dev-tree figure, the refusal side is covered by "
+            "the sibling clean-clone tests",
+        )
     rows = _rows(PER_STRUCTURE)
     pool = {(row["mol_id"] + "|" + row["state"], row["geometry_relpath"]): row["geometry_sha256"]
             for row in _rows(POOL)}

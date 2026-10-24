@@ -5,6 +5,19 @@ import pytest
 from types import SimpleNamespace
 import json
 
+# --- declared dependency on the gitignored `work/` layer (step 12) -----------
+# A clean clone has no `work/`: raw ledgers, logs and geometries live there and
+# are 12 GB, so they are not tracked.  The builders REFUSE loudly when it is
+# missing (pinned by test_clean_clone_dependencies.py); a test that consumes a
+# dev-tree fixture therefore declares the need and skips WITH A REASON instead
+# of failing -- and never silently passes.
+pytestmark = pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir(),
+    reason="the machine-local work/wp2prod evidence layer (gitignored) is absent in this checkout; "
+           "the builders' loud refusal is pinned by test_clean_clone_dependencies.py",
+)
+# ---------------------------------------------------------------------------
+
 MODULE = Path(__file__).resolve().parents[1] / "scripts/wp_production/prepare_hpc_main_remaining.py"
 spec = importlib.util.spec_from_file_location("prepare_hpc", MODULE)
 m = importlib.util.module_from_spec(spec)
