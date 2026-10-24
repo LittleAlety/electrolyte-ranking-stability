@@ -238,6 +238,21 @@ def test_the_selection_cap_refuses_instead_of_dropping(btp, reg):
         "the cap dropped %d of %d candidates without accounting"
         % (len(cands) - accounted, len(cands)))
     assert "max_keep_reached" in {r["reason"] for r in capped["refused"]}
+    assert all(r["detail"]["gate_evaluated"] is True
+               for r in capped["refused"] if r["reason"] == "max_keep_reached")
+
+    # The cap must not stop the GATE: a candidate that FAILS beyond the cap
+    # keeps its true refusal reason, so a ring-broken seed can never be
+    # disguised as merely "capped".
+    big = [c for c in btp.ring_pucker_candidates(syms, coords, adj)
+           if abs(c["amplitude_a"]) >= 0.80]
+    assert big, "the fixture must contain an over-large amplitude"
+    mixed = btp.select_candidates(syms, coords, adj, [cands[0], big[0]],
+                                  registered_single_bonds=singles,
+                                  source_sha256=sha, max_keep=1)
+    assert len(mixed["accepted"]) == 1
+    assert len(mixed["accepted"]) + len(mixed["refused"]) == 2
+    assert [r["reason"] for r in mixed["refused"]] == ["ring_broken"]
 
 
 def test_a_negative_rotation_axis_index_is_malformed_input(btp, reg):
