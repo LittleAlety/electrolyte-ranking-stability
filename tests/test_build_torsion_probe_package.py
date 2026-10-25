@@ -104,3 +104,53 @@ def test_repair_only_selected_members_and_keep_source_immutable(tmp_path, monkey
     assert {p.name: p.read_bytes() for p in source.iterdir()} == before
     with pytest.raises(ValueError, match="exists"):
         m.build_repair_package(source, output, batch=2)
+
+
+#: The SAME physical quantity carries three different names in this project:
+#: ``uhf`` (XT_PLAN / ROUND1_STATES / ``--uhf``), ``multiplicity`` (SP_PLAN,
+#: ``candidate.json``, the registered pools) and ``$spin`` (the xtB input file).
+#: Two of those forms differ by exactly one (uhf = multiplicity - 1), so a reader
+#: (or a consumer) that conflates them is off by one electron pair.  These two
+#: tests pin the convention so that a future flip cannot pass silently.
+P4_PACKAGE = REPO / "work" / "hpc_four_state_p4_xtb_screening_v1"
+
+
+def test_the_builder_writes_spin_as_multiplicity_minus_one():
+    """Structural: the input file's ``$spin`` is UHF, not the multiplicity.
+
+    The conversion lives in ``build_p4_screening_files`` (the function that emits
+    each task's ``job.inp``), NOT in ``write_p4_screening_package`` — pinned by AST
+    so that a rename/move cannot silently drop the guard.
+    """
+    import ast
+    import inspect
+    src = inspect.getsource(m)
+    owner = None
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.FunctionDef):
+            seg = ast.get_source_segment(src, node)
+            if seg and 'spin = identity["multiplicity"] - 1' in seg:
+                owner = node.name
+    assert owner == "build_p4_screening_files", \
+        "the multiplicity -> $spin (UHF) conversion must stay in build_p4_screening_files; found %r" % owner
+    assert '"$chrg %d\\n$spin %d\\n" % (identity["charge"], spin)' in src
+
+
+@pytest.mark.skipif(not (P4_PACKAGE / "manifest.json").is_file(),
+                    reason="P4 screening package not present in this tree")
+def test_every_shipped_p4_task_agrees_between_candidate_json_and_job_inp():
+    """Real data: ``candidate.json.multiplicity == job.inp $spin + 1``, and charges agree."""
+    tasks = sorted((P4_PACKAGE / "tasks").glob("*/*/"))
+    assert tasks, "the shipped package must contain tasks"
+    checked = 0
+    for task in tasks:
+        cand = json.loads((task / "candidate.json").read_text(encoding="utf-8"))
+        lines = (task / "job.inp").read_text(encoding="utf-8").splitlines()
+        chrg = [ln for ln in lines if ln.strip().startswith("$chrg ")]
+        spin = [ln for ln in lines if ln.strip().startswith("$spin ")]
+        assert len(chrg) == 1 and len(spin) == 1, (task, lines)
+        assert int(chrg[0].split()[1]) == int(cand["charge"]), task
+        assert int(cand["multiplicity"]) == int(spin[0].split()[1]) + 1, (
+            "spin/multiplicity convention drifted", task, cand["multiplicity"], spin)
+        checked += 1
+    assert checked == len(tasks)

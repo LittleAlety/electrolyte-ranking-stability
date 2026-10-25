@@ -189,3 +189,39 @@ EC\|LiM_2plus `n_registered=1`——代码判据是**每成员 attempted≥2**�
 - 未验证真实 ORCA 输出格式是否总能解析成功（那需要真实作业；本轮只用合成 ORCA 文本与既有 fixture）。
 - 未复核 `import_hpc_numfreq.py` 的 NumFreq 遗留路径是否同样严格；本轮只审 AnFreq 生产路径。
 - 未复核聚合器的权重/去重数学（那属 WP3/WP5 面）。
+
+## 6. 「同一个量、三个名字」的口径隐患——已实测澄清并新增守卫（2026-10-25）
+
+起因：核对目标书条目「三个 `LiM_2plus` 的 **charge=2/spin=1**」时，看到包里 `candidate.json` 写 `multiplicity: 2`，
+一度以为筛选包算错了自旋态。逐行查证后**结论是：没有错误——同一个物理量在本项目有三个名字，其中两种形式数值差 1**：
+
+| 形式 | 出现处 | 含义 |
+|---|---|---|
+| `uhf` | `run_batch.XT_PLAN` / `ROUND1_STATES` / `--uhf` 命令行 | **未成对电子数 2S** |
+| `multiplicity` | `run_batch.SP_PLAN` / `candidate.json` / 两个登记池的列 | **多重度 2S+1** |
+| `$spin` | xtB 输入文件（`job.inp`）里那一行 | **同 `uhf`（2S）** |
+
+**换算在全项目一致**（逐处实测）：`build_torsion_probe_package.py:1048` `spin = identity["multiplicity"] - 1`
+（该行在 `build_p4_screening_files` 内，`:1049` 写出 `$chrg/$spin`）；`run_strict_recovery_search.py:189`
+`--uhf str(mult - 1)`；`run_second_search_emc.py:85` 同；`run_batch.py:183` 由**名为 `uhf` 的列**喂 `--uhf`；
+`build_wp2_sampling.py:236-267` 循环变量即 `uhf`、写表时 `"multiplicity": str(uhf + 1)`。
+
+**实测（P4 包 8 个任务）**：`M_plus` 全部 `job.inp: $chrg 1 / $spin 1` ＋ `candidate.json: multiplicity 2`；
+三个 `LiM_2plus` 全部 `$chrg 2 / $spin 1` ＋ `multiplicity 2` ⇒ **标签与输入自洽**；
+目标书的「charge=2/spin=1」指的正是 **`$spin` 关键字值（UHF）**。池表亦然（`sampling_conformer_set` 的
+`M_plus` 记 mult=2、`li_motif_screen` 的 `LiM_2plus` 记 mult=2，均 = uhf+1）。
+
+**唯一真隐患是命名而非数值**：`build_wp2_sampling.run_xtb(directory, block, charge, multiplicity, do_opt)`
+的**形参叫 `multiplicity` 却收 `uhf`**（调用点与写表都对，故不产生错误结果），读者极易混。
+
+**新增两道守卫**（`tests/test_build_torsion_probe_package.py`）：
+① 结构：用 AST 断言 `spin = identity["multiplicity"] - 1` 仍留在 `build_p4_screening_files` 内（防改名/搬移后静默丢失）；
+② 真实数据：对包里**每个**任务断言 `$chrg == candidate.json.charge` 且 `candidate.json.multiplicity == $spin + 1`。
+**RED 实证**：把该行改成 `spin = identity["multiplicity"]`（不 −1）⇒ pytest **exit 1**；随后按字节还原。
+
+**事故与整改（如实记录）**：做 RED 时我**直接改了生产脚本**、又用 Python `Path.write_text` 还原——
+Windows 默认换行翻译把 **CRLF 写进工作树**，使该文件 sha256 从冻结的 `5eb615da…` 变成 `8fec1fa…`
+（`.gitattributes` 要求 LF）。已改为**用 git blob 的精确字节还原**（`write_bytes`）：CRLF=0、
+sha256 回到 `5eb615da609b9c59d4edb35ec5ae3089df53e225264aef246ef8ce53be98668f`、`git status` 干净，
+且 `--check-p4-screening` 与 293 项审计复跑全绿。
+**整改后的做法**：RED 实证只改**副本或 monkeypatch**，绝不碰生产文件；还原文件一律 `write_bytes`/`git checkout`。
