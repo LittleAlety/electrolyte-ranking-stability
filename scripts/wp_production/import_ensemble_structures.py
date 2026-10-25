@@ -240,6 +240,16 @@ FETCH_ARTIFACTS = (
 )
 
 RE_ORCA_ERROR = re.compile(r"ORCA (?:ERROR|stopped|input error)", re.I)
+#: SCF convergence signature.  ORCA prints this for every converged SCF pass.
+#: Plan section 6.3 lists SCF convergence as ONE of the six checks that may not
+#: be substituted by another; ``ORCA TERMINATED NORMALLY`` is only a technical
+#: statement, so an unconverged SCF could otherwise reach ``computed``.
+#: Measured 2026-10-24 before adding the gate: all 115 ensemble-feeding legs
+#: (status computed/ready) carry this signature in their own recorded
+#: log_path, and all 126 canonical work/wp2prod logs do too (the only log
+#: without it is the non-leg _reopt/watch_reopt.log) -- so the gate is
+#: behaviour-preserving for every live leg.
+RE_SCF_CONVERGED = re.compile(r"SCF CONVERGED AFTER\s+\d+\s+CYCLES")
 #: ORCA 6.1.1 max-cycles text (DOL/M__15 chunk-1 evidence, job 3718293): the
 #: optimizer error block -- "reached the maximum number of optimization cycles"
 #: followed by "ORCA will abort" (the requested Frequencies never ran).
@@ -891,6 +901,11 @@ def qc_task(task_dir: Path, task: str, cand: dict) -> dict:
                        failure_class="orca_error_in_log",
                        note="ORCA error text present; technical marker alone is not acceptance")
             return row
+    if not RE_SCF_CONVERGED.search(text):
+        # Plan 6.3: SCF convergence is its own check.  Normal termination is a
+        # technical marker and does not prove a converged SCF, so a leg whose log
+        # never reports one is QC-failed rather than folded into the ensemble.
+        flags.append("scf_not_converged")
     max_cycles = bool(RE_MAXCYC.search(text))
     if max_cycles:
         # Optimizer ran out of cycles: AnFreq never ran on a converged geometry.

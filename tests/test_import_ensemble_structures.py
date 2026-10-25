@@ -75,7 +75,12 @@ def _log(n_freq=6, negative=False, close_enough=False, terminated=True):
         value = -50.0 if (negative and i == 0) else 100.0 + 10.0 * i
         freqs.append("   %d:  %.2f cm**-1" % (i, value))
     body = (
-        (CLOSE_ENOUGH_TABLE if close_enough else GEOM_TABLE)
+        # Real ORCA logs carry this line for every converged SCF pass (measured
+        # 2026-10-24: all 115 ensemble-feeding legs have it), and the acceptance
+        # path now asserts it (RE_SCF_CONVERGED), so the fixture must not invent
+        # a log that no real run produces.
+        "SCF CONVERGED AFTER   12 CYCLES\n"
+        + (CLOSE_ENOUGH_TABLE if close_enough else GEOM_TABLE)
         + (CLOSE_ENOUGH_TEXT if close_enough else "")
         + "THE OPTIMIZATION HAS CONVERGED\n"
         + "VIBRATIONAL FREQUENCIES\n" + "\n".join(freqs) + "\n"
@@ -132,6 +137,25 @@ def test_clean_structure_imports_as_computed(tmp_path):
     assert row["g_single_eh"] == "-100.700000"
     assert row["connectivity_ok"] == "true"
     assert row["log_sha256"] and row["input_sha256"] and row["hess_sha256"]
+
+
+def test_a_log_without_an_scf_convergence_signature_is_qc_failed(tmp_path):
+    """Plan 6.3 lists SCF convergence as its own check.
+
+    ``ORCA TERMINATED NORMALLY`` is only a technical statement, so before this
+    gate an unconverged SCF could reach ``computed`` and be folded into the
+    ensemble.  Measured 2026-10-24: no test covered the branch, and every real
+    leg's log does carry the signature, so refusing an absent one cannot flip
+    any existing state.
+    """
+    module = _module()
+    text = _log().replace("SCF CONVERGED AFTER   12 CYCLES\n", "")
+    assert "SCF CONVERGED AFTER" not in text
+    task = _task_dir(tmp_path, text)
+    row = module.qc_task(task, "tasks/DMC/M__8", _cand())
+    assert row["status"] == "technical_complete_qc_failed"
+    assert "scf_not_converged" in row["qc_flags"]
+    assert row["failure_class"] == "scf_not_converged"
 
 
 def test_candidate_bond_graph_change_rejects_the_leg(tmp_path, monkeypatch):
@@ -713,7 +737,8 @@ def _converged_final_log(frame_text):
     """A CONVERGED opt log whose last CARTESIAN block is frame_text's geometry."""
     atoms = "\n".join("  " + line.strip() for line in frame_text.splitlines()[2:])
     return (
-        GEOM_TABLE
+        "SCF CONVERGED AFTER   12 CYCLES\n"
+        + GEOM_TABLE
         + "THE OPTIMIZATION HAS CONVERGED\n"
         + "CARTESIAN COORDINATES (ANGSTROEM)\n"
         + "---------------------------------\n"
