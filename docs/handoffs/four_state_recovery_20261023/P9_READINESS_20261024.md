@@ -195,6 +195,14 @@
 
 **Lead 的自我更正一并留档**（防历史载体误导）：我在 t3 的 `review_note` 里写过「extension_pool.csv **12 行** FROZEN、成员报告写 11 需对齐」——**那是我的计数错**（把含表头的文件行数当数据行数）；**草稿与成员报告写的 11 个候选才正确**。板底 note 与已推送 commit 属**不可改写历史**，不回写，以本条为准。
 
+**③（本轮追加）同一个词 `li_pair_complete` 在两侧指不同的量**——`wp6_explicit_ligand` 行显示 `li_pair_complete=12/12 required_li_pairs=9 gate_ready=false`，而**触发闸门实际用的是另一个口径**：
+| 侧 | 计算 | 当前值 |
+|---|---|---|
+| 台账显示 | `strict_main_counts(set_main, progress["scientific"]["accepted_legs"])` 的 `li_pair_ok`（`:170`/`:318`）＝**按「主态生产腿 accepted」计**（meta `scientific.accepted=48/48`，与系综 44/48 是两回事） | **12/12** |
+| 触发判定 | `strict_readiness_wiring._complete_li_pairs(labels)`（**系综 labels 里 `LiM_plus` 与 `LiM_2plus` 双 accepted 的分子数**），与 `WP6_REQUIRED_LI_PAIRS=9` 比较 | **9/12**（缺 DMC / DOL / EC，各缺 `LiM_2plus`） |
+
+**定界（已核，结论：不改任何状态）**：`48/48` 时两侧必然同时为真（labels 全 accepted ⇒ 双口径都 12≥9），未 48 时 `wp6_ready` 因要求 `production_ensembles=48` 而两侧同时为假 ⇒ **当前与未来都不改变 `blocked_on_production` 的判定**。但**阅读层风险真实**：若有人按台账把「12/12 ≥ 9」读成「Li 配对已满足、只剩系综」，就低估了缺口——实际 labels 口径只有 **9/12，恰好压线**，且这 3 个缺 LiM_2plus 的分子正是四态恢复的目标态所在分子。P8 草稿引用的是 labels 口径（9/12），与台账显示不同源，接线时须统一词义。
+
 ## 五、要用户裁决的事（其余都已就绪）
 
 1. **是否发出一次性限额授权**（800 core-hours：筛选 ≤32 / 首产 ≤512 / 有因补救 ≤256；每态 ≤2 独立起点 + ≤1 有因补救）。
