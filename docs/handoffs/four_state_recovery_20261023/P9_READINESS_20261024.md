@@ -17,11 +17,11 @@
 
 | 检查 | 实测结果 | 命令 |
 |---|---|---|
-| 收口链 | **79/79 步 exit 0**，末行 `OFFLINE CLOSURE GREEN` | `pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1` |
+| 收口链 | **79/79 步 exit 0**，末行 `OFFLINE CLOSURE GREEN`（**核验于 HEAD `001cfad`、`CHAIN_EXIT=0`**；此前每个提交各跑过一次同样全绿） | `pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1` |
 | 只读检查无写盘 | **逐文件 `(size, mtime_ns)` 不变**（含失败路径） | `pytest tests/test_checks_are_read_only.py -q` |
 | **干净环境复现** | 仅跟踪文件（无 `work/`）的检出跑全量：**0 failed**（**核验于 HEAD `d2f8aa5`、`PYTEST_EXIT=0`、`FAILED` 计数 0**；此前 `06d08aa` 同样 0 failed，该步可随时复跑），跳过均带显式理由（9 个） | `git worktree add --detach <tmp> HEAD`，再在该树跑 `pytest tests` |
-| 冻结清单复算 | 三个周清单 **CHECK OK**（真树 external=0；干净克隆把 18 个**有意 gitignore** 的 `.cpcm/.property.txt` 记为 `external_machine_local` 而非 `missing`） | `refreeze_manifest.py --manifest outputs/weekN/SHA256SUMS --check` |
-| 归档复算 | `[manifest] OK`；账本逐字段 **300 处比对 / 不符 0 / sha256 不符 0 / 归档缺条目 0** | `verify_archive.py --latest --ledger --gate-when-complete` |
+| 冻结清单复算 | 三个周清单 **CHECK OK**（**核验于 HEAD `001cfad`**，链内 `refreeze-week1/2/3` 三步 exit 0；真树 external=0；干净克隆把 18 个**有意 gitignore** 的 `.cpcm/.property.txt` 记为 `external_machine_local` 而非 `missing`） | `refreeze_manifest.py --manifest outputs/weekN/SHA256SUMS --check` |
+| 归档复算 | `[manifest] OK`；账本逐字段 **300 处比对 / 不符 0 / sha256 不符 0 / 归档缺条目 0**（**核验于 HEAD `001cfad`**，链内 `archive-verify` exit 0） | `verify_archive.py --latest --ledger --gate-when-complete` |
 | `git diff --check` | 干净（无空白/冲突标记） | `git diff --check` |
 | 未提交状态 | 仅并行会话的 `docs/handoffs/wp5_formal_replay_guard_20261023/README.md`（他人所有，不并入） | `git status --porcelain` |
 
