@@ -98,3 +98,28 @@
 提交 → 回收（`ensemble_hpc_io.py`，幂等）→ 逐元素收终态/`xtbopt.log`/`stderr.log`/`xtbopt.xyz`/
 启动终止时间/实测成本 → 按冻结 **6 kcal/mol** 窗筛选 → 四态分流（新盆地／回已知盆地／身份漂移／
 八条均无新盆地）→ 有界生产计算（每态 ≤2 起点 + ≤1 有因补救）→ 逐腿六项验收。
+
+### ⚠️ 5.1 提交前的就绪缺口：**回收后的「判定」尚无专用消费者**（2026-10-25 实测）
+上文那条链里，**「回收」与「验收」两半都有工具，中间的「判定」这一半没有**：
+| 环节 | 现有工具 | 状态 |
+|---|---|---|
+| 生成/校验筛选包 | `build_torsion_probe_package.py --build/--check-p4-screening` | ✅ |
+| 提交 | `submit_hpc_batch.py`（受保护） | ✅ |
+| 取回文件 | `ensemble_hpc_io.py`（幂等） | ✅ |
+| 逐文件哈希/溯源 | `build_compute_provenance.py`（含 xTB 的 `xtbopt.log`/`xtbopt.xyz`） | ✅ |
+| **判定（6 kcal 窗 + 等价原子映射/拓扑去重 → 四态分流）** | **无** | ❌ **缺口** |
+
+实测证据：① builder 的全部 CLI 只有 `--repair-original-batch / --source-package / --out-package /
+--build-p4-screening / --check-p4-screening`，**没有收结果模式**；② 唯一算 `rel_kcal` 与
+`rmsd_to_nearest_known_a`（即新盆地/已知盆地判据）的工具 `run_strict_recovery_search.py` 是
+**自己用本机打包的 xTB 重跑搜索**——`_run_xtb()` 直接调 `XTB`，`search_state()` 还会 `rmtree`
+工作目录并按 SMILES 重新 embedding——**不是导入已跑完的任务目录**；③ 全仓检索确认没有任何模块
+walk `work/hpc_four_state_p4_xtb_screening_v1/tasks/*/` 的结果（只有 builder、README 生成器、提交器
+读它的 manifest）。
+
+**含义**：筛选结果落地后，要把 8 个元素的输出变成「冻结窗口下的四态分流 + 覆盖证据」，
+必须**先有新代码**（或改造上述 runner，但那会踩本机 xTB 的红线，且 `rmtree` 行为不可用于导入）。
+⇒ **建议在提交前把这件事排进计划**：写一个**只读、幂等、可 --check 的判定器**，输入 = 任务目录
+（`xtbopt.xyz`/`xtbopt.log`/`.xtboptok`/`candidate.json`），输出 = 每个元素的相对能、等价原子映射/
+拓扑去重结论、四态分流 verdict，并**复用** `build_coverage_reviews.py` 的 route/verdict 词表
+（该词表已由 G5 加守卫）。**本手册不自行实现它**（新脚本须按项目纪律四处登记、且需要真实结果才能验证）。
