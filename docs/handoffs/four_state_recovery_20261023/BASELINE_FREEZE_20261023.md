@@ -14,6 +14,11 @@
 
 ## 2. 协议与输入哈希（sha256 前缀，用于判断基线是否漂移）
 
+> ⚠ **这张表是「冻结时点」的快照，不是「当前值」**。它记的是冻结那一刻各输入的样子，因此**之后被合法重建过的产物必然与当前文件不同**——这是快照的设计，不是漂移。
+> 实测（2026-10-24）：`outputs/physics_completion/compliance/plan_compliance_meta.json` 在本表里是 `5f826c8ff3d7cb71`，当前实际是 `91822dc2f74d3498`（compliance 随计算每轮重建）。
+> **判断"是否漂移"的正确用法**：拿**同一时点**的记录互相比（如与 `preflight.py` 的 `baseline_snapshot.json` 比），**不要用当前文件来"验证"这张表**；若某个**协议/科学输入**（`config/`、`data/metadata/`）的哈希变了，那才是需要审查的漂移。
+> 另：本包内文档里的相对路径（如 `tests/test_preflight.py`）一律**按本包目录**解析，**不是仓库根相对**。
+
 | 输入 | sha256[:16] |
 |---|---|
 | `data/metadata/physics_completion_set.csv` | `f07340d7e203b527` |
