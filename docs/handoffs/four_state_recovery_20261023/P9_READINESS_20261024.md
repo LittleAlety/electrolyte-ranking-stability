@@ -165,6 +165,25 @@
 
 **裁决：该审计器结构合格、退出码诚实、严格只读、语义可分**——达到「可考虑正式接线」的**质量门槛**；但**接线与否仍属用户裁决**（它仍是 `AUDIT_ONLY`；`model_v2` 目录缺失属**已知待补**，接线前须先补齐或明确只接 `knn_v1`）。所委派的复审成员零产出后已收回，本节为 **Lead 亲自复审**（首次实跑两版 + 全树只读快照证明）。
 
+## 四之六、共享任务板审计线（t1–t5）的复核结论（2026-10-26，全部 Lead 独立复跑后采信）
+
+并行工作面按「成员产出 → Lead 独立复算 → approve/接手收口 → 逐路径入库」跑完 5 个任务，**4 done + t5 在跑**：
+
+| 任务 | 结论（证据目录已入库，commit `84e8ac7` / `ab69a90`） |
+|---|---|
+| **t1** G5 复核 | `audit_g5_route_coverage_20261026/`（6 文件 1836 行）。Lead 行号级核验全部与当前源码吻合：`coverage_route()` **`:163-223`，7 个 distinct route / 10 个 return**；route→verdict 映射 **`:357-375`**、`else: verdict="pending"` **`:373-374`**；`kept_evidence` 分支 **`:377-388`**；`strict_readiness_wiring.py` 的 `COVERAGE_ROUTES` 白名单 **`:167-168`**。CSV 实测 14 行 = `multi_basin_coverage 8 / search_exhausted 2 / single_basin_verified 2 / unresolved_qc 2`，**`known_basin_reproduction`/`pending`/`dedup_evidence_required` 三者 0 行**。**关键问题（route 名拼错的后果）用执行级证据回答**：emit 侧错拼 → 落 `else` → **两重后果**（verdict 由 `unresolved` 降为 `pending`，**且** `kept_evidence` 被清空、`duplicate_of` 证据丢弃）；方向 = **链级 fail-closed 阻塞**（wiring 响亮报 `unknown route`、闸门红），**不是放水**，但**本地误诊断**（"review still pending" 掩盖真实的 "unresolved + 证据已丢"）；`pending` 自身拼错（`pendingg`）行为不可见。守卫测试 `test_resolved_route_evidence.py` **对 emit 侧错拼会红、对 mapping 侧单独错拼不红**（靠 wiring 兜底）；**唯一残余风险 = 三处词汇副本协同改名**（全树无任何测试可抓，且恰好在三条零数据 route 上最易做不全）。该三点精化已被并行会话吸收进 `ACCEPTANCE_CHAIN_AUDIT_20261024.md`（commit `c5dbf37`「零测试→**零行为测试**；错拼同时清空 kept_evidence；方向分层」）——**本项目首例完整跨会话复核闭环**（提出→独立抽验→吸收落 commit）。 |
+| **t2** 提交器 H1–H5 复现 | `audit_submitter_bypass_20261026/`。**两份独立实现各自 12/12 全绿、退出码 0、结论逐条一致**（成员完成版 `probe_output.txt` + Lead 接手版 `probe_output_final.txt`；竞态归属与真相记于任务板 review note，未改写历史）：**H2** `submission_resources:127` 缺 `resource_profile` → **静默降级 `orca_production_v1`**（cap 800/免账本），实测"提交成功、`budget_checked=False`"；**H2′** 真 xtb 输入的拒绝发生在 **doctor+mkdir 锁+squeue+rmdir 共 4 次 bridge 调用之后**；**H3** 篡改 sbatch（100 任务×16 核×24 h，潜在 38400 core-hours）仍 `budget_checked=True, reserved=32`，**`script_sha256` 与 manifest 声明不符却无人校验**；**H4** manifest 的 `task_count/cores_per_task/wall_hours/budget_cap` 全是装饰、profile 静默获胜；**H5** `submission_gate` 在提交器全文出现 **0 次**（`manifest.get(` 仅 `batches:100` + `resource_profile:127` 两处），manifest 写 HOLD 照常提交；**H1** `committed_core_hours:257` 跳过 `planned` 状态、`measured_core_hours="0"` 合法 → **两条路都把真实 20 h 成本抹成 committed=0**。**唯一有效守卫**：CLI `--budget-cap-core-hours` 与 profile cap 不符**在任何 bridge 调用之前**被拒（`:302-304`）。**并坐实无自动纠错通道**：`collect_sacct:159-170` 只取 JobID/State/ExitCode、**不取 Elapsed/AllocCPUS**，全仓无 `measured_core_hours` 生产写入点 ⇒ ledger 全靠调用方手填。**全程零集群、零网络**（C9 实测真实 spawn=0、bridge 路径 `E:\nonexistent\hpc.ps1` 不存在）。合成 `fixtures/` 已从跟踪移除（探针每次跑前须 `rm -rf`，否则残留 journal 造成"already submitted"假失败）。 |
+| **t3** P8 预注册 | `p8_prereg_drafts_20261026/{WP6,POOL_EXTENSION}_PREREG_DRAFT.md`。触发条件逐条带**文件:行号**（核心方案 §14 `:386-392`、§5.2 `:127`、§13.5 `:382`、§15 `:402-403`；`计划.md:102/:115/:389-391`；`GOAL.md:85/:90`）；成本均值 Lead 现算**逐位吻合**（M 5.885 / M_plus 11.750 / LiM_plus 10.632 / LiM_2plus 12.434，60 腿 mean 9.864 / median 8.128）；扩池候选唯一指向已冻结 `extension_pool.csv`，**未发明分子**；两稿均声明「44/48 未触发——预准备非启动」与「预算与 800 core-hours 严格分离」。 |
+| **t4** 双查（降级） | `audit_partial_crosscheck_20261026/`。抽验对象 `audit_partial_items_20261026/REPORT.md` **始终为 6 字节 "probe" 占位（mtime 冻结 15:22）⇒ 零产物不入库、其任务收回**；双查如实降级为"独立建 ground truth"：三方互证确立 `sampling_audit_3to6` 现值 **1 executable / 9 executable_partial / 6 sampling_limited**、**8 条 Li 腿全部执行**，据此**否定了旧背景假设**（"7/8 分割"与"EMC 两腿被过期父哈希挡在 2/1"）——两个更正已回写后续任务简报。 |
+| **t5** compliance 17 行 | 原任务重发（带**路径级锚点** + **强制增量落盘**），`compliance/plan_compliance.md` 状态 ∈ {partial, not_satisfied, blocked_on_production} = **13+2+2 = 17 行**，逐行对生成器分支与当前磁盘实数三态判定。**进行中**。 |
+
+**⇒ 对授权轮的直接影响（提交前强制人工核对清单）**：`budget_checked=true` / `ORCA TERMINATED NORMALLY` / 工程链全绿**都不能代替**下列核对（提交器自身不做，H1–H5）：
+① manifest 的 `resource_profile` **必填**，缺失即停，不接受静默降级到 ORCA 800 池；
+② 核数 / 墙钟 / `task_count` 与 **sbatch 脚本自身的 `#SBATCH --array/--cpus-per-task/--time` 三向一致**，并核对 `script_sha256`/`list_sha256`；
+③ `submission_gate` / `submitted` 与**实时授权状态**人工对齐（提交器不读这两个字段）；
+④ `attempts_ledger` 的每条 `measured_core_hours` **必须可追到 sacct 的 Elapsed×AllocCPUS**（无此链即不得放行，防"写 0 / 标 planned"抹账）；
+⑤ 提交瞬间重验 `committed + reserved ≤ 800`，且运行/排队/拟提交均占额度。
+
 ## 五、要用户裁决的两件事（其余都已就绪）
 
 1. **是否发出一次性限额授权**（800 core-hours：筛选 ≤32 / 首产 ≤512 / 有因补救 ≤256；每态 ≤2 独立起点 + ≤1 有因补救）。
