@@ -56,7 +56,22 @@
 ## 1. 授权到手后的固定顺序（不得跳步）
 1. 阅读 `E:\软件\超算连接\AGENTS.md`（命令桥规程）。
 2. `hpc.ps1 doctor` —— 未通过即**停止远端操作**，不得绕过命令桥。
-3. 经命令桥**上传**包，远端**逐文件**核对根 `PACKAGE_SHA256SUMS`。
+3. 经命令桥**上传**包（**必须逐文件，不能一次传目录**），远端**逐文件**核对根 `PACKAGE_SHA256SUMS`。
+
+   **驱动**：`.venv\Scripts\python.exe work\_p4_upload_package.py`
+   —— 默认 **dry-run**（只打印 56 次桥调用，不触网）；`--execute --i-have-authorization` 才真正执行；
+   `--verify` 只做远端复算。`--selftest` 断言：46 文件本地齐全且哈希相符、9 个远端目录、**55 条远端路径全部落在桥的安全 token 字符集内**。
+
+   **为何不能一次传目录（2026-10-25 读桥实现实测，纠正此前写法）**：`hpc.ps1 put` → `Copy-HpcFile -Direction Put`
+   最终执行 `scp $common <本地> <远端>`，而 `$common`（`Get-HpcSshCommonArgs`）**只含 `-o` 选项、没有 `-r`**
+   ⇒ 传目录必 `scp: not a regular file`；桥的**全部子命令**（version/doctor/policy/run/shell/ls/df/quota/
+   partitions/modules/templates/submit/jobs/job/stat/logs/cancel/node/setup-node-key/put/get）里
+   **没有任何目录同步子命令**；登录节点 `tar` 解包又被策略拒（「打包」在拒绝清单）。
+   ⇒ **正确三步**：① `run "mkdir -p <远端>/tasks/<state>/<cand>"`（共 **9** 个目录：root + 8 任务目录）；
+   ② 按 `PACKAGE_SHA256SUMS` **逐文件 `put`**（共 **46** 次）；③ `run "cd <远端> && sha256sum -c PACKAGE_SHA256SUMS"`。
+   **远端落点**：`~/project/electrolyte_wp2/p4_xtb_screening_v1`（与第 5 步 `--remote-workdir` 保持一致）。
+   **已预验（只判定不执行）**：`mkdir -p …`、`sha256sum -c …`、`cd … && sha256sum -c …`、`ls -d …` 经
+   `hpc.ps1 policy "<cmd>"` 判定**均为 Allow**（白名单内、未命中重计算规则）——该命令只判定不执行，本轮**未产生任何远端写入**。
 4. 查真实 `squeue`：确认本账户 `running+pending ≤ 20`、无同身份任务已在跑。
 
    **上传前的本地三级完整性核验（2026-10-24 实测已全过，可复跑；上传后第 3 步再在远端复核一次）**：
