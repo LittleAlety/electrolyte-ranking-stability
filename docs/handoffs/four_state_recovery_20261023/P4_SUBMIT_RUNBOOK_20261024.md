@@ -42,6 +42,20 @@
 2. `hpc.ps1 doctor` —— 未通过即**停止远端操作**，不得绕过命令桥。
 3. 经命令桥**上传**包，远端**逐文件**核对根 `PACKAGE_SHA256SUMS`。
 4. 查真实 `squeue`：确认本账户 `running+pending ≤ 20`、无同身份任务已在跑。
+
+   **上传前的本地三级完整性核验（2026-10-24 实测已全过，可复跑；上传后第 3 步再在远端复核一次）**：
+
+   ```bash
+   cd work/hpc_four_state_p4_xtb_screening_v1
+   sha256sum -c PACKAGE_SHA256SUMS          # 包级：46 条 = 40 个任务文件 + 6 个顶层文件 → 实测 0 FAILED
+   for d in tasks/*/*/; do (cd "$d" && sha256sum -c inputs.sha256) || echo "FAIL $d"; done
+                                            # 逐任务：8/8 目录通过（相对路径 ⇒ 必须在任务目录内执行）
+   ```
+
+   - 包内共 **47 个文件**（= `PACKAGE_SHA256SUMS` 46 条 + 该清单自身，不含自身是设计）；
+   - 实测结果：`PACKAGE_SHA256SUMS` **0 FAILED**、逐任务 `inputs.sha256` **OK=8 / FAIL=0**；
+   - 该格式为**相对路径**，与远端回收阶段「在任务目录内跑 `sha256sum -c inputs.sha256`」完全同构——本地先跑可提前暴露路径/格式问题，避免上传后才发现。
+
 5. 调用受保护提交器（**唯一入口**，外层脚本不得绕过预算门）：
 
    ```powershell
