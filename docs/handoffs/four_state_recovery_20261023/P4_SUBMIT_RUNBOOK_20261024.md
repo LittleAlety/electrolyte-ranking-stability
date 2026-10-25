@@ -26,6 +26,12 @@
 
 ⇒ 本轮实耗 **0 core-hours**、在途 **0**、800 未动；提交侧仍停在授权门。
 
+**本地半侧一键核验（只读，一命令）**：`work/_p4_preflight_local.py`
+——7 项本地检查（包完整性 / 293 项包审计 / 离线模拟提交 17-17 且 0 次 bridge 调用 /
+判定器原型自测 19-19 / 冻结清单 refreeze / 站点 `--check` / 包仍为 HOLD+未提交+cap 32）
+**实测 7/7 通过、退出码 0**，并把「仍需桥或授权」的四步（doctor、实时 `squeue`、上传+远端根哈希、
+受保护提交器）显式单列，避免误以为本地绿等于可提交。
+
 ### 0.1 bundle 的 `preflight.py` 当前报 `STALE`（退出码 2）——**这是真陈述，不是包坏了**
 2026-10-24 在 HEAD `f1c0483` 实测：`preparation_status = "STALE"`，
 `changed_sources = [build_coverage_reviews.py, import_ensemble_structures.py, submit_hpc_batch.py, HEAD]`。
