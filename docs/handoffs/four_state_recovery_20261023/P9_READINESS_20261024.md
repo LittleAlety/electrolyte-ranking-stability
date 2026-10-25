@@ -136,6 +136,22 @@
 ② `docs/handoffs/four_state_recovery_20261023/audit_partial_items_20261026/REPORT.md`——对 16 个**未满足**项抽验：声称的阻塞原因**是否仍然成立**、有无**过时陈述**。
 **两者都只是"发现"，须由 Lead 独立复跑核验后才并入结论**（零产物不计完成）。
 
+## 四之四、对并行会话「验收链离线审计」的独立复核（2026-10-26，Lead 亲自复跑）
+
+并行的另一执行者产出 `ACCEPTANCE_CHAIN_AUDIT_20261024.md`（G1–G5：容差同一性 / 五项数值强制 / **SCF 收敛此前无断言** / **6 kcal 筛选窗四处表示零守卫** / `coverage_route()` 三条 route 零数据零测试）。
+按规矩**不由其作者自证**，我逐条复跑其**最能翻转结论**的三处：
+
+| 其声称 | 我的独立复核 | 结果 |
+|---|---|---|
+| 新增 `RE_SCF_CONVERGED` 门（缺签名 ⇒ `scf_not_converged`） | `grep import_ensemble_structures.py` → `:252` 正则、`:904` 判定、`:908` 旗标 | **在位** ✓ |
+| 筛选窗四处表示：三份 `WINDOW_KCAL = 6.0` + 一份 `ENERGY_WINDOW_KJ = 25.0` | 逐文件 grep（`build_production_ensemble_manifest:82`、`build_gap_decision_support:70`、`build_sampling_audit_3to6:59`、`screen_li_motifs:71`） | **逐行对上** ✓ |
+| **加该门"不翻转任何现行接受状态"**（115/115 入池腿已带 SCF 签名） | 自写只读脚本 `work/_verify_scf_nodiff.py` 从 `production_ensemble_structures.csv` 取 `status ∈ {computed, ready}` 的腿，按其 `log_path` 逐条读日志匹配签名 | **`pool_legs=115 / signed=115 / 缺签名 0 / 日志缺失 0` ⇒ "no-flip holds"** ✓ |
+| 三个新门测试在位 | 实跑：`-k tolerance` 1 ✓、`-k scf` 1 ✓、`-k "window or screen"` 4 ✓ | **通过** ✓ |
+| 五份 RED/证明脚本 | `work/_threshold_guard_red.py`、`_tolerance_guard_red.py`、`_scf_gate_red.py`、`_window_guard_red.py`、`_scf_nodiff_proof.py` | **均存在** ✓ |
+
+**意义**：该审计最关键的**诚实性论据**（"加门不会翻旧账"）经我**独立复算逐位成立**，故其新增的三道守卫可被当作**已复核的防线**（而非作者自述）。
+**边界**：G5 的 route 覆盖率统计与其余散文陈述我**未逐条复算**；且该文件属**并行会话所有**，我**不代为提交**（其自身提交节奏由它掌握）。
+
 ## 五、要用户裁决的两件事（其余都已就绪）
 
 1. **是否发出一次性限额授权**（800 core-hours：筛选 ≤32 / 首产 ≤512 / 有因补救 ≤256；每态 ≤2 独立起点 + ≤1 有因补救）。
