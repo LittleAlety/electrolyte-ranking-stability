@@ -86,19 +86,34 @@
 | **`pending`** | **0** | **0** |
 | **`dedup_evidence_required`** | **0** | **0** |
 
-**为何是风险**：`build_coverage_reviews.py:357–375` 的 route→verdict 映射带 **`else: verdict = "pending"`** 兜底；
-且 `:380` 用**同一个字符串**决定 `kept_evidence` 是否从 `duplicate_of` 取（即分支 2 的「只增覆盖证据」规则）。
-⇒ **产出侧错拼**会把 `unresolved` 静默降级成 `pending`（改变严格闸门报告），并把 `kept_evidence` 清空。
-既有 `tests/test_resolved_route_evidence.py` 的 `else: raise AssertionError("resolved with unknown route")`
-**只能挡住映射侧错拼**——降级后的行 `verdict="pending"`，会被该循环直接跳过。
+**为何是风险（含**下修**：下游其实会报，但不是静默通过）**：`build_coverage_reviews.py:357–375` 的 route→verdict
+映射带 **`else: verdict = "pending"`** 兜底；`:380` 又用**同一字符串**决定 `kept_evidence` 是否从 `duplicate_of` 取
+（分支 2 的「只增覆盖证据」规则）。产出侧错拼会把 `unresolved` 降级成 **`pending`**。
+**但下游并非无感**：`strict_readiness_wiring.py:167` 用 `COVERAGE_ROUTES` frozenset 校验 route（未知即报错），
+`:179-180` 对 `verdict == "pending"` 报「review still pending (evidence not settled)」⇒ **链路重跑时严格门会变红**。
+所以真实缺陷不是「静默通过闸门」，而是**三份 route 词表副本之间可以协调错拼**：
+① `coverage_route()` 的产出字符串；② 映射处的比较字符串；③ `strict_readiness_wiring.COVERAGE_ROUTES` 的 frozenset。
+只改 ①（或只改 ②）会被下游抓到；**同时改 ① 与 ③**（例如把某个 route 改名并同步更新 frozenset）则不会有任何测试变红——
+而现在 3 个零数据零测试的 route 正是最容易在改名时被漏掉的地方。
 
 **修复**：新增 `tests/test_resolved_route_evidence.py::test_the_coverage_route_vocabulary_is_frozen_and_mapping_complete`，
 **用 AST**（不能靠文本匹配：`pending` 是裸逗号元组 `return "pending", "..."`）钉两件事：
 ① 产出侧 route 集合恒等于 7 元冻结集；② **每个能吐出的 route 都必须在 `coverage_route()` 函数体之外被点名**
-（即映射/证据分支），任一侧错拼都会失败。该测试**不依赖任何数据**，干净克隆同样生效。
+（即映射/证据分支），任一侧错拼都会失败。该测试**不依赖任何数据**，干净克隆同样生效，
+把「下游才发现」提前成「源头即失败」。
 
 **RED 实证**（`work/_route_guard_red.py`）：真模块 GREEN；**产出侧**注入错拼 → 失败于 `vocabulary drifted`；
 **仅映射侧**注入错拼 → 失败于 `never named elsewhere`；两次均不改动真实模块。
+
+### 附：Phase-2 四条固定分支的映射（Lead 自查，取代失败的委派）
+| 计划分支 | 落地位置 | 状态 |
+|---|---|---|
+| ① 发现合法新盆地 | coverage route `multi_basin_coverage`（+ `new_minima_found`）→ verdict `resolved` | 有数据(8)、有测试(3 文件) |
+| ② 回到已知盆地 | route **`known_basin_reproduction`** → verdict `unresolved`；规则「只增覆盖证据、不增简并度」由 `:380` 取 `duplicate_of` | **route 名零数据零测试** → G5 已补词表/映射守卫 |
+| ③ 身份漂移或断环 | **不在 coverage 层**，而在成员层：`species_drift_unrecoverable` 处置 / `member_next_action.stop_species_drift`（有测试）/ 导入器 `restart_species_drift` 拒收（有测试） | 有测试(4+1+1 文件) |
+| ④ 八条均无可用新盆地 | route `search_exhausted` → verdict `search_exhausted`；`COVERAGE_SETTLED` 视其为「已定」 | 有数据(2)、有测试(2 文件) |
+
+⇒ **四条分支都有落地位置，没有「无处可去」的分支**；唯一零覆盖的是分支 ②（已由 G5 补上词表/映射守卫）。
 
 ## 3. 是否把该门继续下沉到主态路径？——**已测量，结论：不下沉**（2026-10-24）
 **门的位置决定了保护面**：`RE_SCF_CONVERGED` 在 `qc_task` 里，因此覆盖**经它的注册新增成员**——而
