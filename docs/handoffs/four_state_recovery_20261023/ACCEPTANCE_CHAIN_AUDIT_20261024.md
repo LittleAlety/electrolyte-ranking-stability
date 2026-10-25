@@ -73,6 +73,33 @@
 **RED 实证**（`work/_window_guard_red.py`）：真源 GREEN；把其中一份副本改成 `7.0`、把 kJ 改成 `30.0`
 （> 6 kcal）后，两道守卫均按预期 `AssertionError`；被审的 5 个生产模块**未被改动**。
 
+### G5（本轮修复）**`coverage_route()` 的 7 个 route 里有 3 个「零数据 + 零测试」**，而错拼会静默降级
+实测（AST 取产出侧 + 真实数据统计）：
+
+| route | 14 条真实 `coverage_reviews.csv` 行数 | `tests/` 引用文件数 |
+|---|---|---|
+| `multi_basin_coverage` | 8 | 3 |
+| `single_basin_verified` | 2 | 1 |
+| `unresolved_qc` | 2 | 0（经 `verdict` 间接覆盖） |
+| `search_exhausted` | 2 | 2 |
+| **`known_basin_reproduction`**（计划分支 2「回到已知盆地」） | **0** | **0** |
+| **`pending`** | **0** | **0** |
+| **`dedup_evidence_required`** | **0** | **0** |
+
+**为何是风险**：`build_coverage_reviews.py:357–375` 的 route→verdict 映射带 **`else: verdict = "pending"`** 兜底；
+且 `:380` 用**同一个字符串**决定 `kept_evidence` 是否从 `duplicate_of` 取（即分支 2 的「只增覆盖证据」规则）。
+⇒ **产出侧错拼**会把 `unresolved` 静默降级成 `pending`（改变严格闸门报告），并把 `kept_evidence` 清空。
+既有 `tests/test_resolved_route_evidence.py` 的 `else: raise AssertionError("resolved with unknown route")`
+**只能挡住映射侧错拼**——降级后的行 `verdict="pending"`，会被该循环直接跳过。
+
+**修复**：新增 `tests/test_resolved_route_evidence.py::test_the_coverage_route_vocabulary_is_frozen_and_mapping_complete`，
+**用 AST**（不能靠文本匹配：`pending` 是裸逗号元组 `return "pending", "..."`）钉两件事：
+① 产出侧 route 集合恒等于 7 元冻结集；② **每个能吐出的 route 都必须在 `coverage_route()` 函数体之外被点名**
+（即映射/证据分支），任一侧错拼都会失败。该测试**不依赖任何数据**，干净克隆同样生效。
+
+**RED 实证**（`work/_route_guard_red.py`）：真模块 GREEN；**产出侧**注入错拼 → 失败于 `vocabulary drifted`；
+**仅映射侧**注入错拼 → 失败于 `never named elsewhere`；两次均不改动真实模块。
+
 ## 3. 是否把该门继续下沉到主态路径？——**已测量，结论：不下沉**（2026-10-24）
 **门的位置决定了保护面**：`RE_SCF_CONVERGED` 在 `qc_task` 里，因此覆盖**经它的注册新增成员**——而
 `production_ensemble_candidates.csv` 的实测构成是 **48 primary + 57 round1_extra + 14 recovery_v1_start**，
