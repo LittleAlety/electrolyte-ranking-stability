@@ -73,28 +73,37 @@
 **RED 实证**（`work/_window_guard_red.py`）：真源 GREEN；把其中一份副本改成 `7.0`、把 kJ 改成 `30.0`
 （> 6 kcal）后，两道守卫均按预期 `AssertionError`；被审的 5 个生产模块**未被改动**。
 
-### G5（本轮修复）**`coverage_route()` 的 7 个 route 里有 3 个「零数据 + 零测试」**，而错拼会静默降级
+### G5（本轮修复）**`coverage_route()` 的 7 个 route 里有 3 个「零数据 + 零行为测试」**；错拼在本地会降级（下游 fail-closed 兜住）
 实测（AST 取产出侧 + 真实数据统计）：
 
-| route | 14 条真实 `coverage_reviews.csv` 行数 | `tests/` 引用文件数 |
+| route | 14 条真实 `coverage_reviews.csv` 行数 | `tests/` 引用文件数（**加守卫之前**测量） |
 |---|---|---|
 | `multi_basin_coverage` | 8 | 3 |
 | `single_basin_verified` | 2 | 1 |
-| `unresolved_qc` | 2 | 0（经 `verdict` 间接覆盖） |
+| `unresolved_qc` | 2 | 0（仅间接：合成行喂给下游校验器） |
 | `search_exhausted` | 2 | 2 |
 | **`known_basin_reproduction`**（计划分支 2「回到已知盆地」） | **0** | **0** |
 | **`pending`** | **0** | **0** |
 | **`dedup_evidence_required`** | **0** | **0** |
 
+> **口径更正（2026-10-25，由独立复核 `audit_g5_route_coverage_20261026/` 逼出）**：上表第三列是**加守卫之前**的测量。
+> 守卫本身就点名了全部 7 个 route，所以**「零测试」现在只能按「零行为测试」理解**：
+> 三个 route 的**数据行数仍精确为 0**，但它们的唯一测试引用是
+> `test_resolved_route_evidence.py` 的冻结词表元组与 AST 守卫本身——**没有任何行为测试跑过这三条分支**。
+> 独立复核同时**逐行复现了本表全部计数**（`STAGE2_counts.md` §2.3：8/2/2/2 与三个 0，逐项 ✅）。
+
 **为何是风险（含**下修**：下游其实会报，但不是静默通过）**：`build_coverage_reviews.py:357–375` 的 route→verdict
 映射带 **`else: verdict = "pending"`** 兜底；`:380` 又用**同一字符串**决定 `kept_evidence` 是否从 `duplicate_of` 取
-（分支 2 的「只增覆盖证据」规则）。产出侧错拼会把 `unresolved` 降级成 **`pending`**。
-**但下游并非无感**：`strict_readiness_wiring.py:167` 用 `COVERAGE_ROUTES` frozenset 校验 route（未知即报错），
+（分支 2 的「只增覆盖证据」规则）。产出侧错拼**一次造成两件事**（独立复核逐行确认，`STAGE3`）：
+① `unresolved`（确定的「否」）被降级成 **`pending`**（什么也没决定）；② **`kept_evidence` 被清空**（:388）。
+另有一处退化：**`pending` 自身的错拼在行为上不可见**（正确与错拼都落到 `verdict="pending"`）。
+**方向要分层看**：在 `build_coverage_reviews.py` **内部**它**看似 fail-open**（朝「不再阻塞」的方向走）；
+但**下游 fail-closed**——`strict_readiness_wiring.py:167` 用 `COVERAGE_ROUTES` frozenset 校验 route（未知即报错），
 `:179-180` 对 `verdict == "pending"` 报「review still pending (evidence not settled)」⇒ **链路重跑时严格门会变红**。
 所以真实缺陷不是「静默通过闸门」，而是**三份 route 词表副本之间可以协调错拼**：
 ① `coverage_route()` 的产出字符串；② 映射处的比较字符串；③ `strict_readiness_wiring.COVERAGE_ROUTES` 的 frozenset。
-只改 ①（或只改 ②）会被下游抓到；**同时改 ① 与 ③**（例如把某个 route 改名并同步更新 frozenset）则不会有任何测试变红——
-而现在 3 个零数据零测试的 route 正是最容易在改名时被漏掉的地方。
+只改 ①（或只改 ②）会被守卫抓到；③ 单独改会被下游抓到（`COVERAGE_ROUTES` 校验）；**唯一残余漏洞是全 ①+②+③ 协同改名**——
+而那三个零数据 route 正是改名最易漏的地方。
 
 **修复**：新增 `tests/test_resolved_route_evidence.py::test_the_coverage_route_vocabulary_is_frozen_and_mapping_complete`，
 **用 AST**（不能靠文本匹配：`pending` 是裸逗号元组 `return "pending", "..."`）钉两件事：
