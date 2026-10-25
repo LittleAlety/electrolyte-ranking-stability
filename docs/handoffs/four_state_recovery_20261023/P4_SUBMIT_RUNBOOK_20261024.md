@@ -152,8 +152,14 @@ walk `work/hpc_four_state_p4_xtb_screening_v1/tasks/*/` 的结果（只有 build
    `_state_charge()` 在缺池行时**直接 `SystemExit`**。这独立佐证了「必须有新判定器」。
 
 **原型已就绪（机器本地层，未登记进生产包）**：`work/_p4_screen_triage.py`
-——实现上述 1–3 点与两套参考口径，并**双源交叉校验**能量（stdout 的
-`| TOTAL ENERGY … Eh |` 与 `xtbopt.xyz` 第 2 行的 ` energy: …`，两者差 >1e-6 Eh 即记为 problem）；
-`--selftest` **12/12 通过**；对真实包空跑得 **8 元素全部 `not_run_yet`**，且跑后我的 293 项包审计仍全绿
-（**对包只读**）。**尚未实现**：等价原子映射/去重（按规格 ④ 应复用聚合器 `dedup_members`），
-以及写入/`--check` 形态；提升进 `scripts/wp_production/` 时仍须按纪律四处登记。
+——实现上述规格 1–4，并**双源交叉校验**能量（stdout 的 `| TOTAL ENERGY … Eh |` 与
+`xtbopt.xyz` 第 2 行的 ` energy: …`，两者差 >1e-6 Eh 即记为 problem）。**等价性不再另写映射**：
+直接复用聚合器的原语与同一容差（`bond_adjacency` + `find_topology_mappings`（WL＋回溯）→
+heavy Kabsch RMSD < `DUP_RMSD_A=0.35` → 最差扭转 ≤ `TORSION_TOL_DEG=10.0` → Li 供体位点 →
+镜像/手性），**但不做** `dedup_members` 那步「按 G 排代表」——筛选层还没有自由能，
+硬套会把 GFN2 当生产自由能（红线），故生产层判定仍归聚合器。
+`--selftest` **17/17 通过**（含「刚性副本判为同一极小（RMSD≈2.6e-16）」「断拓扑被拒」
+「如实报告复用原语与容差」「序列化与键序无关」）；对真实包空跑得 **8 元素全部 `not_run_yet`**；
+`--json` 写入 + `--check` **连跑两次字节一致**（1871 B）；跑后 293 项包审计仍全绿（**对包只读**）。
+**尚未实现**：提升进 `scripts/wp_production/` 所需的四处登记；把等价结论接成
+`build_coverage_reviews.coverage_route` 的 `novelty` 输入（这一步需要真实筛选结果才能验证）。
