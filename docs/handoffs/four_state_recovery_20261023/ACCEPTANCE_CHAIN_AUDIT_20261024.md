@@ -18,7 +18,7 @@
 
 **结论：五项阈值与六项验收在**写入路径与聚合路径**上都真正 fail-closed**；`geometry_criteria_ok` 对缺值返回 `False`（`import_ensemble_structures.py:124-129`），不存在「缺值默认为零」。
 
-## 2. 本轮发现并关闭的两个缺口
+## 2. 已发现并关闭的四个缺口（G1–G4）
 
 ### G1（前一轮已修，`06d08aa`）五项阈值无一致性守卫
 三份表示（代码常量 / 冻结契约 / 两处生成器散文）之间**没有任何测试**。已补三道测试覆盖；RED 实证见 `work/_threshold_guard_red.py`。
@@ -49,6 +49,29 @@
 **RED 实证**（`work/_scf_gate_red.py`）：护栏在位 GREEN；把 `RE_SCF_CONVERGED` 中和为「匹配一切」后
 该测试**按预期失败于 `AssertionError`**，退出码 0。
 （注：第一次演示用同一临时目录重跑，失败原因是 `FileExistsError` 而非断言——那是**无效演示**，已改用全新目录重做。）
+
+### G4（本轮修复）冻结的 **6 kcal/mol 筛选窗**在 4 处表示上**零守卫**
+筛选窗决定「哪些筛选盆地可成为生产候选」，属 load-bearing；但实测它有 4 处独立表示，而
+`tests/` 对 `WINDOW_KCAL` / `ENERGY_WINDOW_KJ` / `window_kcal` / `"6 kcal"` 的**引用数 = 0**：
+
+| 位置 | 表示 |
+|---|---|
+| `build_production_ensemble_manifest.py:82` | `WINDOW_KCAL = 6.0`（并派生 `WINDOW_KJ = ×4.184`） |
+| `build_gap_decision_support.py:70` | `WINDOW_KCAL = 6.0` |
+| `build_sampling_audit_3to6.py:59` | `WINDOW_KCAL = 6.0` |
+| `screen_li_motifs.py:71` | `ENERGY_WINDOW_KJ = 25.0`（= **5.975 kcal/mol**，比 6.0 kcal **略紧 0.1%**） |
+
+对比：同层的 `DUP_TOL_KCAL` / `ESCALATE_TOL_KCAL` **已被既有测试钉住**（`tests/test_wp2_ensemble.py`
+的 `test_free_state_pool_keeps_the_registered_screen_discipline`），**窗口这几份却谁都没钉** ⇒ 只改一份
+就能静默改变入池判定而没有测试变红（与 G1 同类）。
+
+**修复**：新增两道测试（落在 `tests/test_wp2_ensemble.py`，与 KEEP/DUP/ESCALATE 钉子同处，**不新增测试文件**）：
+1. 三份 `WINDOW_KCAL` 必须恒等于 `6.0`，且 `WINDOW_KJ == WINDOW_KCAL × 4.184`；
+2. `ENERGY_WINDOW_KJ` 钉住 `25.0`，**且必须 ≤ 6.0 kcal/mol** —— 钉「关系」而非只钉数字，以记录那 0.1% 的差异，
+   并挡住将来「把钉子改成跟代码一致」的改动。
+
+**RED 实证**（`work/_window_guard_red.py`）：真源 GREEN；把其中一份副本改成 `7.0`、把 kJ 改成 `30.0`
+（> 6 kcal）后，两道守卫均按预期 `AssertionError`；被审的 5 个生产模块**未被改动**。
 
 ## 3. 是否把该门继续下沉到主态路径？——**已测量，结论：不下沉**（2026-10-24）
 **门的位置决定了保护面**：`RE_SCF_CONVERGED` 在 `qc_task` 里，因此覆盖**经它的注册新增成员**——而
