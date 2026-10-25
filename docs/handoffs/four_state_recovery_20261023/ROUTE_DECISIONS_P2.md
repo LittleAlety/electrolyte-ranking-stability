@@ -18,7 +18,7 @@
 | 代表几何（P0 解析器） | `DMC__M_plus__primary/geom.xyz`，sha256 `5b9e93e0146333f7c851e2f0176675a9` |
 | 末次尝试 | `tors_8_0_1_2` att2 `technical_complete_qc_failed`，`final_geom` `60ef9ba4…`、`log` `fa78c69f…`、`hess` `42ea648b…` |
 | 失败机制 | `verytight_convergence`（`tors_6`/`tors_7`，**各仅 1 次真实计算**）＋ `strict_reopt_required`（`28`/`tors_8`，**2 次已尽**） |
-| **可用独立起点** | 登记二面角 **10** 个（键级校验后），已探过 **3** 个且全部来自**被声明无效的 v1 刚性族** → **7 个从未被合法探过**；对这 7 个跑**修好的 gate**：**7 个全部接受**，其中 **4 个 `ok_heavy_fragment`**、3 个 `ok_methyl_rotor` |
+| **可用独立起点** | 登记二面角 **10** 个（键级校验后），已探过 **3** 个且全部来自**被声明无效的 v1 刚性族** → **7 个从未被合法探过**。对这 7 个跑**修好的 gate（不带 `prior_starts`，只看"这条候选本身合法吗"）**：**7 个全部接受**（**4 个 `ok_heavy_fragment`**、3 个 `ok_methyl_rotor`）。⚠ **这是"逐条合法性"测量，不是最终候选数**——加上 `prior_starts` 去重后**只余 3 个**（见下一行与 `P3_CANDIDATES_20261023.json` 的 `select_candidates` 口径，那边记「3 接受 + 4 判 `equivalent_start`」）。两者不矛盾，**以带去重的那一行为准**。 |
 | 去重后**真正不同的操作** | **2 个重骨架操作**：`{0-1-2-3/4}`（pair 1.0131、**heavy 0.2743 Å**）与 `{1/3-2-4-5}`（pair 0.6152、**heavy 0.2432 Å**）；另有 1 个甲基转子（`2-4-5-H`，heavy 0.0000，**不得当作重骨架搜索证据**） |
 | 为何独立 | gate verdict `ok_heavy_fragment`，重原子成对距离变化 **0.2743 / 0.2432 Å ≫ 1e-5**；共价拓扑完整、Li 首壳未变、**与源及任一已登记起点不等价**（gate 逐项判定） |
 | **路线** | ① 对 `verytight_convergence` 且**仅 1 次**计算的腿，从其**自身收敛末几何**做严格重优化（两步走设计，**这是数值修复，不计作独立新起点**）；② 最多 **2 个独立生产起点**取自上面两个不同重骨架操作 |
@@ -40,7 +40,8 @@
 
 | 项 | 值 |
 |---|---|
-| 代表几何 | `DOL__LiM_2plus__c05/geom.xyz`（**加权成员是 `c05`，不是 `primary`**），sha256 `f0b2558e0cf2cf9b3430d27239b4a76a` |
+| 代表几何 | **`work/hpc_production_ensemble_r1_036-053/tasks/DOL/LiM_2plus__c05/geom.xyz`**（**加权成员是 `c05`，不是 `primary`**），sha256 `f0b2558e0cf2cf9b3430d27239b4a76a` |
+| ｜路径提醒 | ⚠ 上行的 sha 属**生产系综包**（该目录正是登记 resolver 实际读的那份）。**frontier 树里的同名文件是另一份**：`work/hpc_frontier_localization_v1/tasks/DOL__LiM_2plus__c05/geom.xyz` = `079dd8b35c5839c0…`（**不同 sha，勿混用**）。2026-10-24 逐文件实测 |
 | **`c05` att1 = `computed`** | 即 **scientific QC passed**（`disposition=computed`、`failure_class=strict_reopt_not_needed`）；`final_geom` `079dd8b3…`、`log` `984fa741…`、`hess` `0ac027cf…` |
 | 其余 | `c01` att1 `imaginary_modes`（2 次已尽） |
 | 失败机制 | **筛选级单盆地**：独立 GFN2 搜索"所有起点塌缩到已知盆地"，复核原文明确「**是筛选层的物理发现，不是预算失败**」 |
