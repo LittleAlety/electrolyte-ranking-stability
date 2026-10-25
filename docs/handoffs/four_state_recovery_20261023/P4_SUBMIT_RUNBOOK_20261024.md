@@ -16,6 +16,27 @@
 | 索引映射 | `manifest.tasks` 顺序 == `batch_1.txt` 行序（`sed -n "$((SLURM_ARRAY_TASK_ID+1))p"`） |
 | 离线模拟提交 | 17/17 通过，**bridge 调用尝试 = 0**（`work/_p4_mock_submit.py`） |
 
+### 0.1 bundle 的 `preflight.py` 当前报 `STALE`（退出码 2）——**这是真陈述，不是包坏了**
+2026-10-24 在 HEAD `f1c0483` 实测：`preparation_status = "STALE"`，
+`changed_sources = [build_coverage_reviews.py, import_ensemble_structures.py, submit_hpc_batch.py, HEAD]`。
+独立复算（`work/_bundle_baseline_drift.py`，读 `baseline_snapshot.json` 的 `source_hashes`）**与之完全一致**：
+
+| `WATCHED` 源（共 12） | baseline → 现在 |
+|---|---|
+| `scripts/wp_production/build_coverage_reviews.py` | `3ab3caf0185e` → `387d26b792ea` |
+| `scripts/wp_production/import_ensemble_structures.py` | `badbce9f6f06` → `ec41475a2ff7`（含本轮的 **SCF 收敛门**） |
+| `scripts/wp_production/submit_hpc_batch.py` | `59440414885d` → `086f113b73f6` |
+| 其余 9 项（含 `config/production_method_freeze_v1.json`、全部产物 CSV、`orca_derivative_policy.py`） | **全部 ok（未漂移）** |
+
+**刷新协议存在，但没有生成器**：`baseline_snapshot.json` 自带 `baseline_refresh_review`
+（记 `previous_head` / `current_head` / `watched_hash_changes` 逐源 before-after / `reason`），
+上一次刷新的 reason 写的是「authorised G0 …」。全仓检索确认**没有任何脚本会生成该基线**
+（只有 `preflight.py --baseline` 的默认路径）。⇒ 刷新 = **对这几处脚本变更背书「已复核、已授权」**，
+是一项**需要给出理由的复核动作**，不能手改抹掉。**本轮未刷新**：3 处漂移中 2 处是并行会话的脚本改动，
+本会话无依据为其背书；本会话自己贡献的 1 处（SCF 门）也不能单独刷新。
+**提交轮刷新时必须**：记 `previous_head=462f7f8b`、`current_head=<刷新时 HEAD>`、上表三条 before/after，
+并在 `reason` 里**明确覆盖 `import_ensemble_structures.py` 的 SCF 收敛门**（本轮 `f64b954`）。
+
 ## 1. 授权到手后的固定顺序（不得跳步）
 1. 阅读 `E:\软件\超算连接\AGENTS.md`（命令桥规程）。
 2. `hpc.ps1 doctor` —— 未通过即**停止远端操作**，不得绕过命令桥。
