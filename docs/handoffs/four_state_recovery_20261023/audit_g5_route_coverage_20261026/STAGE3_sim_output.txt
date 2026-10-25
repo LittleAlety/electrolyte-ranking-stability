@@ -1,0 +1,150 @@
+STAGE 3 simulation output — verbatim capture.
+Produced by running:
+  & ".venv\Scripts\python.exe" -B docs\handoffs\four_state_recovery_20261023\audit_g5_route_coverage_20261026\stage3_sim.py
+(venv python = E:\Claude Code\电解液溶剂-HB\电解液溶剂HB-Code\.venv\Scripts\python.exe)
+Exit code: 0.
+
+NOTE: PowerShell output redirection into the workspace is blocked by the DSH
+sandbox, so this capture was written with the file-write tool. The text below
+is the exact stdout of the run, copied verbatim.
+
+================================================================================
+PART 1 -- coverage_route() itself, real code, real inputs
+================================================================================
+coverage_route(...) -> 'known_basin_reproduction'
+note: computed start(s) deduplicated onto known minima; **not a QC failure** -- these are independent reproductions. Coverage is not yet certifiable: the production-side evidence set is incomplete
+
+================================================================================
+PART 2 -- the REAL route->verdict mapping block, executed verbatim
+================================================================================
+--- extracted verbatim from build_coverage_reviews.py lines 357-388 ---
+verdict_route = route
+if route in ("multi_basin_coverage", "single_basin_verified"):
+    verdict = "resolved"
+    note = route_note
+elif route == "known_basin_reproduction":
+    verdict = "unresolved"
+    note = route_note
+elif route == "pending":
+    verdict = "pending"
+    note = route_note
+elif route == "search_exhausted":
+    verdict = "search_exhausted"
+    note = route_note
+elif route in ("unresolved_qc", "dedup_evidence_required"):
+    verdict = "unresolved"
+    note = route_note
+else:
+    verdict = "pending"
+    note = route_note
+
+if route == "multi_basin_coverage":
+    kept_evidence = ([k for k, v in novelty.items() if v == "new"]
+                     or [r["member_key"] for r in qualified_all])
+elif route in ("single_basin_verified", "known_basin_reproduction"):
+    kept_evidence = sorted({
+        d.get("duplicate_of", "")
+        for r in computed
+        for d in [dedup_rows.get(r["member_key"])]
+        if d and d.get("duplicate_of")
+    } - {""})
+else:
+    kept_evidence = []
+--- end extract ---
+
+A) BASELINE  route = 'known_basin_reproduction'  (spelled correctly)
+   verdict_route = 'known_basin_reproduction'
+   verdict       = 'unresolved'
+   kept_evidence = ['DMC|LiM_2plus|tors_3']
+
+B) MISSPELLED  route = 'known_basin_reproducton'  (emit-side typo only)
+   verdict_route = 'known_basin_reproducton'
+   verdict       = 'pending'   <-- came from the else: at line 373-375
+   kept_evidence = []   <-- emptied by the else: at line 387-388
+
+C) MISSPELLED  route = 'dedup_evidence_requird'  (emit-side typo only)
+   verdict       = 'pending'
+   kept_evidence = []
+
+D) MISSPELLED  route = 'pendingg'  (emit-side typo only)
+   verdict       = 'pending'   <-- INDISTINGUISHABLE from a correct 'pending'
+
+================================================================================
+PART 3 -- downstream: strict_readiness_wiring._check_coverage
+================================================================================
+COVERAGE_ROUTES (wiring.py:62-65) = ['dedup_evidence_required', 'known_basin_reproduction', 'multi_basin_coverage', 'pending', 'search_exhausted', 'single_basin_verified', 'unresolved_qc']
+COVERAGE_VERDICTS (wiring.py:66-67) = ['pending', 'resolved', 'search_exhausted', 'unresolved']
+COVERAGE_SETTLED  (wiring.py:68)    = ['resolved', 'search_exhausted', 'unresolved']
+
+  'known_basin_reproduction'   in COVERAGE_ROUTES -> True
+  'known_basin_reproducton'    in COVERAGE_ROUTES -> False
+  'pending'                    in COVERAGE_SETTLED  -> False
+
+-- _check_coverage on the REAL coverage_reviews.csv --
+   ok = True ; problems = [] ; review_rows = 14
+
+-- _check_coverage on synthetic_misspelled_route_only.csv --
+   ok = False
+   problem: AN|M_plus unknown route 'known_basin_reproducton'
+
+-- _check_coverage on synthetic_misspelled_route_plus_pending.csv --
+   ok = False
+   problem: AN|M_plus unknown route 'known_basin_reproducton'
+   problem: AN|M_plus review still pending (evidence not settled)
+   problem: AN|M_plus accepts a review for a state that is not open
+
+synthetic CSVs written to (temp, NOT the repo): C:\Users\LITTLE~1\AppData\Local\Temp\dsh-csZQtB\g5_synthetic_jd3f42hb
+
+================================================================================
+PART 5 -- would the guard test CATCH the typo? (RED evidence, in-memory)
+================================================================================
+Replicating the exact assertions of
+tests/test_resolved_route_evidence.py::test_the_coverage_route_vocabulary_is_frozen_and_mapping_complete
+against an in-memory mutated source. The repo file is NOT touched.
+
+pristine source:
+no mutation                                span=(163, 223)  assert1(vocab frozen)=True   assert2(named outside)=True
+      -> test PASSES
+
+mutation 1 -- emit-side typo at lines 210 and 216 only:
+emit-side typo                             span=(163, 223)  assert1(vocab frozen)=False  assert2(named outside)=False
+      -> FAILS 'route vocabulary drifted': emitted=['dedup_evidence_required', 'known_basin_reproducton', 'multi_basin_coverage', 'pending', 'search_exhausted', 'single_basin_verified', 'unresolved_qc']
+      -> FAILS 'never named elsewhere': ['known_basin_reproducton']
+      -> test GOES RED
+
+mutation 2 -- mapping-side typo at line 361 only:
+mapping-side typo                          span=(163, 223)  assert1(vocab frozen)=True   assert2(named outside)=True
+      -> test PASSES
+
+mutation 3 -- coordinated rename of ALL occurrences in this module:
+coordinated rename in-module               span=(163, 223)  assert1(vocab frozen)=False  assert2(named outside)=True
+      -> FAILS 'route vocabulary drifted': emitted=['dedup_evidence_required', 'known_basin_reproducton', 'multi_basin_coverage', 'pending', 'search_exhausted', 'single_basin_verified', 'unresolved_qc']
+      -> test GOES RED
+      -> in-module guard GOES RED
+      -> but downstream COVERAGE_ROUTES still holds the old spelling, so
+         strict_readiness_wiring.py:167-168 would reject it (see PART 3).
+
+================================================================================
+PART 6 -- the guard's BLIND SPOT: mapping-side-only typo (line 361)
+================================================================================
+Mutation 2 PASSES the guard test (see PART 5). What does it actually do
+to behaviour? Run the MUTATED mapping block with the CORRECT route name.
+
+correct route 'known_basin_reproduction' through the MUTATED mapping:
+   verdict       = 'pending'   <-- WRONG, should be 'unresolved'
+   kept_evidence = ['DMC|LiM_2plus|tors_3']
+
+-- _check_coverage on synthetic_mapping_side_typo.csv --
+   ok = False
+   problem: AN|M_plus review still pending (evidence not settled)
+   problem: AN|M_plus accepts a review for a state that is not open
+
+   => the guard test is BLIND to this mutation, but the downstream gate
+      is NOT: verdict=='pending' trips strict_readiness_wiring.py:179-180.
+
+================================================================================
+PART 4 -- is the vocabulary guard test present and does it pass?
+================================================================================
+pytest exit code = 0
+..
+                                                                       [100%]
