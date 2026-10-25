@@ -174,8 +174,27 @@ walk `work/hpc_four_state_p4_xtb_screening_v1/tasks/*/` 的结果（只有 build
 heavy Kabsch RMSD < `DUP_RMSD_A=0.35` → 最差扭转 ≤ `TORSION_TOL_DEG=10.0` → Li 供体位点 →
 镜像/手性），**但不做** `dedup_members` 那步「按 G 排代表」——筛选层还没有自由能，
 硬套会把 GFN2 当生产自由能（红线），故生产层判定仍归聚合器。
-`--selftest` **17/17 通过**（含「刚性副本判为同一极小（RMSD≈2.6e-16）」「断拓扑被拒」
+`--selftest` **19/19 通过**（含「刚性副本判为同一极小（RMSD≈2.6e-16）」「断拓扑被拒」
+「有收敛签名但无能量 ⇒ `technical_incomplete`」「双源能量不一致被记为 problem」
 「如实报告复用原语与容差」「序列化与键序无关」）；对真实包空跑得 **8 元素全部 `not_run_yet`**；
-`--json` 写入 + `--check` **连跑两次字节一致**（1871 B）；跑后 293 项包审计仍全绿（**对包只读**）。
-**尚未实现**：提升进 `scripts/wp_production/` 所需的四处登记；把等价结论接成
-`build_coverage_reviews.coverage_route` 的 `novelty` 输入（这一步需要真实筛选结果才能验证）。
+`--json` 写入 + `--check` **连跑两次字节一致**；跑后 293 项包审计仍全绿（**对包只读**）。
+**尚未实现**：① 提升进 `scripts/wp_production/` 所需的四处登记；② 把等价结论按 `coverage_route()`
+的 `novelty` 约定接成 **route/verdict**（这一步需要真实筛选结果才能验证）。
+
+### 5.2 「结果落地当天」可执行清单（每步命令 + 预期输出；接口均已实测核对）
+> 下列命令的**存在性与接口**已逐条核对（`--help` / 源码），但**只在授权到手后才执行第 0–1 步之后的提交动作**。
+
+| 步 | 动作 | 命令 | 预期输出 | 是否触科学 |
+|---|---|---|---|---|
+| 0 | 提交筛选轮（**需授权**） | 见 §1 第 5 条（受保护提交器 + `--attempts-ledger`） | 数组 JobID（记进 `submission_journal.json`） | 是（提交） |
+| 1 | **回收**（逐元素） | `.venv\Scripts\python.exe scripts\wp_production\ensemble_hpc_io.py --package work\hpc_four_state_p4_xtb_screening_v1 --job-id <数组JobID>` | 每元素一行：`verified <ID>_<i> N artifacts`；未结束的元素打印 `pending <ID>_<i>: no terminal accounting evidence` 并跳过 | **否**（只读远端 + 落快照；**不跑化学、不提交、不删证据、不覆盖已有快照**） |
+| 2 | **判定**（元素级事实） | `.venv\Scripts\python.exe work\_p4_screen_triage.py --package work\hpc_four_state_p4_xtb_screening_v1 --json work\_p4_triage_out.json` | 每元素 `status ∈ {adjudicated, technical_incomplete, not_run_yet}` + `rel_kcal` + `window_verdict` + 与已登记极小的 `equivalence` | 否（只读解析） |
+| 3 | **四态分流** | 按步骤 2 的 `equivalence` / 窗口结果落到 `coverage_route()` 的 route：新盆地→`multi_basin_coverage`；回已知盆地→`known_basin_reproduction`；身份漂移→独立登记；八条均无→`search_exhausted` | 逐态 route + verdict（词表见 `strict_readiness_wiring.COVERAGE_ROUTES`） | 否（但**这是决策点**） |
+| 4 | 建**生产包**（每态 ≤2 起点 + ≤1 补救） | `python scripts\wp_production\build_production_ensemble_manifest.py --build-packages <DIR> --chunk 18 [--register-recovery]`；恢复腿用 `import_ensemble_structures.py --build-recovery-strict-reopt / --build-recovery-continuation / --build-strict-recovery / --build-li-round2-legs [--recovery-batch 1\|2]`；修补包用 `build_torsion_probe_package.py --repair-original-batch <批次号> --source-package <原包> --out-package <新包>`（**`--out-package` 是必需项**，缺它会直接 `ap.error`；`--source-package` 默认即原包） | 新目录中的任务清单 + manifest | 否（只建包） |
+| 5 | 提交生产包（**需授权**） | 同 §1 第 5 条（ORCA profile 4 核 / 24 h；`%pal nprocs` 必须等于分配核数） | 生产批次 JobID | 是（提交） |
+| 6 | 回收 + **QC** | 先 `ensemble_hpc_io.py`；再 `import_ensemble_structures.py`（同源几何/Hessian、正常终止、SCF、五阈值、零虚频、身份） | 结构表新增行；QC 失败的腿**不得**计入验收 | 否 |
+| 7 | **只经四段流水线**更新接受状态 | `build_coverage_reviews.py` → `build_production_ensemble_aggregator.py` → 下游重建 | `production_ensemble_labels.csv` 变化；`strict_readiness_wiring.py` 重算 | 否 |
+| 8 | 重跑 WP5 | 先 `build_wp5_target_pool.py` 核对 A/B 各 12 `qc_complete_pair=True`，再 `run_wp5_AB_replay.py` | 32 组端点 + 停止预算判据 | 是（重算，可复现） |
+
+**每步纪律**：`git status` → **逐路径** `git add`（禁 `git add -A`）→ 长流水线同步执行 + 长超时；
+**链一旦启动，就把它会生成/校验的文件整块让出**（多会话同工作树）。
