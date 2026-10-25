@@ -15,7 +15,7 @@
 
 | 项 | 值 |
 |---|---|
-| 代表几何（P0 解析器） | `DMC__M_plus__primary/geom.xyz`，sha256 `5b9e93e0146333f7c851e2f0176675a9` |
+| 代表几何（P0 解析器） | `work/hpc_frontier_localization_v1/tasks/DMC__M_plus__primary/geom.xyz`，sha256 `5b9e93e0146333f7c851e2f0176675a9`（**2026-10-24 逐文件实测：该 sha 属 frontier 树**，本态无同名系综副本；与 §3 的 DOL 行不同——那份属生产系综包） |
 | 末次尝试 | `tors_8_0_1_2` att2 `technical_complete_qc_failed`，`final_geom` `60ef9ba4…`、`log` `fa78c69f…`、`hess` `42ea648b…` |
 | 失败机制 | `verytight_convergence`（`tors_6`/`tors_7`，**各仅 1 次真实计算**）＋ `strict_reopt_required`（`28`/`tors_8`，**2 次已尽**） |
 | **可用独立起点** | 登记二面角 **10** 个（键级校验后），已探过 **3** 个且全部来自**被声明无效的 v1 刚性族** → **7 个从未被合法探过**。对这 7 个跑**修好的 gate（不带 `prior_starts`，只看"这条候选本身合法吗"）**：**7 个全部接受**（**4 个 `ok_heavy_fragment`**、3 个 `ok_methyl_rotor`）。⚠ **这是"逐条合法性"测量，不是最终候选数**——加上 `prior_starts` 去重后**只余 3 个**（见下一行与 `P3_CANDIDATES_20261023.json` 的 `select_candidates` 口径，那边记「3 接受 + 4 判 `equivalent_start`」）。两者不矛盾，**以带去重的那一行为准**。 |
@@ -27,7 +27,7 @@
 
 | 项 | 值 |
 |---|---|
-| 代表几何 | `DMC__LiM_2plus__primary/geom.xyz`，sha256 `f619c13234e5455fe0651b7444728e42` |
+| 代表几何 | `work/hpc_frontier_localization_v1/tasks/DMC__LiM_2plus__primary/geom.xyz`，sha256 `f619c13234e5455fe0651b7444728e42`（**2026-10-24 实测属 frontier 树**） |
 | 末次尝试 | `tors_7_0_1_2` att**12** `technical_complete_qc_failed`，`final_geom` `a7bc7283…`、`log` `3973a13d…`、`hess` `aa06de59…` |
 | 失败机制 | `max_cycles_exhausted`（`tors_6`/`tors_8`，**各 1 次**）＋ `verytight_convergence`（`tors_7` att12，2 次已尽）＋ `strict_reopt_required`（`c06` att1，2 次已尽） |
 | 可用独立起点 | 上述 7 个候选中，**仅 2 个接受**（`{0-1-2-3/4}`，pair 1.2478、**heavy 0.4874 Å**，四态中最大重骨架扰动）→ **1 个真正不同的重骨架操作** |
@@ -52,7 +52,7 @@
 
 | 项 | 值 |
 |---|---|
-| 代表几何 | `EC__LiM_2plus__primary/geom.xyz`，sha256 `16774e2151551a5e69ff867c6deea686` |
+| 代表几何 | `work/hpc_frontier_localization_v1/tasks/EC__LiM_2plus__primary/geom.xyz`，sha256 `16774e2151551a5e69ff867c6deea686`（**2026-10-24 实测属 frontier 树**） |
 | 末次尝试 | `c03` att1 `technical_complete_qc_failed`，`final_geom` `7de2ab24…`、`log` `4887d4ed…`、`hess` `9d4fc1cf…` |
 | 失败机制 | `imaginary_modes`（2 次已尽）＋ 两个 v1 `tors_2_3_4_10`/`tors_5_3_4_10` 是 **C=O 伪扭转**（`rotate_fragment` 的单键门直接拒收） |
 | 可用登记扭转 | **0 个**（键级门禁后；两条原登记都是绕 **1.186 Å 的 C=O** 旋转） |

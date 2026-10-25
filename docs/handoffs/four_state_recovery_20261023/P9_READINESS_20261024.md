@@ -98,6 +98,11 @@
 | `e874ab3` | 证据列断言「**64** 个独立起点…（**RMSD 0.0000**）」，而搜索池 CSV 只有 2 行（全是 `TMP\|M_plus`）⇒ 两数**全仓无出处**（`64` 真来源是索引 `protocol.num_confs_per_state`；逐态 RMSD 不存在） | 改读权威 `strict_recovery_v1_search_index.json`；无出处就写「未记录 / 不写 RMSD / 不得代写为 0」 |
 | `efd02a6` | 恢复报告断言「**在飞补救（已提交、尚未产出结果）**」，判据却只有 `status=="pending"` ⇒ 那 2 条 EC 腿 `n_attempts=0`、**已被判 C=O 伪扭转并拒收**、队列为空、远端无 EC（**从未提交**） | 标题改「**pending 行**」+ 写明判据与边界（须与实时队列交叉核对、被拒收的登记行也会落在这里）；测试改反向断言 |
 | `d2f8aa5` | `ROUTE_DECISIONS_P2.md` **S1**：代表几何写 frontier 风格路径、却配生产系综包的 sha（实测 `hpc_production_ensemble_r1_036-053/…` = `f0b2558e…` vs `hpc_frontier_localization_v1/…` = `079dd8b3…`）；**S2**：「7 个全部接受」（不带 `prior_starts` 的逐条合法性）被读成最终候选数 | S1：写全系综路径 + 新增「路径提醒」行点名易混树；S2：就地标注两口径并写明「**以带去重的那一行为准**」（P3 = 3 接受 + 4 `equivalent_start`） |
+| `9de8590` | 冻结基线表被"用当前文件验证"会误判漂移 | 表头加防误读说明（快照 vs 当前值；判漂移须**同时点互比**；本包内相对路径按**包目录**解析） |
+| `7be7273` | 包里自带 `PACKAGE_SHA256SUMS` 与逐任务 `inputs.sha256`，但**从未被执行过** | 本地**真跑三级**（生成一致性 / 包级 46 条 **0 FAILED** / 逐任务 **8/8**）并把命令+结果写进运行手册第 4 步 |
+| 待提交（本轮） | `ROUTE_DECISIONS_P2.md` 另 **3 行**代表几何（DMC\|M_plus、DMC\|LiM_2plus、EC\|LiM_2plus）**只写了裸文件名、未限定所属树**——与 S1 同型 | 逐文件实测**三者的 sha 均属 frontier 树**（本态无同名系综副本），已补全 `work/hpc_frontier_localization_v1/tasks/…` 并注明实测 |
+
+**同轮做的系统性清扫（避免同类残余）**：写了只读清扫器 `work/_sweep_path_sha.py`（**机器本地层**）把本包内**所有 sha 形式 token 与同行路径逐条配对核对**，并**按"文档自身目录 + 仓库根"两个基准面各试一次**。最终裁决（2026-10-24）：**12 处发现、0 处真缺陷**——`no-path` 9（提交 sha 与包内相对路径等参考资料式引用）、`mixed` 2（**对照行**同时引用冻结值与当前值，工具已把它与真不符分开）、`sha-mismatch` 1（冻结快照的**设计内**差异）。⇒ 该包**已无同类隐藏缺陷**。
 
 **仍开放（需用户一个决定）**：仓库根下两个 `Permission denied` 的 pytest scratch 目录（`.pytest_tmp_wp2_optimizer`、`.pytest_tmp_wp2_stale_baseline`）——用 `diagnose-windows-sandbox-acl` 技能实测**连对象 ACL 都读不出**（`WinError 5`、Medium 完整性、unconfined 亦不提升）⇒ 病因无法证明；技能给**仓库根**补了缺失的 `WRITE_OWNER`（已备份 + 验证，回滚脚本在 `E:\Claude Code\电解液溶剂-HB\.dsh-coordination\acl-repair-20261024\`），重复原操作后**警告仍在**；仓库内**无引用**、**未被 gitignore 覆盖** ⇒ 建议**由用户在管理员 shell 删除**这两个目录（不删内容不可列的未知目录、不提权）。
 
