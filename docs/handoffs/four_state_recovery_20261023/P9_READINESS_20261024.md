@@ -184,10 +184,22 @@
 ④ `attempts_ledger` 的每条 `measured_core_hours` **必须可追到 sacct 的 Elapsed×AllocCPUS**（无此链即不得放行，防"写 0 / 标 planned"抹账）；
 ⑤ 提交瞬间重验 `committed + reserved ≤ 800`，且运行/排队/拟提交均占额度。
 
-## 五、要用户裁决的两件事（其余都已就绪）
+## 四之七、合规台账的两处「记录级」缺陷定界（2026-10-26，t5；**均不翻转任何科学状态**）
+
+抽验对象 = `outputs/physics_completion/compliance/plan_compliance.md` 的 17 个未满足行（42 行 = satisfied 22 / partial 13 / exempt 3 / not_satisfied 2 / blocked_on_production 2，求和闭合）。t4 双查已给出 **17/17 与台账一致、0 分歧**；本轮在其上加两处**显示/来源**定界：
+
+| 缺陷 | 现象 | 实测边界（关键：**影响面到此为止**） |
+|---|---|---|
+| **① 口径覆盖不全** | 行 `wp2_state_identity_qc` 声称 `frontier_localization=not_computed`。该声称**与它自己的数据源一致**：`state_identity/state_identity_qc.csv` 的 `frontier_localization_status` **60 行全 not_computed**，`state_identity_acceptance.csv` 第 12 项 `frontier_localization_is_registered_not_guessed` 写明「生产输入未要求逐轨道原子组成」、ok=true ⇒ 状态维持 `partial`、**不是矛盾** | 但项目另有**同名不同口径**的 frontier identity 管线：`frontier/frontier_localization.csv` **80 行 computed**、`frontier_identity_evidence.csv` **80 行 verified**。台账**只引用前者、`证据` 列只写 `state_identity/`** ⇒ 读者据台账会误判「轨道定域/前端识别整体缺失」。**危害仅在阅读层，不改任何判据结果** |
+| **② 计数读错来源文件** | 行 `wp5_pool_extension` 声称 `extension_rows=0`。根因：生成器 `build_plan_compliance.py:797` 在 `data/metadata/physics_completion_set.csv` 里筛 `cohort=="extension"`，而该文件 cohort **只有 main 12 / method_audit 8 / sampling_audit 4 / excluded 6**（**不存在 extension**）；已冻结扩展候选登记在 `data/metadata/physics_completion_extension_pool.csv` = **11 个候选、11/11 `FROZEN_NOT_COMPUTED`** ⇒ 这个 0 **不是「池里没有候选」，而是「读错了文件」** | **不影响扩池触发闸门**（已核源码 + 实跑）：`derive_pool_extension_trigger()` 只以 `wp5_full_target_pool_evaluated` 为前置、**不读该计数**，且实跑 `None→unknown / False→not_triggered / True→triggered`（由真实前置推导，非常量 False）；WP6 触发由 labels + Li 配对推导，同样不读。**残留风险**＝未来执行者/文档（含 P8 草稿引用该池）把台账的 `0` 读成「无扩展候选」。**状态仍应 `not_satisfied`**（未提交任何扩样计算、且扩池需各自预算） |
+
+**Lead 的自我更正一并留档**（防历史载体误导）：我在 t3 的 `review_note` 里写过「extension_pool.csv **12 行** FROZEN、成员报告写 11 需对齐」——**那是我的计数错**（把含表头的文件行数当数据行数）；**草稿与成员报告写的 11 个候选才正确**。板底 note 与已推送 commit 属**不可改写历史**，不回写，以本条为准。
+
+## 五、要用户裁决的事（其余都已就绪）
 
 1. **是否发出一次性限额授权**（800 core-hours：筛选 ≤32 / 首产 ≤512 / 有因补救 ≤256；每态 ≤2 独立起点 + ≤1 有因补救）。
    发出后执行序：提交筛选轮（8 任务 / 2 核 × 2 h / 32 core-hours，活跃 ≤2）→ 回收逐文件哈希 → GFN2 判定（**6 kcal/mol 仅筛选层；全塌缩则按预注册分支如实填"零"，不伪称新极小**）→ 生产包 → P5 八项 QC → P6 只经 `importer→dedup→coverage review→aggregator` 更新 → P8 重算触发 → P9 终验。
 2. **WP6 与新分子（8–12）扩池的计算启动**：属新增科学范围，**需各自的数值预算**，不得从 800 偷支。
+3. **是否修 §四之七 的两处记录级缺陷**（改 `build_plan_compliance.py` 的前端定域引用与 `ext_rows` 来源文件）：二者**都不改变任何科学状态**（`wp2_state_identity_qc` 仍 partial、`wp5_pool_extension` 仍 not_satisfied），修的是「台账文字会不会误导下一个读者」；**我不自行翻判据**——尤其是方向可能"变绿"的那一侧。
 
 **若第 1 项在 800 core-hours 或有界尝试内不能达成 48/48**，最可信的结论就是"四态仍有限制、还需要明确的新机制和下一轮预算"——而不是继续无限续算。这也保护现有 **44 个真实 accepted 标签**不被一次激进救援污染。
