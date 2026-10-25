@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -21,10 +22,37 @@ def _doc():
     return LAYOUT.read_text(encoding="utf-8")
 
 
+def _git_ignores(path: Path) -> bool:
+    """True when git deliberately ignores ``path``, i.e. it is NOT published.
+
+    The skeleton map documents what the repository publishes: the site inventory
+    counts ``git ls-files`` and ``refreeze_manifest`` separates "ignored on
+    purpose" from "missing".  A transient gitignored file at the root is not part
+    of that map, and demanding a registration for it only trains readers to
+    ignore this test -- measured 2026-10-25: ``__sandbox_probe_audit.tmp`` (6
+    bytes, content "probe", matched by ``.gitignore:42 *.tmp``) reddened the whole
+    suite.  When git cannot answer (no repo, git missing) the entry counts as NOT
+    ignored, so the check still fails loudly.
+    """
+    try:
+        out = subprocess.run(["git", "-C", str(REPO_ROOT), "check-ignore", "-q", path.name],
+                             capture_output=True, check=False)
+    except OSError:
+        return False
+    return out.returncode == 0
+
+
 def test_layout_doc_covers_every_top_level_entry():
+    """Every PUBLISHED top-level entry must be in the map; ignored ones need not.
+
+    A new top-level directory that is not gitignored is still required here -- the
+    discipline is unchanged; only deliberately-unpublished transient entries are
+    exempt (the same distinction the rest of this file already makes with
+    ``SKIP_DIRS`` and ``SCRATCH_RE``).
+    """
     doc = _doc()
     for path in sorted(REPO_ROOT.iterdir()):
-        if path.name.startswith("."):
+        if path.name.startswith(".") or _git_ignores(path):
             continue
         token = "%s/" % path.name if path.is_dir() else path.name
         assert token in doc, "顶层条目未登记到骨架图：%s" % token
