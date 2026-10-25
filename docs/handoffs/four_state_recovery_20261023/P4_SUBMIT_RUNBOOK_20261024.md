@@ -16,6 +16,16 @@
 | 索引映射 | `manifest.tasks` 顺序 == `batch_1.txt` 行序（`sed -n "$((SLURM_ARRAY_TASK_ID+1))p"`） |
 | 离线模拟提交 | 17/17 通过，**bridge 调用尝试 = 0**（`work/_p4_mock_submit.py`） |
 
+### 0.0 实时超算只读核验（2026-10-25，**Lead 自己经命令桥实测，未提交任何作业**）
+| 项 | 实测 |
+|---|---|
+| `hpc.ps1 doctor` | **通过（0 项提醒）**：ssh 客户端 / 专用密钥 `id_ed25519_whu` / 三个节点 TCP / 免密登录 / `~/project` / module 系统 / 远端 `timeout` 全通过；`~/scratch` 按预期跳过 |
+| `hpc.ps1 jobs` | **队列空**（表头无行 ⇒ 0 running / 0 pending） |
+| 远端是否已有本包 | `ls -d ~/project/electrolyte_wp2/*p4*` → **No such file or directory（exit 2）** ⇒ **不存在重复提交** |
+| P4 作业脚本依赖的远端装备 | `~/project/soft/xtb/env.sh`（450 B）与 `~/project/soft/xtb/bin/xtb`（63,253,248 B）**均存在**（exit 0）⇒ sbatch 里 `source …/env.sh` 与 `…/bin/xtb` 的假设**端到端成立** |
+
+⇒ 本轮实耗 **0 core-hours**、在途 **0**、800 未动；提交侧仍停在授权门。
+
 ### 0.1 bundle 的 `preflight.py` 当前报 `STALE`（退出码 2）——**这是真陈述，不是包坏了**
 2026-10-24 在 HEAD `f1c0483` 实测：`preparation_status = "STALE"`，
 `changed_sources = [build_coverage_reviews.py, import_ensemble_structures.py, submit_hpc_batch.py, HEAD]`。
