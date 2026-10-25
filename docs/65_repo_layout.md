@@ -105,7 +105,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**84** 个跟踪文件：78 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**85** 个跟踪文件：79 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -191,6 +191,8 @@ week36 与 week44 只存在于 part2 镜像。
 | `archive_raw_outputs.py` | 把 provenance 登记的原始作业文件打成**确定性、可复核的 zip 归档**（`--build` 默认落仓库外 `_compute_archive/`；`--check <zip>` 逐条复算 sha256）；并把当次 manifest 内嵌成 `_manifest/job_archive_manifest.csv`，让「这份 zip 对应哪一版登记表」自证、过期可判 | `job_archive_manifest.csv` + 仓库外原始日志 → `_compute_archive/*.zip` + `.index.csv` + `.README.md` |
 | `build_wp2_ensemble_free_energies.py` | 方案 6.1 第 3 步 / 6.2：把两个**已登记**的筛选池（自由态构象池 + Li motif 池）在 xTB GFN2 `--ohess` 自由能层面折成 Boltzmann 系综（`G_state = -RT ln Q` 与布居平均 `G_avg` 两种口径并列、不互换），并给 EMC-GBL / EMC-SL 两对输出「同分子氧化轴」的四层配对台（`free_ionisation` 与 `Li_conditioned`）；虚频结构留行并排除出系综。**是筛选层不是生产 R4**，状态一律 `computed_screen_only` | 两登记池 + gitignore 的 `work/enso/**` → `outputs/physics_completion/ensembles/**` |
 | `verify_archive.py` | 归档的**可重新解析性**核验：拿归档原始日志按仓库口径重算登记值，与 manifest 逐字段比对；`--ledger` 再重算交付账本；`--latest` 自动取最新归档并先打一行 `[freshness]`（内嵌登记表是否与仓库当前那份同版）；`--gate-when-complete` 是收口链里的**结题门禁**（只在 20/20 时先重建归档再要求同版 + 0 不符，没跑完时只提示）；缺条目/哈希不符/数值不符 → 退出码 1 | `*.zip` + `job_archive_manifest.csv`（+ `production_ledger.csv`） → 核验结论 |
+
+| `build_p4_screening_adjudication.py` | **P4 筛选结果判定器**（P4「回收后判定」这半侧，此前无消费者）：逐元素读 `xtbopt.log`（=stdout）/`xtbopt.xyz`/`.xtboptok`/`candidate.json`；三条件判收敛（`.xtboptok` 存在 + xyz 非空 + 日志含 `GEOMETRY OPTIMIZATION CONVERGED`）；**双源交叉校验**能量（stdout 的 `\| TOTAL ENERGY … Eh \|` 与 `xtbopt.xyz` 第 2 行的 ` energy:`，差 >1e-6 Eh 即记 problem）；按该态**冻结参考**算相对能并套 **6 kcal/mol 窗口**（`M`/`M_plus` = 该态筛选池最小值；`LiM_plus`/`LiM_2plus` = 该态生产几何这个**固定父级**，并断言同态内反推参考恒定）；与已登记极小的**等价性复用聚合器原语与容差**（`bond_adjacency` + `find_topology_mappings` WL/回溯 → Kabsch RMSD < 0.35 → 扭转 ≤ 10° → Li 供体 → 镜像/手性），**不另写原子映射**；缺值/失败形态如实记 `not_run_yet`/`technical_incomplete`（不冒充成功）；`--json` 写出 + `--check` 逐字节复核（**只读**） | 包内 `tasks/<state>/<cand>/{xtbopt.log,xtbopt.xyz,.xtboptok,candidate.json}` + 两个登记池 → `--json` 结果集 |
 
 非 Python 的跟踪文件：`finalize_wp2.ps1`（一键收口链）、`supervise_pending.ps1`（无人值守监守）、
 `watch_smpd.ps1`（轻量 smpd 看护）、`watch_supervisor.ps1`（监守看护：接住监守 `exit 3` 的信号）、

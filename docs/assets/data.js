@@ -1815,7 +1815,7 @@ window.HB = {
   {
    "path": "scripts",
    "note": "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）",
-   "files": 255
+   "files": 256
   },
   {
    "path": "config",

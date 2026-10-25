@@ -148,3 +148,14 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
   它被 `.gitignore`/提交时排除，不是交付物来源。
 * **零新增电子结构**：除 WP1/WP2 与靶向复核三段**显式登记**的本机作业外，收口链不引入任何新的电子结构计算。靶向复核的单点（2 核 × 串行；条数与实测 core-hours 逐条记在 `cost_ledger.csv` 的 `..._computed` 行，不写死）落在已登记的生产 Opt 几何上，结果与成本记在 `outputs/physics_completion/pair_evidence/targeted_recheck/recheck_results.csv` 与 `cost_ledger.csv` 的 `..._computed` 行。
 * **仓库骨架**：目录职责、阶段编号与 WP 的对应、收口链与不可改清单见 `docs/65_repo_layout.md`；新增顶层目录/子包不登记会被 `tests/test_repo_layout.py` 拦下。
+* **`build_p4_screening_adjudication.py`（P4 筛选结果判定器）**：补上 P4 链条里此前**没有消费者**的那半侧——
+  逐元素读 `xtbopt.log`（P4 的 sbatch 把 stdout 重定向到这里）/`xtbopt.xyz`/`.xtboptok`/`candidate.json`；
+  三条件判收敛（`.xtboptok` + xyz 非空 + 日志含 `GEOMETRY OPTIMIZATION CONVERGED`）；
+  **双源交叉校验**能量（stdout 的 `| TOTAL ENERGY … Eh |` 与 `xtbopt.xyz` 第 2 行的 ` energy:`，差 >1e-6 Eh 即记 problem）；
+  按该态**冻结参考**算相对能并套 **6 kcal/mol 窗口**（`M`/`M_plus` = 该态筛选池最小值；`LiM_plus`/`LiM_2plus` =
+  该态生产几何这个**固定父级**，并断言同态内反推参考恒定）；与已登记极小的**等价性复用聚合器原语与容差**
+  （`bond_adjacency` + `find_topology_mappings` WL/回溯 → Kabsch RMSD < 0.35 → 扭转 ≤ 10° → Li 供体 → 镜像/手性），
+  **不另写原子映射**，也**不做** `dedup_members` 的「按 G 排代表」（筛选层无自由能）。
+  缺值/失败形态如实记 `not_run_yet` / `technical_incomplete`，**不冒充成功**；`--selftest` **19/19**；
+  `--json` 写出 + `--check` 逐字节复核（**只读**）。用途与规格见
+  `docs/handoffs/four_state_recovery_20261023/P4_SUBMIT_RUNBOOK_20261024.md` §5.1–§5.2。
