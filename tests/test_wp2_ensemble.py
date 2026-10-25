@@ -255,6 +255,55 @@ def test_free_state_pool_keeps_the_registered_screen_discipline():
     assert "GFN2" in module.LEVEL and "gas phase" in module.LEVEL
 
 
+def _prod_module(filename):
+    """Load a ``scripts/wp_production`` module by filename (they are stdlib-light)."""
+    import sys as _sys
+    _sys.dont_write_bytecode = True
+    path = REPO_ROOT / "scripts" / "wp_production" / filename
+    spec = importlib.util.spec_from_file_location("frozen_window_" + filename, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+#: Every module that restates the frozen screening window.
+WINDOW_MODULES = (
+    "build_production_ensemble_manifest.py",
+    "build_gap_decision_support.py",
+    "build_sampling_audit_3to6.py",
+)
+
+
+def test_the_frozen_six_kcal_window_is_identical_in_every_module_that_restates_it():
+    """The window decides which screened basins may become production candidates.
+
+    Measured 2026-10-24: ``WINDOW_KCAL = 6.0`` lived in THREE independent modules
+    and NOTHING under ``tests/`` referenced ``WINDOW_KCAL``, ``ENERGY_WINDOW_KJ``,
+    ``window_kcal`` or "6 kcal" -- so editing one copy alone would silently change
+    which basins are admitted, with no failing test.  (Contrast ``DUP_TOL_KCAL`` /
+    ``ESCALATE_TOL_KCAL``, which the test above already pins.)
+    """
+    values = {}
+    for filename in WINDOW_MODULES:
+        values[filename] = _prod_module(filename).WINDOW_KCAL
+    assert set(values.values()) == {6.0}, values
+    manifest = _prod_module(WINDOW_MODULES[0])
+    assert manifest.WINDOW_KJ == pytest.approx(manifest.WINDOW_KCAL * manifest.KJ_PER_KCAL)
+
+
+def test_the_li_motif_kj_window_is_never_looser_than_the_frozen_kcal_window():
+    """A second representation of the same window exists, expressed in kJ.
+
+    ``screen_li_motifs.ENERGY_WINDOW_KJ = 25.0`` kJ = 5.975 kcal/mol, i.e. slightly
+    TIGHTER than 6.0 kcal/mol (6 kcal = 25.104 kJ).  Pinning the relation, not only
+    the number, records that difference instead of hiding it: an edit that let the
+    kJ window reach past 6 kcal/mol fails here first.
+    """
+    module = _prod_module("screen_li_motifs.py")
+    assert module.ENERGY_WINDOW_KJ == pytest.approx(25.0)
+    assert module.ENERGY_WINDOW_KJ / 4.184 <= 6.0 + 1e-12
+
+
 def test_designated_sampling_set_is_still_the_section_3_3_cohort():
     """方案 §3.3 的采样审计集是 C02/C03/C08/C17；扩覆盖不等于改写指定集。"""
     payload = _sampling_payload()
