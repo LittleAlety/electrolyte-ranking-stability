@@ -134,7 +134,9 @@ walk `work/hpc_four_state_p4_xtb_screening_v1/tasks/*/` 的结果（只有 build
 
    **实测判据**：对**每**个 LiM_2plus 态反推 `E_ref = E − energy_rel_kj/2625.499638`，在全部行内**恒定**
    （11 个态的离散仅 **0.0004–0.0009 kJ**＝舍入）⇒ 参考是**固定父级**，不是行内最小值。
-   反例即 `DOL|LiM_2plus`：其**最优候选仍比参考高 1.447 kJ**（若按「最小值」当参考，会错算成 0）。
+   反例即 `DOL|LiM_2plus`：其**最优候选比该参考低 1.447 kJ**（该行 `energy_rel_kj = −1.447`；
+   实测 `ref − E_min = +1.4466 kJ`，即**父级在最优候选之上**）——若按「行内最小值」当参考，
+   会把这**唯一低于父级的候选**错算成 0 kcal，恰好抹掉最该看见的那条证据。
    ⇒ `sampling_conformer_set.csv` **没有 LiM_2plus 行**（只有 24 个 M/M_plus 态），
    对 3 个目标态用它当参考会直接算错窗口。
 2. **换算与可比性**——1 Eh = **627.5094740631** kcal/mol（同 `run_strict_recovery_search.py` 用值）；
@@ -148,3 +150,10 @@ walk `work/hpc_four_state_p4_xtb_screening_v1/tasks/*/` 的结果（只有 build
 5. **另注**：唯一会算 `rel_kcal`/`rmsd_to_nearest_known_a` 的 `run_strict_recovery_search.py`
    **结构上无法处理 `LiM_2plus`**——它的 `POOL_CSV` 就是上表那个只有 M/M_plus 的池，且
    `_state_charge()` 在缺池行时**直接 `SystemExit`**。这独立佐证了「必须有新判定器」。
+
+**原型已就绪（机器本地层，未登记进生产包）**：`work/_p4_screen_triage.py`
+——实现上述 1–3 点与两套参考口径，并**双源交叉校验**能量（stdout 的
+`| TOTAL ENERGY … Eh |` 与 `xtbopt.xyz` 第 2 行的 ` energy: …`，两者差 >1e-6 Eh 即记为 problem）；
+`--selftest` **12/12 通过**；对真实包空跑得 **8 元素全部 `not_run_yet`**，且跑后我的 293 项包审计仍全绿
+（**对包只读**）。**尚未实现**：等价原子映射/去重（按规格 ④ 应复用聚合器 `dedup_members`），
+以及写入/`--check` 形态；提升进 `scripts/wp_production/` 时仍须按纪律四处登记。
