@@ -150,7 +150,20 @@
 | 五份 RED/证明脚本 | `work/_threshold_guard_red.py`、`_tolerance_guard_red.py`、`_scf_gate_red.py`、`_window_guard_red.py`、`_scf_nodiff_proof.py` | **均存在** ✓ |
 
 **意义**：该审计最关键的**诚实性论据**（"加门不会翻旧账"）经我**独立复算逐位成立**，故其新增的三道守卫可被当作**已复核的防线**（而非作者自述）。
-**边界**：G5 的 route 覆盖率统计与其余散文陈述我**未逐条复算**；且该文件属**并行会话所有**，我**不代为提交**（其自身提交节奏由它掌握）。
+**边界**：G5 的 route 覆盖率统计与其余散文陈述我**未逐条复算**（已上共享任务板 t1、成员 `g5-route-audit` 在做）；且该文件属**并行会话所有**，我**不代为提交**（其自身提交节奏由它掌握）。
+
+## 四之五、WP5 外层审计器（AUDIT_ONLY）的 Lead 复审（2026-10-26，实跑 + 只读证明）
+
+复审对象 `docs/handoffs/wp5_formal_replay_guard_20261023/audit.py`（413 行；自述 `IMPLEMENTED / AWAITING INDEPENDENT REVIEW`）。**四问逐条**：
+
+| 问题 | 实测 | 结论 |
+|---|---|---|
+| **它到底检查什么** | `Snapshot` 只读层：`need()` fail-closed、路径逃逸拒绝、64 MiB 上限、CSV `strict=True` 拒短行、JSON 拒重复键与非有限数（`parse_constant`）、`finish()` 结束前**重哈希全部输入**防中途篡改。`check_inputs` 对固定输入集逐文件 SHA256 对账；`load_stop_rule` 只 `exec` **白名单 import**（`__future__/math/random/hashlib`）的纯标准库 helper，**从不导入回放器/模型代码**；`target_pools` 从 metadata 的 `in_main` 独立推导 12 分子、核对 48 态 label 集、`qc_complete_pair` 与 labels **实际重算比对**、B 任务 `Li=free+shift` 恒等式（≤1.6e-9 Eh） | 结构上覆盖了**此前发生过的六类坏证据**：缺键（`need` 抛）、单行自证（**对账外部 metadata**）、`not_computed` 带数（`stop_budget_status` 分语义）、`invalid_input`（`axis_of` 白名单拒）、NaN（`Decimal` 有限性 + JSON 拒非有限）、触发写死（`full_pool` 由 24 行实数据推导） |
+| **退出码诚实吗** | 实跑两版：`knn_v1` → **exit 2**（`integrity=PASS`、`full_pool=BLOCKED`——子池 A11/B9 证据完整但非全 12，**不冒充全池**）；`model_v2` → **exit 1**（缺 `blind_replay_model_v2/AB_index.json` ⇒ `integrity=FAIL`，**fail-closed**，不因目录缺失而放水） | **诚实**：0/1/2 三分语义与 README 表逐字一致；结果恒带 `authority=AUDIT_ONLY`、`submission_gate=HOLD` |
+| **真的只读吗** | 对 `outputs/` 全树做 `(size, mtime_ns)` 快照 → 前后 **changed=0 / added=0 / removed=0**；`__pycache__` 无残留（`-B` + `dont_write_bytecode`） | **严格只读** ✓（期间 F59–F63 图表 mtime 变化来自**并行会话**重生成，git 内容未变，与本审计无关） |
+| **能否区分「没产生 / 没接线 / 未通过」** | `full_pool=BLOCKED`（子池证据完整、全池未齐）与 `integrity=FAIL`（证据本身缺失/对账失败）分列；`issues[].code` 机器可读（MISSING / STALE_INPUT_HASH / TARGET_IDENTITY / …） | **三种情形分开** ✓ |
+
+**裁决：该审计器结构合格、退出码诚实、严格只读、语义可分**——达到「可考虑正式接线」的**质量门槛**；但**接线与否仍属用户裁决**（它仍是 `AUDIT_ONLY`；`model_v2` 目录缺失属**已知待补**，接线前须先补齐或明确只接 `knn_v1`）。所委派的复审成员零产出后已收回，本节为 **Lead 亲自复审**（首次实跑两版 + 全树只读快照证明）。
 
 ## 五、要用户裁决的两件事（其余都已就绪）
 
