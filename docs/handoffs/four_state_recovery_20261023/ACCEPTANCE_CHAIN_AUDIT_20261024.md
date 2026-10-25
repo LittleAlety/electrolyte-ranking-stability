@@ -50,12 +50,28 @@
 该测试**按预期失败于 `AssertionError`**，退出码 0。
 （注：第一次演示用同一临时目录重跑，失败原因是 `FileExistsError` 而非断言——那是**无效演示**，已改用全新目录重做。）
 
-## 3. 本轮的边界（如实记录）
-- **该门覆盖的是「经 `qc_task` 的成员」**（即注册新增成员：救援/扭转/恢复/探针腿）——**新计算正是从这条道进**。
-  **48 个冻结主态不走这条路**：`primary_rows()` 直接从 `candidates.csv` 取 `status` 并复制逐腿 JSON 字段
-  （`import_ensemble_structures.py:1075-1114`），其中**没有** SCF 断言。因 115/115 现行腿都带签名，
-  两条路当前结果一致；若要让主态也受同一门约束，需在逐腿 JSON 生产链（`import_hpc_opt_numfreq.py`）
-  或 `primary_rows()` 增加同等断言——**本轮未做，登记为后续**。
+## 3. 是否把该门继续下沉到主态路径？——**已测量，结论：不下沉**（2026-10-24）
+**门的位置决定了保护面**：`RE_SCF_CONVERGED` 在 `qc_task` 里，因此覆盖**经它的注册新增成员**——而
+`production_ensemble_candidates.csv` 的实测构成是 **48 primary + 57 round1_extra + 14 recovery_v1_start**，
+即**新增计算全部以 extra 身份走 `qc_task`**，已被覆盖。
+**48 个冻结主态**走 `primary_rows()`（`import_ensemble_structures.py:1075-1114`），从 `candidates.csv`
+取 `status`、复制逐腿 JSON 字段，**无 SCF 断言**。
+
+**若下沉，代价与收益的实测**（脚本 `work/_scf_status_matrix.py`、`work/_scf_package_cost.py`）：
+| 实测项 | 数值 |
+|---|---|
+| `production_ensemble_structures.csv` 全部**有日志**的行（含 89 `superseded` + 31 `technical_complete_qc_failed`） | **235/235 全部带 SCF 签名** |
+| 无日志的行 | 仅 **3** 条 `pending`（中途抓取的日志，`qc_task` 的终止标记已先返回 `pending`，不会走到 SCF 检查） |
+| `work/hpc_*/**` 全部包日志 | **434 个，431 带签名（99.3%）**；17 个无 `ORCA TERMINATED NORMALLY` |
+| 3 个无签名者 | 2 个是批处理驱动日志（`local_batch*.log`，非腿日志）+ 1 个 `local_runs/GBL_LiM_2plus/job.log` |
+| 该 GBL 日志是否为现行行所用 | **不是**——`ready` 行引用的是 `hpc_runs/GBL_LiM_2plus/job.log`（**有**签名）；无签名的那份 `local_runs/` 副本**无任何现行行引用** |
+
+**结论**：下沉到 `import_hpc_opt_numfreq.py` 对**当前campaign 零新增保护**（新计算已在 `qc_task` 被覆盖），
+却需改写该文件测试夹具里的合成日志并重验其约 60 个测试，且会新硬拒 1 个**无人引用**的历史本地日志。
+⇒ **按「只为会改变结论的事花钱」的口径，本轮不做**。仅当将来**主态腿需要从 HPC 包重新导入**时，
+才值得在 `import_hpc_opt_numfreq.py`（紧邻其 `ORCA TERMINATED NORMALLY` / `THE OPTIMIZATION HAS CONVERGED`
+断言处）补同等断言——届时仍须先做上表这样的**无翻转证明**。
+## 4. 仍未覆盖的范围
 - 未验证真实 ORCA 输出格式是否总能解析成功（那需要真实作业；本轮只用合成 ORCA 文本与既有 fixture）。
 - 未复核 `import_hpc_numfreq.py` 的 NumFreq 遗留路径是否同样严格；本轮只审 AnFreq 生产路径。
 - 未复核聚合器的权重/去重数学（那属 WP3/WP5 面）。
