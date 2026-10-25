@@ -125,16 +125,26 @@ walk `work/hpc_four_state_p4_xtb_screening_v1/tasks/*/` 的结果（只有 build
 （该词表已由 G5 加守卫）。**本手册不自行实现它**（新脚本须按项目纪律四处登记、且需要真实结果才能验证）。
 
 **该判定器必须先钉死的规格（否则窗口会算错）**：
-1. **「6 kcal/mol 相对谁」**——冻结口径原文是 `window: 6 kcal/mol above the slot's screening minimum`
-   （`build_production_ensemble_manifest.py:31`），即**相对该 (name,state) 已登记筛选池的最小值**，
-   不是相对源几何、也不是相对生产 DFT。参考值与换算都有出处：池表
-   `outputs/physics_completion/sampling/sampling_conformer_set.csv`（44 数据行）带 `xtb_energy_eh`
-   与 `rel_kcal` 两列；1 Eh = **627.5094740631** kcal/mol（同 `run_strict_recovery_search.py` 用值）。
-2. **可比性前提**——GFN2 能量只有**同一 level/电荷/多重度**下可比：P4 任务是 `--gfn 2 --opt tight`
-   且 `$chrg/$spin` 取自权威账本（三个 `LiM_2plus` 为 `2/1`），与池的 GFN2 口径一致；判定器必须
-   **显式断言**这一点（而不是默默把不同电荷的能量相减）。
-3. **收敛判定**——沿用既有两条件：`.xtboptok` 存在 **且** `xtbopt.xyz` 非空 **且** 日志含
-   `GEOMETRY OPTIMIZATION CONVERGED`（`run_strict_recovery_search.py:194` 的口径）。
-4. **去重与身份**——等价原子映射下的重原子 RMSD + 拓扑签名（项目约定 1.3× 共价半径，
-   `run_batch.RADII`；签名 = 逐片段原子组成排序），与**已登记池**逐个比对；身份漂移**独立登记**、
-   绝不改名塞回原态（这是红线，不是工具自由度）。
+1. **「6 kcal/mol 相对谁」——本项目其实有**两套**参考口径，P4 的 4 个目标态横跨两套**
+   （2026-10-25 实测，**修正本手册上一版把两套混为一谈的写法**）：
+   | 态族 | 参考 | 出处（列） |
+   |---|---|---|
+   | `M` / `M_plus`（如 `DMC|M_plus`） | **该 (name,state) 筛选池的最小值**（冻结原文 `window: 6 kcal/mol above the slot's screening minimum`，`build_production_ensemble_manifest.py:31`） | `outputs/physics_completion/sampling/sampling_conformer_set.csv`（**44 行，只有 M/M_plus**）的 `xtb_energy_eh` / `rel_kcal` |
+   | `LiM_plus` / `LiM_2plus`（如 `DMC/DOL/EC|LiM_2plus`） | **该态自身生产几何（去掉 Li）这个固定父级**，`parent_kind = state_own_production_geometry_minus_Li` | `outputs/physics_completion/li_motif_sampling/li_motif_screen.csv`（99 个 LiM_2plus 行）的 `energy_eh` / `energy_rel_kj` |
+
+   **实测判据**：对**每**个 LiM_2plus 态反推 `E_ref = E − energy_rel_kj/2625.499638`，在全部行内**恒定**
+   （11 个态的离散仅 **0.0004–0.0009 kJ**＝舍入）⇒ 参考是**固定父级**，不是行内最小值。
+   反例即 `DOL|LiM_2plus`：其**最优候选仍比参考高 1.447 kJ**（若按「最小值」当参考，会错算成 0）。
+   ⇒ `sampling_conformer_set.csv` **没有 LiM_2plus 行**（只有 24 个 M/M_plus 态），
+   对 3 个目标态用它当参考会直接算错窗口。
+2. **换算与可比性**——1 Eh = **627.5094740631** kcal/mol（同 `run_strict_recovery_search.py` 用值）；
+   GFN2 能量只在**同一 level/电荷/多重度**下可比，判定器须**显式断言**（两套池都带 `charge`/`multiplicity` 列，
+   P4 任务的 `$chrg/$spin` 取自权威账本）。
+3. **收敛判定**沿用既有两条件：`.xtboptok` 存在 ＋ `xtbopt.xyz` 非空 ＋ 日志含
+   `GEOMETRY OPTIMIZATION CONVERGED`（`run_strict_recovery_search.py:194` 口径）。
+4. **去重与身份**——等价原子映射下的重原子 RMSD ＋ 拓扑签名（项目约定 1.3× 共价半径，`run_batch.RADII`；
+   签名 = 逐片段原子组成排序），与**已登记池**逐个比对；**等价性判定应复用聚合器的 `dedup_members`**
+   （WL＋回溯），不要另写一套映射；身份漂移**独立登记**、绝不改名塞回原态（红线）。
+5. **另注**：唯一会算 `rel_kcal`/`rmsd_to_nearest_known_a` 的 `run_strict_recovery_search.py`
+   **结构上无法处理 `LiM_2plus`**——它的 `POOL_CSV` 就是上表那个只有 M/M_plus 的池，且
+   `_state_charge()` 在缺池行时**直接 `SystemExit`**。这独立佐证了「必须有新判定器」。
