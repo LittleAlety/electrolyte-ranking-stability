@@ -53,6 +53,8 @@
 
 **未提交的原因**：计划文本自带的一次性限额授权明确「**只有你作为用户把它发送到 Harness 会话，它才构成指令**」，而该授权尚未发出。**工程就绪 ≠ 执行授权**。
 
+**本轮复验（2026-10-26 深夜，授权轮前最后一次对当前输入核对）**：`--check-p4-screening` → **`P4 SCREENING PACKAGE OK`（exit 0）**；包级 `PACKAGE_SHA256SUMS` → **46 条全 OK / 0 FAILED**；**8 个叶子任务**（`tasks/<mol>__<state>/<probe>/`，即 4 态 × 2 探针）逐个 `inputs.sha256` → **各 4 OK / 0 FAIL**（合计 32 个文件核对全过）。⇒ **包与当前磁盘输入仍一致，授权一到即可过门**（不是"曾经一致"）。
+
 ### 3.3 其余闭环项
 
 | 项 | 状态 |
@@ -165,9 +167,9 @@
 
 **裁决：该审计器结构合格、退出码诚实、严格只读、语义可分**——达到「可考虑正式接线」的**质量门槛**；但**接线与否仍属用户裁决**（它仍是 `AUDIT_ONLY`；`model_v2` 目录缺失属**已知待补**，接线前须先补齐或明确只接 `knn_v1`）。所委派的复审成员零产出后已收回，本节为 **Lead 亲自复审**（首次实跑两版 + 全树只读快照证明）。
 
-## 四之六、共享任务板审计线（t1–t5）的复核结论（2026-10-26，全部 Lead 独立复跑后采信）
+## 四之六、共享任务板审计线（t1–t6）的复核结论（2026-10-26，全部 Lead 独立复跑后采信）
 
-并行工作面按「成员产出 → Lead 独立复算 → approve/接手收口 → 逐路径入库」跑完 5 个任务，**4 done + t5 在跑**：
+并行工作面按「成员产出 → Lead 独立复算 → approve/接手收口 → 逐路径入库」跑完 **6 个任务，6/6 done**（t5/t6 于 2026-10-26 深夜收口；t5 实际作者 `p8-prereg-drafter`、t6 为 `submitter-bypass-audit`）：
 
 | 任务 | 结论（证据目录已入库，commit `84e8ac7` / `ab69a90`） |
 |---|---|
@@ -175,7 +177,8 @@
 | **t2** 提交器 H1–H5 复现 | `audit_submitter_bypass_20261026/`。**两份独立实现各自 12/12 全绿、退出码 0、结论逐条一致**（成员完成版 `probe_output.txt` + Lead 接手版 `probe_output_final.txt`；竞态归属与真相记于任务板 review note，未改写历史）：**H2** `submission_resources:127` 缺 `resource_profile` → **静默降级 `orca_production_v1`**（cap 800/免账本），实测"提交成功、`budget_checked=False`"；**H2′** 真 xtb 输入的拒绝发生在 **doctor+mkdir 锁+squeue+rmdir 共 4 次 bridge 调用之后**；**H3** 篡改 sbatch（100 任务×16 核×24 h，潜在 38400 core-hours）仍 `budget_checked=True, reserved=32`，**`script_sha256` 与 manifest 声明不符却无人校验**；**H4** manifest 的 `task_count/cores_per_task/wall_hours/budget_cap` 全是装饰、profile 静默获胜；**H5** `submission_gate` 在提交器全文出现 **0 次**（`manifest.get(` 仅 `batches:100` + `resource_profile:127` 两处），manifest 写 HOLD 照常提交；**H1** `committed_core_hours:257` 跳过 `planned` 状态、`measured_core_hours="0"` 合法 → **两条路都把真实 20 h 成本抹成 committed=0**。**唯一有效守卫**：CLI `--budget-cap-core-hours` 与 profile cap 不符**在任何 bridge 调用之前**被拒（`:302-304`）。**并坐实无自动纠错通道**：`collect_sacct:159-170` 只取 JobID/State/ExitCode、**不取 Elapsed/AllocCPUS**，全仓无 `measured_core_hours` 生产写入点 ⇒ ledger 全靠调用方手填。**全程零集群、零网络**（C9 实测真实 spawn=0、bridge 路径 `E:\nonexistent\hpc.ps1` 不存在）。合成 `fixtures/` 已从跟踪移除（探针每次跑前须 `rm -rf`，否则残留 journal 造成"already submitted"假失败）。 |
 | **t3** P8 预注册 | `p8_prereg_drafts_20261026/{WP6,POOL_EXTENSION}_PREREG_DRAFT.md`。触发条件逐条带**文件:行号**（核心方案 §14 `:386-392`、§5.2 `:127`、§13.5 `:382`、§15 `:402-403`；`计划.md:102/:115/:389-391`；`GOAL.md:85/:90`）；成本均值 Lead 现算**逐位吻合**（M 5.885 / M_plus 11.750 / LiM_plus 10.632 / LiM_2plus 12.434，60 腿 mean 9.864 / median 8.128）；扩池候选唯一指向已冻结 `extension_pool.csv`，**未发明分子**；两稿均声明「44/48 未触发——预准备非启动」与「预算与 800 core-hours 严格分离」。 |
 | **t4** 双查（降级） | `audit_partial_crosscheck_20261026/`。抽验对象 `audit_partial_items_20261026/REPORT.md` **始终为 6 字节 "probe" 占位（mtime 冻结 15:22）⇒ 零产物不入库、其任务收回**；双查如实降级为"独立建 ground truth"：三方互证确立 `sampling_audit_3to6` 现值 **1 executable / 9 executable_partial / 6 sampling_limited**、**8 条 Li 腿全部执行**，据此**否定了旧背景假设**（"7/8 分割"与"EMC 两腿被过期父哈希挡在 2/1"）——两个更正已回写后续任务简报。 |
-| **t5** compliance 17 行 | 原任务重发（带**路径级锚点** + **强制增量落盘**），`compliance/plan_compliance.md` 状态 ∈ {partial, not_satisfied, blocked_on_production} = **13+2+2 = 17 行**，逐行对生成器分支与当前磁盘实数三态判定。**进行中**。 |
+| **t5** compliance 17 行 | 原任务重发（带**路径级锚点** + **强制增量落盘**），`compliance/plan_compliance.md` 状态 ∈ {partial, not_satisfied, blocked_on_production} = **13+2+2 = 17 行**，逐行对生成器分支与当前磁盘实数三态判定。**✅ done**（入库 `555491d`；**实际作者 `p8-prereg-drafter`**——板上 owner 是 `compliance-partials-audit`，归属裁定见其 complete report）。 |
+| **t6** §四之七 三缺陷第三方复核 | `submitter-bypass-audit`（`audit_ledger_defects_crosscheck_20261026/{REPORT.md, recheck.py}`，入库 `555491d`） | **✅ done+approve**。三处记录级问题（frontier 两口径 / `extension_rows=0` / `li_pair_complete` 两名一量）**独立重算全部确认**，42 行分布求和闭合、未满足 17 行数法复现 ⇒ §四之七 成**三方收敛口径**。它报的"唯一分歧"（frontier `status=parsed`）**经裁定不成立**（其 `recheck.py` 用 `"status" in col` 子串选列命中 `molden_status`；正确值 `computed`，见 `build_frontier_localization.py:370-371`），且该分歧一度被其写入我的记忆条目、已复核恢复。 |
 
 **⇒ 对授权轮的直接影响（提交前强制人工核对清单）**：`budget_checked=true` / `ORCA TERMINATED NORMALLY` / 工程链全绿**都不能代替**下列核对（提交器自身不做，H1–H5）：
 ① manifest 的 `resource_profile` **必填**，缺失即停，不接受静默降级到 ORCA 800 池；
@@ -184,7 +187,7 @@
 ④ `attempts_ledger` 的每条 `measured_core_hours` **必须可追到 sacct 的 Elapsed×AllocCPUS**（无此链即不得放行，防"写 0 / 标 planned"抹账）；
 ⑤ 提交瞬间重验 `committed + reserved ≤ 800`，且运行/排队/拟提交均占额度。
 
-## 四之七、合规台账的两处「记录级」缺陷定界（2026-10-26，t5；**均不翻转任何科学状态**）
+## 四之七、合规台账的三处「记录级」问题定界（2026-10-26，t5 提出 + t6 三方确认；**均不翻转任何科学状态**）
 
 抽验对象 = `outputs/physics_completion/compliance/plan_compliance.md` 的 17 个未满足行（42 行 = satisfied 22 / partial 13 / exempt 3 / not_satisfied 2 / blocked_on_production 2，求和闭合）。t4 双查已给出 **17/17 与台账一致、0 分歧**；本轮在其上加两处**显示/来源**定界：
 
