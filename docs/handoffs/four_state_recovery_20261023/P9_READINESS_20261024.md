@@ -226,11 +226,33 @@
 >
 > **本节作者的归属更正（重要，防误导后续读者）**：§四之七 的三处发现由 **Lead 独立重算 t5 的 17 行时**提出；随后**第一轮第三方**（`build_rows()` 内存重放 + 逐行现算）由 `p8-prereg-drafter` 完成，据此把 ③ 的定论修正为"命名可读性"；**第二轮独立复核**（自己的 `recheck.py`，函数签名+实跑）由 `submitter-bypass-audit`（t6）完成，**三处缺陷全部确认**。§四之七 现记录的是**三方收敛后的最终口径**，不再是单方结论。另记：`wp2_state_identity_qc` 的 `not_computed` 与 `wp5_pool_extension` 的 `extension_rows=0` 均**与其各自数据源一致**（第三方实测 `set.csv` cohort 取值集合 = {excluded, main, method_audit, sampling_audit}、extension 行 = 0；`sampling_escalation.csv` 24/24 仍 `registered_pending_round1_free_energy_check` ⇒ t4 时期疑的"过时陈述"**不成立**）；所以 **17 行的状态判定全部维持原样，零翻转**。
 
+## 四之八、授权轮前的第三处入口缺口：后继闸门「有入口、无供给」（2026-10-26，Lead 实核）
+
+**现象**：`strict_readiness.py:54-61` 的组合闸门对后继门是这样判的——
+```python
+for gate in ("wp6", "pool_extension"):
+    state = checks.get(gate + "_trigger_state")   # 来自 wiring，三态
+    if state == "unknown":            reasons.append(gate + "_trigger_unknown")
+    elif state == "triggered" and checks.get(gate + "_complete") is not True:
+        reasons.append(gate + "_incomplete")
+```
+即**一旦触发，就必须有 `wp6_complete=True` / `pool_extension_complete=True` 才可能 `complete`**。
+
+**但生产侧从无供给**：全仓 grep（排除 `*.pyc`）显示 `wp6_complete` / `pool_extension_complete` **只出现在 `tests/test_strict_readiness.py:97`**（该测试手工构造 `dict(ALL_TRUE, wp6_triggered=True, wp6_complete=True)`）；唯一的生产 check 字典产出者 `strict_readiness_wiring.derive_checks()` **只产 `wp6_trigger_state` / `pool_extension_trigger_state` / `wp6_triggered` / `pool_extension_triggered` 四个键，从不产 `*_complete`**。
+⇒ **推论**：当系综真达 48/48（WP6 触发）且 WP5 全池通过（扩池触发）后，组合闸门会**永久**报 `wp6_incomplete` / `pool_extension_incomplete`——**无论 WP6/扩池是否真的做完都过不去**，因为没有任何代码会把这些键置真。当前它不显形，只因为两个触发器都还是 `not_triggered`。
+
+**为什么危险**：这正是「**计算成功之后才发现验收器无入口**」的形态——错误会**推迟到花完钱之后**才暴露，且表现像"项目还没做完"，而不是像"闸门缺实现"。同时也说明 `test_strict_readiness.py` 那条用例是**合成字典**在过（测试绿、生产不可达）。
+
+**修法方向（待裁决，本轮只记录不改）**：给 `strict_readiness_wiring` 补两个**从真实产物派生**的完成判据（例如 WP6：`explicit_ligand_plan.csv` 的 `executed_jobs` 覆盖已触发范围且逐条有其 QC 证据；扩池：新 cohort 的成员确实进了目标池并被评估），并**同时补负向测试**（触发但未完成 → 必须 `*_incomplete`；触发且完成 → 必须不再因此阻塞）。**任何新增判据必须先做 no-flip 证明**（证它不翻转现行已通过对象），且**不得为了让闸门变绿而把 `*_complete` 写成常量 True**。
+
+**同族**：本节的 ①②③ 是"记录级/命名级"问题，**本条是"闸门实现缺口"**——级别更高：它是**唯一会在 48/48 之后直接卡住结题**的一项，已列入待裁决清单第 ④ 项。
+
 ## 五、要用户裁决的事（其余都已就绪）
 
 1. **是否发出一次性限额授权**（800 core-hours：筛选 ≤32 / 首产 ≤512 / 有因补救 ≤256；每态 ≤2 独立起点 + ≤1 有因补救）。
    发出后执行序：提交筛选轮（8 任务 / 2 核 × 2 h / 32 core-hours，活跃 ≤2）→ 回收逐文件哈希 → GFN2 判定（**6 kcal/mol 仅筛选层；全塌缩则按预注册分支如实填"零"，不伪称新极小**）→ 生产包 → P5 八项 QC → P6 只经 `importer→dedup→coverage review→aggregator` 更新 → P8 重算触发 → P9 终验。
 2. **WP6 与新分子（8–12）扩池的计算启动**：属新增科学范围，**需各自的数值预算**，不得从 800 偷支。
 3. **是否做台账的两处文字级改动**（均**不改变任何科学状态**，17 行判定零翻转）：(a) `build_plan_compliance.py:797` 的 `ext_rows` 改为读**真实候选来源**——注意 `extension_pool.csv` 是**独立文件、无 `cohort` 列**（第三方实测 `set.csv` cohort 取值集合只有 {excluded, main, method_audit, sampling_audit}），所以 `extension_rows=0` 在 set.csv 口径内**技术上没错**，问题在于台账用它表达「已冻结扩展候选数」，与 `extension_pool.csv` 的 11 个候选对不上，读者会误读；(b) `:838` 的 `li_pair_complete=12/12` 串改为显式消歧命名（两口径都 ≥9、不影响 `gate_ready`，纯可读性）。另有 §四之七①：`wp2_state_identity_qc` 的 `证据` 列只写 `state_identity/`，未点名 frontier identity 管线（80 computed / 80 verified），读者易误判"轨道定域整体缺失"。**我不自行翻判据、也不自行改判据文字**——尤其方向可能"变绿"的一侧。
+4. **是否为后继闸门补齐「完成证据供给」（§四之八，级别最高）**：`strict_readiness.py` 在 WP6 / 扩池**触发后**要求 `wp6_complete` / `pool_extension_complete`，而**全仓无生产者**（只在 `tests/test_strict_readiness.py:97` 的合成字典里为真）⇒ **48/48 之后闸门会永久报 `*_incomplete`**。修它要定"什么算 WP6/扩池已完成"的产物级判据（并配负向测试 + no-flip 证明）。**这是唯一会在算完后直接卡住结题的一项**，建议**在发出授权之前**先定，否则等于把一笔昂贵计算的验收通道留到事后才发现缺实现。
 
 **若第 1 项在 800 core-hours 或有界尝试内不能达成 48/48**，最可信的结论就是"四态仍有限制、还需要明确的新机制和下一轮预算"——而不是继续无限续算。这也保护现有 **44 个真实 accepted 标签**不被一次激进救援污染。
