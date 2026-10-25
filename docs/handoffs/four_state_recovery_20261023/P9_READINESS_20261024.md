@@ -19,7 +19,7 @@
 |---|---|---|
 | 收口链 | **79/79 步 exit 0**，末行 `OFFLINE CLOSURE GREEN` | `pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1` |
 | 只读检查无写盘 | **逐文件 `(size, mtime_ns)` 不变**（含失败路径） | `pytest tests/test_checks_are_read_only.py -q` |
-| **干净环境复现** | 仅跟踪文件（无 `work/`）的检出跑全量：**0 failed**（**核验于 HEAD `06d08aa`**，该步可随时复跑），跳过均带显式理由（9 个） | `git worktree add --detach <tmp> HEAD`，再在该树跑 `pytest tests` |
+| **干净环境复现** | 仅跟踪文件（无 `work/`）的检出跑全量：**0 failed**（**核验于 HEAD `d2f8aa5`、`PYTEST_EXIT=0`、`FAILED` 计数 0**；此前 `06d08aa` 同样 0 failed，该步可随时复跑），跳过均带显式理由（9 个） | `git worktree add --detach <tmp> HEAD`，再在该树跑 `pytest tests` |
 | 冻结清单复算 | 三个周清单 **CHECK OK**（真树 external=0；干净克隆把 18 个**有意 gitignore** 的 `.cpcm/.property.txt` 记为 `external_machine_local` 而非 `missing`） | `refreeze_manifest.py --manifest outputs/weekN/SHA256SUMS --check` |
 | 归档复算 | `[manifest] OK`；账本逐字段 **300 处比对 / 不符 0 / sha256 不符 0 / 归档缺条目 0** | `verify_archive.py --latest --ledger --gate-when-complete` |
 | `git diff --check` | 干净（无空白/冲突标记） | `git diff --check` |
@@ -87,6 +87,21 @@
 | **`blocked_by`** | **`["ensemble_not_48_accepted", "wp5_full_target_pool_evaluated"]`（2 项）** |
 
 推导来源：`scripts/wp_production/strict_readiness_wiring.py` 的 `derive_checks()` + `strict_readiness.py` 的 `strict_readiness()`（README 顶部同一口径，异常时写"无法判定"，**绝不默认通过**）。
+
+## 四之二、本轮（2026-10-24）清掉的「会静默误导」缺陷（各附 commit）
+
+> 共同形态：**产物里印出无法核对的内容**——数字没有出处 / 口径与冻结条款相反 / 状态断言超出判据。处置一律**改生成器**（不手改产物）+ 让文案只陈述可核对的字段，并**把旧错误措辞做成反向断言**。
+
+| commit | 缺陷 | 修法 |
+|---|---|---|
+| `f1c0483` | 预注册稿写「搜索级（GFN2，**本机**）」，与**五处**冻结条款 + 计划正文「**只在 Slurm 计算节点**」相反（且明令禁止本地 `xtb.exe`） | 改为 Slurm 口径并**逐条点名依据**（`GOAL.md:49` 等） |
+| `e874ab3` | 证据列断言「**64** 个独立起点…（**RMSD 0.0000**）」，而搜索池 CSV 只有 2 行（全是 `TMP\|M_plus`）⇒ 两数**全仓无出处**（`64` 真来源是索引 `protocol.num_confs_per_state`；逐态 RMSD 不存在） | 改读权威 `strict_recovery_v1_search_index.json`；无出处就写「未记录 / 不写 RMSD / 不得代写为 0」 |
+| `efd02a6` | 恢复报告断言「**在飞补救（已提交、尚未产出结果）**」，判据却只有 `status=="pending"` ⇒ 那 2 条 EC 腿 `n_attempts=0`、**已被判 C=O 伪扭转并拒收**、队列为空、远端无 EC（**从未提交**） | 标题改「**pending 行**」+ 写明判据与边界（须与实时队列交叉核对、被拒收的登记行也会落在这里）；测试改反向断言 |
+| `d2f8aa5` | `ROUTE_DECISIONS_P2.md` **S1**：代表几何写 frontier 风格路径、却配生产系综包的 sha（实测 `hpc_production_ensemble_r1_036-053/…` = `f0b2558e…` vs `hpc_frontier_localization_v1/…` = `079dd8b3…`）；**S2**：「7 个全部接受」（不带 `prior_starts` 的逐条合法性）被读成最终候选数 | S1：写全系综路径 + 新增「路径提醒」行点名易混树；S2：就地标注两口径并写明「**以带去重的那一行为准**」（P3 = 3 接受 + 4 `equivalent_start`） |
+
+**仍开放（需用户一个决定）**：仓库根下两个 `Permission denied` 的 pytest scratch 目录（`.pytest_tmp_wp2_optimizer`、`.pytest_tmp_wp2_stale_baseline`）——用 `diagnose-windows-sandbox-acl` 技能实测**连对象 ACL 都读不出**（`WinError 5`、Medium 完整性、unconfined 亦不提升）⇒ 病因无法证明；技能给**仓库根**补了缺失的 `WRITE_OWNER`（已备份 + 验证，回滚脚本在 `E:\Claude Code\电解液溶剂-HB\.dsh-coordination\acl-repair-20261024\`），重复原操作后**警告仍在**；仓库内**无引用**、**未被 gitignore 覆盖** ⇒ 建议**由用户在管理员 shell 删除**这两个目录（不删内容不可列的未知目录、不提权）。
+
+**另一道待裁决的科学门**（不动冻结的 P4 计划）：筛选轮 4 个起点的几何风险——① 旋转轴非纯单键；② 位移后 Li–O<1.6 Å 无最小接触护栏。三选一：**原包提交 / 换冻结集合内的 offset / 预注册 v2**。
 
 ## 五、要用户裁决的两件事（其余都已就绪）
 
