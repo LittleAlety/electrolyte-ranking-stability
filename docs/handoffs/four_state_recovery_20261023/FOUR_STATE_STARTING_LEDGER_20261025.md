@@ -47,12 +47,17 @@
 | `…_v2_realfragment` | 3749450 | 2 | 5.25 | — | — |
 
 - **合计 42 个元素**：`COMPLETED` **41**（ExitCode 全部 `0:0`）+ `CANCELLED by 59540` **1**（`3747724_[0-2]`，`00:00:00`、`AllocCPUS=0` ⇒ **零消耗**）。
-- **strict_recovery 家族 12 包 = 187.00 CH**，与 `recovery_budget_accounting.md` 的 **187.0** 及**逐包 12/12 数值**全部一致；torsion-probe 家族另计 **40.43 CH**；**总 227.43 CH**。
+- **strict_recovery 家族 12 包 = 187.00 CH**（精确 **186.9979**），与 `recovery_budget_accounting.md` 的 **187.0** 及**逐包 12/12 数值**全部一致（账本逐包为**取整值**，故表面相加=187.1；合计按**未取整**值算——t4 复核指出的呈现瑕疵，如实标注）；torsion-probe 家族另计 **40.43 CH**（精确 40.4334）；**总 227.43 CH**（精确 **227.4311**，t4 独立复算逐位一致）。
 
 **规划但从未发送**：
 - `outputs/physics_completion/recovery/strict_recovery_v1_manifest.csv` 的四态行 `status=**planned**`，且 `start_1_basin`/`start_2_basin`/`start_1_source_sha256`/`start_2_source_sha256` **全为空** ⇒ **这些行不等于已运行的尝试**；真实已跑的腿是 coverage 里登记的 `tors_8_0_1_2`（DMC\|M_plus）与 `tors_7_0_1_2`（DMC\|LiM_2plus）；**DOL/EC 无登记腿**。
 
-**唯一拒收记录**：`work/hpc_production_ensemble_r2_reopt/submission_journal.attempt0_refused_no_sbatch.json`（`r2_reopt` 不在四态活动内）。
+**journal 级拒收记录（2026-10-25 t4 复核后修正口径，原「唯一拒收记录」表述不成立）**：
+- `work/hpc_production_ensemble_r2_reopt/submission_journal.attempt0_refused_no_sbatch.json`（`r2_reopt` 不在四态活动内）；
+- `work/hpc_four_state_p4_xtb_screening_v1.pre_partition_fix/submission_journal.json`：P4 首次提交因 sbatch 缺 `#SBATCH --partition` 被桥校验拒（`status=submit_failed`、`bridge_exit_code=1`、`job_id` 为空 ⇒ 任何 sbatch 运行前被拒）；该记录**原样保留**；
+- **非 journal 形式的功能性排除**：`work/hpc_torsion_probe_v1_batch2_fragmentfix_20261022/manifest.json` 的 `rejected` 数组 2 条（`EC|LiM_2plus|tors_2_3_4_10`、`EC|LiM_2plus|tors_5_3_4_10`，理由 `central bond is not a verified single bond`）——**这不是旁注**：`build_coverage_reviews._rejected_probe_members()`（:106-148）依赖该 rejected 数组与 `replaces_cancelled_job`(=3747724)，缺 manifest 即 `SystemExit`（fail-closed）。
+- 另有 2 条 `submit_failed` 属**测试夹具**（`_release_core_tests_*`、`_torsion_submit_fix_tests_*`），非真实提交。
+- **修正后的准确表述**：四态恢复/扭转两家族的 `submission_journal*` 内**无** submit_failed（全部真实提交都到了 sbatch）；系统内**第一条** submit_failed 记录是 attempt0（r2_reopt）。
 
 ## 3. 唯一链条 `state → candidate → attempt → Slurm element → output → cost`
 
@@ -73,7 +78,14 @@
 - 17 个 JobID **全部终态**（见 §2 的 41+1）。
 - 每个包**恰 1 次提交**（仅 `hpc_torsion_probe_v1` 为 2 次：`3747714` + 被取消的 `3747724`）。
 - 上游 P4 包仍 `HOLD`／未提交 ⇒ **不存在第二份在飞**。
-⇒ **出口（2）成立：不存在重复在飞任务。**
+⇒ **出口（2）成立：不存在重复在飞任务——但证据强度有界**（2026-10-25 t4 复核指出的范围缺口，如实记录）：
+  ① `sacct` 落盘**无 Start/End 列**，无法重建运行区间；② 只核了**已知 17 个 JobID**，未做账户级在飞快照；
+  ③ `squeue` 空是**单点快照**。结论「当前无重复在飞」**未被反驳**，但在上述三点补齐前**不算被证明**。
+  补齐法（下次提交前照做）：`squeue -u <user>`（带时间戳原文落盘）+ `sacct` 增加 `Start,End` 列。
+- t4 复核方**额外补链**（采信）：`3747724`（torsion_probe_v1 batch 2，3 任务）07:08:26Z 提交、**取消前未运行、计 0 CH**；
+  `NEXT_ACTIONS.md:35,39` 明载「取消前未运行」「不建议再次提交」⇒ 无部分产出、无待重投意图；
+  同一条腿的重投均**非并发**（`DMC|LiM_2plus__tors_7_0_1_2`：3748336(08:21Z) → 3749453(11:30Z)；
+  `DMC|M_plus__tors_8_0_1_2`：3747714(07:07Z) → 3749450(11:30Z)）。
 
 ## 5. 写入面归属（「他人持有」）
 
