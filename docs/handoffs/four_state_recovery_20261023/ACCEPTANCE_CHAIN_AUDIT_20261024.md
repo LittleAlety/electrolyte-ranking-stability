@@ -18,7 +18,7 @@
 
 **结论：五项阈值与六项验收在**写入路径与聚合路径**上都真正 fail-closed**；`geometry_criteria_ok` 对缺值返回 `False`（`import_ensemble_structures.py:124-129`），不存在「缺值默认为零」。
 
-## 2. 已发现并关闭的四个缺口（G1–G4）
+## 2. 已发现并关闭的五个缺口（G1–G5）
 
 ### G1（前一轮已修，`06d08aa`）五项阈值无一致性守卫
 三份表示（代码常量 / 冻结契约 / 两处生成器散文）之间**没有任何测试**。已补三道测试覆盖；RED 实证见 `work/_threshold_guard_red.py`。
@@ -137,7 +137,34 @@
   且**没有任何下游对账**时，才构成 G1/G4/G5 那一类真缺口；只有一份副本的词表由「下游数据自校验」兜住。
 ⇒ 本轮审计的 G 系列到此**收敛**：已无同类未处置缺口。
 
-## 3. 是否把该门继续下沉到主态路径？——**已测量，结论：不下沉**（2026-10-24）
+## 3. WP5 目标池前置审计（只读，2026-10-25）：**缺额恰好等于四个 limited 态**
+用 `build_wp5_target_pool.build_rows()`（**纯投影 labels CSV**）实测，并与端点表 `AB_axis_endpoint.csv` 的 `n_pool` 对账：
+
+| 任务 | 态对 | 两腿都 accepted 的分子数 | 缺谁 | 缺的原因（该腿） |
+|---|---|---|---|---|
+| **A** | (`M_plus`, `M`) | **11 / 12** | **DMC** | `M_plus` = `limited`（`M` 腿 accepted） |
+| **B** | (`LiM_2plus`, `LiM_plus`) | **9 / 12** | **DMC、DOL、EC** | 三者的 `LiM_2plus` = `limited`（`LiM_plus` 腿全部 accepted） |
+
+**对账结果**：builder 给的 `{A:11, B:9}` 与端点表记录的 `n_pool`（A=11、B=9，各 16 组）**完全一致**。
+⇒ **`wp5_full_target_pool_evaluated` 的缺额就是那四个 limited 态本身，没有任何别的因素**；
+四态一旦按现有规则转 `accepted`，A 与 B 应同时到 12/12，随后需按正式协议**重跑** A/B 回放（池变了，旧回放不作数）。
+
+### 4.1 一处**层间措辞冲突**（如实记录，未改账本）
+四个 limited 态的 label `limitation_reason` **全是 `rescue_budget_exhausted`**，但成员层计数与它**自洽**
+（DMC\|M_plus 与 DMC\|LiM_2plus 各 `n_registered=2`/`n_qc_failed=2`；DOL\|LiM_2plus `n_registered=2`（1 失败 + 1 去重）；
+EC\|LiM_2plus `n_registered=1`——代码判据是**每成员 attempted≥2**，单个成员可被尝试两次，故与「登记数≥2」不是一回事）。
+**冲突在于层与层的说法**：`coverage_reviews.csv` 对 DOL/EC 明写
+「single-basin is a physical finding at the screening level, **not** a budget failure」
+（route=`search_exhausted`，`registered_starts=''`），而 label 写 `rescue_budget_exhausted`。
+原因在 `build_production_ensemble_aggregator.py:938-940`：`if n_limited and not cov_resolved:` 先定粗原因，
+**早于** `:941-949` 那串更细的分支（`no_registered_extras` / `single_basin_pool` / …）。
+**风险**：读者可能据此推出「再加预算就能找到极小」，而覆盖复核恰好否认这一点（其对 DOL/EC 的结论是
+「筛选层就是单盆地，属物理发现」）。
+**处置**：**不改**冻结账本（labels 被多处产物哈希引用，且这是标签口径决策，须由 Lead/用户定）；
+若将来要改，最小修法是让 `:938-940` 在 `cov.verdict == "search_exhausted"` 时不要抢占
+`single_basin_pool` 这一更准确的原因，并同步重建下游链。
+
+## 4. 是否把该门继续下沉到主态路径？——**已测量，结论：不下沉**（2026-10-24）
 **门的位置决定了保护面**：`RE_SCF_CONVERGED` 在 `qc_task` 里，因此覆盖**经它的注册新增成员**——而
 `production_ensemble_candidates.csv` 的实测构成是 **48 primary + 57 round1_extra + 14 recovery_v1_start**，
 即**新增计算全部以 extra 身份走 `qc_task`**，已被覆盖。
@@ -158,7 +185,7 @@
 ⇒ **按「只为会改变结论的事花钱」的口径，本轮不做**。仅当将来**主态腿需要从 HPC 包重新导入**时，
 才值得在 `import_hpc_opt_numfreq.py`（紧邻其 `ORCA TERMINATED NORMALLY` / `THE OPTIMIZATION HAS CONVERGED`
 断言处）补同等断言——届时仍须先做上表这样的**无翻转证明**。
-## 4. 仍未覆盖的范围
+## 5. 仍未覆盖的范围
 - 未验证真实 ORCA 输出格式是否总能解析成功（那需要真实作业；本轮只用合成 ORCA 文本与既有 fixture）。
 - 未复核 `import_hpc_numfreq.py` 的 NumFreq 遗留路径是否同样严格；本轮只审 AnFreq 生产路径。
 - 未复核聚合器的权重/去重数学（那属 WP3/WP5 面）。
