@@ -165,7 +165,13 @@
 | **真的只读吗** | 对 `outputs/` 全树做 `(size, mtime_ns)` 快照 → 前后 **changed=0 / added=0 / removed=0**；`__pycache__` 无残留（`-B` + `dont_write_bytecode`） | **严格只读** ✓（期间 F59–F63 图表 mtime 变化来自**并行会话**重生成，git 内容未变，与本审计无关） |
 | **能否区分「没产生 / 没接线 / 未通过」** | `full_pool=BLOCKED`（子池证据完整、全池未齐）与 `integrity=FAIL`（证据本身缺失/对账失败）分列；`issues[].code` 机器可读（MISSING / STALE_INPUT_HASH / TARGET_IDENTITY / …） | **三种情形分开** ✓ |
 
-**裁决：该审计器结构合格、退出码诚实、严格只读、语义可分**——达到「可考虑正式接线」的**质量门槛**；但**接线与否仍属用户裁决**（它仍是 `AUDIT_ONLY`；`model_v2` 目录缺失属**已知待补**，接线前须先补齐或明确只接 `knn_v1`）。所委派的复审成员零产出后已收回，本节为 **Lead 亲自复审**（首次实跑两版 + 全树只读快照证明）。
+**裁决：该审计器结构合格、退出码诚实、严格只读、语义可分**——达到「可考虑正式接线」的**质量门槛**；但**接线与否仍属用户裁决**（它仍是 `AUDIT_ONLY`）。所委派的复审成员零产出后已收回，本节为 **Lead 亲自复审**（首次实跑两版 + 全树只读快照证明）。
+
+**`model_v2` 目录缺失的处置裁决（2026-10-26，Lead；此前记为"已知待补"，本轮定死为"按设计缺席"）**：
+- **它不是缺交付，而是被生成器自身契约要求推迟**：`run_wp5_AB_replay.py:766-773` 的 `acquisition_v2_status` 明写「model_v2 已实现并在当前子池上 dev-verified，但计划要求**正式全量回放等标签稳定**」；`--acq-version` 的 help（`:943-946`）同样标「dev verification only until the labels are stable」。而系综**仍是 44/48、4 态在飞** ⇒ 现在跑全量 20 repeats 只会产出**必须重跑**的产物，且会被误读为"正式回放"。
+- **因此审计器 `model_v2` → exit 1（MISSING `blind_replay_model_v2/AB_index.json`）是"按设计且诚实"的行为**，不是交付缺失；接线口径＝**先只接 `knn_v1`**，待标签稳定后再由声明的正式运行补齐 `model_v2`（该目录被设计为 sibling，永不覆盖 control）。
+- **同轮修掉一处会自我矛盾的潜在缺陷（本轮新增，`run_wp5_AB_replay.py`）**：`acquisition_v2_status` 原为**无条件字面量**，若将来跑 model_v2，其 index 会自称「the products here were produced by the default knn_v1 … this index describes the CONTROL run」——**对自身说谎**。已改为**按版本分支**：model_v2 分支写「produced by the ACQUISITION model_v2 …, **NOT by knn_v1**；DEV-VERIFICATION，正式声明运行须在标签稳定后重发」。
+- **两向验证**：① control 侧 `--check` → **`CHECK OK -- knn_v1 A/B replay tables match recomputation`（exit 0）** ⇒ 文本改动**逐字不动 control**（字节级 no-flip）；② model_v2 侧用 **`work/` 内暂存目录 + monkeypatch `output_paths`**（不写 `outputs/`）跑通一次，实测 index：`is_control_directory=False`、`acquisition_version='model_v2'`、`acquisition_v2_status` 已含 "**NOT by knn_v1**"、且不再出现 "CONTROL run" 字样（脚本 `work/_verify_wp5_modelv2_index.py`，断言通过后自行清理暂存）。**全程未写 `outputs/`、`blind_replay_model_v2/` 仍不存在（按设计）**。
 
 ## 四之六、共享任务板审计线（t1–t6）的复核结论（2026-10-26，全部 Lead 独立复跑后采信）
 

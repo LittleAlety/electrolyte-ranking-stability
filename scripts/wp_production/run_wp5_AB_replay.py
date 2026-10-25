@@ -767,10 +767,17 @@ def write_outputs(data: dict, repeats: int,
                 "model_v2 is IMPLEMENTED and dev-verified on the current "
                 "sub-pool (tests/test_wp5_acquisition_v2.py), but the plan "
                 "requires the formal full replay to wait for STABLE labels: "
-                "the products here were produced by the default knn_v1, so "
-                "this index describes the CONTROL run.  A full model_v2 replay "
-                "must be a separate, declared run once the ensemble labels "
-                "stop moving."),
+                + (("the products here were produced by the default knn_v1, so "
+                    "this index describes the CONTROL run.  A full model_v2 replay "
+                    "must be a separate, declared run once the ensemble labels "
+                    "stop moving.")
+                   if acq_version == DEFAULT_ACQ_VERSION else
+                   ("the products here were produced by the ACQUISITION "
+                    "model_v2 (model-driven uncertainty / ranking-aware), NOT by "
+                    "knn_v1 -- this directory is the model_v2 sibling and never "
+                    "overwrites the control.  Treat it as a DEV-VERIFICATION run: "
+                    "a formal, declared run must still be re-issued once the "
+                    "ensemble labels stop moving."))),
             "acquisition_open_decision": (
                 "wiring the acquisition to the executed model WOULD CHANGE every "
                 "reported number, so it is a plan-level decision and has NOT been "
