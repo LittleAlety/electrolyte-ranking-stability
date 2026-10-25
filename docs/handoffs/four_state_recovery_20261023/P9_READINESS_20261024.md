@@ -173,6 +173,14 @@
 - **同轮修掉一处会自我矛盾的潜在缺陷（本轮新增，`run_wp5_AB_replay.py`）**：`acquisition_v2_status` 原为**无条件字面量**，若将来跑 model_v2，其 index 会自称「the products here were produced by the default knn_v1 … this index describes the CONTROL run」——**对自身说谎**。已改为**按版本分支**：model_v2 分支写「produced by the ACQUISITION model_v2 …, **NOT by knn_v1**；DEV-VERIFICATION，正式声明运行须在标签稳定后重发」。
 - **两向验证**：① control 侧 `--check` → **`CHECK OK -- knn_v1 A/B replay tables match recomputation`（exit 0）** ⇒ 文本改动**逐字不动 control**（字节级 no-flip）；② model_v2 侧用 **`work/` 内暂存目录 + monkeypatch `output_paths`**（不写 `outputs/`）跑通一次，实测 index：`is_control_directory=False`、`acquisition_version='model_v2'`、`acquisition_v2_status` 已含 "**NOT by knn_v1**"、且不再出现 "CONTROL run" 字样（脚本 `work/_verify_wp5_modelv2_index.py`，断言通过后自行清理暂存）。**全程未写 `outputs/`、`blind_replay_model_v2/` 仍不存在（按设计）**。
 
+**⚠ 第二份独立复审（另一会话的 Lead，2026-10-26，**与本节结论收敛**）**：`docs/handoffs/wp5_formal_replay_guard_20261023/REVIEW_20261026.md`（19 KB，**未跟踪，归其作者提交**，我只读引用不代提交）+ 可复跑对抗探针 `probe_adversarial_20261026.py` / `probe_results_20261026.json` / `probe_stdout_20261026.txt`。其方法比本节更强，**四项可与本节互补互证**：
+1. **对抗注入六类历史坏证据 → 全部 fail-closed**（缺键 `NUMBER` / 短行 `CSV` / labels 折叠成 1 行 `LABELS` / `MISSING` 带数 `COST` / `not_reached` 带数 `STOP_RULE` / `invalid_input` / NaN 成本 / **触发布尔被重算而非采信** `TARGET_ADMISSION`）；关键手法是**同步刷新 index 里的声明哈希以绕过 `STALE_INPUT_HASH` 前门**，逼它靠语义判错——**这正是本节能耐下来说"结构覆盖六类"的实证**。
+2. **只读双实证**：686 文件隔离副本连跑四类命令后 `(path,size,mtime_ns)` **零差异**；真实仓库 206 文件单轮前后**零差异**。
+3. **边界（本节应补记）**：`unittest` **不带 `-B`** 会落 2 个 `__pycache__/*.pyc` ⇒ "严格只读"只在 **`-B`** 下成立；接线必须强制 `-B`。
+4. **相同的接线裁决（收敛）**：其 §⑥ 建议「接线前解决 model_v2 缺失：补齐 **或** 明确只接 `knn_v1`」，并要求**显式消费退出码**（1→完整性 FAIL 使闸门失败；2→`full12 blocked` **单列**不得包装成科学失败或完成；0→仅表结构一致，仍带 `not_proven`）。**与本节"先只接 `knn_v1`"一致**。
+5. **它诚实声明的未覆盖面**：真实全 12 池（审计器**从未在生产数据上达到 exit 0**，`full=True` 分支仅合成夹具覆盖）、科学正确性（不证明无标签泄漏/不重训模型/不做 sacct 成本 join/不做几何电子 QC）、大文件与深递归边界、并发撕裂读时序、helper 信任边界（白名单 stdlib 内仍可执行有害代码）。
+**⇒ 至此该审计器共有两份独立复审，结论一致：质量门槛已到、接线属用户裁决、先只接 `knn_v1`、接线须 `-B` 且显式消费退出码。**
+
 ## 四之六、共享任务板审计线（t1–t6）的复核结论（2026-10-26，全部 Lead 独立复跑后采信）
 
 并行工作面按「成员产出 → Lead 独立复算 → approve/接手收口 → 逐路径入库」跑完 **6 个任务，6/6 done**（t5/t6 于 2026-10-26 深夜收口；t5 实际作者 `p8-prereg-drafter`、t6 为 `submitter-bypass-audit`）：
