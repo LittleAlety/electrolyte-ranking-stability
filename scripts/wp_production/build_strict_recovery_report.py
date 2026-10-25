@@ -196,7 +196,7 @@ def render(doc: dict) -> str:
         lines.append("| %s | %d |" % (k, totals.get(k, 0)))
     lines += [
         "",
-        "分母固定 48；未 accepted 共 **%d** 态（`provisional` = 有登记补救在飞，`limited` = 首轮搜索耗尽）。" % len(states),
+        "分母固定 48；未 accepted 共 **%d** 态（`provisional` = 有登记补救，`limited` = 首轮搜索耗尽）。" % len(states),
         "",
         "## 恢复腿终局统计（按**最后一次真实运行**；规划中的补救另计）",
         "",
@@ -205,7 +205,9 @@ def render(doc: dict) -> str:
     ]
     for k, v in sorted(statuses.items()):
         lines.append("| `%s` | %d |" % (k, v))
-    lines += ["", "**在飞补救（已提交、尚未产出结果）**：%d 条腿" % sum(in_flight.values()), ""]
+    lines += ["", "**pending 行（`status=pending`）**：%d 条腿——**本报告不校验它是否真的提交过**"
+              "（判据只有那一行的 `status`）⇒ 「在飞」必须另与实时 `squeue`/提交日志交叉核对；"
+              "**从未提交或已被预检拒收的登记行也会落在这里**。" % sum(in_flight.values()), ""]
     if classes:
         lines += ["", "失败类分布（最后一次真实运行）：", ""]
         lines += ["- `%s`: %d" % (k, v) for k, v in sorted(classes.items())]

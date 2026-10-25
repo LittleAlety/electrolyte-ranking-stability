@@ -31,7 +31,12 @@ def test_report_counts_completed_failures_not_only_pending():
     if rows:
         # every completed result class must be visible in the report
         assert "technical_complete_qc_failed" in text
-        assert "在飞补救" in text
+        # The pending bucket must NOT claim the rows were submitted: measured
+        # 2026-10-24, the two pending EC rows were rejected C=O pseudo-torsions
+        # that were never submitted, yet the report said "已提交".
+        assert "pending 行（`status=pending`）" in text
+        assert "本报告不校验它是否真的提交过" in text
+        assert "在飞补救（已提交" not in text
 
 
 def test_no_unescaped_pipe_in_the_detail_table():

@@ -11,7 +11,7 @@
 | provisional | 0 |
 | limited | 4 |
 
-分母固定 48；未 accepted 共 **4** 态（`provisional` = 有登记补救在飞，`limited` = 首轮搜索耗尽）。
+分母固定 48；未 accepted 共 **4** 态（`provisional` = 有登记补救，`limited` = 首轮搜索耗尽）。
 
 ## 恢复腿终局统计（按**最后一次真实运行**；规划中的补救另计）
 
@@ -21,7 +21,7 @@
 | `never_ran` | 2 |
 | `technical_complete_qc_failed` | 8 |
 
-**在飞补救（已提交、尚未产出结果）**：2 条腿
+**pending 行（`status=pending`）**：2 条腿——**本报告不校验它是否真的提交过**（判据只有那一行的 `status`）⇒ 「在飞」必须另与实时 `squeue`/提交日志交叉核对；**从未提交或已被预检拒收的登记行也会落在这里**。
 
 
 失败类分布（最后一次真实运行）：
