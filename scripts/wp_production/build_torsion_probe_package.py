@@ -962,7 +962,12 @@ def _p4_batch_script() -> bytes:
         "#SBATCH --array=0-7%2", "#SBATCH --nodes=1", "#SBATCH --ntasks=1",
         "#SBATCH --cpus-per-task=2", "#SBATCH --time=02:00:00",
         "#SBATCH --output=slurm-%A_%a.out", "#SBATCH --error=slurm-%A_%a.err",
-        "set -euo pipefail", 'ROOT=$(cd "$(dirname "$0")" && pwd)',
+        "set -euo pipefail",
+        # Slurm executes the batch script from its SPOOL COPY, so $0 is NOT the workdir
+        # (job 3774076 failed 8/8 with exit 2: sed couldn't read the spool-resident
+        # batch_1.txt).  Every historical package uses SLURM_SUBMIT_DIR instead.
+        'cd "${SLURM_SUBMIT_DIR}"',
+        'ROOT="${SLURM_SUBMIT_DIR}"',
         'TASK=$(sed -n "$((SLURM_ARRAY_TASK_ID+1))p" "$ROOT/batch_1.txt")',
         'test -n "$TASK"', 'cd "$ROOT/$TASK"',
         "source ~/project/soft/xtb/env.sh",
