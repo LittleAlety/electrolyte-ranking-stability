@@ -3,7 +3,7 @@
 **项目状态**：`submission_gate=HOLD`, `submitted=false`。**未获任何计算授权**。  
 **范围**：仅离线复现 `scripts/wp_production/submit_hpc_batch.py` H1–H5。全程不触达 bridge/集群/网络/ORCA。  
 **探针**：`probe_offline.py`（纯内存 + `tempfile` 构造合成包，monkeypatch `subprocess.run`/`shutil.which` 为 tripwire，强制 `bridge=E:/nonexistent/hpc.ps1`）。  
-**输出**：`probe_output.txt`（完整 stdout）、`REPORT.json`。
+**输出**：`probe_output.txt`（完整 stdout）。
 
 ## H1–H5 逐条行号级结论（独立再推导）
 
@@ -50,12 +50,14 @@ cd "E:\Claude Code\电解液溶剂-HB\电解液溶剂HB-Code"
 - **修复方案**：不在本次只读复核范围内，需用户裁决。
 
 ## 遗留说明
-- `wp5_guard_review_independent/PROBE.txt` 为早期竞态残留空探针，与本次 t2 无关（目录已存在）。
-- 报告文件：`REPORT.md`、`REPORT.json`、`probe_offline.py`、`probe_output.txt` 均位于本审计目录顶层。
+- `wp5_guard_review_independent/PROBE.txt` 是早期自动派单竞态残留的**空探针**（与本次 t2 无关），**已由 Lead 随本报告入库时删除**；合成 `fixtures/` 同样不入库（见「快速复跑」的前置清理）。
+- 报告文件：`REPORT.md`、`probe_offline.py`、`probe_output.txt` 均位于本审计目录顶层。
 
 ## 快速复跑
 ```bash
 cd "E:\Claude Code\电解液溶剂-HB\电解液溶剂HB-Code"
+# 前置（必需）：清掉上次运行残留的合成包，否则 C1 抛 "already submitted" 假失败
+rm -rf docs\handoffs\four_state_recovery_20261023\audit_submitter_bypass_20261026\fixtures
 .\.venv\Scripts\python.exe -B docs\handoffs\four_state_recovery_20261023\audit_submitter_bypass_20261026\probe_offline.py
-# 预期：SUMMARY 12 checks, 12 pass, 0 fail；exit 0
+# 预期：SUMMARY 12 checks, 12 pass, 0 fail；exit 0（脚本自身会重建 fixtures/，勿入库）
 ```
