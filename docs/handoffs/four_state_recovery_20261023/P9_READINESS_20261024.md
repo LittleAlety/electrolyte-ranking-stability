@@ -201,13 +201,15 @@
 | 台账显示 | `strict_main_counts(set_main, progress["scientific"]["accepted_legs"])` 的 `li_pair_ok`（`:170`/`:318`）＝**按「主态生产腿 accepted」计**（meta `scientific.accepted=48/48`，与系综 44/48 是两回事） | **12/12** |
 | 触发判定 | `strict_readiness_wiring._complete_li_pairs(labels)`（**系综 labels 里 `LiM_plus` 与 `LiM_2plus` 双 accepted 的分子数**），与 `WP6_REQUIRED_LI_PAIRS=9` 比较 | **9/12**（缺 DMC / DOL / EC，各缺 `LiM_2plus`） |
 
-**定界（已核，结论：不改任何状态）**：`48/48` 时两侧必然同时为真（labels 全 accepted ⇒ 双口径都 12≥9），未 48 时 `wp6_ready` 因要求 `production_ensembles=48` 而两侧同时为假 ⇒ **当前与未来都不改变 `blocked_on_production` 的判定**。但**阅读层风险真实**：若有人按台账把「12/12 ≥ 9」读成「Li 配对已满足、只剩系综」，就低估了缺口——实际 labels 口径只有 **9/12，恰好压线**，且这 3 个缺 LiM_2plus 的分子正是四态恢复的目标态所在分子。P8 草稿引用的是 labels 口径（9/12），与台账显示不同源，接线时须统一词义。
+**定界（第三方独立重放后修正本节的定论）**：成员 `p8-prereg-drafter` 只读重放 `build_plan_compliance.build_rows()`（不写盘，等价 `--check`），实测 `WP6 status=blocked_on_production`、`measured` 串与 CSV **逐字一致**（叠加 `--check` 字节一致 ⇒ CSV 无誊写错）。关键更正我原先的过头措辞：**两种口径的 Li 配对都已满足**（scientific 12 ≥ 9、labels 9 ≥ 9，**恰好压线**），因此 `gate_ready=false` **完全由 `production_ensembles=44/48` 这一半决定**——不存在我先前写的「把 12/12 读成满足会**低估缺口**」那种风险。真正残留的只是**命名可读性**：同一短语 `li_pair_complete` 在 wp2/wp6 行取 scientific ledger 分子分母（12/12），在系综行是 44/48，两个分母混在同一条 `measured` 串里；建议（待裁决项 3）把 `:838` 的串改为显式消歧命名（如 `li_pair_complete_scientific_ledger=`）。**状态判定不受影响，本项由 Lead 原判「记录级缺陷」下调为「命名可读性问题」**。P8 草稿引用的是 labels 口径（9/12），接线时仍需统一词义。
+
+> **本节作者的归属更正（重要，防误导后续读者）**：§四之七 的三处发现由 **Lead 独立重算 t5 的 17 行时**提出；随后**第三方复核**（`build_rows()` 内存重放 + 逐行现算）由 `p8-prereg-drafter` 完成，并据此把 ③ 的定论修正为"命名可读性"。§四之七 现记录的是**两方收敛后的最终口径**，不再是单方结论。另记：`wp2_state_identity_qc` 的 `not_computed` 与 `wp5_pool_extension` 的 `extension_rows=0` 均**与其各自数据源一致**（第三方实测 `set.csv` cohort 取值集合 = {excluded, main, method_audit, sampling_audit}、extension 行 = 0；`sampling_escalation.csv` 24/24 仍 `registered_pending_round1_free_energy_check` ⇒ t4 时期疑的"过时陈述"**不成立**）；所以 **17 行的状态判定全部维持原样，零翻转**。
 
 ## 五、要用户裁决的事（其余都已就绪）
 
 1. **是否发出一次性限额授权**（800 core-hours：筛选 ≤32 / 首产 ≤512 / 有因补救 ≤256；每态 ≤2 独立起点 + ≤1 有因补救）。
    发出后执行序：提交筛选轮（8 任务 / 2 核 × 2 h / 32 core-hours，活跃 ≤2）→ 回收逐文件哈希 → GFN2 判定（**6 kcal/mol 仅筛选层；全塌缩则按预注册分支如实填"零"，不伪称新极小**）→ 生产包 → P5 八项 QC → P6 只经 `importer→dedup→coverage review→aggregator` 更新 → P8 重算触发 → P9 终验。
 2. **WP6 与新分子（8–12）扩池的计算启动**：属新增科学范围，**需各自的数值预算**，不得从 800 偷支。
-3. **是否修 §四之七 的两处记录级缺陷**（改 `build_plan_compliance.py` 的前端定域引用与 `ext_rows` 来源文件）：二者**都不改变任何科学状态**（`wp2_state_identity_qc` 仍 partial、`wp5_pool_extension` 仍 not_satisfied），修的是「台账文字会不会误导下一个读者」；**我不自行翻判据**——尤其是方向可能"变绿"的那一侧。
+3. **是否做台账的两处文字级改动**（均**不改变任何科学状态**，17 行判定零翻转）：(a) `build_plan_compliance.py:797` 的 `ext_rows` 改为读**真实候选来源**——注意 `extension_pool.csv` 是**独立文件、无 `cohort` 列**（第三方实测 `set.csv` cohort 取值集合只有 {excluded, main, method_audit, sampling_audit}），所以 `extension_rows=0` 在 set.csv 口径内**技术上没错**，问题在于台账用它表达「已冻结扩展候选数」，与 `extension_pool.csv` 的 11 个候选对不上，读者会误读；(b) `:838` 的 `li_pair_complete=12/12` 串改为显式消歧命名（两口径都 ≥9、不影响 `gate_ready`，纯可读性）。另有 §四之七①：`wp2_state_identity_qc` 的 `证据` 列只写 `state_identity/`，未点名 frontier identity 管线（80 computed / 80 verified），读者易误判"轨道定域整体缺失"。**我不自行翻判据、也不自行改判据文字**——尤其方向可能"变绿"的一侧。
 
 **若第 1 项在 800 core-hours 或有界尝试内不能达成 48/48**，最可信的结论就是"四态仍有限制、还需要明确的新机制和下一轮预算"——而不是继续无限续算。这也保护现有 **44 个真实 accepted 标签**不被一次激进救援污染。
