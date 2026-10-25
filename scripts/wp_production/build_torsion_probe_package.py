@@ -958,6 +958,7 @@ def _p4_xyz_bytes(symbols, coords, *, state_key, candidate_id, source_sha) -> by
 def _p4_batch_script() -> bytes:
     lines = [
         "#!/bin/bash", "#SBATCH --job-name=p4_xtb_screen",
+        "#SBATCH --partition=hpxg",
         "#SBATCH --array=0-7%2", "#SBATCH --nodes=1", "#SBATCH --ntasks=1",
         "#SBATCH --cpus-per-task=2", "#SBATCH --time=02:00:00",
         "#SBATCH --output=slurm-%A_%a.out", "#SBATCH --error=slurm-%A_%a.err",

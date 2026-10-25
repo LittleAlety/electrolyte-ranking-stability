@@ -54,7 +54,26 @@ README/站点只显示、`tests/test_p4_screening_plan.py:81` **断言必须为 
 | 提交器 | `submit_hpc_batch.py <包> --batch 1 --remote-workdir <远端> --attempts-ledger <包>/attempts_ledger.json --budget-cap-core-hours 32 --bridge <hpc.ps1>` |
 | 提交器不变量 | `--budget-cap-core-hours` 必须等于 profile cap（唯一在任何 bridge 调用**之前**生效的守卫）；终态缺 `slurm_allocation_id`/`measured_core_hours` 即抛错，**绝不按 0**；重复 journal 会被拒（幂等） |
 
-## 6. 提交后必须回填（禁止遗漏）
+## 6. 提交记录（2026-10-25 16:40 UTC 实测回填）
+
+**首次提交被拒（如实记录）**：旧 sbatch 模板缺 `#SBATCH --partition` ⇒ 桥的 sbatch 校验拒（exit 2，
+`[Error] 缺少 #SBATCH --partition，应加 #SBATCH --partition=hpxg`），journal 记 `status=submit_failed`（保留在
+`work/hpc_four_state_p4_xtb_screening_v1.pre_partition_fix/submission_journal.json`，未删）。这是**真实缺陷**：
+历史生产包全部显式写 `--partition=hpxg`（`build_production_ensemble_manifest.py:679` 的 `_SBATCH` 模板），
+P4 的 `_p4_batch_script()`（`build_torsion_probe_package.py:958-963`）漏了。已在生成器补 `#SBATCH --partition=hpxg`、
+通过定向测试（31 项）后**重建包**——与旧包只差 `batch_1.sbatch`、`PACKAGE_SHA256SUMS`、`manifest.json` 三个文件
+（`generator_sha256` 更新为 `e51cf847…`，manifest 自钉 `script_sha256 f824854…` = 磁盘实测一致）。
+
+| 项 | 值 |
+|---|---|
+| **数组 JobID** | **`3774076`**（单数组 `0-7%2`，8 元素 → `batch_1.txt` 行序，即 DMC_LiM_2plus/p4_01 → EC_LiM_2plus/p4_02） |
+| 状态 | `submitted`（journal `budget_checked=True`）；队列实测 `3774076_[4 PENDING (JobArrayTaskLimit)`——%2 限流生效，0:00 |
+| 预算 | `committed=0 + reserved=32 = cap=32`，`remaining_after=0`；提交前 `headroom=20`、`observed_active_pending=0` |
+| 上传 | 逐文件 47 次（9 mkdir + 47 put + 1 复核），远端 `sha256sum -c` **46/46 OK、0 失败** |
+| 幂等 | 新包 journal 恰 1 条 `submitted`；旧包的 `submit_failed` 记录原样保留，未删除 |
+
+**待回收**：按 `P4_SUBMIT_RUNBOOK_20261024.md` §5.2——`ensemble_hpc_io.py --package … --job-id 3774076`（逐元素；
+未终态打印 pending 并跳过）→ 判定器 → 四态分流。
 
 - **数组 JobID** 与「本批索引 → 本批任务」映射（`batch_1.txt` 的行序）；
 - 每元素**实测成本**：`sacct -X -j <JobID> -o JobID,State,ExitCode,Elapsed,AllocCPUS` → `Elapsed × AllocCPUS`，
