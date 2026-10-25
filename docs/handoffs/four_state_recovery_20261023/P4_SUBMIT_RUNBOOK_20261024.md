@@ -123,3 +123,18 @@ walk `work/hpc_four_state_p4_xtb_screening_v1/tasks/*/` 的结果（只有 build
 （`xtbopt.xyz`/`xtbopt.log`/`.xtboptok`/`candidate.json`），输出 = 每个元素的相对能、等价原子映射/
 拓扑去重结论、四态分流 verdict，并**复用** `build_coverage_reviews.py` 的 route/verdict 词表
 （该词表已由 G5 加守卫）。**本手册不自行实现它**（新脚本须按项目纪律四处登记、且需要真实结果才能验证）。
+
+**该判定器必须先钉死的规格（否则窗口会算错）**：
+1. **「6 kcal/mol 相对谁」**——冻结口径原文是 `window: 6 kcal/mol above the slot's screening minimum`
+   （`build_production_ensemble_manifest.py:31`），即**相对该 (name,state) 已登记筛选池的最小值**，
+   不是相对源几何、也不是相对生产 DFT。参考值与换算都有出处：池表
+   `outputs/physics_completion/sampling/sampling_conformer_set.csv`（44 数据行）带 `xtb_energy_eh`
+   与 `rel_kcal` 两列；1 Eh = **627.5094740631** kcal/mol（同 `run_strict_recovery_search.py` 用值）。
+2. **可比性前提**——GFN2 能量只有**同一 level/电荷/多重度**下可比：P4 任务是 `--gfn 2 --opt tight`
+   且 `$chrg/$spin` 取自权威账本（三个 `LiM_2plus` 为 `2/1`），与池的 GFN2 口径一致；判定器必须
+   **显式断言**这一点（而不是默默把不同电荷的能量相减）。
+3. **收敛判定**——沿用既有两条件：`.xtboptok` 存在 **且** `xtbopt.xyz` 非空 **且** 日志含
+   `GEOMETRY OPTIMIZATION CONVERGED`（`run_strict_recovery_search.py:194` 的口径）。
+4. **去重与身份**——等价原子映射下的重原子 RMSD + 拓扑签名（项目约定 1.3× 共价半径，
+   `run_batch.RADII`；签名 = 逐片段原子组成排序），与**已登记池**逐个比对；身份漂移**独立登记**、
+   绝不改名塞回原态（这是红线，不是工具自由度）。
