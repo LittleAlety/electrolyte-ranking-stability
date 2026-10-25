@@ -189,10 +189,16 @@ walk `work/hpc_four_state_p4_xtb_screening_v1/tasks/*/` 的结果（只有 build
 heavy Kabsch RMSD < `DUP_RMSD_A=0.35` → 最差扭转 ≤ `TORSION_TOL_DEG=10.0` → Li 供体位点 →
 镜像/手性），**但不做** `dedup_members` 那步「按 G 排代表」——筛选层还没有自由能，
 硬套会把 GFN2 当生产自由能（红线），故生产层判定仍归聚合器。
-`--selftest` **19/19 通过**（含「刚性副本判为同一极小（RMSD≈2.6e-16）」「断拓扑被拒」
-「有收敛签名但无能量 ⇒ `technical_incomplete`」「双源能量不一致被记为 problem」
+`--selftest` **20/20 通过**（含「**夹具写在仓库外**（只读仓库也能跑）」「刚性副本判为同一极小（RMSD≈2.6e-16）」
+「断拓扑被拒」「有收敛签名但无能量 ⇒ `technical_incomplete`」「双源能量不一致被记为 problem」
 「如实报告复用原语与容差」「序列化与键序无关」）；对真实包空跑得 **8 元素全部 `not_run_yet`**；
 `--json` 写入 + `--check` **连跑两次字节一致**；跑后 293 项包审计仍全绿（**对包只读**）。
+> **该自测曾在只读环境跑不通（2026-10-25 由成员会话实测发现并修）**：夹具原写进仓库内固定路径
+> `work/_triage_selftest_refs`，成员侧 `mkdir` 被 **`PermissionError [WinError 5]`** 拒 ⇒ 自测在
+> 第 12 项之后中断（可写会话里 19/19 全绿，属**权限环境差异**）。修法：夹具改落 `tempfile.mkdtemp()`
+> （仓库外）+ `equivalence` 支持**绝对路径**（它原只按 `REPO / rel` 解析）+ 断言「夹具不在 `REPO` 内」。
+> **动态证明**：`work/_selftest_write_audit.py` 挂钩全部写路径并带**阳性对照**，实测自测期间
+> **12 次写入全在仓库外、仓库内 0 次**。
 **判定器已提升进生产包（2026-10-25）**：`scripts/wp_production/build_p4_screening_adjudication.py`
 —— 早先的机器本地原型 `work/_p4_screen_triage.py` 已按项目纪律完成**四处登记**
 （`docs/65_repo_layout.md` §3.1 + 计数句 `85`/`79`、`scripts/wp_production/README.md` 条目、

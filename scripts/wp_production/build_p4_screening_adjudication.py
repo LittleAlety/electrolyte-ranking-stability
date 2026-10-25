@@ -239,7 +239,9 @@ def equivalence(syms, coords, refs):
     rot = agg.find_rotatable_bonds(syms, coords)
     considered, best = [], None
     for rid, rel in refs:
-        path = REPO / rel
+        path = Path(rel)
+        if not path.is_absolute():          # registered pools are repo-relative
+            path = REPO / rel
         entry = {"ref": rid, "path": rel, "present": path.is_file()}
         if not entry["present"]:
             considered.append(entry)
@@ -495,14 +497,21 @@ def selftest() -> int:
           "problems=%s" % row["problems"])
 
     # 8. equivalence via the aggregator's own primitives (no re-implemented mapping)
-    ref_dir = REPO / "work" / "_triage_selftest_refs"
+    #    The fixture MUST live outside the repository: a self-test that writes into
+    #    the tree cannot run in a read-only sandbox (reported 2026-10-25 by a teammate
+    #    session whose repo mkdir was denied with WinError 5, aborting the selftest at
+    #    this very check).  ``equivalence`` accepts absolute reference paths for this.
+    ref_dir = tmp / "selftest_refs"
+    check("selftest fixture is written outside the repository",
+          not str(tmp).startswith(str(REPO)), "fixture dir=%s" % tmp)
     chain = [("C", (0.0, 0.0, 0.0)), ("C", (1.5, 0.0, 0.0)),
              ("O", (2.9, 0.0, 0.0)), ("H", (3.86, 0.0, 0.0))]
     _write_xyz(ref_dir / "ref_chain.xyz", [s for s, _ in chain], [c for _, c in chain])
+    ref_path = str(ref_dir / "ref_chain.xyz")
     rot = [(s, (c[0], c[2], -c[1])) for s, c in chain]          # rotate about x
     moved = [(s, (c[0] + 7.0, c[1] - 3.0, c[2] + 2.0)) for s, c in rot]
     eq = equivalence([s for s, _ in moved], [c for _, c in moved],
-                     [("pool:selftest", "work/_triage_selftest_refs/ref_chain.xyz")])
+                     [("pool:selftest", ref_path)])
     check("equivalence_finds_a_rigid_copy",
           eq["best_duplicate"] is not None
           and eq["considered"][0]["verdict"] == "duplicate_of_registered_minimum",
@@ -511,7 +520,7 @@ def selftest() -> int:
 
     broken = [(s, (c[0], c[1] + (4.0 if i == 2 else 0.0), c[2])) for i, (s, c) in enumerate(chain)]
     eq2 = equivalence([s for s, _ in broken], [c for _, c in broken],
-                      [("pool:selftest", "work/_triage_selftest_refs/ref_chain.xyz")])
+                      [("pool:selftest", ref_path)])
     check("equivalence_refuses_a_broken_topology",
           eq2["best_duplicate"] is None,
           "verdict=%s" % eq2["considered"][0]["verdict"])
@@ -522,7 +531,7 @@ def selftest() -> int:
           and eq["tolerances"]["TORSION_TOL_DEG"] == 10.0,
           "%s %s" % (eq["mapping_primitive"], eq["tolerances"]))
     import shutil as _shutil
-    _shutil.rmtree(ref_dir, ignore_errors=True)
+    _shutil.rmtree(tmp, ignore_errors=True)
 
     # 9. --check idempotence: canonical bytes must not depend on dict order
     check("serialise_is_order_independent",

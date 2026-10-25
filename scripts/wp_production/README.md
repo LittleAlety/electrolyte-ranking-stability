@@ -156,6 +156,9 @@ wp2 驱动 / ORCA 在跑，有则拒绝启动（`--force` 可覆盖），防止�
   该态生产几何这个**固定父级**，并断言同态内反推参考恒定）；与已登记极小的**等价性复用聚合器原语与容差**
   （`bond_adjacency` + `find_topology_mappings` WL/回溯 → Kabsch RMSD < 0.35 → 扭转 ≤ 10° → Li 供体 → 镜像/手性），
   **不另写原子映射**，也**不做** `dedup_members` 的「按 G 排代表」（筛选层无自由能）。
-  缺值/失败形态如实记 `not_run_yet` / `technical_incomplete`，**不冒充成功**；`--selftest` **19/19**；
+  缺值/失败形态如实记 `not_run_yet` / `technical_incomplete`，**不冒充成功**；`--selftest` **20/20**；
+  其夹具写在**仓库外**（`tempfile.mkdtemp`）⇒ **在只读仓库里也能跑**（原先把夹具写进 `work/`，
+  被成员会话的只读沙箱以 `WinError 5` 拒掉、自测在第 12 项后中断——2026-10-25 由成员会话发现，
+  已修，并用 `work/_selftest_write_audit.py` 动态证明「仓库内 0 次写入」）；
   `--json` 写出 + `--check` 逐字节复核（**只读**）。用途与规格见
   `docs/handoffs/four_state_recovery_20261023/P4_SUBMIT_RUNBOOK_20261024.md` §5.1–§5.2。
