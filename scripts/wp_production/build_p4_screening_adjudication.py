@@ -150,15 +150,37 @@ def _pool_rows(path: Path) -> list[dict]:
     return list(csv.DictReader(path.open(encoding="utf-8-sig")))
 
 
+#: pools carry BOTH columns (mol_id "C01" <-> name "DMC"); the mapping is READ
+#: from the pool itself so it can never drift from the registered tables.
+def mol_name(mol_id: str, pool_m: list[dict] | None = None,
+             pool_li: list[dict] | None = None) -> str:
+    """Translate a candidate's record id (e.g. ``C01``) to its molecule NAME (``DMC``).
+
+    P4's ``candidate.json`` stores ``mol_id`` (the record id), but the registered
+    screening pools key their rows by ``name`` -- feeding ``mol_id`` straight into
+    :func:`reference_energy` finds no rows (measured 2026-10-25 against the real
+    retrieved results).
+    """
+    for pool in (pool_li if pool_li is not None else _pool_rows(POOL_LI),
+                 pool_m if pool_m is not None else _pool_rows(POOL_M)):
+        for r in pool:
+            if r.get("name") == mol_id:
+                return mol_id            # already a NAME (selftest pools have no mol_id)
+            if r.get("mol_id") == mol_id and r.get("name"):
+                return r["name"]
+    raise ValueError("mol_id %s has no registered name in either screening pool" % mol_id)
+
+
 def reference_energy(name: str, state: str, charge: int, mult: int,
                      pool_m: list[dict] | None = None,
                      pool_li: list[dict] | None = None) -> dict:
     """(ref_eh, provenance) for the state's frozen screening reference.
 
-    Raises ValueError when the reference rows disagree with the element's
-    electronic identity: GFN2 energies are only comparable at the SAME level,
-    charge and multiplicity, and silently subtracting across them is the bug
-    this assertion exists to prevent.
+    ``name`` is the molecule NAME (e.g. "DMC"); translate ``mol_id`` via
+    :func:`mol_name` first.  Raises ValueError when the reference rows disagree
+    with the element's electronic identity: GFN2 energies are only comparable at
+    the SAME level, charge and multiplicity, and silently subtracting across them
+    is the bug this assertion exists to prevent.
     """
     if state in ("M", "M_plus"):
         rows = [r for r in (pool_m if pool_m is not None else _pool_rows(POOL_M))
@@ -319,8 +341,9 @@ def adjudicate(task_dir: Path, cand: dict, pool_m=None, pool_li=None, references
         row["status"] = "technical_incomplete"
         return row
 
-    ref = reference_energy(cand["mol_id"], cand["state_key"].split("|")[1],
-                           row["charge"], row["multiplicity"], pool_m, pool_li)
+    ref = reference_energy(mol_name(cand["mol_id"], pool_m, pool_li),
+                            cand["state_key"].split("|")[1],
+                            row["charge"], row["multiplicity"], pool_m, pool_li)
     row.update(ref_eh=round(ref["ref_eh"], 12), reference_provenance=ref["provenance"],
                reference_source=ref["source"], reference_rows=ref["n_rows"])
     rel = rel_kcal(e, ref["ref_eh"])
@@ -339,11 +362,14 @@ def adjudicate(task_dir: Path, cand: dict, pool_m=None, pool_li=None, references
 
 def walk_package(package: Path, pool_m=None, pool_li=None) -> list[dict]:
     manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
-    rows, refs_cache = [], {}
+    rows, refs_cache, name_cache = [], {}, {}
     for task in manifest["tasks"]:
         tdir = package / task["task_path"]
         cand = json.loads((tdir / "candidate.json").read_text(encoding="utf-8"))
-        key = (cand["mol_id"], cand["state_key"].split("|")[1])
+        if cand["mol_id"] not in name_cache:
+            name_cache[cand["mol_id"]] = mol_name(cand["mol_id"], pool_m, pool_li)
+        name = name_cache[cand["mol_id"]]
+        key = (name, cand["state_key"].split("|")[1])
         if key not in refs_cache:
             refs_cache[key] = registered_references(key[0], key[1], pool_m, pool_li)
         rows.append(adjudicate(tdir, cand, pool_m, pool_li, refs_cache[key]))
