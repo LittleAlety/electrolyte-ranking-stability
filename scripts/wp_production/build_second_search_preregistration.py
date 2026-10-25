@@ -4,8 +4,10 @@ The strict_recovery_v1 batch can lift at most 8 of the 14 limited states; the
 other 6 have no registered independent start because the FIRST search method
 found nothing:
 
-* ``AN|M_plus``, ``DMC|M_plus``, ``EMC|M_plus`` -- 64 independent GFN2 cation
-  conformers all collapsed onto the existing single minimum (RMSD 0.0000);
+* ``AN|M_plus``, ``DMC|M_plus``, ``EMC|M_plus`` -- the GFN2 cation search ran
+  (``num_confs_per_state = 64``, dedup RMSD threshold 0.35 A, seed 20261021) and
+  ``strict_recovery_v1_search_index.json`` records **no new minimum** for them;
+  **no per-state RMSD value exists anywhere**, so none is quoted here;
 * ``DMC|LiM_2plus``, ``DOL|LiM_2plus``, ``EC|LiM_2plus`` -- the round-3
   coordination-motif search produced no new basin.
 
@@ -38,6 +40,10 @@ RECOVERY = REPO / "outputs" / "physics_completion" / "recovery"
 LABELS = ENS / "production_ensemble_labels.csv"
 MANIFEST = RECOVERY / "strict_recovery_v1_manifest.csv"
 SEARCH_POOL = RECOVERY / "strict_recovery_v1_search_pool.csv"
+# Authoritative per-state search record: num_confs_per_state / states_searched
+# / per_state_new_minima.  Read by build_coverage_reviews and
+# build_strict_recovery_manifest as well, so it is the single source here too.
+SEARCH_INDEX = RECOVERY / "strict_recovery_v1_search_index.json"
 LI_EXEC = (REPO / "outputs" / "physics_completion" / "li_motif_sampling"
            / "li_motif_round3_recovery.csv")
 
@@ -62,6 +68,12 @@ COORD_METHODS = (
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _read_json(path: Path) -> dict:
+    if not path.is_file():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _read(path: Path) -> list[dict]:
@@ -112,8 +124,26 @@ def _evidence(name: str, state: str) -> str:
                 % (len(rows), kept, new))
     rows = [r for r in _read(SEARCH_POOL)
             if r.get("name") == name and r.get("state") == state]
-    return ("64 个独立 GFN2 阳离子起点：**新极小 %d 个**（全部塌缩到已有极小，RMSD 0.0000）"
-            % len(rows))
+    index = _read_json(SEARCH_INDEX)
+    proto = index.get("protocol") or {}
+    key = "%s|%s" % (name, state)
+    n_confs = proto.get("num_confs_per_state")
+    threshold = proto.get("rmsd_threshold_a")
+    # A recorded basin row is the only thing that licenses a RMSD number.
+    rmsds = sorted({float(r["rmsd_to_nearest_known_a"]) for r in rows
+                    if r.get("rmsd_to_nearest_known_a")})
+    if rmsds:
+        return ("首轮搜索在池内实测 **%d** 条新盆地行（`num_confs_per_state=%s`、"
+                "去重阈值 %s Å、seed %s）；与最近已知极小的 RMSD 实测 **%s Å**"
+                % (len(rows), n_confs, threshold, proto.get("seed"),
+                   " / ".join("%.4f" % v for v in rmsds)))
+    if key in (index.get("states_searched") or []):
+        return ("已按首轮协议搜索过（`num_confs_per_state=%s`、seed %s、去重阈值 %s Å），"
+                "但 index 的 `per_state_new_minima` **没有该态条目** ⇒ **未记录到新极小**；"
+                "**逐态 RMSD 全仓无数值出处，故本行不写 RMSD**"
+                % (n_confs, proto.get("seed"), threshold))
+    return ("**index 的 `states_searched` 不含该态** ⇒ 如实记「未记录」；"
+            "**不得把它代写为「新极小 0 个」**")
 
 
 def render() -> str:

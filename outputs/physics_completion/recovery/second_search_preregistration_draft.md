@@ -8,7 +8,7 @@
 | 态 | 限制原因 | 首轮证据 |
 |---|---|---|
 | DMC\|LiM_2plus | `rescue_budget_exhausted` | round-3 motif 搜索：9 候选、保留 1、**新独立盆地 0** |
-| DMC\|M_plus | `rescue_budget_exhausted` | 64 个独立 GFN2 阳离子起点：**新极小 0 个**（全部塌缩到已有极小，RMSD 0.0000） |
+| DMC\|M_plus | `rescue_budget_exhausted` | 已按首轮协议搜索过（`num_confs_per_state=64`、seed 20261021、去重阈值 0.35 Å），但 index 的 `per_state_new_minima` **没有该态条目** ⇒ **未记录到新极小**；**逐态 RMSD 全仓无数值出处，故本行不写 RMSD** |
 | DOL\|LiM_2plus | `rescue_budget_exhausted` | round-3 motif 搜索：6 候选、保留 2、**新独立盆地 0** |
 | EC\|LiM_2plus | `rescue_budget_exhausted` | round-3 motif 搜索：9 候选、保留 1、**新独立盆地 0** |
 
