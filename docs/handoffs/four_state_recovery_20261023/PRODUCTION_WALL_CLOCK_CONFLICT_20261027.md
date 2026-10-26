@@ -68,3 +68,21 @@
   （并见 `:424-426` 用 profile 值改写脚本墙钟）
 - 实测：`outputs/physics_completion/cost/production_cost_ledger.csv`（60 腿）
 - 相关：`DOL_EC_PRODUCTION_COVERAGE_PLAN_20261027.md §3.1`
+
+## 7. 处置（2026-10-27 批次落地后追加，不改动上文历史）
+
+本文记录的「4 h 契约 vs 24 h profile」冲突最终按**上文的选项 C（新增专用 profile）**
+关闭，但采用用户 2026-10-27 裁定的 **`orca_production_12h_v1`**（4 核 × 12 h，本批
+2 腿 = **96 CH**，`paid_from=production`；12 h 是覆盖最长实测腿 ~8 h 的工程余量，
+**不是**收敛保证，费用按终态 sacct 结算、绝不用 36.8 CH 的 p90 估算结）：
+
+- 可执行包现为 `work/hpc_dol_ec_recovery_v1_20261027/`（`resource_profile=orca_production_12h_v1`），
+  由 `scripts/wp_production/build_dol_ec_recovery_package.py` 生成，并经提交器自身加载器
+  （`submit_hpc_batch._load_package` + `submission_resources`）验证（见
+  `tests/test_dol_ec_recovery_package.py`）。
+- 旧草案 `work/dol_ec_recovery_v1/`（`orca_production_v1` / 24 h / 192 CH）**保留作历史，不再提交**；
+  它仍指向「无登记通道」的 `blocked_reason` 也随之作废（通道已落地，见下）。
+- 其他批次的**通用生产墙钟仍为 4 h**（`CAPS["production"][3]`），只有本批两态享 12 h 例外；
+  `preflight.py` 已适配 schema v2（`validate_version` 接受 v1/v2 + 新增
+  `validate_production_batches`：第三态 / 非目标态 / 换 profile / 超 96 CH 均被拒，
+  见 `tests/test_preflight_v2_production_batch.py`）。

@@ -98,7 +98,11 @@ def _probe_starts(name: str, state: str) -> list[str]:
             if r.get("name") != name or r.get("slot") != state:
                 continue
             seed = r.get("seed", "")
-            if seed.startswith("tors_"):
+            # 2026-10-27 ruling: P4/v2-derived starts are recognised by their
+            # EXPLICIT source_kind, never by renaming their seeds to look like the
+            # old torsion-probe family.
+            if (seed.startswith("tors_")
+                    or r.get("source_kind") == "p4v2_screening_v1_start"):
                 out.append(seed)
     return out
 

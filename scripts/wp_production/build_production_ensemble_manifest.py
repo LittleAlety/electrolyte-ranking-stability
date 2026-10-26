@@ -532,6 +532,99 @@ def torsion_probe_candidate_rows():
     return out
 
 
+P4V2_ACTIVATION = REPO / "config" / "recovery_start_activation_v1.json"
+
+
+def p4v2_candidate_rows():
+    """P4/v2 screening-derived starts as candidate rows -- the ACTIVATED ones only.
+
+    Authorized 2026-10-27 (recovery_contract.json v2,
+    ``budget.production_batches.dol_ec_recovery_v1``): one ring-pucker-twist start
+    per DOL/EC, using the ORIGINAL perturbed geometry (never the collapsed screening
+    endpoint), paid from the production 512 cap under ``orca_production_12h_v1``.
+
+    Why activated-only: the aggregator treats every ``planned`` ``recovery_v1_start``
+    as registered work, so a registered-but-never-run start would park its state
+    ``pending`` forever.  The activation registry therefore names exactly the starts
+    this batch will run (2); the other 11 skeleton-moved probes stay reserve
+    (``work/skeleton_only_reclassification.json``).
+
+    Loud by design: an activated start whose package, geometry hash or authoritative
+    gate verdict is missing/drifted/disagreed is an ERROR, not a skip -- an
+    authorization that cannot be honoured must stop the build (the work/ layer is
+    gitignored, so a clean clone fails loudly instead of silently dropping rows).
+    """
+    if not P4V2_ACTIVATION.is_file():
+        return []
+    act = json.loads(P4V2_ACTIVATION.read_text(encoding="utf-8"))
+    source_kind = act.get("source_kind", "")
+    rows, seen = [], set()
+    for entry in act.get("activated", []):
+        key = (entry.get("state_key", ""), entry.get("leaf", ""))
+        if key in seen:
+            raise ValueError("duplicate activation entry: %s/%s" % key)
+        seen.add(key)
+        name, slot = entry["state_key"].split("|")
+        td = REPO / entry["package"] / "tasks" / ("%s__%s" % (name, slot)) / entry["leaf"]
+        cand_path = td / "candidate.json"
+        geom_path = td / "geom.xyz"
+        missing = [p.name for p in (cand_path, geom_path) if not p.is_file()]
+        if missing:
+            raise ValueError("activated start %s: package evidence missing in this "
+                             "checkout (%s) -- refusing to register silently"
+                             % (entry["state_key"], ", ".join(missing)))
+        cand = json.loads(cand_path.read_text(encoding="utf-8"))
+        sha = hashlib.sha256(geom_path.read_bytes()).hexdigest()
+        if sha != entry.get("geometry_sha256", ""):
+            raise ValueError("activated start %s: geometry hash drifted "
+                             "(registry %s, on disk %s)"
+                             % (entry["state_key"],
+                                entry.get("geometry_sha256", "")[:16], sha[:16]))
+
+        def _read_xyz(p):
+            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+            n = int(lines[0].split()[0])
+            syms = [ln.split()[0] for ln in lines[2:2 + n]]
+            xyz = np.asarray([[float(x) for x in ln.split()[1:4]]
+                              for ln in lines[2:2 + n]])
+            return syms, xyz
+
+        # the authoritative gate must STILL classify this start as a covalent-skeleton
+        # change (post 2026-10-27 fix); a pure-Li displacement can never be activated
+        import build_torsion_probe_package as _tpg
+        import build_production_ensemble_aggregator as _agg
+        syms, src = _read_xyz(REPO / cand["source_geometry"])
+        _syms2, cxyz = _read_xyz(geom_path)
+        if _syms2 != syms:
+            raise ValueError("activated start %s: composition mismatch vs source"
+                             % entry["state_key"])
+        verdict = _tpg.validate_candidate_start(
+            syms, src, cxyz, _agg.bond_adjacency(syms, src),
+            check_li_shell=True,
+            declared_li_change=bool(cand.get("declared_li_change", False)))
+        if verdict["reason"] != "ok_heavy_fragment":
+            raise ValueError("activated start %s: the authoritative gate says %r, "
+                             "not ok_heavy_fragment -- a pure-Li displacement must "
+                             "never be activated as a skeleton start"
+                             % (entry["state_key"], verdict["reason"]))
+        charge, mult = SLOT_QM[slot]
+        rows.append({
+            "slot": slot, "mol_id": cand.get("mol_id", ""),
+            "name": name, "member_role": act.get("member_role", "recovery_v1_start"),
+            "seed": entry["seed"], "source_kind": source_kind,
+            "geometry": str(geom_path.relative_to(REPO)).replace("\\", "/"),
+            "sha256": sha,
+            "rel_kcal": "", "denticity": "", "duplicate_of": "",
+            "probe_class": verdict["detail"]["probe_class"],
+            "charge": charge, "multiplicity": mult,
+            "status": "planned",
+            "note": ("activated by recovery_contract v2 batch dol_ec_recovery_v1 "
+                     "(skeleton_pair_change_a=%.4f); original perturbed geometry"
+                     % verdict["detail"]["skeleton_pair_change_a"]),
+        })
+    return rows
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--build-packages", metavar="DIR", default="",
@@ -613,19 +706,33 @@ def main(argv=None) -> int:
     }
     recovery_rows = recovery_candidate_rows() if args.register_recovery else []
     probe_rows = torsion_probe_candidate_rows() if args.register_recovery else []
-    if recovery_rows or probe_rows:
+    # 2026-10-27: the DOL/EC activated starts (exactly 2, contract v2 batch
+    # dol_ec_recovery_v1).  Registered under the same flag so a normal rebuild
+    # without --register-recovery never silently drops an authorization.
+    p4v2_rows = p4v2_candidate_rows() if args.register_recovery else []
+    if recovery_rows or probe_rows or p4v2_rows:
         rows.extend(recovery_rows)
         rows.extend(probe_rows)
+        rows.extend(p4v2_rows)
         # keep the CSV schema order stable: re-dump with the same field order
         with csv_path.open("w", encoding="utf-8", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()), lineterminator="\n")
             w.writeheader()
             w.writerows(rows)
+        if p4v2_rows:
+            print("p4v2 activated candidates registered: %d (%s)"
+                  % (len(p4v2_rows),
+                     ", ".join("%s|%s" % (r["name"], r["slot"]) for r in p4v2_rows)))
         if probe_rows:
             print("torsion probe candidates registered: %d (%s)"
                   % (len(probe_rows),
                      ", ".join(sorted({r["probe_class"] or "unclassified"
                                        for r in probe_rows}))))
+    # counts was built above from the base rows only; refresh the recovery-row
+    # count after the --register-recovery extension so the JSON manifest matches
+    # the candidates CSV it declares (otherwise it under-reports by 16 rows).
+    manifest["counts"]["recovery_v1_start_rows"] = sum(
+        1 for r in rows if r["member_role"] == "recovery_v1_start")
     (OUT / "production_ensemble_manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 
