@@ -31,6 +31,17 @@ RESOURCE_PROFILES = {
     "xtb_screening_v1": {"engine": "xtb", "cores": 2, "wall_hours": 2,
                          "budget_cap_core_hours": "32",
                          "attempts_ledger_required": True},
+    # 2026-10-25 ruling: the v2 screening batch is budgeted EXPLICITLY at the 4 cores
+    # Slurm actually allocates.  Measured cause of the v1 mismatch: hpc.ps1:589-595
+    # rewrites #SBATCH --ntasks from --cores and leaves --cpus-per-task alone, so
+    # allocated = cores x cpus-per-task (v1: 2 x 2 = 4 while only 2 were budgeted).
+    # v2 therefore pairs --cores 4 with a script that declares
+    # `#SBATCH --ntasks=4` + `#SBATCH --cpus-per-task=1` => 4 allocated == 4 declared
+    # == 4 budgeted.  Cap 16 CH = the worst case in which all four states run
+    # (4 states x 4 cores x 1 h); the first submission reserves only 8 CH (DOL/EC).
+    "xtb_screening_v2": {"engine": "xtb", "cores": 4, "wall_hours": 1,
+                         "budget_cap_core_hours": "16",
+                         "attempts_ledger_required": True},
 }
 DEFAULT_RESOURCE_PROFILE = "orca_production_v1"
 ORCA_NPROCS_RE = re.compile(r"%pal\s+nprocs\s+(\d+)", re.I)

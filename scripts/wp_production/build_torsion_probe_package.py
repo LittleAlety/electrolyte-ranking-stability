@@ -1129,7 +1129,16 @@ def write_p4_screening_package(output_package=P4_SCREENING_PACKAGE):
 
 
 def check_p4_screening_package(output_package=P4_SCREENING_PACKAGE) -> list[str]:
-    """Pure read-only check: report drift but never repair or recreate a file."""
+    """Pure read-only check: report drift but never repair or recreate a file.
+
+    NOTE (2026-10-25): this is a BUILD-DRIFT check -- it recomputes the package
+    from the current builder and byte-compares.  It is therefore only meaningful
+    for a package that has NOT yet been executed: once the elements have run, the
+    tree legitimately gains execution-side files (xtb outputs, slurm logs) and the
+    generator itself may have evolved (``generator_sha256``), so drift is expected.
+    For a settled package use ``PACKAGE_SHA256SUMS`` (internal byte consistency)
+    plus the frozen pre-settlement copies under ``attempts/`` instead.
+    """
     output_package = Path(output_package)
     expected = build_p4_screening_files()
     problems = []
