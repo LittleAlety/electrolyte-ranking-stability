@@ -29,7 +29,7 @@
 
 | 态 | 已运行尝试 | failure class / 结论 | 证据 |
 |---|---|---|---|
-| `DMC\|M_plus` | 生产层 **18 条失败腿**（含 superseded）；筛选层 P4 2 探针 | `verytight_convergence` / `max_cycles_exhausted` / `strict_reopt_required` **三类同型** | `production_ensemble_structures.csv` + 原始 ORCA 日志逐循环解析 |
+| `DMC\|M_plus` | 生产层 **18 条失败腿**（含 superseded）⚠**口径更正（2026-10-27）**：18 = DMC/DOL/EC **三家合计**（判读文档 `DMC_THRESHOLD_DIAGNOSIS:3` 原文口径）；**DMC 单家实为 14**（8 条 QC 失败 + 6 条 superseded，`production_ensemble_structures.csv` 现测）；筛选层 P4 2 探针 | `verytight_convergence` / `max_cycles_exhausted` / `strict_reopt_required` **三类同型** | `production_ensemble_structures.csv` + 原始 ORCA 日志逐循环解析 |
 | `DMC\|LiM_2plus` | 同上家族 | 同上 | 同上 |
 | `DOL\|LiM_2plus` | 筛选层 `strict_recovery_v1`（**0 起点**）+ P4 2 探针 + v2 10 探针 | 三轮独立方法**未找到新重骨架盆地**；**且当前无登记通道可用**（见 §1.1） | `P4/V2_RESULTS_ADJUDICATION`、`DOL_EC_NO_CANDIDATE_ROOT_CAUSE` |
 | `EC\|LiM_2plus` | 同上（v2 10 探针） | 同上；**但 EC 侧 10/10 涉机器 `no_duplicate`** ⇒ 存在冻结规则下合格候选 | `P4_V2_NO_DUPLICATE_CORRECTION` |
