@@ -164,9 +164,24 @@ H2 的通用回收器是 **xTB 导向**的（只认 `xtbopt.*`），而 H2 产�
 | 输出含 `VIBRATIONAL FREQUENCIES` | `method_drift_not_single_point` | **单点不得算 Hessian** |
 | 末几何哈希 ≠ 输入哈希 | `geometry_changed_in_single_point` | 单点必须**不改几何** |
 
-**H2 最终判定**（冻结在预注册稿）：同一槽位 {v2 末几何, 已登记极小} 的 DFT 能量差
-**< 0.5 kcal/mol ⇒ `h2_falsified_same_basin`**（GFN2 的「同一盆地」得到冻结方法支持）；
-**≥ 0.5 ⇒ `h2_supported_split_detected`**（需更高级别搜索）。
+**H2 最终判定（⚠ 已于 2026-10-27 校准，取代初版「0.5 kcal」）**
+
+**初版的问题（我自查发现）**：我原先写「同一槽位 DFT 能量差 **< 0.5 kcal ⇒ 否证 / ≥0.5 ⇒ 支持**」。
+那 **0.5 是凭经验选的、无证据依据**，且**判定变量也写错了**——初版拿「同一槽位两个变体的绝对跨度」，
+而 H2 真正要问的是「**DFT 能否重现 GFN2 给出的『这两个几何本质等能』这一结论**」。
+
+**实测校准依据**（`work/_v2_triage_out.json`，GFN2 侧）：**同一盆地内**的探针能量差**并不均匀**——
+组内跨度 0.00017–0.0031 kcal，但 **DOL `li_coordination_away` 比其已登记极低迷低 0.3455 kcal**（RMSD 仅 0.18 Å）。
+⇒ **GFN2 意义上的「同一盆地」合法地可跨约 0.35 kcal**，任何任意绝对值切点都会「碰巧」分类。
+
+**冻结规则（在任何 DFT 数值存在之前写下）**：
+- 判定变量＝**成对的 DFT 相对能量差** `|E_dft(final) − E_dft(kept)|`；
+- **`≤ 0.35 kcal/mol` ⇒ `h2_falsified_same_basin`**（冻结方法保持它们等能 ⇒ GFN2 单盆地不是伪影）；
+- **`> 0.35` ⇒ `h2_supported_split_detected`**（冻结方法把它们劈开 ⇒ 需要更高级别搜索）。
+- **0.35 kcal 取自实测的最大同盆地 GFN2 跨度（DOL away 0.3455，向上取整）⇒ 是实证上界，不是猜测。**
+- 缺任一变体 ⇒ **`insufficient_data`**（不猜）。
+
+**自测覆盖**：等能对、劈开对、**边界 0.34（通过）/ 0.36（不通过）**、缺变体 ⇒ 全过；RED 三条 guard 仍各 `exit=1`。
 
 **RED 实证**（`work/_h2_judge_red.py`）：逐条删除 guard 后必须变红——实测三条 guard
 （termination / single-point drift / no-energy）各自删除后 `exit=1` ⇒ **RED PROVEN**。
