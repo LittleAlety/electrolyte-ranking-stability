@@ -7,7 +7,7 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 178,
+  "test_files": 179,
   "tests_passed": 1732
  },
  "wp2_progress": {
@@ -1840,7 +1840,7 @@ window.HB = {
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 181
+   "files": 182
   },
   {
    "path": "docs",
