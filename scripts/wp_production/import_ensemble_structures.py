@@ -1315,6 +1315,28 @@ def ledger_role_index() -> dict:
     return _LEDGER_ROLE_CACHE
 
 
+def _p4v2_activated_set() -> set | None:
+    """The (name, seed) pairs authorised by the tracked activation registry.
+
+    ``None`` when the registry is absent or unreadable -- callers must treat
+    that as a refusal, never as "everything activated" (fail-closed).
+    """
+    p = REPO / "config" / "recovery_start_activation_v1.json"
+    if not p.is_file():
+        return None
+    try:
+        doc = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    out = set()
+    for e in doc.get("activated", []):
+        st = str(e.get("state_key", ""))
+        if "|" not in st:
+            return None
+        out.add((st.split("|")[0], str(e.get("leaf", ""))))
+    return out
+
+
 def resolve_member_identity(pkg, name, slot, seed, pm, registry, ledger_roles):
     """Resolve one task's identity and role from DECLARED sources only.
 
@@ -1343,8 +1365,18 @@ def resolve_member_identity(pkg, name, slot, seed, pm, registry, ledger_roles):
               "structure_ledger" if ledger_role else "")
 
     if pm is not None and (_is_round2_package(pkg) or not registry):
+        # 2026-10-27 ruling: never flatten a DECLARED provenance to the literal
+        # default -- a package manifest that names p4v2_screening_v1_start must
+        # keep it, and that provenance is only valid for ACTIVATED starts.
+        declared_kind = str(pm.get("source_kind") or "")
+        if declared_kind == "p4v2_screening_v1_start":
+            activated = _p4v2_activated_set()
+            if activated is None:
+                return None, role, source, "p4v2_activation_registry_missing"
+            if (name, seed) not in activated:
+                return None, role, source, "p4v2_start_not_activated"
         cand = {"name": name, "slot": slot, "mol_id": pm.get("mol_id", ""),
-                "seed": seed, "source_kind": "round2_pool_extension",
+                "seed": seed, "source_kind": declared_kind or "round2_pool_extension",
                 "charge": str(pm.get("charge", "")),
                 "multiplicity": str(pm.get("multiplicity", "")),
                 "geometry": pm.get("source_geometry", "")}
