@@ -42,6 +42,16 @@ RESOURCE_PROFILES = {
     "xtb_screening_v2": {"engine": "xtb", "cores": 4, "wall_hours": 1,
                          "budget_cap_core_hours": "16",
                          "attempts_ledger_required": True},
+    # 2026-10-27 H2 (single-point) profile.  Measured (not assumed): this helper does
+    # NOT read the script's `#SBATCH --time` -- it REWRITES the wall clock from the
+    # profile (`:424-426`) and budgets the profile's value (`budget_headroom`).  So a
+    # script that says 5 minutes still reserves 4 cores x 1 h x 6 = **24 CH**, which the
+    # user's 2 CH ceiling rejects.  The wall clock therefore has to live in the PROFILE:
+    # 5 min/point (measured median 81 s, ~4x headroom) => 4 x (5/60) x 6 = 1.999 CH.
+    # H2 runs ORCA single points, so the engine is orca while the profile stays cheap.
+    "h2_single_point_v1": {"engine": "orca", "cores": 4, "wall_hours": 1 / 12.0,
+                           "budget_cap_core_hours": "2",
+                           "attempts_ledger_required": True},
 }
 DEFAULT_RESOURCE_PROFILE = "orca_production_v1"
 ORCA_NPROCS_RE = re.compile(r"%pal\s+nprocs\s+(\d+)", re.I)
@@ -421,7 +431,11 @@ def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
                              % batch) from exc
         journal["submissions"].append(record)
         _write_journal(journal_path, journal)
-        wall = "%02d:00:00" % resources["wall_hours"]
+        # fractional wall hours must survive (H2 = 5 min); "%02d:00:00" would
+        # truncate 1/12 h to 00:00:00 and Slurm would kill the job instantly.
+        _wh = float(resources["wall_hours"])
+        _mins = int(round(_wh * 60))
+        wall = "%02d:%02d:00" % (_mins // 60, _mins % 60)
         result = runner([str(bridge), "submit", str(script), "--cores",
                          str(resources["cores"]), "--time", wall,
                          "--workdir", remote_workdir])

@@ -99,3 +99,24 @@ wB97X-D4 层也认为同一极小）？
 本文 §2 的**第一个版本把「当前指向」凭印象写死**（写成 `away_00`/`ring_pucker_02`/`away_00`），
 实测复算后**三处全错**（正确为 `ring_pucker_02` / `away_04` / `away_01`）——恰是我此前记录过的
 「别靠记忆写具体值、要现算」那类错误。**已在提交前改正**，并把该教训写进提交信息。
+## 9. 提交前五门实测（2026-10-27）与一处**新发现的真缺陷**
+
+**五门复验（离线、提交器自身门函数求值）**：
+| 门 | 实测 |
+|---|---|
+| 包清单/批次 | `_load_package` count=6、`batches[0].array="0-5%6"` |
+| 核数一致 | `declared_task_cores=4` == profile `cores=4` |
+| 预算 | `committed 0 + reserved 2.0 ≤ cap 2` ✔ |
+| 墙钟 | `--time=00:05:00`（由 profile 的 1/12 h 换算） |
+| 单点纪律 | `--check` 断言 job.inp 无 `Opt`/`AnFreq`/`NumGrad` |
+
+**新发现的真缺陷（提交器，非本包）**：`budget_headroom()` 用的是 **profile 的 `wall_hours`**，
+而**不读**脚本里的 `#SBATCH --time`；且提交时**会用 profile 值改写脚本墙钟**（`:424-426`）。
+⇒ 我原先把「5 分钟」写在 sbatch 里**是无效的**：预留仍按 1 h 算 = **24 CH**，被 2 CH 上限拒绝（实测报错）。
+**修法（已入库）**：
+1. 新增专用 profile **`h2_single_point_v1`** = `{engine orca, cores 4, wall_hours 1/12, cap 2, ledger required}`
+   —— 墙钟属于**资源协议**，必须写在 profile 里，不能藏在脚本；改 profile 不波及 v2/orca。
+2. `wall = "%02d:00:00"` 会**把 1/12 h 截成 00:00:00**（Slurm 会立刻杀作业）⇒ 改为
+   `"%02d:%02d:00"` 的分钟级换算；**回归实测**：orca 24:00:00 / v1 02:00:00 / v2 01:00:00 **三个旧 profile 输出完全不变**，
+   H2 得 `00:05:00`。`test_submit_hpc_batch` 12 项全过。
+**教训**：**「参数写在脚本里」不等于「参数会被采用」**——凡提交器会改写/重算的量，必须写进它读取的那一层（profile）。
