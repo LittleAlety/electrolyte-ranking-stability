@@ -45,8 +45,14 @@
 > 实测生产函数 `acceptance_decision` **只认 `verdict == "resolved"`**；`search_exhausted` ⇒ **仍是 `limited`**
 > （四种 verdict 实测：`resolved`⇒accepted、**`search_exhausted`⇒limited**、`unresolved`⇒limited、`pending`⇒limited）。
 > DOL/EC 的复核 verdict 正是 **`search_exhausted`** ⇒ **它们在现行机器规则下永远不会变成 `accepted`**。
-> ⇒ **H3 不是「换标签」，而是「承认这 2 态严格意义上不可接受、如实用 `limited` 结题」**——
-> **它是一个停止条件决定，不是一条恢复路径。**（限制报告已经按 `limited` 如实收口。）
+> ⇒ **H3 不是「换标签」，而是「承认这 2 态在当前证据下不可接受、如实用 `limited` 结题」**。
+>
+> **⚠ 用户裁定（2026-10-27）**：H3 **是「本轮停止条件」，但用户明确不同意**「探针不属生产证据 ⇒ **永久终局**」这一推论。
+> 用户原话要旨：「**不同意『探针不属生产证据，所以永久终局』这个推论**」；
+> 「**DOL/EC 不必强行找到第二个极小才能恢复，但必须证明独立起点在生产方法下通过了验证**」。
+> ⇒ **日后若补上生产级 `computed` 证据**（严格优化 + `AnFreq` + 身份 QC + 去重、生产证据齐全），
+> 仍可走 `single_basin_verified` ⇒ `resolved` ⇒ `accepted`。**是本轮证据不足，不是永久终局。**
+> **另**：用户裁定 **S2 沿用 `away_01`**；**0.35／1.0／3.0 只作描述性分档，不用于判定盆地相同或不同**。
 
 ### H1——版本化改优化设定救 DMC（成本最高）
 

@@ -1,26 +1,47 @@
-# 覆盖复核未登记 P4/v2 探针——一处**待裁定的登记缺口**（2026-10-27）
+# 覆盖复核未登记 P4/v2 探针——一处**接线不完整**（2026-10-27，**经用户纠正后更正**）
 
-> 本轮在核对「DOL/EC 为何是 `search_exhausted`」时发现一处**真实缺口**。
-> **本文只诊断与呈报，不修改任何 verdict、不放宽任何规则**——因为修它等于改变机器判定的输入。
-> **纯只读、零计算。**
+> **⚠ 本文核心推断已被用户纠正并经我方实测确认为错——保留原文并加更正，不抹除。**
+>
+> **错在哪**：我把 `search_exhausted` 分支的条件 `not latest_members`（`:177`）解释为
+> 「**登记了起点但没跑**」。**这是误读。** 用户指出：`latest_members` 是**已选入复核的生产恢复成员**，
+> **不是** `registered_starts`。我方**实测复现该反例**：
+>
+> | 输入 | route |
+> |---|---|
+> | 无 starts | `search_exhausted` |
+> | **只加 `registered_starts`（仍是空生产成员）** | **仍然是 `search_exhausted`** ✅ **用户正确** |
+> | 有 `computed` 生产成员 + 生产证据齐全 | `single_basin_verified` |
+> | 有 `computed` 生产成员 + 生产证据缺失 | `known_basin_reproduction` |
+>
+> ⇒ **只补登记并不能改变 route**；要离开 `search_exhausted` **必须有生产侧的 `computed` 成员**。
+> 故我原文「补登记即可走 single_basin_verified」的暗示**不成立**，**必须撤回**。
+>
+> **仍然成立的部分**：P4/v2 的 28 条探针**确实没有登记进 `coverage_reviews` 的起点集合**
+> （`_probe_starts` 只收 `tors_` 前缀、且候选 CSV 里根本没有这些种子）——**这是真的接线缺口**，
+> 但它**不是**「accepted 被登记遗漏挡住」的原因。
+
+## 0. 结论（更正后）
+
+**接线不完整是真的；据此外推「补登记就能 recovered」是错的。**
+正确关系：`search_exhausted` ↔ **无生产恢复成员**；恢复**必须**有**生产级 `computed` 成员**
+（`single_basin_verified` 还要求生产证据齐全 + 搜索范围有文档）。
+**补齐登记只是把筛选证据接上线，不能代替生产计算。**
 
 ## 1. 事实链（每步实测）
 
-1. `accepted` **只能**由 `acceptance_decision` 产生，判据是 **`cov.verdict == "resolved"`**（`3abe7b3` 已查明）。
-2. `verdict == "resolved"` 只由两条 route 产生：**`multi_basin_coverage`** 与 **`single_basin_verified`**
-   （`build_coverage_reviews.py:358-359`）；`known_basin_reproduction` ⇒ **`unresolved`**（`:361-362`）。
-3. 那么 DOL/EC 为何走了 **`search_exhausted`**？——因为 `coverage_route` 的该分支要求
-   **`latest_members` 为空**（`build_coverage_reviews.py:176-188`）：即「**登记了起点但没跑**」才能判 `search_exhausted`。
-4. **而 P4/v2 实际跑了 28 条探针**（P4 job `3774215` 8 条 + v2 job `3777206` 20 条）。⇒ **矛盾**。
-5. 根因：**探针从未登记进覆盖复核的输入**。
-   - `registered_starts` 由 `starts` 组装（`build_coverage_reviews.py:250-256`）：
-     冻结 recovery 行（`manifest` 的 `start_1_basin`/`start_2_basin`）**并集** `_probe_starts(name, state)`。
-   - `_probe_starts`（`:84-103`）读 `outputs/physics_completion/ensembles/production_ensemble_candidates.csv`，
-     且**只收 `seed.startswith("tors_")`**（`:101`）。
-   - **实测该 CSV（119 行）里 DOL/EC 的 `LiM_2plus` 只有 `c01`/`c03`/`c05` 这类旧种子**，
-     **没有任何 P4/v2 探针种子**（其命名是 `ring_pucker_00` / `li_coordination_away_00` / `p4_01_torsion_*`，
-     **不以 `tors_` 开头**）。
-   ⇒ 两道过滤**同时**拦下：文件里没有 + 前缀不匹配。故 `starts` 为空 ⇒ `search_exhausted`。
+1. `accepted` **只能**由 `acceptance_decision` 产生，判据是 **`cov.verdict == "resolved"`**（`3abe7b3`）。
+2. `verdict == "resolved"` 只由 **`multi_basin_coverage`** 与 **`single_basin_verified`** 产生（`:358-359`）；
+   `known_basin_reproduction` ⇒ **`unresolved`**（`:361-362`）。
+3. `search_exhausted` 的条件是 **`not latest_members` 且 `search_outcome == "no_new_minimum_found"`**（`:176-185`），
+   其中 **`latest_members` ＝ 已选入复核的「生产恢复成员」**，与 `registered_starts` **不是同一概念**（`:172-190`）。
+4. **实测**：`registered_starts` 非空而 `latest_members` 为空 ⇒ **仍是 `search_exhausted`**（用户反例，我方已复现）。
+5. 真正的接线缺口：`registered_starts` 由 `:250-256` 组装 = 冻结 recovery 行 ∪ `_probe_starts()`；
+   而 `_probe_starts()`（`:84-103`）**只收 `seed.startswith("tors_")`**（`:101`），
+   且实测 `production_ensemble_candidates.csv`（119 行）里 **DOL/EC 的 `LiM_2plus` 只有 `c01`/`c03`/`c05` 等旧种子，
+   没有任何 P4/v2 探针**（命名 `ring_pucker_00`/`li_coordination_away_00`/`p4_01_torsion_*`，**不以 `tors_` 开头**）。
+   ⇒ **筛选证据没有接上线**，但这**只影响「搜索范围文档」一侧**，**不改变 `search_exhausted` 的成立条件**。
+
+
 
 ## 2. 这个缺口意味着什么（**关键**）
 
@@ -33,8 +54,11 @@
 | **有起点（`computed`,`known`）+ 搜索范围有文档** | **`single_basin_verified`** | **`resolved`** | **`accepted`** |
 | 有起点（`computed`,`known`）+ 生产证据缺失 | `known_basin_reproduction` | `unresolved` | `limited` |
 
-⇒ **DOL/EC 存在一条「已被现行规则支持、但因登记缺失而未走」的路径**：
-`探针登记 → known → 搜索范围有文档 → single_basin_verified → resolved → accepted`。
+⇒ **⚠ 更正（用户纠正 + 我方实测）**：上表第一行「有起点(`computed`,`known`)+搜索范围有文档」中的
+**「起点」必须是「生产恢复成员（`latest_members`）」**，**不是 `registered_starts`**。
+故**不能**说「DOL/EC 因登记缺失而未走这条路」——补登记**不改变** route（实测仍 `search_exhausted`）。
+**正确表述**：DOL/EC 要走 `single_basin_verified`，**必须有一个或多个人生产级 `computed` 成员**
+（严格优化 + AnFreq + 身份 QC + 去重，且生产证据齐全）；**登记只是接线，不能代替计算**。
 
 ## 3. 但**不能**据此宣布「可以恢复」——三个必须核实的门槛
 
@@ -47,7 +71,36 @@
 **门槛 3 尤其要紧**：「探针复现了已知极小」在 **GFN2 层**成立，但 `single_basin_verified` 的语义是
 「**生产侧**已确认单盆地」。把 GFN2 探针当生产证据，可能违反「不把 GFN2 当生产自由能」的红线。
 
-## 4. 我的建议（**不自行执行**）
+## 3.5 用户裁定（2026-10-27，**已采纳，取代 §4 我的建议**）
+
+| 待裁定事项 | 用户裁定 |
+|---|---|
+| **P4/v2 是否登记** | **作为「筛选证据」登记：是**；**直接作为生产级 `computed` 成员：否**。另建**版本化映射**，保留原始执行时间、方法、几何与日志哈希 |
+| **H2 是否执行** | **暂不作为恢复前置条件**。修正验收缺口后**可做小额能量诊断**；但**单点结果不能证明同盆地，也不能替代生产覆盖证据** |
+| **H3 是否结题** | **可定稿本轮限制报告**，保留 **44/48** 与严格目标未完成。**明确不同意**「探针不属生产证据 ⇒ 永久终局」这一推论 |
+| **S2 与阈值** | **沿用 `away_01`**；0.35／1.0／3.0 **只能作明确标注的描述性分档，不用于判定盆地相同或不同** |
+
+**用户给执行侧的下一步顺序（4 步）**：
+1. **补齐 28 条筛选证据的登记与引用**——按态拆分：DOL/EC 合计 **24** 条、DMC 两态合计 **4** 条；
+   注明这是**历史执行证据的补接线**，**不能伪装成事前生产预注册**；**补登记后的验收预期仍为 44/4**。
+2. **为 DOL/EC 各准备一个生产级覆盖验证方案**——从可追溯、经**非刚体与身份预检**的**独立起点**出发，
+   冻结候选、次数、成本与停止条件；**单纯重复提交已知极小的相同几何，不能冒充独立搜索**。
+3. **通过真实生产计算补足证据**——冻结方法下完成严格优化、`AnFreq`、身份 QC 与去重，
+   由 importer 验证方法与原始文件；**`imaginary_modes`、两个哈希字段「非空」本身不足以证明生产证据合格**。
+4. **按结果自动走覆盖路线**：QC 通过且复现已接受极小 + 搜索范围与其他证据齐全 ⇒ **`single_basin_verified`**；
+   通过 QC 且得新极小 ⇒ **`multi_basin_coverage`**；QC 失败或证据不完整 ⇒ **继续 `limited`**，保留原因与成本。
+
+**用户的核心结论（原话要旨）**：
+> 「**DOL/EC 不必强行找到第二个极小才能恢复，但必须证明独立起点在生产方法下通过了验证。**
+> **『版本化登记』能够建立这条证据链，不能替代其中的计算。**」
+
+## 4. 我的建议（**不自行执行**）——⚠ **已被用户裁定取代（见 §3.5）**，仅作过程记录
+
+> 本文 §4 原建议的第 3 条（「若裁定为是，须另立版本化登记批次」）与用户裁定方向一致；
+> 但**第 4 条「若裁定为否，则 `search_exhausted` 就是终局」已被用户明确否定**
+> （原话要旨：「**不同意『探针不属生产证据，所以永久终局』这个推论**」）。
+> **以 §3.5 为准。**
+
 
 1. **不修改** `coverage_reviews.csv`、**不放宽** `_probe_starts` 的前缀过滤、**不改** `coverage_route`；
 2. **把本缺口作为一项独立裁定**呈报：**「P4/v2 探针是否构成 `single_basin_verified` 所需的已登记起点」**；
