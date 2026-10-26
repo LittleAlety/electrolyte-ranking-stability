@@ -215,3 +215,28 @@ H2 的通用回收器是 **xTB 导向**的（只认 `xtbopt.*`），而 H2 产�
 （termination / single-point drift / no-energy）各自删除后 `exit=1` ⇒ **RED PROVEN**。
 **过程中发现并修掉一个真缺口**：`no_energy_parsed` 分支最初**没有任何用例覆盖**
 （我引用的用例名不存在），是 RED 把它抓出来的。
+
+## 12. `--check` 的自证盲区已修补（2026-10-27）
+
+**问题（上轮暴露）**：H2 包的 `--check` 原先只做 `manifest.reservation > manifest.cap` 的**自证比对**，
+**完全不解析 profile**。所以当 `resource_profile` 仍是旧的 `xtb_screening_v2`（⇒ `--time=01:00:00`、cap 16）时，
+它照样打印 `H2 PACKAGE OK`。**读取被测物自身无法发现被测物错了**。
+
+**修法**：`--check` 现在**通过真实提交器解析包**并逐项比对：
+`submission_resources()` 解析出的 profile 名必须等于 `h2_single_point_v1`、墙钟必须 5 分钟、cap 必须 2；
+`declared_task_cores` 必须等于 profile 的 `cores`；`committed + reserved ≤ cap`；
+manifest 的 `resource_profile` 必须等于解析结果。
+
+**RED 实证**（`work/_h2_package_check_red.py`，每例在**包的副本**上做一处破坏）：
+
+| 破坏 | `--check` | 说明 |
+|---|---|---|
+| **profile 改回 `xtb_screening_v2`** | **STALE** ✅ | **正是上轮漏掉的那条** |
+| `job.inp` 加 `Opt` | **STALE** ✅ | 单点纪律被破坏 |
+| sbatch 删 `--partition=hpxg` | **STALE** ✅ | 与 3774076 失败同因 |
+
+⇒ **RED PROVEN**（3/3）。
+
+**过程中删掉一条自己的无效用例**：我最初还加了「改账本里的 `resource_profile` 应报错」——
+但**账本的该字段不是权威来源**（提交器读 manifest），所以它不报错是**正确的**，
+把这条当缺陷是我的判据错了。**用例必须只针对权威字段。**
