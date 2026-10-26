@@ -143,3 +143,32 @@ wB97X-D4 层也认为同一极小）？
    ⇒ **审计器必须与被审计对象走同一条判据分支**，否则产生幻影缺陷（与我此前记的「数目对不上先分三种可能」同族）。
 
 **注**：审计器位于 `work/`（gitignored 机器本地层），按项目纪律**不入库**；本段即其留痕。
+
+## 11. 判定入口（2026-10-27 补齐）——`work/_h2_retrieve_and_judge.py`
+
+**为什么必须先有它**：计划 item 2 的警告原话是「**避免计算成功后才发现验收器无入口**」。
+H2 的通用回收器是 **xTB 导向**的（只认 `xtbopt.*`），而 H2 产出的是 **ORCA 单点输出**（`job.out`）
+⇒ 若不预先补，作业跑完将**无处判定**。
+
+**两种模式**：
+- `--selftest`（**离线**，无需超算）：合成 7 类 ORCA 输出并断言分类正确；
+- `--plan-fetch JOBID`：**只打印**逐元素 `sacct` / `sha256sum` 检索命令（不执行），供 runbook 使用。
+
+**判定规则（7 类，全部离线自测通过）**：
+| 情形 | 状态 | 依据 |
+|---|---|---|
+| 正常终止 + 有能量 + 几何未变 | **`computed`** | `FINAL SINGLE POINT ENERGY` 解析成功 |
+| 无 `ORCA TERMINATED NORMALLY` | `technical_failed` | 截断/被杀 |
+| 正常终止但**无能量行** | `no_energy_parsed` | 不许把「终止」当「有结果」 |
+| 输出含 `GEOMETRY OPTIMIZATION CONVERGED` | `method_drift_not_single_point` | **单点不得优化**（方法漂移） |
+| 输出含 `VIBRATIONAL FREQUENCIES` | `method_drift_not_single_point` | **单点不得算 Hessian** |
+| 末几何哈希 ≠ 输入哈希 | `geometry_changed_in_single_point` | 单点必须**不改几何** |
+
+**H2 最终判定**（冻结在预注册稿）：同一槽位 {v2 末几何, 已登记极小} 的 DFT 能量差
+**< 0.5 kcal/mol ⇒ `h2_falsified_same_basin`**（GFN2 的「同一盆地」得到冻结方法支持）；
+**≥ 0.5 ⇒ `h2_supported_split_detected`**（需更高级别搜索）。
+
+**RED 实证**（`work/_h2_judge_red.py`）：逐条删除 guard 后必须变红——实测三条 guard
+（termination / single-point drift / no-energy）各自删除后 `exit=1` ⇒ **RED PROVEN**。
+**过程中发现并修掉一个真缺口**：`no_energy_parsed` 分支最初**没有任何用例覆盖**
+（我引用的用例名不存在），是 RED 把它抓出来的。
