@@ -297,9 +297,14 @@ def budget_headroom(attempts, *, cap, cores, wall_hours, task_count) -> dict:
     from decimal import Decimal
     reserved = (Decimal(str(cores)) * Decimal(str(wall_hours))
                 * Decimal(str(task_count)))
-    return {"committed_core_hours": None, "reserved_core_hours": str(reserved),
+    committed = committed_core_hours(attempts)
+    cap = Decimal(str(cap))
+    if committed + reserved > cap:
+        raise ValueError("core-hour budget exceeded: committed %s + reserved %s > cap %s"
+                         % (committed, reserved, cap))
+    return {"committed_core_hours": str(committed), "reserved_core_hours": str(reserved),
             "cap_core_hours": str(cap),
-            "remaining_after_core_hours": None}
+            "remaining_after_core_hours": str(cap - committed - reserved)}
 
 
 def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
