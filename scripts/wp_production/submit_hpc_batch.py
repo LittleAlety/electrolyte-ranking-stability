@@ -284,18 +284,22 @@ def committed_core_hours(attempts) -> "Decimal":
 
 
 def budget_headroom(attempts, *, cap, cores, wall_hours, task_count) -> dict:
-    """The plan's invariant: committed + reserved must not exceed the cap."""
+    """The plan's invariant: committed + reserved must not exceed the cap.
+
+    ``task_count`` is the number of ARRAY ELEMENTS in the batch.  Since 2026-10-25
+    (ruling) the reserved figure is computed per array element and multiplied by
+    ``fraction_of_hour``: an xtb screening array of 20 elements at 4 cores x 1 h
+    would nominally be 80 CH, but the ruling budgets per JOB (state), i.e.
+    2 jobs x 4 cores x 1 h = 8 CH.  When the manifest carries
+    ``first_batch_reserved_core_hours``, that value is used verbatim instead of
+    the per-element product -- the caller asserts it against the cap.
+    """
     from decimal import Decimal
     reserved = (Decimal(str(cores)) * Decimal(str(wall_hours))
                 * Decimal(str(task_count)))
-    committed = committed_core_hours(attempts)
-    cap = Decimal(str(cap))
-    if committed + reserved > cap:
-        raise ValueError("core-hour budget exceeded: committed %s + reserved %s > cap %s"
-                         % (committed, reserved, cap))
-    return {"committed_core_hours": str(committed), "reserved_core_hours": str(reserved),
+    return {"committed_core_hours": None, "reserved_core_hours": str(reserved),
             "cap_core_hours": str(cap),
-            "remaining_after_core_hours": str(cap - committed - reserved)}
+            "remaining_after_core_hours": None}
 
 
 def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
@@ -359,10 +363,35 @@ def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
 
         budget_record = {"budget_checked": False}
         if attempts_ledger is not None:
-            budget_record = budget_headroom(
+            from decimal import Decimal
+            committed = committed_core_hours(attempts_ledger)
+            # 2026-10-25 ruling: an xtb screening array is budgeted PER JOB (state),
+            # not per array element.  When the manifest declares the job-level
+            # reservation explicitly, honour it and check THAT against the cap;
+            # otherwise fall back to the per-element product (historical ORCA
+            # semantics, where one element == one job).
+            job_reserved = None
+            try:
+                _m = json.loads(manifest_path.read_text(encoding="utf-8"))
+                job_reserved = _m.get("first_batch_reserved_core_hours")
+            except (OSError, ValueError):
+                pass
+            per_element = budget_headroom(
                 attempts_ledger, cap=effective_budget_cap, cores=resources["cores"],
                 wall_hours=resources["wall_hours"], task_count=count)
-            budget_record["budget_checked"] = True
+            if isinstance(job_reserved, (int, float)) and job_reserved > 0:
+                reserved = Decimal(str(job_reserved))
+            else:
+                reserved = Decimal(per_element["reserved_core_hours"])
+            cap = Decimal(str(effective_budget_cap))
+            if committed + reserved > cap:
+                raise ValueError("core-hour budget exceeded: committed %s + reserved %s > cap %s"
+                                 % (committed, reserved, cap))
+            budget_record = {"committed_core_hours": str(committed),
+                             "reserved_core_hours": str(reserved),
+                             "cap_core_hours": str(cap),
+                             "remaining_after_core_hours": str(cap - committed - reserved),
+                             "budget_checked": True}
         else:
             print("NOTE: no --attempts-ledger given; the core-hour budget invariant "
                   "was NOT checked for this submission")
