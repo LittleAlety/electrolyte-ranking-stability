@@ -41,12 +41,19 @@
 | 不做的后果 | 四态**永远停在「待判」**，限制报告无法定稿 |
 | 建议 | **若先做 H2**，则 H2 结果出来再定 H3（H2 若否证 GFN2，H3 就更有依据）⇒ **建议 H3 排在 H2 之后** |
 
+> **⚠ H3 的含义已于 2026-10-27 精确澄清（`FOUR_STATE_ACCEPTANCE_PATH_20261027.md`，`3abe7b3`）**：
+> 实测生产函数 `acceptance_decision` **只认 `verdict == "resolved"`**；`search_exhausted` ⇒ **仍是 `limited`**
+> （四种 verdict 实测：`resolved`⇒accepted、**`search_exhausted`⇒limited**、`unresolved`⇒limited、`pending`⇒limited）。
+> DOL/EC 的复核 verdict 正是 **`search_exhausted`** ⇒ **它们在现行机器规则下永远不会变成 `accepted`**。
+> ⇒ **H3 不是「换标签」，而是「承认这 2 态严格意义上不可接受、如实用 `limited` 结题」**——
+> **它是一个停止条件决定，不是一条恢复路径。**（限制报告已经按 `limited` 如实收口。）
+
 ### H1——版本化改优化设定救 DMC（成本最高）
 
 | 项 | 内容 |
 |---|---|
 | 在问什么 | DMC 的浅赝平坦谷，能否靠**改优化设定**（不降阈值）通过五阈值？ |
-| 已知事实 | 生产层 **18 条失败腿**三类同型（已证同设置重试无效）；GFN2 层其探针**全部**回同一极小 |
+| 已知事实 | 生产层 **18 条失败腿**三类同型（已证同设置重试无效）；GFN2 层其探针**全部**回同一极小；且 **DMC 两态的复核是 `unresolved`（`unresolved_qc`），与 DOL/EC 的 `search_exhausted` 处境不同**——理论上仍可由**新的、能过 QC 的起点**转成 `resolved` ⇒ `accepted` |
 | 硬约束 | 计划要求**全 cohort 可比性评估**（对 48 态同法重算才算数） |
 | 成本 | 需按**生产腿口径**估（≈9.9 CH/腿基准）× 全 cohort ⇒ **远超筛选余量 30.12** |
 | 不做的后果 | DMC 两态保持 `limited`（当前即是），不影响其余闸门推进路径 |
