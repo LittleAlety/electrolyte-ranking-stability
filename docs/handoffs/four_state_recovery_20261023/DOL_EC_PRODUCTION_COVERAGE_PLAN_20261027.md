@@ -153,6 +153,43 @@
 新增一个专用生产 profile（如 `orca_production_8h`，`wall_hours=8`）⇒ 预留降至 **32 CH/腿**；
 但**必须先做「无翻转证明」**（证明它不改变任何既有已提交腿的成本/验收），且**须与 `--time` 实测上限一致**。
 
+### 3.2 ⚠ **登记接线要求**：`member_role` 写错 = 静默阻塞整条接受路径（2026-10-27 新增，`PRODUCTION_ROLE_WIRING_20261027.md`）
+
+`build_production_ensemble_aggregator.py` 有**角色白名单**（`:610` 与 `:696`）：
+
+```
+if r["member_role"] not in ("round1_extra", "recovery_v1_start"): continue
+```
+
+**`:691-696` 的注释就是一份事故报告**：
+> 「*EVERY first-class member role must be listed here. A missing role is not a cosmetic omission:
+> the member then never enters `latest` … and the state can never leave `limited` —
+> `recovery_v1_start` was missing exactly so, which silently blocked the whole acceptance path.*」
+
+**现有四类角色**（`production_ensemble_structures.csv`，238 行实测）：
+
+| `member_role` | 行数 | 进 `latest`？ | 计入接受？ |
+|---|---|---|---|
+| `primary` | 48 | 走另一条路 | 基线 |
+| **`round1_extra`** | 110 | **✅** | **✅** |
+| **`recovery_v1_start`** | 44 | **✅** | **✅** |
+| **`round2_audit_extra`** | 36 | **❌** | **仅 ceiling（ceiling-only）** |
+
+⇒ **本批新腿必须登记为 `recovery_v1_start`**（其语义即「a NEW independent minimum … first-class member」，`:606-608`）；
+**登记成 `round2_audit_extra` 会静默阻塞**（状态永远 `limited` 且**不报错**）。
+
+**同时必须满足的 6 条**（逐条可复核）：
+1. `member_role = recovery_v1_start`（或经裁定用 `round1_extra`）；
+2. `member_key` 与该态在 `coverage_reviews.csv` 的证据列一致（聚合器 `:649-651` 以 `kept_keys` 反作弊）；
+3. `status` 最终为 **`computed`**（`build_coverage_reviews.py:175` 只计 `computed`）；
+4. **`production_evidence` 三字段非空**：`imaginary_modes`、`final_geometry_sha256`、`log_sha256`
+   （`build_coverage_reviews.py:334-338`），**且过冻结五阈值与身份 QC**；
+5. `search_outcome` 属三类之一 **且** `registered_starts` 非空（`build_coverage_reviews.py:150-160`）；
+6. **命名族序号高于该成员全部历史序号**（项目红线）。
+
+> **这是本方案第二处「静默阻塞」类约束**（第一处见 `0mvp79e3`：必须有生产恢复成员才能离开 `search_exhausted`）。
+> **共同点：「有结果」≠「被系统看见」**，中间隔着一层登记/白名单，**失败时不报错**。
+
 ## 4. 每腿完成后自动走覆盖路线（用户裁定第 4 步）
 
 | 实测结果 | route | verdict | ⇒ acceptance |
