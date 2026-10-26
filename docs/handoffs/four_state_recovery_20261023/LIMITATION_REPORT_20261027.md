@@ -10,6 +10,7 @@
 |---|---|---|
 | ① **四态科学恢复** | **未达成**：系综 **44/48 accepted**；四态仍 `limited`（`rescue_budget_exhausted`） | `production_ensemble_labels.csv` 实测 |
 | ② **正式研究闭环** | **未达成**（**但根因已查明为①的下游**）：闸门 2 `wp5_full_target_pool_evaluated` 仍 False（A **11/12**、B **9/12**） | `AB_axis_endpoint.csv` + `strict_readiness` |
+| ③ **工程可复现性** | **已核验**：**41 项只读门 40 通过**（唯一失败 `check-mirror` 已定位并修复，见 §4） | `work/_run_readonly_gates.py` |
 
 > **②的根因更正（2026-10-27，`8b3d515`，见 `WP5_GATE2_ROOT_CAUSE_20261027.md`）**：
 > 本报告初版把 ② 与 ① 并列为**两个独立未达成**。实测**不成立**——A 11/12、B 9/12 **完全由 ① 决定**：
@@ -17,7 +18,9 @@
 > 有非 `accepted` 态的那三个**（B 池缺失集合 `{DMC,DOL,EC}` 与系综非 accepted 集合**完全相等**）。
 > ⇒ **②是①的下游信号，不是平行任务**；四态一旦恢复，门2 自动满足。
 > 此处**保留原记录**（不抹除历史），仅补根因更正。
-| ③ **工程可复现性** | **已核验**：**41 项只读门 40 通过**（唯一失败 `check-mirror` 已定位并修复，见 §4） | `work/_run_readonly_gates.py` |
+
+> **③的补充（2026-10-27 后续轮）**：只读门清单扩展并**全部通过**（见 §3）；但**同时发现三处「静默阻塞」**
+> （§1.1）——**工程可复现性「绿」不等于「恢复路径通」**：门会响，但**登记链会静默吞掉结果**。
 
 **严格总闸门**：`complete = false`，`blocked_by = [ensemble_not_48_accepted, wp5_full_target_pool_evaluated]`
 （与裁决前**逐字一致**，未因本轮改动漂移）。
@@ -28,8 +31,25 @@
 |---|---|---|---|
 | `DMC\|M_plus` | 生产层 **18 条失败腿**（含 superseded）；筛选层 P4 2 探针 | `verytight_convergence` / `max_cycles_exhausted` / `strict_reopt_required` **三类同型** | `production_ensemble_structures.csv` + 原始 ORCA 日志逐循环解析 |
 | `DMC\|LiM_2plus` | 同上家族 | 同上 | 同上 |
-| `DOL\|LiM_2plus` | 筛选层 `strict_recovery_v1`（0 起点）+ P4 2 探针 + v2 10 探针 | 三轮独立方法**未找到新重骨架盆地** | `P4/V2_RESULTS_ADJUDICATION` |
+| `DOL\|LiM_2plus` | 筛选层 `strict_recovery_v1`（**0 起点**）+ P4 2 探针 + v2 10 探针 | 三轮独立方法**未找到新重骨架盆地**；**且当前无登记通道可用**（见 §1.1） | `P4/V2_RESULTS_ADJUDICATION`、`DOL_EC_NO_CANDIDATE_ROOT_CAUSE` |
 | `EC\|LiM_2plus` | 同上（v2 10 探针） | 同上；**但 EC 侧 10/10 涉机器 `no_duplicate`** ⇒ 存在冻结规则下合格候选 | `P4_V2_NO_DUPLICATE_CORRECTION` |
+
+### 1.1 三处「静默阻塞」（**本轮新增，是本报告最重要的结构发现**）
+
+四态的四个缺口**不只是「找不到起点」**——即使找到起点，还有**三层登记/资格过滤**会**静默**吞掉结果：
+
+| # | 约束 | 漏掉的后果 | 证据 |
+|---|---|---|---|
+| 1 | 离开 `search_exhausted` **必须有生产恢复成员**（`latest_members` 非空） | 只补 `registered_starts` **不改变 route**（实测仍 `search_exhausted`） | `build_coverage_reviews.py:172-190`；用户反例已复现 |
+| 2 | `member_role` 必须 ∈ `{round1_extra, recovery_v1_start}` | 该成员**永不进 `latest`**，状态永远 `limited`（`:691-696` 注释即事故报告） | `build_production_ensemble_aggregator.py:610`/`:696`；四角色实测 |
+| 3 | **候选表 `production_ensemble_candidates.csv` 里必须先有该态的行** | **生产腿跑完也无处挂靠**（`load_candidates()` 只读该表，缺失即 `raise`） | `:599-612`；DOL/EC 实测无 `recovery_v1_start` 行 |
+
+**共同点：「有结果」≠「被系统看见」**，而**每一环失败都不报错**（显为 `n_pending` / `limited`，像「还在进行中」）。
+
+**DOL/EC 的具体阻塞（第三条）**：`strict_recovery_v1_manifest.csv`（13 行）里 DOL/EC 的
+`start_1_basin`/`start_2_basin` **均为空** ⇒ `recovery_candidate_rows()` 无料可产；
+而 `torsion_probe_candidate_rows()` 的 glob **只匹配 `work/hpc_torsion_probe_v*`**，**不覆盖 P4/v2 包**
+⇒ **两条通道都无料可产**。**故 DOL/EC 当前无法经生产腿恢复**，除非补一条版本化登记通道（**待裁定**）。
 
 **DMC 的判读（item 6）**：三种 failure class 是**同一浅赝平坦谷**的三种表现——
 末循环常 **4/5 过**（唯一不过的 MAXstep 3.24e-4 vs 2e-4）；49 循环者在末期**反而恶化**；
@@ -77,10 +97,32 @@
 |---|---|---|---|
 | **H1** | DMC 阈值平台可由「**同一冻结方法 + 版本化优化设定**」解决（不降阈值） | 须先做**全 cohort 可比性评估**（对全部 48 态同法重算）⇒ 成本需按生产腿口径估，**远超本轮余量** | 未批 |
 | **H2** | GFN2 单盆地是**方法性**的（可用冻结方法的**单点**检验） | **单点实测中位 81 s ≈ 0.09 CH**；包内 **6 次**（3 样本 × {末几何, 已登记极小}）≈ **0.54 CH**、提交器预留 **2.0 CH**；若只投 3 次则约 **0.27 / 1.0 CH**。（原文按生产腿估 20–30 CH，**高估 74–111 倍**）⇒ 余量绰绰有余 | 未批（**唯一便宜且不越冻结项**，**且已升级为解锁门2 的关键一步**） |
-| **H3** | 接受 `search_exhausted` 为最终态并据此收口 | 0 | 未批 |
+| **H3** | 接受 `search_exhausted` 为**本轮**终态并据此收口 | 0 | **用户裁定：可定稿本报告**（保留 44/48），但**明确不同意「探针不属生产证据 ⇒ 永久终局」** |
 | **H4** | 把**冻结规则下合格**的 P4 四元素（EC 侧为主）送 DFT 生产轮 | 需按生产腿口径估（≈9.9 CH/腿基准）并**预注册**；受「每态 ≤2 起点」约束 | 未批 |
 
+**用户对 H3 的原话要旨（必须并列保留）**：
+> 「**不同意『探针不属生产证据，所以永久终局』这个推论**」；
+> 「**DOL/EC 不必强行找到第二个极小才能恢复，但必须证明独立起点在生产方法下通过了验证。**」
+> 「『版本化登记』能够建立这条证据链，**不能替代其中的计算**。」
+
+⇒ **`search_exhausted` 是本轮的诚实终态；日后若补上生产级 `computed` 证据
+（严格优化 + `AnFreq` + 身份 QC + 去重、生产证据齐全），仍可走 `single_basin_verified` ⇒ `resolved` ⇒ `accepted`。
+是本轮证据不足，不是永久终局。**
+
 **共同前提**：H1/H4 涉及版本化或新起点，须**先预注册**（唯一定义/成本上限/停止条件/不回填旧池）。
+
+## 5.1 当前唯一剩下的**硬阻塞**（待你裁定）
+
+**DOL/EC 无登记通道**（§1.1 第三条）。两条解法：
+1. **新增版本化通道**直接读 P4/v2 包（`source_kind=p4v2_screening_v1_start`），
+   **只收骨架真动 13 条**、排除 **15 条纯 Li 位移**（**更干净**：不动既有生成物、语义显式）；
+2. 把合格起点写进 `strict_recovery_v1_manifest.csv` 的 `start_1_basin`——
+   但该文件是**生成物**，手工改会被重建覆盖（影响面更大）。
+
+**明确不是解法**：把 glob 扩到 `hpc_xtb_screening_v2`——会让**纯 Li 位移**混进候选
+（P4/v2 的 `probe_class` 是错的 `heavy_fragment_torsion`），且改变既有包登记语义。
+
+**若你不出这条通道** ⇒ DOL/EC **无法经生产腿恢复**，本报告即为本轮终稿。
 
 ## 6. 本报告明确**不**主张的事（守红线）
 
