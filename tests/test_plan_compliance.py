@@ -137,7 +137,11 @@ def test_project_closure_counts_come_from_strict_live_accepted_legs() -> None:
     assert counts == expected
     rows = {row["item_id"]: row for row in module.build_rows(snapshot)}
     assert f"main_four_state_complete={expected['main4_ok']}/12" in rows["wp2_four_state_complete"]["measured"]
-    assert f"main_li_pair_complete={expected['li_pair_ok']}/12" in rows["wp2_four_state_complete"]["measured"]
+    assert f"main_li_pair_complete={expected['li_pair_ok']}/12" not in rows["wp2_four_state_complete"]["measured"]
+    # renamed 2026-10-27 (ruling ③): this column is the LIVE-LEG QC count, a DIFFERENT
+    # evidence source from the ensemble-label Li pairing (currently 9/12); the old name
+    # `main_li_pair_complete` collided with the label-side wording.
+    assert f"main_leg_li_pair_qc_complete={expected['li_pair_ok']}/12" in rows["wp2_four_state_complete"]["measured"]
     assert f"main_li_legs_produced={expected['li_legs_done']}/24" in rows["wp2_li_legs"]["measured"]
     assert f"main_four_state_complete={expected['main4_ok']}/12" in rows["plan_overall_complete"]["measured"]
 

@@ -11,7 +11,7 @@ window.HB = {
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-25T12:51:40Z",
+  "generated_at_utc": "2026-10-26T09:35:12Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -1845,7 +1845,7 @@ window.HB = {
   {
    "path": "docs",
    "note": "技术报告与周报（NN_*.md）、协议、结题报告、站点",
-   "files": 229
+   "files": 230
   },
   {
    "path": "deliverables",

@@ -365,13 +365,17 @@ def build_rows(progress=None):
         "wp2_four_state_complete", "6",
         "12 主集每个分子的 M / M+ / [LiM]+ / [LiM]2+ 四态全部产出",
         "satisfied" if set_main and main4_ok == len(set_main) else "blocked_on_production",
-        "main_four_state_complete=%d/%d; main_li_pair_complete=%d/%d; "
+        "main_four_state_complete=%d/%d; main_leg_li_pair_qc_complete=%d/%d; "
         "pilot_four_state_complete=%d/%d; pilot_five_leg_complete=%d/%d"
         % (main4_ok, len(set_main), li_pair_ok, len(set_main), pilot_main4_ok, pilot_mol_count,
            five_ok, pilot_mol_count),
         "work/wp2prod/**/<name>_<state>.json; data/metadata/physics_completion_set.csv; "
         "outputs/physics_completion/closure/four_molecule_state_closure.csv",
-        "方案主验收线只从实时 payload 的严格 QC 接受集合计算；四分子 pilot 完成数只作进度旁证。",
+        "方案主验收线只从实时 payload 的严格 QC 接受集合计算；四分子 pilot 完成数只作进度旁证。"
+        "**口径消歧（2026-10-27 裁决 ③）**：此处的 Li 配对是**逐腿 QC 口径**"
+        "（读 `work/wp2prod/**` 逐腿 JSON），与**系综标签口径**（`production_ensemble_labels.csv` 的"
+        "`acceptance_status`，当前 Li 配对 **9/12**）是**两个不同证据源，不可互相印证**；"
+        "故本列改名为 `main_leg_li_pair_qc_complete`。",
     ))
     redox = read_rows("outputs/physics_completion/free_states/production_redox.csv")
     free_ok = count(redox, lambda r: r.get("free_status") == "computed")
@@ -518,7 +522,12 @@ def build_rows(progress=None):
         "outputs/physics_completion/state_identity/",
         "13 项自检全过、身份标签按冻结词表分层并逐行带原始日志 sha256；唯 frontier localization "
         "在 thresholds.json 里显式登记为 not_computed（生产 Opt 日志未要求逐轨道原子组成），"
-        "少一项就不写 satisfied。",
+        "少一项就不写 satisfied。"
+        "**口径消歧（2026-10-27 裁决 ③）**：本条引用的 `not_computed` 是 **§6.3 生产输入口径**"
+        "（`state_identity/`）；另有一条**独立**的 frontier 识别管线"
+        "（`outputs/physics_completion/frontier/frontier_localization.csv` **80 行 computed** 与 "
+        "`frontier_identity_evidence.csv` **80 行 verified**）属**不同口径**，"
+        "**两者不可互相替代，也不可据此推断「轨道定域整体缺失」**。",
     ))
 
     # ---------------- §7 WP3 ----------------
@@ -794,15 +803,29 @@ def build_rows(progress=None):
         "outputs/physics_completion/active_learning/round_diagnostics.csv",
         "逐轮字段已落盘；旧回放未保存候选级预测与逐查询成本映射，因此两列留空并附机器可读 MISSING 原因，不用其他台账或旧端点冒充。",
     ))
+    # 2026-10-27 裁决 ③：候选数必须读**真实扩展池**，不能用主集文件里的 0 行暗示「没有候选」。
+    # 但裁决同时明令**不翻转状态**：冻结候选（FROZEN_NOT_COMPUTED）是「先冻结」，不是「已完成」；
+    # 扩样完成须有**已计算**的扩展 cohort 与回放，故状态仍由**已计算数**决定（当前 0 ⇒ not_satisfied）。
+    ext_pool = read_rows("data/metadata/physics_completion_extension_pool.csv")
+    ext_frozen = count(ext_pool, lambda r: r.get("registration_status") == "FROZEN_NOT_COMPUTED")
+    ext_computed = count(ext_pool, lambda r: r.get("registration_status") == "COMPUTED")
     ext_rows = [r for r in cfg_set if r.get("cohort") == "extension" and r.get("mol_id")]
     out.append(item(
         "wp5_pool_extension", "9",
         "§9.3 扩样触发：目标池扩到约 20-24（先加 8-12 个，含一个方法审计未覆盖的家族），先冻结再计算",
-        "partial" if len(ext_rows) >= 8 else "not_satisfied",
-        "extension_rows=%d; replay_pool=%s" % (len(ext_rows), "legacy_pool_not_blind"),
-        "data/metadata/physics_completion_set.csv; outputs/physics_completion/ml/frozen_family_view.csv",
+        "partial" if ext_computed else "not_satisfied",
+        "extension_candidates_frozen=%d; extension_candidates_computed=%d; "
+        "extension_rows_in_main_set_file=%d; replay_pool=%s"
+        % (ext_frozen, ext_computed, len(ext_rows), "legacy_pool_not_blind"),
+        "data/metadata/physics_completion_extension_pool.csv; "
+        "outputs/physics_completion/ml/frozen_family_view.csv",
         "首轮没有扩样：ML/AL 回放仍跑在旧池上，池内端点不能当普适最低标签数。"
-        "扩样要等目标标签与独立 uncertainty 流程可用后才触发（先登记再计算）。",
+        "**口径消歧（2026-10-27 裁决 ③）**：候选数以**真实扩展池**"
+        "（`physics_completion_extension_pool.csv`，实测 **%d 个 FROZEN_NOT_COMPUTED / %d 个已计算**）为准；"
+        "`extension_rows_in_main_set_file` 恒为 **%d** 是因为**主集文件没有 extension cohort**，"
+        "**不得**据此推断「没有扩展候选」，也**不得**把「已冻结」当成「已完成」（状态仍 not_satisfied）。"
+        "扩样要等目标标签与独立 uncertainty 流程可用后才触发。"
+        % (ext_frozen, ext_computed, len(ext_rows)),
     ))
 
     # ---------------- §10 WP6 ----------------
