@@ -52,6 +52,17 @@ RESOURCE_PROFILES = {
     "h2_single_point_v1": {"engine": "orca", "cores": 4, "wall_hours": 1 / 12.0,
                            "budget_cap_core_hours": "2",
                            "attempts_ledger_required": True},
+    # 2026-10-27 ruling (C+D): a DEDICATED profile for the dol_ec_recovery_v1 batch.
+    # The v1 contract's production wall clock is 4 h, which cannot be paired with the
+    # 24 h orca_production_v1 profile; the ruling therefore authorises BOTH a batch
+    # profile (C) and a versioned contract revision (D).  12 h is engineering headroom
+    # over the longest observed production leg (~8 h) -- NOT a completion guarantee.
+    # Cap 96 CH = the exact reservation for the authorised 2 legs (4 cores x 12 h x 2);
+    # the ledger is REQUIRED so the actual spend settles from terminal sacct, never
+    # from the 36.8 CH p90 planning estimate.
+    "orca_production_12h_v1": {"engine": "orca", "cores": 4, "wall_hours": 12,
+                               "budget_cap_core_hours": "96",
+                               "attempts_ledger_required": True},
 }
 DEFAULT_RESOURCE_PROFILE = "orca_production_v1"
 ORCA_NPROCS_RE = re.compile(r"%pal\s+nprocs\s+(\d+)", re.I)
