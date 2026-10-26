@@ -97,6 +97,24 @@
 
 **若第 3–5 步任一门失败**：立即停、只报「H2 未提交/未完成 + 具体原因 + 实测耗时」，**不续投**。
 
+## 2.5 🚫 **新增阻塞（2026-10-27）：DOL/EC 的生产起点没有登记通道**
+
+`DOL_EC_NO_REGISTRATION_PATH_20261027.md` 实测：`build_production_ensemble_manifest.py` 只有两条产出
+`recovery_v1_start` 候选行的通道——`recovery_candidate_rows()`（读 `strict_recovery_v1_manifest.csv`，11 行）
+与 `torsion_probe_candidate_rows()`（glob **只匹配 `work/hpc_torsion_probe_v*`**，3 行）。
+**DOL/EC 两态在两条通道里都为空** ⇒ `production_ensemble_candidates.csv`（119 行 / 14 条 `recovery_v1_start`）里
+**没有 DOL/EC 的 `recovery_v1_start` 行**。
+
+⇒ **即使批准并跑完 DOL/EC 生产腿，结果也无处挂靠，状态永远 `limited`。**
+**在补上登记通道之前，第 2 步方案的生产提交不应执行。**
+
+**这是第三处「静默阻塞」**（前两处：`search_exhausted` 需生产成员 `0mvp79e3`；`member_role` 白名单 `0mvp7xbj`）。
+**共同点：「有结果」≠「被系统看见」，每一环失败都不报错。**
+
+**因此第 2 步的待批项要加一条**：**是否批准新增一条版本化登记通道**（`source_kind=p4v2_screening_v1_start`，
+只收骨架真动的 13 条、排除 15 条纯 Li 位移；**不得**简单扩 glob，否则纯 Li 位移会混入）。
+若你**不批**这条通道，则 DOL/EC 无法经生产腿恢复，只能按 **H3** 以 `limited` 结题。
+
 ## 3. 与预算的关系（不越界）
 
 | 段 | 额度 | 现状 |

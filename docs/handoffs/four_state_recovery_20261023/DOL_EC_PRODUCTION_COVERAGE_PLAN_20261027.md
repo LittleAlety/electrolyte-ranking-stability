@@ -116,6 +116,29 @@
 > 但**骨架对距变化 0.055–0.077 Å > 1e-5 阈值** ⇒ 按本项目口径**算「动过」**。
 > 是否够「独立」**仍属需要你确认的科学口径**（与 §5 的 `li_coordination_away` 问题同类，但对象不同）。
 
+## 2.4 🚫 **阻塞级前置：DOL/EC 目前没有登记通道**（2026-10-27 实测，见 `DOL_EC_NO_REGISTRATION_PATH_20261027.md`）
+
+**本方案 §2.1–§2.3 的起点选择，在「登记」这一步会被卡住。** 实测：
+
+| 通道（`build_production_ensemble_manifest.py`） | 读什么 | 覆盖的态 |
+|---|---|---|
+| `recovery_candidate_rows()`（`:411`） | `strict_recovery_v1_manifest.csv`（`:364`） | DEC/DME/DMSO/SL/TMP 系列（**无 DOL/EC**） |
+| `torsion_probe_candidate_rows()`（`:454`） | glob **只匹配 `work/hpc_torsion_probe_v*/manifest.json`**（`:478`） | AN\|M_plus、**DMC** 两态（**无 DOL/EC**） |
+
+⇒ **`DOL\|LiM_2plus` 与 `EC\|LiM_2plus` 在 `production_ensemble_candidates.csv`（119 行、14 条 `recovery_v1_start`）里
+没有任何 `recovery_v1_start` 行**（只有 `primary` 与 `round1_extra`/`li_motif`）。
+
+**后果**：manifest 由 candidates 驱动 ⇒ 无候选行 ⇒ 进不了 structures 表 ⇒ 进不了 `latest_members`
+⇒ `coverage_route` 看不到 `computed` 成员 ⇒ **即使生产腿跑完，状态永远 `limited`**。
+
+**⇒ 在补上登记通道之前，本方案的 §3（提交生产）不应执行。**
+
+**补通道的要点（须你批准）**：
+① 版本化新增一条通道，`source_kind = p4v2_screening_v1_start`；
+② **只收权威门判为骨架真动的 13 条**（`work/skeleton_only_reclassification.json`），**排除 15 条纯 Li 位移**；
+③ **不得**简单把 glob 扩到 `hpc_xtb_screening_v2`——那会让纯 Li 位移探针进候选
+（P4/v2 的 `probe_class` 是**错的** `heavy_fragment_torsion`，见 `LI_ONLY_MISCLASSIFIED_AS_HEAVY_20261027.md`）。
+
 ## 3. 生产级验证的执行形态（若批准）
 
 | 项 | 方案 |
