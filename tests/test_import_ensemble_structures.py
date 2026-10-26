@@ -217,6 +217,43 @@ def test_imaginary_mode_fails_the_structure(tmp_path):
     assert "imaginary_modes" in row["qc_flags"]
 
 
+def test_a_missing_inputs_sha256_list_is_qc_failed(tmp_path):
+    """Plan 6.3 requires the leg's INPUT hashes; absence must not pass.
+
+    ``qc_task`` already appended ``inputs_sha256_missing`` when ``inputs.sha256``
+    is absent, but no test named it — so the branch could be deleted silently.
+    Measured 2026-10-26 (t5 review): implementation present, no named test.
+    """
+    module = _module()
+    task = _task_dir(tmp_path, _log())
+    (task / "inputs.sha256").unlink()
+    row = module.qc_task(task, "tasks/DMC/M__8", _cand())
+    assert row["status"] == "technical_complete_qc_failed"
+    assert "inputs_sha256_missing" in row["qc_flags"]
+    assert row["failure_class"] == "inputs_sha256_missing"
+
+
+def test_a_tampered_input_file_is_qc_failed(tmp_path):
+    """A recorded digest that no longer matches the bytes must be refused.
+
+    Same gap as above: ``input_sha_mismatch`` was implemented and untested.
+    The tamper is on a listed file's CONTENT (the hash list itself stays intact
+    and well-formed), which is exactly the drift this gate exists to catch.
+    """
+    module = _module()
+    task = _task_dir(tmp_path, _log())
+    before = (task / "geom.xyz").read_bytes()
+    (task / "geom.xyz").write_text(GEOM.replace("0.7400000000", "0.9300000000"),
+                                   encoding="utf-8")
+    # the tamper MUST change the bytes, or this test proves nothing (the hash list
+    # still records the ORIGINAL digest, so a changed file is the whole point)
+    assert (task / "geom.xyz").read_bytes() != before
+    row = module.qc_task(task, "tasks/DMC/M__8", _cand())
+    assert row["status"] == "technical_complete_qc_failed"
+    assert "input_sha_mismatch" in row["qc_flags"]
+    assert row["failure_class"] == "input_sha_mismatch"
+
+
 def test_numfreq_input_is_rejected_even_with_clean_log(tmp_path):
     module = _module()
     bad_input = INPUT.replace(" AnFreq ", " NumFreq ")
