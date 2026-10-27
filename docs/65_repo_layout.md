@@ -105,7 +105,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**85** 个跟踪文件：79 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**88** 个跟踪文件：82 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -193,6 +193,9 @@ week36 与 week44 只存在于 part2 镜像。
 | `verify_archive.py` | 归档的**可重新解析性**核验：拿归档原始日志按仓库口径重算登记值，与 manifest 逐字段比对；`--ledger` 再重算交付账本；`--latest` 自动取最新归档并先打一行 `[freshness]`（内嵌登记表是否与仓库当前那份同版）；`--gate-when-complete` 是收口链里的**结题门禁**（只在 20/20 时先重建归档再要求同版 + 0 不符，没跑完时只提示）；缺条目/哈希不符/数值不符 → 退出码 1 | `*.zip` + `job_archive_manifest.csv`（+ `production_ledger.csv`） → 核验结论 |
 
 | `build_p4_screening_adjudication.py` | **P4 筛选结果判定器**（P4「回收后判定」这半侧，此前无消费者）：逐元素读 `xtbopt.log`（=stdout）/`xtbopt.xyz`/`.xtboptok`/`candidate.json`；三条件判收敛（`.xtboptok` 存在 + xyz 非空 + 日志含 `GEOMETRY OPTIMIZATION CONVERGED`）；**双源交叉校验**能量（stdout 的 `\| TOTAL ENERGY … Eh \|` 与 `xtbopt.xyz` 第 2 行的 ` energy:`，差 >1e-6 Eh 即记 problem）；按该态**冻结参考**算相对能并套 **6 kcal/mol 窗口**（`M`/`M_plus` = 该态筛选池最小值；`LiM_plus`/`LiM_2plus` = 该态生产几何这个**固定父级**，并断言同态内反推参考恒定）；与已登记极小的**等价性复用聚合器原语与容差**（`bond_adjacency` + `find_topology_mappings` WL/回溯 → Kabsch RMSD < 0.35 → 扭转 ≤ 10° → Li 供体 → 镜像/手性），**不另写原子映射**；缺值/失败形态如实记 `not_run_yet`/`technical_incomplete`（不冒充成功）；`--json` 写出 + `--check` 逐字节复核（**只读**） | 包内 `tasks/<state>/<cand>/{xtbopt.log,xtbopt.xyz,.xtboptok,candidate.json}` + 两个登记池 → `--json` 结果集 |
+| `evidence_gate.py` | 2026-10-27 执行方案的**只读证据状态机**：`next_action(Evidence)` 按已验证证据给出唯一下一步（hold/submit_once/reconcile/wait/fetch/qc/settle/rebuild/report），已有提交尝试时**绝不**回落自动提交分支；`qc_results_complete`＝「每腿都有明确判定」而非「都通过」；`batch_is_exactly_activated()` 三方核对激活登记/candidates/tasks.txt **恰好等于两条激活任务**（混入即拒）；`sacct_terminal_states()` 非终态返回空、不编造 | Evidence 适配器（真实证据填充） → NextAction |
+| `batch_cost_settlement.py` | 2026-10-27 执行方案的**sacct 费用结算**：`allocated_core_hours()` 按**精确数组元素 ID** 匹配（父数组与 `.batch`/`.extern` 不重复计费）；缺记录即 `MISSING` 拒绝结算（不补零）；同元素多条记录拒绝简单相加（须核对重启）；结果 = **AllocCPUS × ElapsedRaw** 分配核时（非 TotalCPU） | sacct `-P` 输出 + 期望元素集 → Decimal 核时 |
+| `build_dol_ec_recovery_package.py` | **dol_ec_recovery_v1 schema-2 生产包构建器**（2026-10-27 裁定授权的 2 腿：DOL/EC 各一条 ring-pucker 起点，`orca_production_12h_v1` 4c×12h×2=96 CH 走 512 额度）：产出可发现、可执行的新包 `work/hpc_dol_ec_recovery_v1_20261027/`（旧 draft 不动、不可提交）；fail-closed 断言：成员键集＝激活登记集＝candidates p4v2 行集且**恰为 2**；每任务几何＝**原始扰动 p4v2 几何**（sha256 须等于激活登记，绝不用塌缩末几何）；冻结生产方法（wB97X-D4/def2-TZVPD Opt VeryTightOpt AnFreq SMD 4 procs）；`recovery_v1_start` 角色（聚合器全名匹配 + 覆盖复核前缀匹配都认） | `config/recovery_start_activation_v1.json` + P4 包原始几何 → `work/hpc_dol_ec_recovery_v1_20261027/`（含 batch sbatch / tasks.txt / attempts 账本） |
 
 非 Python 的跟踪文件：`finalize_wp2.ps1`（一键收口链）、`supervise_pending.ps1`（无人值守监守）、
 `watch_smpd.ps1`（轻量 smpd 看护）、`watch_supervisor.ps1`（监守看护：接住监守 `exit 3` 的信号）、
