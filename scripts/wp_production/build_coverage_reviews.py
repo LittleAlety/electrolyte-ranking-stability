@@ -382,12 +382,19 @@ def build_rows() -> list[dict]:
             kept_evidence = ([k for k, v in novelty.items() if v == "new"]
                              or [r["member_key"] for r in qualified_all])
         elif route in ("single_basin_verified", "known_basin_reproduction"):
-            kept_evidence = sorted({
-                d.get("duplicate_of", "")
-                for r in computed
-                for d in [dedup_rows.get(r["member_key"])]
-                if d and d.get("duplicate_of")
-            } - {""})
+            # 2026-10-27 fix: a single-basin verifier that itself ENTERED the
+            # kept pool (first-point convergence, novelty="new", no
+            # duplicate_of) is exactly as much evidence as one that was
+            # deduplicated onto an existing minimum.  Naming only duplicate_of
+            # left the claim empty for the reopt legs, so the aggregator's
+            # anti-cheat (all claims in kept_keys) read "no evidence" and kept
+            # a genuinely-covered state limited forever.
+            kept_evidence = sorted(
+                {d.get("duplicate_of", "")
+                 for r in computed
+                 for d in [dedup_rows.get(r["member_key"])]
+                 if d and d.get("duplicate_of")} - {""}
+                | {r["member_key"] for r in computed if r["member_key"] in weights})
         else:
             kept_evidence = []
 
