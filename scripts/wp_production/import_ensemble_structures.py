@@ -2277,8 +2277,13 @@ def main(argv=None) -> int:
         print("REJECT: candidates CSV missing; run build_production_ensemble_manifest first")
         return 2
     cand_rows = list(csv.DictReader(CANDIDATES.open(encoding="utf-8")))
+    # 2026-10-27: the registry must carry BOTH first-class extra roles -- a
+    # recovery_v1_start registered in the candidates table is exactly as
+    # declared as a round1_extra, and filtering to round1_extra alone made the
+    # dol_ec_recovery_v1 legs resolve as member_identity_unknown.
     extras = {f"{r['name']}|{r['slot']}|{r['seed']}": r
-              for r in cand_rows if r["member_role"] == "round1_extra"}
+              for r in cand_rows
+              if r["member_role"] in ("round1_extra", "recovery_v1_start")}
 
     packages = [p for p in iter_packages() if (p / 'tasks.txt').is_file()]
     if args.fetch:
@@ -2300,9 +2305,18 @@ def main(argv=None) -> int:
             if not task:
                 continue
             task_dir = pkg / task
-            name = task_dir.parent.name
-            leaf = task_dir.name
-            slot, seed = leaf.split("__", 1)
+            # Two legal task layouts coexist (2026-10-27 schema-2 batch):
+            #   draft:    tasks/<NAME>/<SLOT>__<seed>
+            #   schema-2: tasks/<NAME>__<SLOT>/<seed>
+            # The main loop previously only understood the draft form; the
+            # schema-2 leaf has no "__" and crashed the unpack.  Parse both.
+            _head, _leaf = task_dir.parent.name, task_dir.name
+            if "__" in _head and "__" not in _leaf:
+                name, slot = _head.split("__", 1)
+                seed = _leaf
+            else:
+                name = _head
+                slot, seed = _leaf.split("__", 1)
             key = f"{name}|{slot}|{seed}"
             pm = package_members.get(key)
             registry = extras.get(key)
