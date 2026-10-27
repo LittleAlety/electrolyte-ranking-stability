@@ -37,6 +37,12 @@ window.HB = {
    "total": 48,
    "remaining": [
     {
+     "name": "AN",
+     "state": "M_plus",
+     "status": "limited",
+     "reason": "rescue_budget_exhausted"
+    },
+    {
      "name": "DMC",
      "state": "M_plus",
      "status": "limited",
@@ -44,12 +50,6 @@ window.HB = {
     },
     {
      "name": "DMC",
-     "state": "LiM_2plus",
-     "status": "limited",
-     "reason": "rescue_budget_exhausted"
-    },
-    {
-     "name": "DOL",
      "state": "LiM_2plus",
      "status": "limited",
      "reason": "rescue_budget_exhausted"
@@ -67,9 +67,9 @@ window.HB = {
    "compliance_source": "outputs/physics_completion/compliance/plan_compliance.csv"
   },
   "frontier": {
-   "available": true,
-   "parsed": 80,
-   "registered_verified": 80,
+   "available": false,
+   "parsed": 0,
+   "registered_verified": 0,
    "total": 80,
    "sources": {
     "weights": "outputs/physics_completion/ensembles/production_ensemble_weights.csv",
@@ -77,11 +77,11 @@ window.HB = {
     "evidence": "outputs/physics_completion/frontier/frontier_identity_evidence.csv"
    },
    "source_sha256": {
-    "outputs/physics_completion/ensembles/production_ensemble_weights.csv": "82d280dab2c203459b7dba53d4850a52559151cacad72985d1f5ebe91a7f1766",
+    "outputs/physics_completion/ensembles/production_ensemble_weights.csv": "201e19545bf0c1ccc209ca017e4ed55c581085d15ceb1df117f31f7e36494101",
     "outputs/physics_completion/frontier/frontier_localization.csv": "ae6d6f6ae4326e8981053e675c9fba64849be5f1635d90fe61bcc603d81bbedc",
     "outputs/physics_completion/frontier/frontier_identity_evidence.csv": "f27d58978f7ead6b443a83e5531c4efeedd4c248783d97433602ad6c8f06d048"
    },
-   "error": ""
+   "error": "member sets differ from current weights"
   },
   "strict_evidence": {
    "available": true,
