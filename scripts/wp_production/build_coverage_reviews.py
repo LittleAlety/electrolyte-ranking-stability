@@ -57,7 +57,7 @@ SEARCH_INDEX = RECOVERY / "strict_recovery_v1_search_index.json"
 OUT_CSV = RECOVERY / "coverage_reviews.csv"
 OUT_INDEX = RECOVERY / "coverage_reviews_index.json"
 
-REVIEW_VERSION = "coverage_review_v1"
+REVIEW_VERSION = "coverage_review_v2_dedup_aware_20261027"
 RECOVERY_ROLE_PREFIX = "recovery_v1"
 
 FIELDS = [
@@ -313,26 +313,52 @@ def build_rows() -> list[dict]:
         # (the coverage_status no longer says resolved_by_review) still flips
         # this row back to the derived route.
         label_cov = labels[key].get("coverage_status", "")
-        if label_cov == "resolved_by_review" and key in prior:
+        # 2026-10-27: the prior-reuse guard also pins the prior REVIEW_VERSION --
+        # a semantics change (dedup-cluster-aware novelty) must re-derive every
+        # released row ONCE; the guard still prevents oscillation afterwards.
+        prior_row = prior.get(key)
+        prior_matches_version = (prior_row is not None
+                                 and prior_row.get("review_version") == REVIEW_VERSION)
+        if label_cov == "resolved_by_review" and prior_matches_version:
             rows.append(dict(prior[key]))
             continue
 
-        # novelty per computed member: "new" when it survived dedup into the
-        # kept pool, "known" when it was deduplicated onto an existing minimum
+        # novelty per computed member.  2026-10-27 ruling correction: a member
+        # that BECAME the lowest-energy representative of a CLUSTER is not a
+        # "new basin" -- the frozen dedup says who belongs to which minimum, and
+        # a cluster whose previous members (primary / c05 / ...) all map onto
+        # the new member means the new member REPRODUCED that registered
+        # minimum.  Being in `weights` (kept representative) is therefore NOT
+        # sufficient for "new": we also require that some OLDER member of the
+        # same state did NOT deduplicate onto it (i.e., it is not merely the
+        # new head of an already-registered cluster).
         novelty = {}
-        for r in computed:
-            novelty[r["member_key"]] = ("new" if r["member_key"] in weights
-                                        else "known")
         dedup_dir = REPO / "outputs" / "physics_completion" / "ensembles"
         dedup_rows = {}
         ded = dedup_dir / "production_ensemble_dedup.csv"
         if ded.is_file():
             for d in _read(ded):
                 dedup_rows[d.get("member_key", "")] = d
+        # who deduplicates ONTO each member (its cluster's older members)
+        dedup_onto: dict[str, list] = {}
+        for d_key, d in dedup_rows.items():
+            if d.get("duplicate_of"):
+                dedup_onto.setdefault(d["duplicate_of"], []).append(d_key)
         for r in computed:
-            d = dedup_rows.get(r["member_key"])
+            mk = r["member_key"]
+            d = dedup_rows.get(mk)
             if d is not None and d.get("duplicate_of"):
-                novelty[r["member_key"]] = "known"
+                novelty[mk] = "known"          # deduplicated onto an existing minimum
+                continue
+            if mk not in weights:
+                novelty[mk] = "known"          # not in the weighted kept pool
+                continue
+            # kept representative: it is "new" ONLY if no older member of the
+            # same state deduplicated onto it (reproduced-cluster heads are
+            # "known" -- they verified a REGISTERED minimum, not a new basin)
+            onto = [k for k in dedup_onto.get(mk, [])
+                    if k.rsplit("|", 1)[0] == mk.rsplit("|", 1)[0]]
+            novelty[mk] = "known" if onto else "new"
 
         # production evidence = every computed member carries the full QC set
         production_evidence = bool(computed) and all(
@@ -344,13 +370,39 @@ def build_rows() -> list[dict]:
         # C-group ruling: a state whose WEIGHTED qualified members already give
         # >=2 independent minima is multi-basin covered, whichever batch supplied
         # them; the review still names the kept-pool members as its evidence so
-        # the aggregator's anti-cheat can verify every claim
-        if len(qualified_all) >= 2 and not pending:
+        # the aggregator's anti-cheat can verify every claim.
+        # 2026-10-27 ruling correction: "independent" is judged by the FROZEN
+        # dedup clusters, not by head-counting kept representatives.  When the
+        # new member's cluster absorbed an older qualified member (primary/c05
+        # deduplicated onto it), the state still has ONE registered minimum
+        # that the reopt leg REPRODUCED -- that is single_basin_verified, not
+        # multi_basin coverage.
+        _qa_heads = set()
+        _qa_absorbed_by = set()
+        for r in qualified_all:
+            mk = r["member_key"]
+            d = dedup_rows.get(mk)
+            if d is not None and d.get("duplicate_of"):
+                _qa_absorbed_by.add((mk, d["duplicate_of"]))
+        _qa_effective = [r for r in qualified_all
+                         if (r["member_key"], ) not in
+                         tuple(((mk, ref) for (mk, ref) in _qa_absorbed_by
+                                if mk == r["member_key"]
+                                and ref in {q["member_key"] for q in qualified_all}))]
+        # members absorbed BY another qualified member of the same state do not
+        # count as an extra independent minimum
+        _qa_keys = {r["member_key"] for r in qualified_all}
+        _qa_effective = [r for r in qualified_all
+                         if not (r["member_key"] in {mk for (mk, ref) in _qa_absorbed_by
+                                                     if ref in _qa_keys})]
+        if len(_qa_effective) >= 2 and not pending:
             route = "multi_basin_coverage"
             route_note = ("%d weighted independent minima from the full qualified "
                          "evidence set (user ruling C-group: coverage over ALL "
-                         "qualified members, not only the recovery batch)"
-                         % len(qualified_all))
+                         "qualified members, dedup-cluster-aware; absorbed "
+                         "duplicates do not count as extra minima)"
+                         % len(_qa_effective))
+            qualified_all = _qa_effective
         else:
             route, route_note = coverage_route(
                 members, novelty,
