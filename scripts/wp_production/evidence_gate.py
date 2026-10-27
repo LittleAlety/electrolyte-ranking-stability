@@ -41,9 +41,12 @@ REPO = Path(__file__).resolve().parents[2]
 ACTIVATION = REPO / "config" / "recovery_start_activation_v1.json"
 CANDIDATES = (REPO / "outputs" / "physics_completion" / "ensembles"
               / "production_ensemble_candidates.csv")
-#: the batch's own remote-dir name (ensemble_hpc_io binds sacct WorkDir against
-#: REMOTE_ROOT/<local package dir name>, so the two must match exactly)
-PACKAGE_NAME = "dol_ec_recovery_v1"
+#: the batch's package-dir naming family.  ensemble_hpc_io binds sacct WorkDir
+#: against REMOTE_ROOT/<local package dir name>, and the 2026-10-27 batch has
+#: TWO physical packages: the draft (dol_ec_recovery_v1, DOL leg already run
+#: and settled there) and the executable schema-2 package.  Both names are
+#: legitimate carriers of the two activated tasks.
+PACKAGE_NAMES = {"dol_ec_recovery_v1", "hpc_dol_ec_recovery_v1_20261027"}
 
 #: single source of truth for terminal scheduler states (audit F-2): reusing
 #: the submitter's list kills the second, drifting copy.  Slurm semantics AND
@@ -144,14 +147,26 @@ def candidates_matching(source_kind: str) -> list[tuple[str, str, str]]:
 
 
 def _task_row_keys(rel: str) -> tuple[str, str, str] | None:
-    """(name, slot, seed) from 'tasks/<NAME>/<SLOT>__<seed>'; None if malformed."""
+    """(name, slot, seed) from a tasks.txt row; None if malformed.
+
+    Two package layouts coexist (both legit carriers of the activated set):
+      draft:      tasks/<NAME>/<SLOT>__<seed>
+      schema-2:   tasks/<NAME>__<SLOT>/<seed>
+    """
     parts = rel.split("/")
-    if len(parts) < 3 or "__" not in parts[-1]:
+    if len(parts) < 3:
         return None
-    slot_seed = parts[-1].split("__", 1)
-    if not slot_seed[0] or not slot_seed[1]:
-        return None
-    return (parts[1], slot_seed[0], slot_seed[1])
+    if "__" in parts[1]:                       # tasks/<NAME>__<SLOT>/<seed>
+        head = parts[1].split("__", 1)
+        if len(head) != 2 or not head[0] or not head[1] or not parts[2]:
+            return None
+        return (head[0], head[1], parts[2])
+    if "__" in parts[-1]:                      # tasks/<NAME>/<SLOT>__<seed>
+        tail = parts[-1].split("__", 1)
+        if len(tail) != 2 or not tail[0] or not tail[1] or not parts[1]:
+            return None
+        return (parts[1], tail[0], tail[1])
+    return None
 
 
 def batch_is_exactly_activated(package_dir: Path,
@@ -168,7 +183,7 @@ def batch_is_exactly_activated(package_dir: Path,
     cand = set(candidates_matching(source_kind))
     if act != cand or len(act) != 2:
         return False
-    if package_dir.name != PACKAGE_NAME:
+    if package_dir.name not in PACKAGE_NAMES:
         return False
     tasks = (package_dir / "tasks.txt").read_text(encoding="utf-8").split()
     if len(tasks) != 2:
