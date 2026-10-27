@@ -82,7 +82,7 @@
 > 本方案只保证它**过了权威预检门**且**机械规则可复核**，不替你做这项科学判断。
 ## 2.2 ⚠ **§2.1 的起点推荐已撤回——权威门把「纯 Li 位移」误分类为 `ok_heavy_fragment`**（2026-10-27）
 
-**实测更正**：`validate_candidate_start` 的 `heavy` 定义（`:322`）是 `s != "H"` ⇒ **含 Li**。
+**实测更正**：`validate_candidate_start` 的 `heavy` 定义（`:325`）是 `s != "H"` ⇒ **含 Li**。
 于是 `declared_li_change=False` 的**纯 Li 平移**探针，其 `heavy_change` 等于整体距离变化，
 被判 **`ok_heavy_fragment` / `probe_class: heavy_fragment_torsion`**——
 **而纯骨架（排除 H 与 Li）RMSD = 0.0000**。详细机制见 `LI_ONLY_MISCLASSIFIED_AS_HEAVY_20261027.md`。

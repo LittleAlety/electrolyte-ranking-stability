@@ -28,14 +28,14 @@
 
 | 位置 | 定义 | 是否含 Li |
 |---|---|---|
-| **`:322`** `heavy = [i for i, s in enumerate(symbols) if s != "H"]` | **按质量** | **含 Li** ✅ |
+| **`:325`** `heavy = [i for i, s in enumerate(symbols) if s != "H"]` | **按质量** | **含 Li** ✅ |
 | **`:407`** `non_li_heavy = [... if s != "H" and s != "Li"]` | **按共价骨架** | **不含 Li** ✅ |
 
 ⇒ **`:407` 的注释本身就说明了正确概念**：
 > 「*Li is a heavy atom by mass, **but not part of the covalent skeleton***」
 
 **但 `non_li_heavy` 只在 `declared_li_change=True` 分支被使用**（`:406-416`）。
-**当 `declared_li_change=False` 时**，分类走的是 `heavy_change`（`:322-325`，**含 Li**）⇒
+**当 `declared_li_change=False` 时**，分类走的是 `heavy_change`（`:325-328`，**含 Li**）⇒
 **纯 Li 位移会把 `heavy_change` 顶上去**，于是被判为 `ok_heavy_fragment`（`probe_class: heavy_fragment_torsion`）。
 
 ## 3. 影响范围（实测）
@@ -77,7 +77,7 @@
 
 ## 7. 证据出处
 
-- 门与两套「重原子」定义：`build_torsion_probe_package.py:322`（含 Li）、`:407`（不含 Li）
+- 门与两套「重原子」定义：`build_torsion_probe_package.py:325`（含 Li）、`:422`（不含 Li，声明分支内；修复后另有 `:336` 无条件骨架口径）
 - 实测：`work/_screening_probe_regate.py` 的复评 + 本轮纯骨架/含 Li 对照（`kabsch_rmsd`）
 - 含 Li 的 `heavy_array`：`build_production_ensemble_aggregator.py::heavy_array`（`s != "H"`）
 - 被更正的我方结论：`4e0fa6c`（`DOL_EC_PRODUCTION_COVERAGE_PLAN_20261027.md §2.1`）
