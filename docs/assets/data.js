@@ -7,7 +7,7 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 182,
+  "test_files": 183,
   "tests_passed": 1732
  },
  "wp2_progress": {
@@ -1815,7 +1815,7 @@ window.HB = {
   {
    "path": "scripts",
    "note": "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）",
-   "files": 257
+   "files": 259
   },
   {
    "path": "config",
@@ -1840,12 +1840,12 @@ window.HB = {
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 185
+   "files": 186
   },
   {
    "path": "docs",
    "note": "技术报告与周报（NN_*.md）、协议、结题报告、站点",
-   "files": 247
+   "files": 248
   },
   {
    "path": "deliverables",

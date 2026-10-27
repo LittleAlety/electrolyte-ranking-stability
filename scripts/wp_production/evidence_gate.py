@@ -14,6 +14,19 @@ Design points from the ruling:
     limitation report, never to retry;
   * mixing DMC / a third task / a reserve start into the batch is a HOLD-level
     refusal BEFORE submission.
+
+2026-10-27 audit fixes (gate-code-auditor REPORT.md, adopted in full):
+  F-1  unknown sacct states are now NON-terminal (white-list, fail-closed)
+  F-2  the terminal white-list REUSES submit_hpc_batch.TERMINAL_STATES (single
+       source of truth; CANCELLED is terminal, matching Slurm and the project's
+       own 3747724 settlement) and states are normalised (split " by ",
+       rstrip "+") before matching
+  F-3  the activation key now includes the SLOT (tasks/<NAME>/<SLOT>__<seed>):
+       a wrong slot means the wrong chemical system, so slot-blindness was a
+       real hole; malformed tasks.txt rows return False instead of raising
+  F-4  ``batch_tasks_exactly_activated`` defaults to False (fail-closed): a
+       forgotten field HOLDS, never silently claims "exactly activated"
+  F-9  malformed tasks.txt (no "/" or no "__") returns False, not IndexError
 """
 
 from __future__ import annotations
@@ -31,6 +44,17 @@ CANDIDATES = (REPO / "outputs" / "physics_completion" / "ensembles"
 #: the batch's own remote-dir name (ensemble_hpc_io binds sacct WorkDir against
 #: REMOTE_ROOT/<local package dir name>, so the two must match exactly)
 PACKAGE_NAME = "dol_ec_recovery_v1"
+
+#: single source of truth for terminal scheduler states (audit F-2): reusing
+#: the submitter's list kills the second, drifting copy.  Slurm semantics AND
+#: the project's own history (3747724 settled as a 0-CH terminal CANCELLED)
+#: both treat CANCELLED as terminal.
+from submit_hpc_batch import TERMINAL_STATES  # noqa: E402  (same package)
+
+
+def _normalise_state(state: str) -> str:
+    """sacct prints 'CANCELLED by <uid>' and may append '+' when truncated."""
+    return state.split(" by ")[0].strip().rstrip("+")
 
 
 class NextAction(str, Enum):
@@ -60,7 +84,9 @@ class Evidence:
     cost_settled: bool
     downstream_checks_ok: bool
     # 2026-10-27 ruling: the batch may ONLY carry the two activated tasks.
-    batch_tasks_exactly_activated: bool = True
+    # NO optimistic default (audit F-4): a forgotten field must fail CLOSED
+    # (HOLD), never silently claim "exactly activated".
+    batch_tasks_exactly_activated: bool = False
 
 
 def next_action(e: Evidence) -> NextAction:
@@ -93,23 +119,39 @@ def next_action(e: Evidence) -> NextAction:
     return NextAction.REPORT
 
 
-def activation_member_keys() -> set[tuple[str, str]]:
-    """(name, seed) pairs authorised by the tracked activation registry."""
+def activation_member_keys() -> set[tuple[str, str, str]]:
+    """(name, slot, seed) triples authorised by the activation registry.
+
+    The SLOT participates (audit F-3): tasks/<NAME>/<SLOT>__<seed> carries the
+    solvent environment -- a wrong slot means the wrong chemical system, and
+    dropping it from the key made the three-way check blind to that.
+    """
     doc = json.loads(ACTIVATION.read_text(encoding="utf-8"))
     out = set()
     for entry in doc.get("activated", []):
-        name, _slot = str(entry["state_key"]).split("|")
-        out.add((name, str(entry["leaf"])))
+        name, slot = str(entry["state_key"]).split("|")
+        out.add((name, slot, str(entry["leaf"])))
     return out
 
 
-def candidates_matching(source_kind: str) -> list[tuple[str, str]]:
+def candidates_matching(source_kind: str) -> list[tuple[str, str, str]]:
     rows = []
     with CANDIDATES.open(encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
             if r.get("source_kind") == source_kind:
-                rows.append((r["name"], r["seed"]))
+                rows.append((r["name"], r["slot"], r["seed"]))
     return rows
+
+
+def _task_row_keys(rel: str) -> tuple[str, str, str] | None:
+    """(name, slot, seed) from 'tasks/<NAME>/<SLOT>__<seed>'; None if malformed."""
+    parts = rel.split("/")
+    if len(parts) < 3 or "__" not in parts[-1]:
+        return None
+    slot_seed = parts[-1].split("__", 1)
+    if not slot_seed[0] or not slot_seed[1]:
+        return None
+    return (parts[1], slot_seed[0], slot_seed[1])
 
 
 def batch_is_exactly_activated(package_dir: Path,
@@ -119,7 +161,8 @@ def batch_is_exactly_activated(package_dir: Path,
 
     Checks all three registries the ruling names (activation registry, the
     candidates table, and the package's own tasks.txt) -- a DMC task, a third
-    task or a reserve start sneaking into any one of them fails the check.
+    task, a reserve start, or a WRONG SLOT sneaking into any one of them fails
+    the check.  Malformed rows fail closed (False), never raise.
     """
     act = activation_member_keys()
     cand = set(candidates_matching(source_kind))
@@ -132,35 +175,35 @@ def batch_is_exactly_activated(package_dir: Path,
         return False
     pkg_keys = set()
     for rel in tasks:
-        parts = rel.split("/")
-        # tasks/<NAME>/<SLOT>__<seed>
-        pkg_keys.add((parts[1], parts[-1].split("__", 1)[1]))
+        key = _task_row_keys(rel)
+        if key is None:
+            return False
+        pkg_keys.add(key)
     return pkg_keys == act
-
-
-#: states that mean the scheduler itself never finished accounting for a job
-SACCT_NON_TERMINAL = {"PENDING", "RUNNING", "SUSPENDED", "COMPLETING", "CANCELLED"}
 
 
 def sacct_terminal_states(rows, expected_job_ids) -> dict[str, str]:
     """Map each expected raw job id -> its scheduler state, verifying terminal.
 
     ``rows`` are parsed sacct lines (dicts with at least JobIDRaw/State).
-    Non-terminal or unknown states return {} (callers read that as "wait"),
-    never a fabricated terminal verdict.
+    States are normalised (``'CANCELLED by 59540'`` -> ``CANCELLED``; trailing
+    ``+`` stripped) and matched against the submitter's TERMINAL_STATES
+    white-list (audit F-1/F-2): anything unknown, empty or genuinely
+    non-terminal returns {} (callers read that as "wait") -- a fabricated
+    terminal verdict is impossible in either direction.
     """
     expected = set(expected_job_ids)
-    seen = {}
+    seen: dict[str, str] = {}
     for row in rows:
         jid = str(row.get("JobIDRaw", row.get("JobID", "")))
         if jid not in expected:
             continue
-        state = str(row.get("State", "")).strip()
+        state = _normalise_state(str(row.get("State", "")))
         if jid in seen and seen[jid] != state:
             return {}
         seen[jid] = state
     if set(seen) != expected:
         return {}
-    if any(s in SACCT_NON_TERMINAL or s == "" for s in seen.values()):
+    if any(s not in TERMINAL_STATES for s in seen.values()):
         return {}
     return seen
