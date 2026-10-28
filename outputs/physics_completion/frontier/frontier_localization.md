@@ -9,15 +9,15 @@
 | 项 | 值 |
 |---|---|
 | 系综加权成员（非仅 48 primary） | 80 |
-| 已解析 | **80** |
-| 待算 | 0 |
+| 已解析 | **79** |
+| 待算 | 1 |
 
 ## 两个前沿并不一致
 
 | 指标 | HOMO 侧 | LUMO 侧 |
 |---|---|---|
 | Li 权重最大值 | **0.004331** | **0.310285** |
-| 分类分布 | donor_localized 45 / ligand_localized 35 | donor_localized 5 / li_localized 34 / ligand_localized 41 |
+| 分类分布 | donor_localized 44 / ligand_localized 35 | donor_localized 5 / li_localized 33 / ligand_localized 41 |
 
 **Li 在 HOMO 中实质上不参与**（最大权重 4.3e-03，远低于 0.25 的 Li 定域阈值），但它在 LUMO 中可以占到 0.31。因此「Li 是否承载前线轨道」这个问题，**只问 HOMO 会得出错误答案**。
 
@@ -49,7 +49,6 @@
 | `DME|LiM_2plus|primary` | 0.0024 | 0.4841 | `li_localized` |
 | `DME|LiM_2plus|r3m_c05` | 0.0009 | 0.3472 | `li_localized` |
 | `EMC|LiM_2plus|primary` | 0.0008 | 0.2676 | `li_localized` |
-| `DOL|LiM_2plus|c05` | 0.0002 | 0.4589 | `li_localized` |
 | `TMP|LiM_2plus|primary` | 0.0002 | 0.5930 | `li_localized` |
 | `SL|LiM_2plus|primary` | 0.0002 | 0.4797 | `li_localized` |
 | `TMP|LiM_2plus|r3m_c00` | 0.0001 | 0.5743 | `li_localized` |
@@ -64,7 +63,7 @@
 
 ## HOMO/LUMO 分类不一致的成员
 
-56 / 80 个已解析成员的 HOMO 与 LUMO 分类不同。
+55 / 79 个已解析成员的 HOMO 与 LUMO 分类不同。
 
 | 成员 | HOMO | LUMO |
 |---|---|---|
@@ -88,7 +87,7 @@
 | `DME|M|14` | `donor_localized` | `ligand_localized` |
 | `DME|M|22` | `donor_localized` | `ligand_localized` |
 | `DME|M|primary` | `donor_localized` | `ligand_localized` |
-| … | 共 56 条 | |
+| … | 共 55 条 | |
 
 ## 已解析成员明细
 
@@ -127,7 +126,6 @@
 | `DMSO|LiM_plus|r3m_c00` | 0.0020 | 0.8213 | `donor_localized` | 0.3103 | 0.3524 | `li_localized` |
 | `DMSO|M_plus|primary` | 0.0000 | 0.8095 | `donor_localized` | 0.0000 | 0.8123 | `donor_localized` |
 | `DMSO|M|primary` | 0.0000 | 0.8331 | `donor_localized` | 0.0000 | 0.2609 | `donor_localized` |
-| `DOL|LiM_2plus|c05` | 0.0002 | 0.4720 | `donor_localized` | 0.0002 | 0.4589 | `li_localized` |
 | `DOL|LiM_plus|c02` | 0.0006 | 0.5016 | `donor_localized` | 0.0598 | 0.2486 | `li_localized` |
 | `DOL|M_plus|40` | 0.0000 | 0.5332 | `ligand_localized` | 0.0000 | 0.3966 | `ligand_localized` |
 | `DOL|M_plus|primary` | 0.0000 | 0.5339 | `ligand_localized` | 0.0000 | 0.3939 | `ligand_localized` |

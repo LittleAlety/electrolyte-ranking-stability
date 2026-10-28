@@ -210,6 +210,35 @@ def _was_searched(name: str, state: str) -> bool:
                for r in _read(SEARCH_POOL)) if SEARCH_POOL.is_file() else False
 
 
+def _original_search_outcome(key: tuple[str, str]) -> str:
+    """The search conclusion a released state earned BEFORE its release.
+
+    2026-10-27 ruling: the review's release overwrote ``search_outcome`` with
+    ``released_by_review``, which erased the honest ``no_new_minimum_found``
+    conclusion for states that DID run a registered search (measured: AN|M_plus
+    ran the 64-conformer GFN2 search per the frozen index).  The original
+    outcome is derived ONLY from registered artifacts -- the search index's
+    per-state new-minima count -- never invented:
+
+      * state in ``states_searched`` and no new minima -> ``no_new_minimum_found``
+      * state in ``states_searched`` and new minima    -> ``new_minima_found``
+      * state never searched                            -> ``""`` (caller falls
+        back to ``released_by_review`` -- which is then honest, because the
+        release came from a review with no search behind it).
+    """
+    if not SEARCH_INDEX.is_file():
+        return ""
+    try:
+        idx = json.loads(SEARCH_INDEX.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    states = idx.get("states_searched") or []
+    if "%s|%s" % key not in states:
+        return ""
+    n_new = int((idx.get("per_state_new_minima") or {}).get("%s|%s" % key, 0))
+    return "new_minima_found" if n_new > 0 else "no_new_minimum_found"
+
+
 def _li_recovery_starts() -> dict[tuple[str, str], list[dict]]:
     """New Li coordination basins discovered by the recovery motif search.
 
@@ -432,10 +461,19 @@ def build_rows() -> list[dict]:
             if not parts:
                 continue
             row = ({f: "" for f in fieldnames} if fieldnames else {})
+            # 2026-10-27 ruling: "field currently missing" must be
+            # distinguished from "no search ever ran".  A released state that
+            # the SEARCH INDEX shows was actually searched keeps its original
+            # search conclusion (no_new_minimum_found / new_minima_found);
+            # only states with no search record read as released_by_review.
+            # The frozen evidence chain (index sha verified) is the source of
+            # truth -- never the review's release marker.
+            searched_outcome = _original_search_outcome(key)
             row.update({"name": key[0], "state": key[1],
                         "batch_id": "strict_recovery_v1",
                         "historical_limitation": rev.get("historical_limitation", ""),
-                        "search_outcome": "released_by_review",
+                        "search_outcome": (searched_outcome
+                                           or "released_by_review"),
                         "priority": "released", "path": "released",
                         "max_new_starts": "0",
                         "start_1_basin": parts[0] if parts else "",
