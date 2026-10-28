@@ -194,9 +194,13 @@
 3. **WP6 / 扩池**：触发后**分别冻结**数值预算（结构数、core-hour 上限、停止规则、交付证据），
    **绝不从四态 800 中支取**；当前执行额度 **0 CH**。
 4. **工程侧遗留**（本轮实测发现，均不阻塞科学结论）：
-   - `outputs/week3/SHA256SUMS` 冻结清单有 **220 条漂移**（抽样文件 mtime 均为 9-29，
-     **属既有状态、非本轮引入**）⇒ `audit_clean_room` 的 C6 现判 FAIL；
-     **不应通过重生成冻结清单来"修绿"**（会毁掉溯源），须由维护者决定冻结清单的处置口径。
+   - **`outputs/week3/SHA256SUMS` 的 1 条合法内容变更**：`outputs/week27/claim_scope.json`
+     引用了 README 的字节，README 因 44→45/48 重生成而变 ⇒ 登记表需常规 `refreeze` 重同步
+     （权威分类器 `refreeze_manifest.py`：eol=0 / **content=1** / missing=0 / dropped=0 / external=0）。
+     **⚠ 本报告初稿曾写「220 条漂移」——那是错的**：my own scan hashed RAW bytes while the
+     registry stores the **LF-normalised** digest (`* text=auto eol=lf` contract)；抽样复核
+     `scripts/make_c1_state_identity_figure.py` 的 LF 归一化 sha = 登记值 `7a21bc16…` 逐位一致。
+     ⇒ 属**我的观测手段错**，不是仓库漂移（同族教训：先证明观测手段，再相信观测结果）。
    - 仓库根存在**未跟踪且未被 gitignore** 的 `_preflight_out.json`（并行会话产物）⇒
      `test_repo_layout` 顶层登记检查变红。
 
