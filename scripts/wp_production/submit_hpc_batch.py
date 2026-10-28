@@ -27,6 +27,15 @@ RESOURCE_PROFILES = {
     "orca_production_v1": {"engine": "orca", "cores": 4, "wall_hours": 24,
                            "budget_cap_core_hours": "800",
                            "attempts_ledger_required": False},
+    # 2026-10-28 EC v2 recovery专用：4核×4小时=16 CH/腿，最多2腿共32 CH。
+    # 仅用于本批次EC恢复，不影响既有orca_production_v1语义。
+    "orca_production_4h_v1": {"engine": "orca", "cores": 4, "wall_hours": 4,
+                              "budget_cap_core_hours": "32",
+                              # Execution supplement 20261029 §5.2: the EC campaign
+                              # must settle from a REAL attempts ledger, never from a
+                              # planning estimate.  Historical profiles keep their own
+                              # semantics; only this new batch profile is tightened.
+                              "attempts_ledger_required": True},
     # The frozen recovery plan caps the GFN2 screening layer at 2 cores/task.
     "xtb_screening_v1": {"engine": "xtb", "cores": 2, "wall_hours": 2,
                          "budget_cap_core_hours": "32",

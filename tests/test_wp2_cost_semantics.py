@@ -120,5 +120,5 @@ def test_wp2_progress_is_indexed_and_layout_count_is_exact():
     counts = {"all": sum(path.is_file() for path in root.iterdir()
                         if path.name != "__pycache__"),
               "py": len(list(root.glob("*.py"))), "ps1": len(list(root.glob("*.ps1")))}
-    assert counts == {"all": 88, "py": 82, "ps1": 4}
-    assert "**88** 个跟踪文件：82 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`" in layout
+    assert counts == {"all": 90, "py": 84, "ps1": 4}
+    assert "**90** 个跟踪文件：84 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`" in layout

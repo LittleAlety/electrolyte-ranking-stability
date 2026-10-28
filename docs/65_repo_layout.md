@@ -105,7 +105,7 @@ week36 与 week44 只存在于 part2 镜像。
 - 命名族：`build_*`（生成器，多数带 `--check`）、`run_*`（执行器 / 队列）、
   `audit_*` 与 `check_*`（审计与校验）、`make_*`（图与提交包）、`freeze_gates.py`（冻结门）。
 - 强制索引：新增顶层入口必须登记到 `scripts/README.md`，否则 `tests/test_scripts_index.py` 失败。
-- `scripts/wp_production/`：新阶段生产链（**88** 个跟踪文件：82 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
+- `scripts/wp_production/`：新阶段生产链（**90** 个跟踪文件：84 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`）；逐脚本职责见 §3.1，一键收口与边界见 `scripts/wp_production/README.md`。
 
 ### 3.1 `scripts/wp_production/` 逐脚本职责
 
@@ -196,6 +196,8 @@ week36 与 week44 只存在于 part2 镜像。
 | `evidence_gate.py` | 2026-10-27 执行方案的**只读证据状态机**：`next_action(Evidence)` 按已验证证据给出唯一下一步（hold/submit_once/reconcile/wait/fetch/qc/settle/rebuild/report），已有提交尝试时**绝不**回落自动提交分支；`qc_results_complete`＝「每腿都有明确判定」而非「都通过」；`batch_is_exactly_activated()` 三方核对激活登记/candidates/tasks.txt **恰好等于两条激活任务**（混入即拒）；`sacct_terminal_states()` 非终态返回空、不编造 | Evidence 适配器（真实证据填充） → NextAction |
 | `batch_cost_settlement.py` | 2026-10-27 执行方案的**sacct 费用结算**：`allocated_core_hours()` 按**精确数组元素 ID** 匹配（父数组与 `.batch`/`.extern` 不重复计费）；缺记录即 `MISSING` 拒绝结算（不补零）；同元素多条记录拒绝简单相加（须核对重启）；结果 = **AllocCPUS × ElapsedRaw** 分配核时（非 TotalCPU） | sacct `-P` 输出 + 期望元素集 → Decimal 核时 |
 | `build_dol_ec_recovery_package.py` | **dol_ec_recovery_v1 schema-2 生产包构建器**（2026-10-27 裁定授权的 2 腿：DOL/EC 各一条 ring-pucker 起点，`orca_production_12h_v1` 4c×12h×2=96 CH 走 512 额度）：产出可发现、可执行的新包 `work/hpc_dol_ec_recovery_v1_20261027/`（旧 draft 不动、不可提交）；fail-closed 断言：成员键集＝激活登记集＝candidates p4v2 行集且**恰为 2**；每任务几何＝**原始扰动 p4v2 几何**（sha256 须等于激活登记，绝不用塌缩末几何）；冻结生产方法（wB97X-D4/def2-TZVPD Opt VeryTightOpt AnFreq SMD 4 procs）；`recovery_v1_start` 角色（聚合器全名匹配 + 覆盖复核前缀匹配都认） | `config/recovery_start_activation_v1.json` + P4 包原始几何 → `work/hpc_dol_ec_recovery_v1_20261027/`（含 batch sbatch / tasks.txt / attempts 账本） |
+| `build_ec_recovery_package.py` | **EC v2 HOLD 包生成器（2026-10-29 L03，design-only）**：`ec_v2_p4` 为唯一 active 元素（schema-2 单数组 0-0、4 核 × 4 h、16 CH 预留、`attempts_ledger.json`、完整 SHA 闭包）；`ec_v2_p7` 只写 `reserve/` 模板、不进任务清单与批次；`--check` 只读复核字节闭包/HOLD/合同；拒绝覆盖已存在包 |
+| `ec_recovery_contract.py` | **EC 下一轮机器合同（2026-10-29 L02，design-only）**：候选顺序固定 `ec_v2_p4 → ec_v2_p7`、一次一元素在飞、最多两次真实提交、16 CH/元素、32 CH 总量、`orca_production_4h_v1`（4 核 × 4 h，强制真实账本）；`next_candidate(history)` 只给出唯一可提交腿；`check_campaign_contract()` 对未登记候选/抢跑/低报预留/第三腿/超帽/在飞/错资源形状一律 `ContractViolation` 拒绝（fail-closed） |
 
 非 Python 的跟踪文件：`finalize_wp2.ps1`（一键收口链）、`supervise_pending.ps1`（无人值守监守）、
 `watch_smpd.ps1`（轻量 smpd 看护）、`watch_supervisor.ps1`（监守看护：接住监守 `exit 3` 的信号）、
