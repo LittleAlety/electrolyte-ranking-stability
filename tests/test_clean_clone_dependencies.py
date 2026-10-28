@@ -85,7 +85,12 @@ def test_the_cost_builder_still_builds_from_the_real_layer():
         )
     m = _load("build_ensemble_cost_by_family")
     rows = m.build_rows()
-    assert len(rows) == 190
+    # 190 was the figure when this pin was written; real runs keep landing in the
+    # machine-local layer (2026-10-27: the DOL/EC reopt batch and the frontier
+    # single point for the new member), so the row count GROWS.  The durable
+    # invariants are "never shrinks below the recorded figure" and "one row per
+    # job identity" -- pinning the exact literal would fail on every new run.
+    assert len(rows) >= 190, len(rows)
     assert len({r["job_identity"] for r in rows}) == len(rows)
 
 
