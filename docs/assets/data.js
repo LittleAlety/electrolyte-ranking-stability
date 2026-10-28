@@ -11,7 +11,7 @@ window.HB = {
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-26T09:35:12Z",
+  "generated_at_utc": "2026-10-28T04:40:47Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -61,9 +61,9 @@ window.HB = {
    "compliance_source": "outputs/physics_completion/compliance/plan_compliance.csv"
   },
   "frontier": {
-   "available": false,
-   "parsed": 0,
-   "registered_verified": 0,
+   "available": true,
+   "parsed": 80,
+   "registered_verified": 80,
    "total": 80,
    "sources": {
     "weights": "outputs/physics_completion/ensembles/production_ensemble_weights.csv",
@@ -72,17 +72,18 @@ window.HB = {
    },
    "source_sha256": {
     "outputs/physics_completion/ensembles/production_ensemble_weights.csv": "201e19545bf0c1ccc209ca017e4ed55c581085d15ceb1df117f31f7e36494101",
-    "outputs/physics_completion/frontier/frontier_localization.csv": "2bae0ac589e83591384f51917a6a7fde671577de24e46f49596b74b9d5b1d7c3",
-    "outputs/physics_completion/frontier/frontier_identity_evidence.csv": "f27d58978f7ead6b443a83e5531c4efeedd4c248783d97433602ad6c8f06d048"
+    "outputs/physics_completion/frontier/frontier_localization.csv": "7310354c98ff2962226bb320438360166ddd1c2d1b368472afdaed639f1effa3",
+    "outputs/physics_completion/frontier/frontier_identity_evidence.csv": "0f8a8653b5285e0e786e62f1f3c03d021b8edc48502a56e768dba46d7ebcc5c6"
    },
-   "error": "member sets differ from current weights"
+   "error": ""
   },
   "strict_evidence": {
    "available": true,
    "status": "not_satisfied",
-   "passed": 5,
+   "passed": 4,
    "total": 6,
    "failed": [
+    "identity_all_members_complete",
     "wp5_full_target_pool_evaluated"
    ],
    "source": "outputs/physics_completion/compliance/plan_compliance.csv"
