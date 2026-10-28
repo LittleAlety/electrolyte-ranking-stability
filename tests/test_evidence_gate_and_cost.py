@@ -336,3 +336,70 @@ def test_unknown_state_is_not_terminal_pure():
         [{"JobIDRaw": "7_0", "State": "PENDING+"}], ["7_0"]) == {}
     assert EG.sacct_terminal_states(
         [{"JobIDRaw": "7_0", "State": "CANCELLED"}], ["7_0"]) == {"7_0": "CANCELLED"}
+
+
+# ---- per-element settlement (2026-10-28 measured swap) ----------------------
+#: verbatim sacct for the reopt array.  JobIDRaw is NOT the element id: the two
+#: raw ids are CROSSED (element 0 -> 3791417, element 1 -> 3791416).  The batch
+#: was hand-settled with the legs SWAPPED and the total looked right because
+#: 810+1004 is symmetric -- these pins exist so that can never recur.
+_REOPT_SACCT = "\n".join([
+    "JobIDRaw|JobID|State|ExitCode|AllocCPUS|ElapsedRaw",
+    "3791417|3791416_0|COMPLETED|0:0|4|810",
+    "3791417.bat+|3791416_0.b+|COMPLETED|0:0|4|810",
+    "3791417.ext+|3791416_0.e+|COMPLETED|0:0|4|810",
+    "3791416|3791416_1|COMPLETED|0:0|4|1004",
+    "3791416.bat+|3791416_1.b+|COMPLETED|0:0|4|1004",
+    "3791416.ext+|3791416_1.e+|COMPLETED|0:0|4|1004",
+])
+_REOPT_TASKS = ["tasks/DOL/LiM_2plus__p4_02_ring_pucker_twist",
+                "tasks/EC/LiM_2plus__p4_02_ring_pucker_twist"]
+
+
+def _reopt_rows():
+    return CS.parse_sacct_rows(_REOPT_SACCT)
+
+
+def test_per_element_uses_the_slurm_element_not_the_raw_id():
+    """DOL is element 0 (raw 3791417, 810 s -> 0.900000 CH);
+    EC is element 1 (raw 3791416, 1004 s -> 1.115556 CH).
+    The swap this pins: the first settlement had them the other way round."""
+    legs = CS.per_element_core_hours(_reopt_rows(), "3791416", _REOPT_TASKS)
+    assert [l["slurm_element"] for l in legs] == ["3791416_0", "3791416_1"]
+    assert [l["job_id_raw"] for l in legs] == ["3791417", "3791416"]
+    assert legs[0]["core_hours"] == Decimal("0.9")            # DOL, 810 s
+    assert legs[1]["core_hours"] == Decimal("1.115555555555555555555555556")
+
+
+def test_per_element_is_order_invariant():
+    """Shuffling the sacct rows must not move a single charge between legs."""
+    rows = _reopt_rows()
+    assert CS.per_element_core_hours(rows, "3791416", _REOPT_TASKS) == \
+        CS.per_element_core_hours(list(reversed(rows)), "3791416", _REOPT_TASKS)
+
+
+def test_per_element_refuses_a_missing_element():
+    rows = [r for r in _reopt_rows() if r["JobID"] != "3791416_1"]
+    with pytest.raises(ValueError, match="MISSING"):
+        CS.per_element_core_hours(rows, "3791416", _REOPT_TASKS)
+
+
+def test_per_element_refuses_a_duplicate_terminal_record():
+    rows = _reopt_rows() + [r for r in _reopt_rows() if r["JobID"] == "3791416_0"]
+    with pytest.raises(ValueError, match="重复终态记录"):
+        CS.per_element_core_hours(rows, "3791416", _REOPT_TASKS)
+
+
+def test_per_element_ignores_batch_and_extern_children():
+    """The .batch/.extern rows repeat the same allocation; counting them would
+    treble the charge (6.046667 instead of 2.015556)."""
+    legs = CS.per_element_core_hours(_reopt_rows(), "3791416", _REOPT_TASKS)
+    assert sum(l["core_hours"] for l in legs) == Decimal("2.015555555555555555555555556")
+
+
+def test_per_element_still_charges_a_failed_element():
+    rows = [dict(r) for r in _reopt_rows() if r["JobID"] in ("3791416_0", "3791416_1")]
+    rows[0]["State"] = "FAILED"
+    legs = CS.per_element_core_hours(rows, "3791416", _REOPT_TASKS)
+    assert legs[0]["core_hours"] == Decimal("0.9")            # failure is not free
+    assert legs[1]["core_hours"].quantize(Decimal("0.000001")) == Decimal("1.115556")

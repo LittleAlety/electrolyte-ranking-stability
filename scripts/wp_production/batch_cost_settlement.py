@@ -114,6 +114,78 @@ def allocated_core_hours(rows, expected_job_ids) -> Decimal:
     return total
 
 
+def per_element_core_hours(rows, array_job: str, task_order: list) -> list[dict]:
+    """Settle an array batch PER LEG, keyed on the SLURM ELEMENT, not the raw id.
+
+    2026-10-28 measured defect this exists to prevent: the reopt batch was
+    settled by hand and the two legs came out SWAPPED.  sacct said
+
+        JobIDRaw  JobID       AllocCPUS ElapsedRaw
+        3791417   3791416_0   4         810      <- element 0
+        3791416   3791416_1   4         1004     <- element 1
+
+    ``JobIDRaw`` is NOT the element id -- here the two raw ids are CROSSED.
+    Mapping "element i -> i-th raw id" therefore mis-assigns every leg while
+    the TOTAL stays correct (810+1004 is symmetric), which is exactly how the
+    swap survived a total-only settlement check.
+
+    Authoritative chain, never reordered and never sorted by raw id:
+        ``task_order[i]``  ->  array element ``i``
+                           ->  the sacct row whose ``JobID`` is exactly
+                               ``"<array_job>_<i>"``
+                           ->  that row's ``JobIDRaw`` / ``AllocCPUS`` / ``ElapsedRaw``
+
+    ``.batch`` / ``.extern`` children carry suffixed ``JobID`` values
+    (``3791416_0.batch``) and are rejected by the digit-only element check.
+
+    Returns one dict per element in ``task_order``; raises ``ValueError`` on a
+    missing element, a duplicate terminal record, or a column gap -- never
+    guesses and never zero-fills.
+    """
+    if not task_order:
+        raise ValueError("task_order is empty; cannot settle an array batch")
+    by_element: dict[int, dict] = {}
+    for row in rows:
+        for column in ("JobID", "JobIDRaw", "AllocCPUS"):
+            if column not in row:
+                raise ValueError("MISSING_COLUMNS: %s (需 JobID/JobIDRaw/AllocCPUS)"
+                                 % row.get("JobIDRaw", "?"))
+        job = str(row["JobID"])
+        prefix = array_job + "_"
+        if not job.startswith(prefix):
+            continue
+        tail = job[len(prefix):]
+        if not tail.isdigit():          # rejects '.batch' / '.extern' children
+            continue
+        index = int(tail)
+        if index in by_element:
+            raise ValueError("重复终态记录，需核对重启/重复作业: %s" % job)
+        by_element[index] = row
+    expected = set(range(len(task_order)))
+    if set(by_element) != expected:
+        raise ValueError("MISSING: 元素记录不完整（缺 %s，多 %s）"
+                         % (sorted(expected - set(by_element)),
+                            sorted(set(by_element) - expected)))
+    out = []
+    for index, task in enumerate(task_order):
+        row = by_element[index]
+        cores = int(Decimal(str(row["AllocCPUS"]).strip()))
+        seconds = _elapsed_seconds(row, str(row["JobID"]))
+        if cores < 0 or seconds < 0:
+            raise ValueError("非法费用字段: %s (cores=%d, seconds=%d)"
+                             % (row["JobID"], cores, seconds))
+        out.append({
+            "array_index": index,
+            "task": task,
+            "slurm_element": str(row["JobID"]),
+            "job_id_raw": str(row["JobIDRaw"]),
+            "alloc_cpus": cores,
+            "elapsed_raw_s": seconds,
+            "core_hours": Decimal(cores) * Decimal(seconds) / Decimal(3600),
+        })
+    return out
+
+
 def parse_elapsed_raw(value: str) -> int:
     """sacct ElapsedRaw is plain seconds; the pretty form is [[DD-]HH:]MM:SS."""
     value = value.strip()

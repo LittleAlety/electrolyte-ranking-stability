@@ -7,11 +7,11 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 183,
+  "test_files": 184,
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-28T04:40:47Z",
+  "generated_at_utc": "2026-10-28T16:09:27Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -80,10 +80,9 @@ window.HB = {
   "strict_evidence": {
    "available": true,
    "status": "not_satisfied",
-   "passed": 4,
+   "passed": 5,
    "total": 6,
    "failed": [
-    "identity_all_members_complete",
     "wp5_full_target_pool_evaluated"
    ],
    "source": "outputs/physics_completion/compliance/plan_compliance.csv"
@@ -1810,7 +1809,7 @@ window.HB = {
   {
    "path": "scripts",
    "note": "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）",
-   "files": 259
+   "files": 261
   },
   {
    "path": "config",
@@ -1835,12 +1834,12 @@ window.HB = {
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 186
+   "files": 187
   },
   {
    "path": "docs",
    "note": "技术报告与周报（NN_*.md）、协议、结题报告、站点",
-   "files": 251
+   "files": 264
   },
   {
    "path": "deliverables",
