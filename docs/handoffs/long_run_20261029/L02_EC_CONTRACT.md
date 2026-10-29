@@ -43,3 +43,38 @@ work/_validate_ec_v2_presubmission.py                                           
 ## 5. 下一步
 
 L03：按 schema-2 生成 `p4` 单腿可执行 HOLD 包（与 `build_dol_ec_recovery_package.py` 同形；p7 只留不进入生产候选表的模板），并用真实加载器/提交器门函数离线验证；L04 并行诊断 DMC 历史过程。
+
+
+## 6. 2026-10-29 收尾：合同已接入**真实提交入口**（此前只接在建包器）
+
+- 接入点：`submit_hpc_batch.submit_batch()` 在 `_load_package` → `submission_resources` → 账本/profile 校验
+  → journal/锁重复检查**之后**、`doctor`/远端锁/`squeue`/submit **之前**调用 `_enforce_ec_contract(...)`。
+  任何拒绝都发生在**零副作用**处（负向用例断言 fake runner 调用数 = 0）。
+- 状态来源（不信任调用方布尔值）：包内 `manifest.json` + `tasks/<...>/candidate.json` + `geom.xyz` 现算 SHA
+  + **共享 campaign 账本** `work/ec_recovery_v2_campaign/attempts_ledger.json`（在包目录旁，**不随拆包清零**）。
+- 门规则（合同 `next_candidate`）：未提交 ⇒ p4；p4 在飞 ⇒ 停；p4 accepted ⇒ 停；p4 终态但 `accepted` 缺失/None ⇒ 停；
+  证据不完整 ⇒ 停；p4 明确未通过且证据完整 ⇒ 才开放 p7；p7 已提交 ⇒ 停（永无第三腿）。
+- 未知响应：bridge 失败/无 JobID 一律记 `submission_unknown`（submitted=True、terminal=False、accepted=null），
+  保守占用次数与 16 CH 预留；只有 journal + 调度证据才能解除。
+- 提交成功后由提交器**追加** campaign 账本条目（accepted 写显式 null，不写 false）。
+- 旧 profile（`orca_production_v1`/`12h`/`xtb_*`/`h2_*`）不进入该分支，行为不变（有正向回归测试）。
+- 测试：`tests/test_ec_submit_entry.py` 18 项（p4 抢跑、第三腿、p4 accepted/未知/缺字段/证据不全、超预算、
+  低报预留、缺账本、并发第二腿、输入偷换、候选偷换、campaign 几何不符、旧 profile 不变、拒绝无 journal）；
+  反向证明：移除接入块后这些入口测试失败（`work/_red_ec_entry.py`，RED PROVEN，生产字节已还原）。
+- 真实 HOLD 包 `work/hpc_ec_recovery_v2_p4_20261029/` 经同一入口函数离线验证：30/30（`work/_validate_ec_package_loader.py`）。
+
+### 6.1 入口审查后的加固（2026-10-29 收尾，t11 独立审查 R1/R2/R3/R5/R6/R7/R9）
+
+- **R1 HOLD 强约束**：入口现在要求 `submission_gate == "OPEN"` 且 `submitted is False`；
+  `HOLD` 包**无法通过真实提交入口**（此前 HOLD 只是散文，提交器全文不读它）。
+- **R2 身份绑定（防"改 profile 绕过"）**：EC 身份由**包名**（`hpc_ec_recovery_v2*`）、
+  `resource_profile` 或 `campaign_contract` 任一命中即触发；触发后**必须**使用 `orca_production_4h_v1`，
+  否则拒。改 manifest 的 profile 不再能降级到 800 CH/免账本的旧口径。
+- **R3 campaign id 必填**：`campaign` 缺失即拒；与共享账本 `campaign_id` 不一致即拒（不再用 `None in (None, X)` 放行）。
+- **R5 账本改名**：共享战役账本改为 `ec_recovery_v2_campaign/campaign_ledger.json`，与包内通用
+  `attempts_ledger.json` 区分，避免"两份同名不同架构"的误用。
+- **R6 预留下限**：若 manifest 声明 `first_batch_reserved_core_hours`，它必须 ≥ 16×元素数，否则拒。
+- **R7 CLI 契约**：`--attempts-ledger` 文件缺失/不可读转为 `REFUSED` + exit 2（不再 traceback）。
+- **R9 合同版本留痕**：入口把合同模块 sha256 写入战役账本条目（`contract_sha256`）。
+- **残余（未在本任务解决，如实登记）**：R4 战役账本本身可被改写（无哈希链）；R8 本地 journal/账本同时被删时
+  「从未提交」无法与「被删除」区分；R10 已随 R2 一并解决。

@@ -27,14 +27,17 @@ class ContractViolation(ValueError):
 def next_candidate(history):
     """Return the only submittable candidate, or ``None`` when the campaign stops.
 
-    ``history`` is an ordered list of dicts with keys ``candidate`` (str),
-    ``submitted`` (bool), ``terminal`` (bool) and ``accepted`` (bool, only
-    meaningful for a terminal entry).  Rules:
+    ``history`` is an ordered list of campaign records with keys ``candidate``
+    (str), ``submitted`` (bool), ``terminal`` (bool), ``accepted`` (bool or None)
+    and ``evidence_complete`` (bool or None).  Rules:
 
     * nothing submitted yet -> ``ec_v2_p4``;
     * p4 submitted but not terminal -> ``None`` (one element in flight);
-    * p4 terminal and accepted -> ``None`` (coverage passed, campaign ends);
-    * p4 terminal and failed -> ``ec_v2_p7``;
+    * p4 accepted -> ``None`` (coverage passed, campaign ends);
+    * p4 terminal but ``accepted`` is missing/None -> ``None`` (an unknown result
+      must never be read as a proven failure, so p7 is NOT opened);
+    * p4 terminal, not accepted, but evidence incomplete -> ``None``;
+    * p4 terminal, not accepted, evidence complete -> ``ec_v2_p7``;
     * p7 already submitted -> ``None`` (never a third leg).
     """
     submitted = [entry for entry in history if entry.get("submitted")]
@@ -44,7 +47,12 @@ def next_candidate(history):
     last_p4 = p4_entries[-1]
     if not last_p4.get("terminal"):
         return None
-    if last_p4.get("accepted"):
+    accepted = last_p4.get("accepted")
+    if accepted is None:
+        return None
+    if accepted:
+        return None
+    if last_p4.get("evidence_complete") is not True:
         return None
     p7_entries = [e for e in submitted if e["candidate"] == EC_CANDIDATES[1]]
     if not p7_entries:
@@ -84,6 +92,29 @@ def check_campaign_contract(
             % (candidate, expected)
         )
 
+    if int(ec_submitted_elements) + int(element_count) > EC_MAX_SUBMITTED_ELEMENTS:
+        raise ContractViolation(
+            "third leg refused: %d element(s) already submitted, at most %d allowed"
+            % (ec_submitted_elements, EC_MAX_SUBMITTED_ELEMENTS)
+        )
+
+    # The caller may not lie about the campaign history: the two derived counts
+    # must agree with the records they claim to summarise, otherwise "no element
+    # in flight" could be asserted while a submission is still unresolved.
+    submitted_count = sum(1 for e in history if e.get("submitted"))
+    pending_count = sum(1 for e in history
+                        if e.get("submitted") and not e.get("terminal"))
+    if int(ec_submitted_elements) != submitted_count:
+        raise ContractViolation(
+            "submitted-element count %r disagrees with the campaign history (%d)"
+            % (ec_submitted_elements, submitted_count)
+        )
+    if int(ec_active_pending) != pending_count:
+        raise ContractViolation(
+            "active/pending count %r disagrees with the campaign history (%d)"
+            % (ec_active_pending, pending_count)
+        )
+
     if profile != EC_PROFILE:
         raise ContractViolation(
             "profile %r is not the authorised EC profile %r" % (profile, EC_PROFILE)
@@ -112,12 +143,6 @@ def check_campaign_contract(
         raise ContractViolation(
             "low-reported reservation: declared %r CH but this element reserves %d CH"
             % (declared_reservation_core_hours, new_reservation)
-        )
-
-    if int(ec_submitted_elements) + int(element_count) > EC_MAX_SUBMITTED_ELEMENTS:
-        raise ContractViolation(
-            "third leg refused: %d element(s) already submitted, at most %d allowed"
-            % (ec_submitted_elements, EC_MAX_SUBMITTED_ELEMENTS)
         )
 
     committed = float(settled_core_hours) + float(unsettled_reserved_core_hours)

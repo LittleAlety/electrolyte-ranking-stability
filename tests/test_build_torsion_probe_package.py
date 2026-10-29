@@ -154,3 +154,51 @@ def test_every_shipped_p4_task_agrees_between_candidate_json_and_job_inp():
             "spin/multiplicity convention drifted", task, cand["multiplicity"], spin)
         checked += 1
     assert checked == len(tasks)
+
+
+def _synthetic_rotor():
+    """Two dihedrals about the SAME bond and moving fragment (a methyl-like head).
+
+    atoms 0-1 is the axis; atoms 2 and 3 are two different attachments on atom 1
+    (they only differ in which atom names the dihedral); atom 4 sits on the other
+    side of the axis.  Rotating about (0,1) therefore gives the SAME geometry for
+    dihedrals (2,1,0,4) and (3,1,0,4) -- the historical DMC defect.
+    """
+    symbols = ["C", "O", "H", "H", "C"]
+    coords = np.array([
+        [0.0, 0.0, 0.0],
+        [1.4, 0.0, 0.0],
+        [2.0, 1.0, 0.2],
+        [2.0, -1.0, -0.2],
+        [-1.2, 0.4, 0.0],
+    ])
+    adjacency = [set() for _ in symbols]
+    for i, j in ((0, 1), (1, 2), (1, 3), (0, 4)):
+        adjacency[i].add(j)
+        adjacency[j].add(i)
+    singles = {(0, 1), (1, 2), (1, 3), (0, 4)}
+    return symbols, coords, adjacency, singles
+
+
+def test_two_dihedrals_on_the_same_axis_produce_identical_coordinates():
+    symbols, coords, adjacency, singles = _synthetic_rotor()
+    first, _ = m.rotate_fragment(coords, (2, 1, 0, 4), adjacency,
+                                 single_bonds=singles, degrees=60.0)
+    second, _ = m.rotate_fragment(coords, (3, 1, 0, 4), adjacency,
+                                  single_bonds=singles, degrees=60.0)
+    assert np.allclose(first, second, atol=0.0), \
+        "same axis + same moving fragment must give byte-identical coordinates"
+
+
+def test_gate_refuses_a_second_start_with_identical_coordinates():
+    symbols, coords, adjacency, singles = _synthetic_rotor()
+    first, _ = m.rotate_fragment(coords, (2, 1, 0, 4), adjacency,
+                                 single_bonds=singles, degrees=60.0)
+    second, _ = m.rotate_fragment(coords, (3, 1, 0, 4), adjacency,
+                                  single_bonds=singles, degrees=60.0)
+    assert m.equivalent_start(symbols, first, second, adjacency) is True
+    verdict = m.validate_candidate_start(
+        symbols, coords, second, adjacency, prior_starts=[first],
+        registered_single_bonds=singles, rotated_bond=(0, 1))
+    assert verdict["accepted"] is False
+    assert verdict["reason"] in ("rigid_transformation", "equivalent_start")

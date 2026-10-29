@@ -54,3 +54,14 @@ build_ec_recovery_package.py --check -> EC PACKAGE OK (15 files, profile=orca_pr
 - 本步**没有**提交、没有 doctor/squeue、没有上传、没有占用任何 core-hour。
 - `32 CH` 仍是**提议**：`paid_from=proposed_ec_campaign_32ch_not_yet_authorised`。
 - 历史包与历史 profile 语义未改动；本包是**新目录**，不覆盖任何既有包。
+
+
+## 5. 2026-10-29 收尾补充
+
+- 入口级门已接入真实 `submit_batch`（见 `L02_EC_CONTRACT.md` §6）；对本包离线跑同一入口函数 **30/30 通过**，
+  且包仍 `HOLD`/`submitted=false`、未触桥、零 core-hour。
+- 提交前唯一剩余步骤仍是「授权后登记 EC planned 候选行（无翻转证明）」；本任务不登记、不提交。
+
+- **2026-10-29 加固后**：真实 HOLD 包经入口函数**被拒绝**（`submission_gate != OPEN`），
+  只有把 gate 显式改为 `OPEN` 的**临时副本**才通过（都在 temp 沙箱内做，真实包字节不变）；
+  离线验证 31/31。⇒ HOLD 现在是**机器强制**，不再只是散文。

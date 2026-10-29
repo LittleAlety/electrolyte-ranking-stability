@@ -50,16 +50,16 @@ def test_p4_accepted_ends_the_campaign():
 
 def test_p4_failure_activates_p7():
     history = [{"candidate": "ec_v2_p4", "submitted": True, "terminal": True,
-                "accepted": False}]
+                "accepted": False, "evidence_complete": True}]
     assert contract.next_candidate(history) == "ec_v2_p7"
 
 
 def test_p7_submitted_ends_the_campaign():
     history = [
         {"candidate": "ec_v2_p4", "submitted": True, "terminal": True,
-         "accepted": False},
+         "accepted": False, "evidence_complete": True},
         {"candidate": "ec_v2_p7", "submitted": True, "terminal": True,
-         "accepted": False},
+         "accepted": False, "evidence_complete": True},
     ]
     assert contract.next_candidate(history) is None
 
@@ -79,7 +79,7 @@ def test_second_leg_fits_exactly_when_the_first_is_settled():
         element_count=1, declared_reservation_core_hours=16,
         settled_core_hours=16.0, ec_submitted_elements=1,
         history=[{"candidate": "ec_v2_p4", "submitted": True, "terminal": True,
-                  "accepted": False}],
+                  "accepted": False, "evidence_complete": True}],
     )
     assert accepted["remaining_after_this_core_hours"] == 0
 
@@ -157,3 +157,29 @@ def test_more_than_one_element_in_flight_is_refused():
             candidate="ec_v2_p4", profile=contract.EC_PROFILE, cores=4,
             wall_hours=4, element_count=2, declared_reservation_core_hours=32,
         )
+
+
+def test_p7_not_opened_when_p4_accepted_is_unknown():
+    # a missing/None accepted value must never be read as a proven failure
+    history = [{"candidate": "ec_v2_p4", "submitted": True, "terminal": True,
+                "accepted": None, "evidence_complete": True}]
+    assert contract.next_candidate(history) is None
+    with pytest.raises(contract.ContractViolation, match="next campaign step"):
+        contract.check_campaign_contract(
+            candidate="ec_v2_p7", profile=contract.EC_PROFILE, cores=4, wall_hours=4,
+            element_count=1, declared_reservation_core_hours=16,
+            ec_submitted_elements=1, history=history)
+
+
+def test_p7_not_opened_when_evidence_is_incomplete():
+    history = [{"candidate": "ec_v2_p4", "submitted": True, "terminal": True,
+                "accepted": False, "evidence_complete": False}]
+    assert contract.next_candidate(history) is None
+
+
+def test_caller_cannot_lie_about_submitted_count():
+    with pytest.raises(contract.ContractViolation, match="disagrees with the campaign history"):
+        contract.check_campaign_contract(
+            candidate="ec_v2_p4", profile=contract.EC_PROFILE, cores=4, wall_hours=4,
+            element_count=1, declared_reservation_core_hours=16,
+            ec_submitted_elements=1, history=[])

@@ -16,3 +16,9 @@
 - `work/hpc_torsion_probe_v2_realfragment/tasks/DMC/M_plus__tors_8_0_1_2/snapshots/3749450_1/job.log`  sha256 `fa78c69f7fabbbcffa3c6ecda639ad1b55e47a188633404d95dd6ce8874df3ac`
 
 Structures ledger: `outputs/physics_completion/ensembles/production_ensemble_structures.csv`  sha256 `3f2c692d2207d935347c3508e095e183e7f25a192952dc84b430b2d023d55df6`
+
+## 起点独立性（2026-10-29 更正）
+
+- `../dispatch_20261029_12h/DMC_START_INDEPENDENCE.csv`（逐 attempt 输入 SHA / 坐标 SHA / 来源 / 作业号）
+- `../dispatch_20261029_12h/DMC_START_INDEPENDENCE_SUMMARY.md`（实际计算次数 vs 独立起点数、根因、更正前后结论）
+- 独立复核：`../L04_DMC_TRACE_RECHECK/REPORT.md`（17 项 16 成立）与本目录上游 `agent_recheck_dmc_independence/RECHECK_START_INDEPENDENCE.csv`（12 条探针输入，坐标 SHA 独立复算一致）

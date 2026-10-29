@@ -51,7 +51,7 @@
 | 4 | WP3 pair 证据：2 ROBUST_INVERSION / 55 STABLE / 9 UNRESOLVED | `plan_compliance` `wp3_pair_evidence` | 仍为 partial（66 对中含未决） |
 | 5 | WP5 子池停止 19/32，13 not_reached | `AB_axis_endpoint.csv`、`success_budget.csv` | 子池≠全池；not_reached 是诚实结果，不是失败 |
 | 6 | WP5 逐轮费用不可复算 | `round_diagnostics.csv` 两列 296/296 MISSING | 只能按契约/账本口径报；成本账 10 行 3 MISSING |
-| 7 | DMC 失败机制有过程证据，推荐 B | `L04_DMC_TRACE/`（9/15 close-enough、探针塌缩、两类失败） | 仅为呈报；**不构成授权**，DMC 仍停止 |
+| 7 | DMC 失败机制有过程证据；推荐改为唯一 ID 机制 | `L04_DMC_TRACE/`（9/15 close-enough、两类失败形态）；**2026-10-29 更正**：`tors_6/7/8` 是**同一输入重复计算**（坐标逐位相同），不算独立起点；推荐 `OPT-COORD-1`（证据仅 1 个独立 M_plus 输入），新增 `START-GEN-1` 前置 | 仅为呈报；**不构成授权**，DMC 仍停止；不得再用「不同探针塌缩」表述 |
 | 8 | 采样/锚点/后继门 | 采样验收 9/9 但 escalation 24/24 未执行；WP4 tier_1=0；WP6/扩池 not_triggered | 不称采样收敛；触发≠完成；0 CH |
 
 ## 5. 明确不主张
