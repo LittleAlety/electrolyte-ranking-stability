@@ -1,7 +1,7 @@
 # 12 小时执行单 · 最终结果（dispatch_20261029_12h）
 
 - 接收/开始：**2026-10-29 09:26（北京时间）**，`received_at=started_at=2026-10-29T01:26:35Z`
-- 期限：**2026-10-29 21:22（北京）/ 13:22 UTC**；本文为提前交付版，若之后仍有复跑会以追加节说明
+- 期限：**2026-10-29 21:22（北京）/ 13:22 UTC**；**最终版（2026-10-29 提交）**，`commit=a065e7f`
 - 基线 HEAD：`6a5f9ef`（`site: repo-inventory refresh after L14 handoff`）
 - 角色：Lead 单写入者；两名子会话（`gate-code-auditor`、`dol-log-auditor`）只读、只写各自目录
 - 计算授权：**没有新增**；本任务未提交任何作业、未调用 bridge submit、零 core-hour
@@ -96,7 +96,9 @@
 
 1. 战役账本增加防篡改（哈希链或与 journal/sacct 交叉核验）——本轮登记为残余 R4/R8。
 2. 授权后仍需：EC p4 planned 候选登记（无翻转证明）→ 受保护提交器；DMC 若选 `OPT-COORD-1`/新起点须另批预算。
-3. `agent_recheck_dmc_independence/REPORT.md` 尚未落盘（仅有独立 CSV），已在正文引用该 CSV。
+3. `agent_recheck_dmc_independence/REPORT.md` 已落盘（80 行，独立复核 12 条 attempt 中 9 组独立坐标）。
+4. **提交哈希**：`a065e7f`（20 文件，+1389/-74）。
+5. **最终复跑**：`pytest tests/test_sbatch_syntax_gate.py -v` 6/6；`pytest tests -q --tb=no` 0 FAILED；`pwsh -File scripts/wp_production/finalize_wp2.ps1` 36/36 `CHECK OK`（含 mirror/site）。
 
 ## 8. 两种结题状态（用户区分）
 
