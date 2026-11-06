@@ -210,6 +210,32 @@ def _check_orca_input(text: str) -> None:
                          + "; ".join(problems))
 
 
+def _bash_executable():
+    """Locate bash for the ``bash -n`` syntax gate.
+
+    ``bash`` is not always on PATH (measured 2026-10-29: the bundled bash lives
+    under the DSH profile and the finalize chain, started from pwsh, could not
+    see it -> three unrelated "syntax gate" tests failed with FileNotFoundError).
+    Resolution order: PATH, the bundled DSH bash, then the usual Git installs.
+    No bash at all is a loud failure: a silent skip would disable the very gate
+    that exists because a quoting bug once burned a whole batch.
+    """
+    import shutil
+    found = shutil.which("bash")
+    if found:
+        return found
+    candidates = [
+        Path.home() / ".dsh/profiles/desktop/node_modules/@dsh-ops/bash-win32-x64/usr/bin/bash.exe",
+        Path(r"C:\Program Files\Git\bin\bash.exe"),
+        Path(r"C:\Program Files\Git\usr\bin\bash.exe"),
+        Path(r"C:\cygwin64\bin\bash.exe"),
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    raise SystemExit("REJECT: bash is required for the sbatch syntax gate but was not found")
+
+
 def _check_shell_syntax(script) -> None:
     """Fail the build if the generated sbatch is not valid bash (``bash -n``).
 
@@ -217,7 +243,7 @@ def _check_shell_syntax(script) -> None:
     reports "unexpected EOF while looking for matching ...") and every task
     fails before ORCA starts.  Cheap to check, expensive to miss.
     """
-    proc = subprocess.run(["bash", "-n", str(script)],
+    proc = subprocess.run([_bash_executable(), "-n", str(script)],
                           capture_output=True, text=True, errors="replace")
     if proc.returncode != 0:
         detail = (proc.stderr or "").strip()

@@ -67,8 +67,9 @@ def test_the_shipped_template_uses_an_explicit_index_variable():
 def test_every_generated_batch_script_parses():
     scripts = sorted(PKG.glob("batch_*.sbatch"))
     assert scripts, "no batch scripts found"
+    bash = _m()._bash_executable()
     for script in scripts:
-        proc = subprocess.run(["bash", "-n", str(script)],
+        proc = subprocess.run([bash, "-n", str(script)],
                               capture_output=True, text=True, errors="replace")
         assert proc.returncode == 0, "%s: %s" % (script.name, proc.stderr.strip())
 
@@ -82,3 +83,9 @@ def test_each_batch_reads_its_own_listing():
         assert "batch_%d.txt" % n in text, script.name
         if n != 1:
             assert "batch_1.txt" not in text, "%s still reads batch 1" % script.name
+
+
+def test_bash_resolver_finds_an_executable():
+    """The gate must find bash even when PATH (e.g. from pwsh) lacks it."""
+    resolved = _m()._bash_executable()
+    assert Path(resolved).is_file(), resolved

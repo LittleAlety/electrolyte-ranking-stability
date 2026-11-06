@@ -299,9 +299,12 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
     never ride along as a side effect of a torsion -- and when it is declared, the
     probe is classified as its own kind, never reported as a torsion.
 
-    Accepted classes: ``ok_methyl_rotor`` (the heavy skeleton did not move; a
-    legitimate independent start on THAT rotor coordinate only) and
-    ``ok_heavy_fragment`` (the heavy skeleton moved -- a real fragment torsion).
+    Accepted classes (2026-10-27 ruling): ``ok_methyl_rotor`` (no non-H atom moved;
+    only H did -- a legitimate independent start on THAT rotor coordinate only),
+    ``ok_heavy_fragment`` (the COVALENT SKELETON, Li excluded, really moved -- a real
+    fragment torsion), and ``ok_li_coordination_change`` (non-H moved but the skeleton
+    did not: a pure Li displacement -- a coordination probe, never a skeleton torsion,
+    and never invalid merely for being Li-only).
     """
     xyz_s = np.asarray(source_coords, dtype=float)
     xyz_c = np.asarray(candidate_coords, dtype=float)
@@ -323,6 +326,18 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
     heavy_change = (float(np.max(np.abs(
         before[np.ix_(heavy, heavy)] - after[np.ix_(heavy, heavy)])))
         if len(heavy) > 1 else 0.0)
+    # 2026-10-27 ruling: "heavy" above counts Li by mass, but Li is NOT part of the
+    # covalent skeleton, so a pure Li displacement could inflate heavy_change and be
+    # misclassified as a heavy-fragment torsion (measured: skeleton RMSD 0.0000 while
+    # heavy_pair_change_a == pair_distance_change_a == the Li shift).  The covalent
+    # skeleton change is therefore computed UNCONDITIONALLY so every classification
+    # below can use the right yardstick, and every detail records all three
+    # quantities: all-non-H / covalent-skeleton / (Li is captured by their contrast).
+    non_li_heavy_all = [i for i, s in enumerate(symbols) if s != "H" and s != "Li"]
+    skeleton_change = (float(np.max(np.abs(
+        before[np.ix_(non_li_heavy_all, non_li_heavy_all)]
+        - after[np.ix_(non_li_heavy_all, non_li_heavy_all)])))
+        if len(non_li_heavy_all) > 1 else 0.0)
 
     # 1. the rotation axis itself must be a registered SINGLE bond
     if rotated_bond is not None:
@@ -422,15 +437,24 @@ def validate_candidate_start(symbols, source_coords, candidate_coords, adjacency
                 "detail": dict({"pair_distance_change_a": change,
                                 "heavy_pair_change_a": heavy_change,
                                 "probe_class": "li_coordination_change"}, **li_shells)}
+    # Classification (2026-10-27 ruling).  Order matters:
+    #   1. nothing non-H moved at all            -> methyl rotor (unchanged);
+    #   2. the COVALENT SKELETON (Li excluded)
+    #      moved                                 -> heavy-fragment torsion;
+    #   3. non-H moved but the skeleton did not  -> a Li displacement: a COORDINATION
+    #      probe, never a skeleton torsion, and never invalid either.
+    _detail3 = {"pair_distance_change_a": change,
+                "heavy_pair_change_a": heavy_change,
+                "skeleton_pair_change_a": skeleton_change}
     if heavy_change <= min_pair_change_a:
         return {"accepted": True, "reason": "ok_methyl_rotor",
-                "detail": {"pair_distance_change_a": change,
-                           "heavy_pair_change_a": heavy_change,
-                           "probe_class": "methyl_rotor"}}
-    return {"accepted": True, "reason": "ok_heavy_fragment",
-            "detail": {"pair_distance_change_a": change,
-                       "heavy_pair_change_a": heavy_change,
-                       "probe_class": "heavy_fragment_torsion"}}
+                "detail": dict(_detail3, probe_class="methyl_rotor")}
+    if skeleton_change > min_pair_change_a:
+        return {"accepted": True, "reason": "ok_heavy_fragment",
+                "detail": dict(_detail3, probe_class="heavy_fragment_torsion")}
+    return {"accepted": True, "reason": "ok_li_coordination_change",
+            "detail": dict(_detail3, probe_class="li_coordination_change",
+                           declared=declared_li_change)}
 
 
 def equivalent_start(symbols, first, second, adjacency):

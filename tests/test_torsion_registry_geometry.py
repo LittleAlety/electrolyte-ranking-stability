@@ -64,15 +64,18 @@ def test_representative_member_comes_from_the_weighted_cohort(tr):
         pytest.skip("no weighted cohort in this checkout")
     reps = tr.representative_members()
     assert reps, "the representative map is empty"
-    # measured: DOL's representative is c05, so 'primary' would resolve nothing
-    assert reps[("DOL", "LiM_2plus")] == "c05"
+    # measured: DOL's representative is p4_02_ring_pucker_twist since the
+    # 2026-10-27 reopt leg entered the kept pool (att=1, first-point convergence,
+    # lower G than the historical c05); before that it was c05 -- the assertion
+    # tracks the WEIGHTED cohort, whichever member it names
+    assert reps[("DOL", "LiM_2plus")] == "p4_02_ring_pucker_twist"
 
 
 def test_dol_geometry_resolves_to_its_real_member(tr):
     geom = tr._primary_geometry("DOL", "LiM_2plus")
     assert geom is not None, "DOL's representative geometry must be found"
     assert geom.is_file()
-    assert "LiM_2plus__c05" in geom.as_posix()
+    assert "LiM_2plus__p4_02_ring_pucker_twist" in geom.as_posix()
 
 
 def test_dol_row_is_a_computed_zero_not_a_missing_file(tr):

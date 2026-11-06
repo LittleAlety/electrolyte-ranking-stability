@@ -1,6 +1,11 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "campaign_id": "four_state_recovery_20261023",
+  "contract_revisions": [
+    {"version": 1, "change": "original four_state_recovery_20261023 contract"},
+    {"version": 2, "date": "2026-10-27", "authorized_by": "user ruling (wall-clock decision C+D)",
+     "change": "add budget.production_batches[\"dol_ec_recovery_v1\"]: a per-batch wall-clock exception (4 cores x 12 h x max 2 legs, reserved 96 CH paid from the production 512 cap). The v1 general production wall clock (4 h) stays unchanged for every other batch; the 24 h orca_production_v1 profile remains the historical default. 12 h is engineering headroom over the longest observed leg (~8 h), NOT a completion guarantee; actual spend settles from terminal sacct and never from the 36.8 CH p90 planning estimate."}
+  ],
   "purpose": "preparation_only",
   "submission_authorized_by_this_bundle": false,
   "requires_external_execution_authorization": true,
@@ -24,7 +29,23 @@
     "active_pending_account_cap": 20,
     "account_cpu_capacity": null,
     "missing_terminal_cost": "block_do_not_assume_zero",
-    "historical_cost_policy": "preserve_separately_never_reset_or_reclassify_as_free"
+    "historical_cost_policy": "preserve_separately_never_reset_or_reclassify_as_free",
+    "production_batches": {
+      "dol_ec_recovery_v1": {
+        "authorized_by": "user ruling 2026-10-27",
+        "resource_profile": "orca_production_12h_v1",
+        "cores": 4,
+        "wall_hours": 12,
+        "max_legs": 2,
+        "max_per_state": 1,
+        "states": ["DOL|LiM_2plus", "EC|LiM_2plus"],
+        "start_geometry": "original_perturbed_geometry_not_the_collapsed_screening_endpoint",
+        "reserved_core_hours": 96,
+        "paid_from": "production",
+        "second_start_and_rescue": "not_auto_started_requires_separate_authorization",
+        "settlement": "terminal_sacct_only_never_release_reservation_from_the_p90_estimate"
+      }
+    }
   },
   "candidate_requirements": ["registered_bond_order_topology", "atom_mapping_verified", "non_rigid_change_classified", "symmetry_dedup_verified", "no_invalid_carbonyl_torsion", "no_ring_breaking", "charge_multiplicity_from_ledger", "geometry_byte_hash", "source_attempt_lineage"],
   "submission_requirements_not_implemented_here": ["user_execution_authorization", "whu_hpc_doctor", "live_account_capacity", "idempotent_submission_journal", "batch_index_mapping", "remote_input_hashes", "scientific_geometry_preflight", "production_consumer_registration"],

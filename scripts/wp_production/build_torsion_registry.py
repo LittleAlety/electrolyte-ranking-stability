@@ -142,10 +142,20 @@ def representative_members() -> dict:
 
 
 def _member_geometry(name: str, state: str, seed: str) -> Path | None:
-    """One named member's geometry: production package first, then frontier."""
+    """One named member's geometry: production package first, then frontier.
+
+    2026-10-27: the dol_ec reopt package (hpc_dol_ec_* naming family) holds the
+    member's TRUE converged geometry (job.xyz in snapshots/); its top-level
+    geom.xyz is the START geometry.  The lookup now covers both families,
+    preferring the computed final geometry when snapshots exist.
+    """
     for cand in (REPO / "work").glob(
             "hpc_production_ensemble_*/tasks/%s/%s__%s/*xyz" % (name, state, seed)):
         if cand.is_file() and cand.parent.name == "%s__%s" % (state, seed):
+            return cand
+    for cand in (REPO / "work").glob(
+            "hpc_dol_ec_*/tasks/%s/%s__%s/snapshots/*/job.xyz" % (name, state, seed)):
+        if cand.is_file():
             return cand
     leaf = "%s__%s__%s" % (name, state, seed)
     cand = (REPO / "work" / "hpc_frontier_localization_v1" / "tasks" / leaf

@@ -154,19 +154,27 @@ def _pool_rows(path: Path) -> list[dict]:
 #: from the pool itself so it can never drift from the registered tables.
 def mol_name(mol_id: str, pool_m: list[dict] | None = None,
              pool_li: list[dict] | None = None) -> str:
-    """Translate a candidate's record id (e.g. ``C01``) to its molecule NAME (``DMC``).
+    """Translate a candidate's record id to its molecule NAME (``C01`` -> ``DMC``).
 
-    P4's ``candidate.json`` stores ``mol_id`` (the record id), but the registered
+    P4's ``candidate.json`` stores a bare record id (``C01``), but the registered
     screening pools key their rows by ``name`` -- feeding ``mol_id`` straight into
     :func:`reference_energy` finds no rows (measured 2026-10-25 against the real
     retrieved results).
+
+    The v2 package stores the COMPOSITE form (``C09|LiM_2plus``), so the state
+    suffix is stripped first.  Measured 2026-10-26: without that strip the whole v2
+    batch failed to adjudicate (``no registered name``), which meant the frozen
+    five-condition rule had never actually been run on v2.
     """
+    raw = str(mol_id)
+    if "|" in raw:                       # v2 style: "<record_id>|<state>"
+        raw = raw.split("|", 1)[0]
     for pool in (pool_li if pool_li is not None else _pool_rows(POOL_LI),
                  pool_m if pool_m is not None else _pool_rows(POOL_M)):
         for r in pool:
-            if r.get("name") == mol_id:
-                return mol_id            # already a NAME (selftest pools have no mol_id)
-            if r.get("mol_id") == mol_id and r.get("name"):
+            if r.get("name") == raw:
+                return raw               # already a NAME (selftest pools have no mol_id)
+            if r.get("mol_id") == raw and r.get("name"):
                 return r["name"]
     raise ValueError("mol_id %s has no registered name in either screening pool" % mol_id)
 

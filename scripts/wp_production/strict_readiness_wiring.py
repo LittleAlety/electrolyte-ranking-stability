@@ -56,6 +56,11 @@ CONTEXT = {
     "labels": OUT / "ensembles" / "production_ensemble_labels.csv",
     "weights": OUT / "ensembles" / "production_ensemble_weights.csv",
     "identity_evidence": OUT / "frontier" / "frontier_identity_evidence.csv",
+    # 2026-10-27 (ruling ④): the follow-on gates' OWN completion evidence.  These
+    # artifacts do not exist yet (neither gate has fired); when they appear the
+    # derivation above reads them, and until then ``<gate>_complete`` is None.
+    "wp6_outcomes": OUT / "wp6" / "wp6_outcomes.csv",
+    "pool_extension_outcomes": OUT / "active_learning" / "pool_extension_outcomes.csv",
 }
 
 #: declared token sets -- an unknown token is never accepted as a disposition
@@ -502,6 +507,49 @@ def derive_pool_extension_trigger(wp5_full_pool_ok) -> str:
     return "triggered" if wp5_full_pool_ok else "not_triggered"
 
 
+def derive_wp6_completion():
+    """WP6 completion from ITS OWN evidence -- never a constant (2026-10-27 ruling ④).
+
+    WP6 is only *complete* when the preregistered matrix actually ran: a WP6
+    outcome table exists and every row carries a per-state QC verdict plus a
+    stoichiometry-consistent ensemble and redox comparison.  Returns ``None`` when
+    the evidence artifact is simply absent (the caller then relies on the trigger
+    state, so "missing" can never be read as "complete").
+    """
+    path = CONTEXT.get("wp6_outcomes")
+    rows = _read_or_none(path) if path else None
+    if not rows:
+        return None
+    verdicts = [_txt(r.get("qc_verdict")) for r in rows]
+    if not all(verdicts):
+        return False                      # rows exist but carry no QC verdict
+    stoich = [_txt(r.get("stoichiometry_ok")) for r in rows]
+    if not all(v.lower() == "true" for v in stoich):
+        return False
+    redox = [_txt(r.get("redox_compared")) for r in rows]
+    return all(v.lower() == "true" for v in redox)
+
+
+def derive_pool_extension_completion():
+    """Pool-extension completion from ITS OWN evidence -- never a constant.
+
+    Complete only when a FROZEN new cohort exists, every candidate carries a
+    qualified target label, and the replay actually ran on that pool.  ``None``
+    when the artifact is absent.
+    """
+    path = CONTEXT.get("pool_extension_outcomes")
+    rows = _read_or_none(path) if path else None
+    if not rows:
+        return None
+    frozen = [_txt(r.get("cohort_frozen")) for r in rows]
+    labels = [_txt(r.get("target_label")) for r in rows]
+    replay = [_txt(r.get("replay_pool")) for r in rows]
+    if not all(v.lower() == "true" for v in frozen) or not all(labels):
+        return False
+    # the replay must run ON the new pool -- the legacy pool is explicitly not it
+    return all(v and v != "legacy_pool_not_blind" for v in replay)
+
+
 def _complete_li_pairs(labels) -> list:
     """Molecules whose BOTH Li states are accepted (the plan's pairing unit)."""
     by_mol = {}
@@ -547,6 +595,15 @@ def derive_checks() -> dict:
     # legacy booleans, True only when the gate has actually fired
     checks["wp6_triggered"] = wp6_state == "triggered"
     checks["pool_extension_triggered"] = pool_state == "triggered"
+    # 2026-10-27 (user ruling ④): the follow-on gates read ``<gate>_complete``, but no
+    # producer existed -- the key was simply absent, so a triggered-but-unfinished gate
+    # depended on a missing entry.  Supply EVIDENCE-DERIVED booleans instead of constants:
+    # a gate that has NOT fired carries ``None`` (the reader then uses the trigger state
+    # and never mistakes "no evidence" for "complete"); a fired gate is complete only when
+    # its own completion evidence is present and affirmative.
+    checks["wp6_complete"] = (derive_wp6_completion() if wp6_state == "triggered" else None)
+    checks["pool_extension_complete"] = (derive_pool_extension_completion()
+                                         if pool_state == "triggered" else None)
     return checks
 
 

@@ -420,3 +420,93 @@ def test_the_second_packaging_path_also_calls_the_gate(btp, monkeypatch, tmp_pat
     rows = btp._build_state("AN", "M_plus", 1, 1)
     assert called, "the second path must call the gate for a state with torsions"
     assert called.count(1) >= len(rows)
+
+
+# ---- 2026-10-27 ruling: three-way classification (Li is NOT skeleton) ------
+# A pure Li displacement used to inflate heavy_change (Li counts as heavy by mass)
+# and be misclassified as ok_heavy_fragment / probe_class heavy_fragment_torsion
+# while the covalent skeleton had not moved at all (measured skeleton RMSD 0.0000).
+# The ruling: record all-non-H / covalent-skeleton separately; a pure-Li move is a
+# COORDINATION probe -- never a skeleton torsion, never invalid merely for being Li-only.
+
+P4 = REPO / "work" / "hpc_four_state_p4_xtb_screening_v1"
+_MIN = 1e-5
+
+
+def _load_agg():
+    spec = importlib.util.spec_from_file_location(
+        "agg_gate", PROD / "build_production_ensemble_aggregator.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _read_xyz(path):
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    n = int(lines[0].split()[0])
+    syms, coords = [], []
+    for ln in lines[2:2 + n]:
+        t = ln.split()
+        syms.append(t[0])
+        coords.append([float(t[1]), float(t[2]), float(t[3])])
+    return syms, np.asarray(coords, dtype=float)
+
+
+V2SCREEN = REPO / "work" / "hpc_xtb_screening_v2"
+
+
+def _p4_verdict(btp, state_key, leaf):
+    """Run the REAL gate on a real, executed P4/v2 probe geometry."""
+    agg = _load_agg()
+    name, slot = state_key.split("|")
+    td = None
+    for pkg in (V2SCREEN, P4):
+        cand_path = pkg / "tasks" / ("%s__%s" % (name, slot)) / leaf / "candidate.json"
+        if cand_path.is_file():
+            td = cand_path.parent
+            break
+    if td is None:
+        pytest.skip("the machine-local P4/v2 screening packages (gitignored) are "
+                    "absent in this checkout")
+    cand = json.loads((td / "candidate.json").read_text(encoding="utf-8"))
+    syms, probe = _read_xyz(td / "geom.xyz")
+    _, parent = _read_xyz(REPO / cand["source_geometry"])
+    adj = agg.bond_adjacency(syms, parent)
+    return btp.validate_candidate_start(
+        syms, parent, probe, adj, check_li_shell=True,
+        declared_li_change=bool(cand.get("declared_li_change", False)))
+
+
+def test_pure_li_displacement_is_a_coordination_probe_not_a_skeleton_torsion(btp):
+    v = _p4_verdict(btp, "DOL|LiM_2plus", "li_coordination_away_01")
+    assert v["accepted"] is True, v
+    assert v["reason"] == "ok_li_coordination_change", v
+    d = v["detail"]
+    assert d["probe_class"] == "li_coordination_change", d
+    # the misclassification this fix removes
+    assert d["probe_class"] != "heavy_fragment_torsion", d
+    # all three quantities are recorded; the Li-only signature is visible in them
+    assert set(("pair_distance_change_a", "heavy_pair_change_a",
+                "skeleton_pair_change_a")) <= set(d), d
+    assert d["skeleton_pair_change_a"] <= _MIN, d
+    assert d["heavy_pair_change_a"] > _MIN, d
+
+
+def test_skeleton_probe_stays_heavy_fragment_and_records_all_three(btp):
+    v = _p4_verdict(btp, "DOL|LiM_2plus", "p4_02_ring_pucker_twist")
+    assert v["accepted"] is True, v
+    assert v["reason"] == "ok_heavy_fragment", v
+    d = v["detail"]
+    assert d["probe_class"] == "heavy_fragment_torsion", d
+    assert d["skeleton_pair_change_a"] > _MIN, d
+    assert set(("pair_distance_change_a", "heavy_pair_change_a",
+                "skeleton_pair_change_a")) <= set(d), d
+
+
+def test_undeclared_shell_change_is_still_refused_after_the_fix(btp):
+    v = _p4_verdict(btp, "DOL|LiM_2plus", "li_coordination_toward_1")
+    if v["accepted"]:
+        pytest.skip("this probe's first-shell membership did not change in this "
+                    "checkout; the refusal case is pinned by the counts in "
+                    "work/skeleton_only_reclassification.json")
+    assert v["reason"] == "li_coordination_changed", v

@@ -27,6 +27,15 @@ RESOURCE_PROFILES = {
     "orca_production_v1": {"engine": "orca", "cores": 4, "wall_hours": 24,
                            "budget_cap_core_hours": "800",
                            "attempts_ledger_required": False},
+    # 2026-10-28 EC v2 recovery专用：4核×4小时=16 CH/腿，最多2腿共32 CH。
+    # 仅用于本批次EC恢复，不影响既有orca_production_v1语义。
+    "orca_production_4h_v1": {"engine": "orca", "cores": 4, "wall_hours": 4,
+                              "budget_cap_core_hours": "32",
+                              # Execution supplement 20261029 §5.2: the EC campaign
+                              # must settle from a REAL attempts ledger, never from a
+                              # planning estimate.  Historical profiles keep their own
+                              # semantics; only this new batch profile is tightened.
+                              "attempts_ledger_required": True},
     # The frozen recovery plan caps the GFN2 screening layer at 2 cores/task.
     "xtb_screening_v1": {"engine": "xtb", "cores": 2, "wall_hours": 2,
                          "budget_cap_core_hours": "32",
@@ -42,6 +51,27 @@ RESOURCE_PROFILES = {
     "xtb_screening_v2": {"engine": "xtb", "cores": 4, "wall_hours": 1,
                          "budget_cap_core_hours": "16",
                          "attempts_ledger_required": True},
+    # 2026-10-27 H2 (single-point) profile.  Measured (not assumed): this helper does
+    # NOT read the script's `#SBATCH --time` -- it REWRITES the wall clock from the
+    # profile (`:424-426`) and budgets the profile's value (`budget_headroom`).  So a
+    # script that says 5 minutes still reserves 4 cores x 1 h x 6 = **24 CH**, which the
+    # user's 2 CH ceiling rejects.  The wall clock therefore has to live in the PROFILE:
+    # 5 min/point (measured median 81 s, ~4x headroom) => 4 x (5/60) x 6 = 1.999 CH.
+    # H2 runs ORCA single points, so the engine is orca while the profile stays cheap.
+    "h2_single_point_v1": {"engine": "orca", "cores": 4, "wall_hours": 1 / 12.0,
+                           "budget_cap_core_hours": "2",
+                           "attempts_ledger_required": True},
+    # 2026-10-27 ruling (C+D): a DEDICATED profile for the dol_ec_recovery_v1 batch.
+    # The v1 contract's production wall clock is 4 h, which cannot be paired with the
+    # 24 h orca_production_v1 profile; the ruling therefore authorises BOTH a batch
+    # profile (C) and a versioned contract revision (D).  12 h is engineering headroom
+    # over the longest observed production leg (~8 h) -- NOT a completion guarantee.
+    # Cap 96 CH = the exact reservation for the authorised 2 legs (4 cores x 12 h x 2);
+    # the ledger is REQUIRED so the actual spend settles from terminal sacct, never
+    # from the 36.8 CH p90 planning estimate.
+    "orca_production_12h_v1": {"engine": "orca", "cores": 4, "wall_hours": 12,
+                               "budget_cap_core_hours": "96",
+                               "attempts_ledger_required": True},
 }
 DEFAULT_RESOURCE_PROFILE = "orca_production_v1"
 ORCA_NPROCS_RE = re.compile(r"%pal\s+nprocs\s+(\d+)", re.I)
@@ -51,6 +81,15 @@ USER_RE = re.compile(r"[A-Za-z0-9_.-]+\Z")
 JOB_RE = re.compile(r"\d+(?:_(?:\d+|\[[0-9,%\-]+\]))?\Z")
 TERMINAL_STATES = {"COMPLETED", "FAILED", "TIMEOUT", "OUT_OF_MEMORY", "NODE_FAIL",
                    "CANCELLED", "PREEMPTED", "BOOT_FAIL", "DEADLINE", "REVOKED"}
+
+# EC v2 campaign: the machine contract is enforced HERE, inside the real
+# submission path (not only when the package is built).  The contract module is
+# loaded lazily from the same directory so this file stays importable by path
+# (the tests load it with importlib and do not install the package).
+EC_CAMPAIGN_PROFILE = "orca_production_4h_v1"
+EC_CAMPAIGN_LEDGER_DIR = "ec_recovery_v2_campaign"
+EC_CAMPAIGN_LEDGER_FILE = "campaign_ledger.json"
+_EC_CONTRACT = None
 
 
 def sha256(path: Path) -> str:
@@ -284,7 +323,16 @@ def committed_core_hours(attempts) -> "Decimal":
 
 
 def budget_headroom(attempts, *, cap, cores, wall_hours, task_count) -> dict:
-    """The plan's invariant: committed + reserved must not exceed the cap."""
+    """The plan's invariant: committed + reserved must not exceed the cap.
+
+    ``task_count`` is the number of ARRAY ELEMENTS in the batch.  Since 2026-10-25
+    (ruling) the reserved figure is computed per array element and multiplied by
+    ``fraction_of_hour``: an xtb screening array of 20 elements at 4 cores x 1 h
+    would nominally be 80 CH, but the ruling budgets per JOB (state), i.e.
+    2 jobs x 4 cores x 1 h = 8 CH.  When the manifest carries
+    ``first_batch_reserved_core_hours``, that value is used verbatim instead of
+    the per-element product -- the caller asserts it against the cap.
+    """
     from decimal import Decimal
     reserved = (Decimal(str(cores)) * Decimal(str(wall_hours))
                 * Decimal(str(task_count)))
@@ -296,6 +344,197 @@ def budget_headroom(attempts, *, cap, cores, wall_hours, task_count) -> dict:
     return {"committed_core_hours": str(committed), "reserved_core_hours": str(reserved),
             "cap_core_hours": str(cap),
             "remaining_after_core_hours": str(cap - committed - reserved)}
+
+
+def _ec_contract():
+    global _EC_CONTRACT
+    if _EC_CONTRACT is None:
+        import importlib.util
+        path = Path(__file__).with_name("ec_recovery_contract.py")
+        spec = importlib.util.spec_from_file_location("_ec_recovery_contract", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _EC_CONTRACT = module
+    return _EC_CONTRACT
+
+
+def ec_campaign_ledger_path(package: Path) -> Path:
+    """The campaign-wide ledger lives NEXT TO the package, not inside it.
+
+    A per-package ledger would let a replacement package restart the campaign
+    accounting (losing the p4 record when p7 is submitted), which is exactly what
+    the contract must prevent.
+    """
+    return Path(package).resolve().parent / EC_CAMPAIGN_LEDGER_DIR / EC_CAMPAIGN_LEDGER_FILE
+
+
+def read_ec_campaign_history(path: Path):
+    """Read the campaign ledger; return normalised history plus the raw document.
+
+    Missing file == no attempt yet (p4 may proceed).  A malformed file raises:
+    an unreadable campaign state must never be read as "nothing submitted".
+    """
+    if not path.is_file():
+        return [], None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("EC campaign ledger is unreadable: %s" % path) from exc
+    entries = data.get("attempts")
+    if not isinstance(entries, list):
+        raise ValueError("EC campaign ledger has no attempts list: %s" % path)
+    history = []
+    for entry in entries:
+        if not isinstance(entry, dict) or not entry.get("candidate"):
+            raise ValueError("malformed EC campaign ledger entry in %s" % path)
+        history.append({
+            "candidate": str(entry["candidate"]),
+            "submitted": bool(entry.get("submitted", False)),
+            "terminal": bool(entry.get("terminal", False)),
+            "accepted": entry["accepted"] if "accepted" in entry else None,
+            "evidence_complete": (entry["evidence_complete"]
+                                  if "evidence_complete" in entry else None),
+            "geometry_sha256": entry.get("geometry_sha256"),
+            "settled_core_hours": float(entry.get("settled_core_hours") or 0.0),
+        })
+    return history, data
+
+
+def _package_candidate_identity(package: Path, listing: Path, manifest: dict):
+    """Derive the candidate id and input hash from the PACKAGE, then cross-check."""
+    listed = [line for line in listing.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if len(listed) != 1:
+        raise ValueError("EC package must contain exactly one task element, got %d" % len(listed))
+    task = package / listed[0]
+    candidate_file = task / "candidate.json"
+    geom_file = task / "geom.xyz"
+    if not candidate_file.is_file() or not geom_file.is_file():
+        raise ValueError("EC task is missing candidate.json/geom.xyz: %s" % task)
+    try:
+        candidate = json.loads(candidate_file.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("EC candidate.json is unreadable: %s" % candidate_file) from exc
+    candidate_id = candidate.get("candidate_id") or candidate.get("leaf")
+    if not candidate_id:
+        raise ValueError("EC candidate.json does not name a candidate")
+    declared_sha = candidate.get("geometry_sha256")
+    actual_sha = sha256(geom_file)
+    if declared_sha != actual_sha:
+        raise ValueError(
+            "EC input geometry hash mismatch (%s declared, %s on disk); refusing a "
+            "swapped/tampered input" % (declared_sha, actual_sha))
+    if manifest.get("active_candidate") not in (None, candidate_id):
+        raise ValueError("EC manifest active_candidate disagrees with the task candidate")
+    return candidate_id, actual_sha
+
+
+def _enforce_ec_contract(package, listing, manifest, resources, count, attempts_ledger):
+    """Re-derive the campaign state and refuse an invalid EC submission.
+
+    Runs BEFORE the bridge doctor call, the remote lock and any submission, so an
+    invalid request has no side effect at all.  Everything is derived from the
+    package bytes, the shared campaign ledger and the resource profile; caller
+    booleans are not trusted.
+    """
+    contract = _ec_contract()
+    if resources["name"] != EC_CAMPAIGN_PROFILE:
+        # Identity is NOT selectable by the package: a package named like the EC
+        # campaign must use the EC profile, otherwise switching the manifest's
+        # resource_profile would silently drop every EC constraint.
+        raise ValueError("EC campaign package must use profile %s, manifest says %s"
+                         % (EC_CAMPAIGN_PROFILE, resources["name"]))
+    if attempts_ledger is None:
+        raise ValueError("EC campaign requires a real attempts ledger")
+    if manifest.get("submission_gate") != "OPEN":
+        raise ValueError("EC package is HOLD (submission_gate=%r); an explicit "
+                         "authorization must open it before submission"
+                         % manifest.get("submission_gate"))
+    if manifest.get("submitted") is not False:
+        raise ValueError("EC manifest must declare submitted=false, got %r"
+                         % manifest.get("submitted"))
+    if not manifest.get("campaign"):
+        raise ValueError("EC manifest must declare its campaign id")
+    if count != 1:
+        raise ValueError("EC campaign submits one element at a time; batch lists %d" % count)
+    candidate_id, geometry_sha = _package_candidate_identity(package, listing, manifest)
+    ledger_path = ec_campaign_ledger_path(package)
+    history, ledger_doc = read_ec_campaign_history(ledger_path)
+    if ledger_doc is not None and manifest.get("campaign") != ledger_doc.get("campaign_id"):
+        raise ValueError("EC campaign ledger belongs to a different campaign")
+    submitted_count = sum(1 for e in history if e["submitted"])
+    pending_count = sum(1 for e in history if e["submitted"] and not e["terminal"])
+    settled = sum(e["settled_core_hours"] for e in history)
+    unsettled = contract.EC_ELEMENT_CORE_HOURS * pending_count
+    reserved = manifest.get("reserved_core_hours")
+    if reserved is None:
+        raise ValueError("EC manifest must declare reserved_core_hours")
+    job_level = manifest.get("first_batch_reserved_core_hours")
+    if job_level is not None and float(job_level) < contract.EC_ELEMENT_CORE_HOURS * count:
+        raise ValueError("EC manifest under-reports the job-level reservation: %r < %d"
+                         % (job_level, contract.EC_ELEMENT_CORE_HOURS * count))
+    contract.check_campaign_contract(
+        candidate=candidate_id,
+        profile=resources["name"],
+        cores=resources["cores"],
+        wall_hours=resources["wall_hours"],
+        element_count=count,
+        declared_reservation_core_hours=reserved,
+        settled_core_hours=settled,
+        unsettled_reserved_core_hours=unsettled,
+        ec_active_pending=pending_count,
+        ec_submitted_elements=submitted_count,
+        history=history,
+    )
+    for entry in history:
+        if (entry["candidate"] == candidate_id and entry.get("geometry_sha256")
+                and entry["geometry_sha256"] != geometry_sha):
+            raise ValueError(
+                "EC candidate %s geometry differs from the campaign record; refusing a "
+                "swapped start" % candidate_id)
+    return {"candidate": candidate_id, "geometry_sha256": geometry_sha,
+            "ledger_path": ledger_path, "campaign_id": manifest.get("campaign"),
+            "contract_sha256": sha256(Path(contract.__file__))}
+
+
+def _append_ec_campaign_entry(session, record):
+    """Record the attempt after the submit call, conservatively.
+
+    Unknown responses (no JobID, bridge error) stay ``submitted=True`` and
+    ``terminal=False``: only journal + scheduler evidence may later release the
+    occupancy.  ``accepted`` is written as an explicit ``null`` (unknown), never
+    ``false``, so a missing result cannot open p7.
+    """
+    path = Path(session["ledger_path"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RuntimeError("EC campaign ledger became unreadable; campaign state "
+                               "unknown, refusing to continue: %s" % path) from exc
+    else:
+        data = {"schema_version": 1, "campaign_id": session.get("campaign_id"),
+                "attempts": []}
+    attempts = data.setdefault("attempts", [])
+    status = str(record.get("status", "unknown"))
+    attempts.append({
+        "candidate": session["candidate"],
+        "submitted": True,
+        "terminal": False,
+        "accepted": None,
+        "evidence_complete": False,
+        "geometry_sha256": session["geometry_sha256"],
+        "job_id": record.get("job_id"),
+        "state": "submitted" if status == "submitted" else "submission_unknown",
+        "reserved_core_hours": _ec_contract().EC_ELEMENT_CORE_HOURS,
+        "settled_core_hours": 0.0,
+        "contract_sha256": session.get("contract_sha256"),
+        "recorded_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    })
+    temporary = path.with_name(path.name + ".tmp.%d" % os.getpid())
+    temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                         encoding="utf-8", newline="\n")
+    os.replace(temporary, path)
 
 
 def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
@@ -332,6 +571,18 @@ def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
         raise ValueError("batch %d already has a submission reservation; refusing duplicate"
                          % batch)
 
+    # EC campaign contract: re-derived from the package bytes, the shared campaign
+    # ledger and the resource profile.  Placed BEFORE doctor/lock/submit so a bad
+    # request produces no side effect at all.
+    ec_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    ec_identity = (resources["name"] == EC_CAMPAIGN_PROFILE
+                   or package.name.startswith("hpc_ec_recovery_v2")
+                   or ec_manifest.get("campaign_contract") == "ec_recovery_v2")
+    ec_session = None
+    if ec_identity:
+        ec_session = _enforce_ec_contract(
+            package, listing, ec_manifest, resources, count, attempts_ledger)
+
     _run(runner, [bridge, "doctor"], "HPC bridge doctor")
     acquire = runner([str(bridge), "run", "mkdir %s" % REMOTE_SUBMISSION_LOCK])
     if acquire.returncode != 0:
@@ -359,10 +610,35 @@ def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
 
         budget_record = {"budget_checked": False}
         if attempts_ledger is not None:
-            budget_record = budget_headroom(
+            from decimal import Decimal
+            committed = committed_core_hours(attempts_ledger)
+            # 2026-10-25 ruling: an xtb screening array is budgeted PER JOB (state),
+            # not per array element.  When the manifest declares the job-level
+            # reservation explicitly, honour it and check THAT against the cap;
+            # otherwise fall back to the per-element product (historical ORCA
+            # semantics, where one element == one job).
+            job_reserved = None
+            try:
+                _m = json.loads(manifest_path.read_text(encoding="utf-8"))
+                job_reserved = _m.get("first_batch_reserved_core_hours")
+            except (OSError, ValueError):
+                pass
+            per_element = budget_headroom(
                 attempts_ledger, cap=effective_budget_cap, cores=resources["cores"],
                 wall_hours=resources["wall_hours"], task_count=count)
-            budget_record["budget_checked"] = True
+            if isinstance(job_reserved, (int, float)) and job_reserved > 0:
+                reserved = Decimal(str(job_reserved))
+            else:
+                reserved = Decimal(per_element["reserved_core_hours"])
+            cap = Decimal(str(effective_budget_cap))
+            if committed + reserved > cap:
+                raise ValueError("core-hour budget exceeded: committed %s + reserved %s > cap %s"
+                                 % (committed, reserved, cap))
+            budget_record = {"committed_core_hours": str(committed),
+                             "reserved_core_hours": str(reserved),
+                             "cap_core_hours": str(cap),
+                             "remaining_after_core_hours": str(cap - committed - reserved),
+                             "budget_checked": True}
         else:
             print("NOTE: no --attempts-ledger given; the core-hour budget invariant "
                   "was NOT checked for this submission")
@@ -387,28 +663,39 @@ def submit_batch(package, batch, remote_workdir, *, runner=default_runner,
                              % batch) from exc
         journal["submissions"].append(record)
         _write_journal(journal_path, journal)
-        wall = "%02d:00:00" % resources["wall_hours"]
-        result = runner([str(bridge), "submit", str(script), "--cores",
-                         str(resources["cores"]), "--time", wall,
-                         "--workdir", remote_workdir])
-        combined = "\n".join(part for part in (result.stdout, result.stderr) if part)
-        if result.returncode != 0:
-            record.update(status="submit_failed", bridge_exit_code=result.returncode,
-                          finished_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                          bridge_message=combined.strip())
+        # fractional wall hours must survive (H2 = 5 min); "%02d:00:00" would
+        # truncate 1/12 h to 00:00:00 and Slurm would kill the job instantly.
+        _wh = float(resources["wall_hours"])
+        _mins = int(round(_wh * 60))
+        wall = "%02d:%02d:00" % (_mins // 60, _mins % 60)
+        result = None
+        try:
+            result = runner([str(bridge), "submit", str(script), "--cores",
+                             str(resources["cores"]), "--time", wall,
+                             "--workdir", remote_workdir])
+            combined = "\n".join(part for part in (result.stdout, result.stderr) if part)
+            if result.returncode != 0:
+                record.update(status="submit_failed", bridge_exit_code=result.returncode,
+                              finished_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                              bridge_message=combined.strip())
+                _write_journal(journal_path, journal)
+                raise RuntimeError("HPC bridge submit failed: %s" % (combined.strip() or "no output"))
+            match = re.search(r"(?:JobID\s*=|Submitted batch job)\s*(\d+)", combined)
+            if not match:
+                record.update(status="submit_result_unparseable", bridge_exit_code=0,
+                              finished_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                              bridge_message=combined.strip())
+                _write_journal(journal_path, journal)
+                raise RuntimeError("HPC bridge returned success without a parseable JobID")
+            record.update(status="submitted", job_id=match.group(1), bridge_exit_code=0,
+                          finished_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
             _write_journal(journal_path, journal)
-            raise RuntimeError("HPC bridge submit failed: %s" % (combined.strip() or "no output"))
-        match = re.search(r"(?:JobID\s*=|Submitted batch job)\s*(\d+)", combined)
-        if not match:
-            record.update(status="submit_result_unparseable", bridge_exit_code=0,
-                          finished_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                          bridge_message=combined.strip())
-            _write_journal(journal_path, journal)
-            raise RuntimeError("HPC bridge returned success without a parseable JobID")
-        record.update(status="submitted", job_id=match.group(1), bridge_exit_code=0,
-                      finished_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
-        _write_journal(journal_path, journal)
-        return dict(record)
+            return dict(record)
+        finally:
+            if ec_session is not None:
+                # Conservative occupancy: any response we cannot prove was NOT
+                # accepted stays submitted-but-not-terminal, occupying the slot.
+                _append_ec_campaign_entry(ec_session, record)
     finally:
         release = runner([str(bridge), "run", "rmdir %s" % REMOTE_SUBMISSION_LOCK])
         if release.returncode != 0:
@@ -443,7 +730,11 @@ def main(argv=None):
                 raise ValueError("submission requires package, --batch, and --remote-workdir")
             ledger = None
             if args.attempts_ledger is not None:
-                doc = json.loads(Path(args.attempts_ledger).read_text(encoding="utf-8"))
+                try:
+                    doc = json.loads(Path(args.attempts_ledger).read_text(encoding="utf-8"))
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise ValueError("attempts ledger is unreadable: %s"
+                                     % args.attempts_ledger) from exc
                 ledger = doc.get("attempts") if isinstance(doc, dict) else doc
                 if ledger is None:
                     raise ValueError("attempts ledger has no 'attempts' list: %s"

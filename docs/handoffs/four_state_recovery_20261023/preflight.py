@@ -27,6 +27,24 @@ CAPS = {"screening": (8, 2, 2, 2, 32), "production": (8, 2, 16, 4, 512),
 TERMINAL = {"COMPLETED", "FAILED", "TIMEOUT", "OUT_OF_MEMORY", "NODE_FAIL", "CANCELLED"}
 ACTIVE = {"RESERVED", "PENDING", "RUNNING"}
 HOLD = "HOLD_NOT_A_SCIENTIFIC_OR_LIVE_QUEUE_GATE"
+# schema 2 adds the dol_ec_recovery_v1 production batch: a state-scoped 12h wall
+# exception (orca_production_12h_v1, 4 cores x 12h x 2 legs = 96 CH) that the
+# general production stage ceiling (4h) does NOT allow.  Only these two states
+# may use the 12h profile; every other batch keeps the original stage caps.
+P4V2_BATCH = {
+    "id": "dol_ec_recovery_v1",
+    "resource_profile": "orca_production_12h_v1",
+    "states": ("DOL|LiM_2plus", "EC|LiM_2plus"),
+    "cores": 4,
+    "wall_hours": 12,
+    "max_legs": 2,
+    "max_per_state": 1,
+    "reserved_core_hours": 96,  # == cores * wall_hours * max_legs
+    "paid_from": "production",
+    "start_geometry": "original_perturbed_geometry_not_the_collapsed_screening_endpoint",
+    "second_start_and_rescue": "not_auto_started_requires_separate_authorization",
+}
+
 WATCHED = (
     "config/production_method_freeze_v1.json",
     "outputs/physics_completion/free_states/production_ledger.csv",
@@ -54,7 +72,11 @@ def require_integer(value, label):
 
 def validate_version(data, label):
     require_integer(data["schema_version"], label + " schema_version")
-    require(data["schema_version"] == 1 and data["campaign_id"] == CAMPAIGN, label + " version")
+    # Whitelist the two known-good schema versions for this campaign (the
+    # contract moved to v2 to carry the dol_ec production batch; the
+    # slots/ledger/baseline templates remain v1).  This is NOT skipping the
+    # version check -- an unknown future version is still rejected.
+    require(data["schema_version"] in (1, 2) and data["campaign_id"] == CAMPAIGN, label + " version")
 
 
 def unique_object(pairs):
@@ -118,6 +140,49 @@ def validate_contract(c, freeze):
     if capacity is not None:
         require_integer(capacity, "account_cpu_capacity")
         require(capacity > 0, "account_cpu_capacity must be positive")
+    # schema 2 carries the authorized dol_ec production batch; v1 does not.
+    if c["schema_version"] >= 2:
+        validate_production_batches(c["budget"])
+
+
+def validate_production_batches(budget):
+    """Validate the v2 dol_ec_recovery_v1 production batch (the 12h exception).
+
+    The 12h wall profile applies ONLY to the two authorized states; the general
+    production stage ceiling (4h) still binds every other batch via
+    validate_ledger.  A third state, a state outside TARGETS, a changed
+    resource profile, or a reservation above the authorized 96 CH is rejected.
+    """
+    batches = budget.get("production_batches", {})
+    require(P4V2_BATCH["id"] in batches, "schema 2 batch " + P4V2_BATCH["id"] + " missing")
+    b = batches[P4V2_BATCH["id"]]
+    states = tuple(b.get("states", ()))
+    require(set(states) == set(P4V2_BATCH["states"]),
+            "batch states must be exactly the two authorized: " + " ".join(P4V2_BATCH["states"]))
+    require(all(s in TARGETS for s in states), "batch state not a recovery target: " + repr(states))
+    require(len(states) == P4V2_BATCH["max_legs"] * P4V2_BATCH["max_per_state"],
+            "batch leg count inconsistent with max_legs/max_per_state")
+    require(b.get("resource_profile") == P4V2_BATCH["resource_profile"],
+            "batch resource profile changed (only the authorized 12h profile is valid)")
+    require(type(b.get("cores")) is int and type(b.get("wall_hours")) is int,
+            "batch cores/wall_hours: integers required")
+    require(b["cores"] == P4V2_BATCH["cores"] and b["wall_hours"] == P4V2_BATCH["wall_hours"],
+            "batch cores/wall_hours differ from the authorized 4c x 12h")
+    require_integer(b["max_legs"], "batch max_legs")
+    require_integer(b["max_per_state"], "batch max_per_state")
+    require(b["max_legs"] == P4V2_BATCH["max_legs"] and b["max_per_state"] == P4V2_BATCH["max_per_state"],
+            "batch max_legs/max_per_state differ from authorization")
+    require_integer(b["reserved_core_hours"], "batch reserved_core_hours")
+    require(b["reserved_core_hours"]
+            == P4V2_BATCH["cores"] * P4V2_BATCH["wall_hours"] * P4V2_BATCH["max_legs"]
+            == P4V2_BATCH["reserved_core_hours"],
+            "batch reserved_core_hours must equal 4x12x2 = 96 (over-96 is rejected)")
+    require(b["reserved_core_hours"] <= CAPS["production"][4], "batch reservation exceeds production cap")
+    require(b.get("paid_from") == P4V2_BATCH["paid_from"], "batch paid_from must be production")
+    require(b.get("start_geometry") == P4V2_BATCH["start_geometry"],
+            "batch must use the original perturbed geometry, not the collapsed screening endpoint")
+    require(b.get("second_start_and_rescue") == P4V2_BATCH["second_start_and_rescue"],
+            "second start / rescue must not auto-start without separate authorization")
 
 
 def validate_slots(data):

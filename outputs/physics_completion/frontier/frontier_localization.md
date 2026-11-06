@@ -49,7 +49,7 @@
 | `DME|LiM_2plus|primary` | 0.0024 | 0.4841 | `li_localized` |
 | `DME|LiM_2plus|r3m_c05` | 0.0009 | 0.3472 | `li_localized` |
 | `EMC|LiM_2plus|primary` | 0.0008 | 0.2676 | `li_localized` |
-| `DOL|LiM_2plus|c05` | 0.0002 | 0.4589 | `li_localized` |
+| `DOL|LiM_2plus|p4_02_ring_pucker_twist` | 0.0002 | 0.4560 | `li_localized` |
 | `TMP|LiM_2plus|primary` | 0.0002 | 0.5930 | `li_localized` |
 | `SL|LiM_2plus|primary` | 0.0002 | 0.4797 | `li_localized` |
 | `TMP|LiM_2plus|r3m_c00` | 0.0001 | 0.5743 | `li_localized` |
@@ -127,7 +127,7 @@
 | `DMSO|LiM_plus|r3m_c00` | 0.0020 | 0.8213 | `donor_localized` | 0.3103 | 0.3524 | `li_localized` |
 | `DMSO|M_plus|primary` | 0.0000 | 0.8095 | `donor_localized` | 0.0000 | 0.8123 | `donor_localized` |
 | `DMSO|M|primary` | 0.0000 | 0.8331 | `donor_localized` | 0.0000 | 0.2609 | `donor_localized` |
-| `DOL|LiM_2plus|c05` | 0.0002 | 0.4720 | `donor_localized` | 0.0002 | 0.4589 | `li_localized` |
+| `DOL|LiM_2plus|p4_02_ring_pucker_twist` | 0.0002 | 0.4717 | `donor_localized` | 0.0002 | 0.4560 | `li_localized` |
 | `DOL|LiM_plus|c02` | 0.0006 | 0.5016 | `donor_localized` | 0.0598 | 0.2486 | `li_localized` |
 | `DOL|M_plus|40` | 0.0000 | 0.5332 | `ligand_localized` | 0.0000 | 0.3966 | `ligand_localized` |
 | `DOL|M_plus|primary` | 0.0000 | 0.5339 | `ligand_localized` | 0.0000 | 0.3939 | `ligand_localized` |

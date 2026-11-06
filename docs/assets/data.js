@@ -7,11 +7,11 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 178,
+  "test_files": 184,
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-25T12:51:40Z",
+  "generated_at_utc": "2026-10-28T16:09:27Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -31,9 +31,9 @@ window.HB = {
   "stale": false,
   "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
   "ensemble": {
-   "accepted": 44,
+   "accepted": 45,
    "provisional": 0,
-   "limited": 4,
+   "limited": 3,
    "total": 48,
    "remaining": [
     {
@@ -44,12 +44,6 @@ window.HB = {
     },
     {
      "name": "DMC",
-     "state": "LiM_2plus",
-     "status": "limited",
-     "reason": "rescue_budget_exhausted"
-    },
-    {
-     "name": "DOL",
      "state": "LiM_2plus",
      "status": "limited",
      "reason": "rescue_budget_exhausted"
@@ -77,9 +71,9 @@ window.HB = {
     "evidence": "outputs/physics_completion/frontier/frontier_identity_evidence.csv"
    },
    "source_sha256": {
-    "outputs/physics_completion/ensembles/production_ensemble_weights.csv": "82d280dab2c203459b7dba53d4850a52559151cacad72985d1f5ebe91a7f1766",
-    "outputs/physics_completion/frontier/frontier_localization.csv": "ae6d6f6ae4326e8981053e675c9fba64849be5f1635d90fe61bcc603d81bbedc",
-    "outputs/physics_completion/frontier/frontier_identity_evidence.csv": "f27d58978f7ead6b443a83e5531c4efeedd4c248783d97433602ad6c8f06d048"
+    "outputs/physics_completion/ensembles/production_ensemble_weights.csv": "201e19545bf0c1ccc209ca017e4ed55c581085d15ceb1df117f31f7e36494101",
+    "outputs/physics_completion/frontier/frontier_localization.csv": "7310354c98ff2962226bb320438360166ddd1c2d1b368472afdaed639f1effa3",
+    "outputs/physics_completion/frontier/frontier_identity_evidence.csv": "0f8a8653b5285e0e786e62f1f3c03d021b8edc48502a56e768dba46d7ebcc5c6"
    },
    "error": ""
   },
@@ -1815,12 +1809,12 @@ window.HB = {
   {
    "path": "scripts",
    "note": "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）",
-   "files": 256
+   "files": 261
   },
   {
    "path": "config",
    "note": "冻结定义与预注册（scientific_definitions.yaml、prereg.yaml）",
-   "files": 4
+   "files": 5
   },
   {
    "path": "data",
@@ -1840,12 +1834,12 @@ window.HB = {
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 181
+   "files": 187
   },
   {
    "path": "docs",
    "note": "技术报告与周报（NN_*.md）、协议、结题报告、站点",
-   "files": 224
+   "files": 267
   },
   {
    "path": "deliverables",

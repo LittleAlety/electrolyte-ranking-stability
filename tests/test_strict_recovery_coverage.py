@@ -137,9 +137,17 @@ def test_a_state_is_resolved_only_with_a_computed_kept_member():
     assert ("AN", "M_plus") not in exhausted_legged
     assert ("DMC", "M_plus") not in exhausted_legged
     assert ("EMC", "M_plus") not in exhausted_legged     # C-group release
-    # the ring-locked DOL state is the one that genuinely cannot be probed by
-    # torsion (0 eligible dihedrals + 0 new motifs): its exhaustion stands
-    assert ("DOL", "LiM_2plus") in exhausted_legged
+    # 2026-10-27: DOL|LiM_2plus LEFT this set too -- it recovered through
+    # single_basin_verified (registered ring_pucker start + full production QC).
+    # The old pin below was a point-in-time snapshot from before that recovery;
+    # the invariant it protected is unchanged (a probed state must never still
+    # read search_exhausted), it simply now covers DOL as well.
+    assert ("DOL", "LiM_2plus") not in exhausted_legged
+    # measured 2026-10-27: NO state reads search_exhausted any more -- all 14
+    # rows carry a substantive verdict (11 resolved + 3 unresolved).  The
+    # empty-set pin makes any regression that resurrects the cheap verdict on a
+    # probed state fail loudly.
+    assert exhausted_legged == set(), sorted(exhausted_legged)
     assert exhausted_legged <= {
         ("AN", "M_plus"), ("DMC", "M_plus"), ("EMC", "M_plus"),
         ("DMC", "LiM_2plus"), ("EC", "LiM_2plus"), ("DOL", "LiM_2plus"),

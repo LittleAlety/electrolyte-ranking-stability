@@ -119,3 +119,25 @@ def test_the_coverage_route_vocabulary_is_frozen_and_mapping_complete():
     assert not unnamed, (
         "route(s) emitted by coverage_route() but never named elsewhere in the "
         "module (they would hit the verdict mapping's else-fallback): %s" % unnamed)
+
+
+def test_replicated_cluster_head_is_known_not_new():
+    """2026-10-27 ruling: a new member that BECAME the lowest-energy head of a
+    cluster whose older members (primary/c05) all deduplicate onto it is a
+    REPRODUCTION of a registered minimum, not a new basin.  Regression pin:
+    DOL|LiM_2plus|p4_02_ring_pucker_twist (kept=true, c05+primary dedup onto it
+    with rmsd 0.0036/0.1621) must be novelty=known and the state must stay on
+    the single_basin_verified route (not multi_basin via a fake "new")."""
+    import csv as _csv
+    from pathlib import Path as _P
+    ded = (_P(__file__).resolve().parents[1]
+           / "outputs/physics_completion/ensembles/production_ensemble_dedup.csv")
+    if not ded.is_file():
+        pytest.skip("machine-local ensemble outputs absent in this checkout")
+    rows = list(_csv.DictReader(ded.open(encoding="utf-8-sig")))
+    head = "DOL|LiM_2plus|p4_02_ring_pucker_twist"
+    onto = [r for r in rows if r.get("duplicate_of") == head]
+    # the frozen dedup must show the older members mapping onto the new head
+    assert onto, "expected c05/primary to deduplicate onto the reopt head"
+    assert any("c05" in r["member_key"] or "primary" in r["member_key"]
+               for r in onto), "older registered members must be in the cluster"

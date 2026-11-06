@@ -179,11 +179,15 @@ def test_plan_overall_still_blocked_on_real_evidence():
     assert "plan_overall_complete" in by_id, sorted(by_id)
     gate = by_id["plan_overall_complete"]
     assert gate["status"].startswith("blocked"), gate
-    assert "production_ensembles=44/48" in gate["measured"], gate["measured"]
-    # and the live denominator must really be 44 of 48 (never a shrunken pool)
+    # the live denominator must really be N of 48 (never a shrunken pool); the
+    # accepted count itself MOVES as recovery progresses (44 -> 45 on
+    # 2026-10-27), so it is read from the labels rather than pinned to a
+    # point-in-time literal -- pinning it would fail every legitimate recovery
     labels = list(csv.DictReader(
         (REPO / "outputs" / "physics_completion" / "ensembles"
          / "production_ensemble_labels.csv").open(encoding="utf-8")))
     accepted = sum(1 for r in labels if r["acceptance_status"] == "accepted")
-    assert accepted == 44, accepted
     assert len(labels) == 48, len(labels)
+    assert accepted < 48, "the gate is only honest while some state is not accepted"
+    assert "production_ensembles=%d/48" % accepted in gate["measured"], (
+        gate["measured"], accepted)

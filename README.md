@@ -13,12 +13,12 @@
 | 验收层 | 当前快照 | 权威来源 |
 | --- | --- | --- |
 | primary 优化 / 频率 QC | 48/48（全成员身份另列） | [主态账本](outputs/physics_completion/free_states/production_ledger.csv) |
-| 生产系综 | **accepted 44/48** · provisional 0 · limited 4 | [系综标签](outputs/physics_completion/ensembles/production_ensemble_labels.csv) |
+| 生产系综 | **accepted 45/48** · provisional 0 · limited 3 | [系综标签](outputs/physics_completion/ensembles/production_ensemble_labels.csv) |
 | 全成员前沿 / 身份登记 | 解析 80/80 · 证据表标记 verified 80/80；不代表独立完整科学身份 QC | [前沿报告](outputs/physics_completion/frontier/frontier_localization.md) · [证据表](outputs/physics_completion/frontier/frontier_identity_evidence.csv) |
 | 现有合规总体项 | **blocked_on_production**（不是完整 v3 严格目标证书） | [合规台账](outputs/physics_completion/compliance/plan_compliance.md) |
 | **逐项严格总闸门** | **未通过** · 缺口 `ensemble_not_48_accepted`、`wp5_full_target_pool_evaluated` | [strict_readiness_wiring](scripts/wp_production/strict_readiness_wiring.py) |
 
-未 accepted：`DMC/M_plus`、`DMC/LiM_2plus`、`DOL/LiM_2plus`、`EC/LiM_2plus`。
+未 accepted：`DMC/M_plus`、`DMC/LiM_2plus`、`EC/LiM_2plus`。
 
 **四态现状（逐态一行，勿读成"只差四态"）**：`DMC/M_plus`、`DMC/LiM_2plus` = `unresolved_qc`（`draft_torsion_probe`：各有 **7 个从未被合法探过的登记二面角**，去重后为 2 个 / 1 个重骨架操作＋5 个可声明配位探针）；`DOL/LiM_2plus`、`EC/LiM_2plus` = `search_exhausted`（**筛选级单盆地、0 个登记扭转**；路线是合法环形变＋声明式 Li 配位探针，而环 pucker 的合法位移只有 0.02–0.08 Å，放大到能到达别的盆地就会断环）。[路由表](outputs/physics_completion/recovery/probe_routes.csv)
 
