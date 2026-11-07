@@ -1,0 +1,456 @@
+# FILE: acs.jctc.8b01176.pdf
+# PAGES: 20
+
+===== PAGE 1 =====
+GFN2-xTBAn Accurate and Broadly Parametrized Self-Consistent
+Tight-Binding Quantum Chemical Method with Multipole
+Electrostatics and Density-Dependent Dispersion Contributions
+Christoph Bannwarth, *,†,‡ Sebastian Ehlert, † and Stefan Grimme *,†
+†Mulliken Center for Theoretical Chemistry, Universita ̈t Bonn, Beringstr. 4, 53115 Bonn, Germany
+‡Department of Chemistry, Stanford University, Stanford, California 94305, United States
+*S Supporting Information
+ABSTRACT: An extended semiempirical tight-binding
+model is presented, which is primarily designed for the fast
+calculation of structures and noncovalent interaction energies
+for molecular systems with roughly 1000 atoms. The essential
+novelty in this so-called GFN2-xTB method is the inclusion of
+anisotropic second order density ﬂuctuation e ﬀects via short-
+range damped interactions of cumulative atomic multipole
+moments. Without noticeable increase in the computational
+demands, this results in a less empirical and overall more
+physically sound method, which does not require any classical
+halogen or hydrogen bonding corrections and which relies
+solely on global and element-speci ﬁc parameters (available up to radon, Z = 86). Moreover, the atomic partial charge dependent
+D4 London dispersion model is incorporated self-consistently, which can be naturally obtained in a tight-binding picture from
+second order density ﬂuctuations. Fully analytical and numerically precise gradients (nuclear forces) are implemented. The
+accuracy of the method is benchmarked for a wide variety of systems and compared with other semiempirical methods. Along
+with excellent performance for the “target” properties, we also ﬁnd lower errors for “oﬀ-target” properties such as barrier heights
+and molecular dipole moments. High computational e ﬃ ciency along with the improved physics compared to its precursor
+GFN-xTB makes this method well-suited to explore the conformational space of molecular systems. Signi ﬁcant improvements
+are furthermore observed for various benchmark sets, which are prototypical for biomolecular systems in aqueous solution.
+1. INTRODUCTION
+The accurate description of large molecular systems partic-
+ularly in the condensed phase still remains one of the main
+challenges faced in theoretical chemistry.
+1,2 While Kohn −
+Sham density functional theory (DFT) can routinely provide
+gas-phase (or continuum embedded) structures and energies
+for roughly a few hundred atoms, long-time molecular
+dynamics simulations or conformational sampling are still
+not feasible in a reasonably sized atomic orbital (AO) basis set
+for systems of this size, e.g., within a day of computation time
+on a standard desktop computer. Recent e ﬀorts of our
+3−6 and
+other groups 7−10 have thus been directed toward the
+development of low-cost DFT and Hartree −Fock methods
+to allow such calculations.
+However, many interesting problems in biochemistry,
+materials science, and supramolecular and macromolecular
+chemistry would require methods that can handle several
+thousands of atoms, which is beyond the scope even for the
+aforementioned low-cost methods. Though classical force-
+ﬁelds (FFs) can routinely be used for nanosecond time scale
+molecular dynamics simulations,
+11 their limitations are
+manifold and they are not suited for general use. Though
+faster computers and more importantly parallel computing
+architectures along with accordingly adjusted codes have
+become available in recent years,
+12−25 there is still need for
+inherently simple, reasonably accurate, and e ﬃ cient electronic
+structure methods, which are applicable to large systems also
+without specialized hardware.
+Semiempirical quantum mechanical (SQM) methods 26−28
+are the physically motivated approach to bridge the gap
+between ab initio quantum mechanical (QM) and FF methods.
+The foundation of SQM methods typically is a valence-only
+minimal basis self-consistent ﬁeld method, derived from either
+Hartree−Fock theory or Kohn −Sham DFT. Since a QM
+description for the valence electrons is used in SQM models,
+their scope of applications is much broader than that of FFs. At
+the same time, they are faster by at least 2 orders of magnitude
+compared to ab initio QM methods, due to drastic integral
+approximations.
+28 These, however, come at the price of a
+signiﬁcantly reduced accuracy and robustness. Nevertheless, if
+parameters are adjusted carefully, SQM methods can be used
+suﬃ ciently well for screening purposes of a desired
+property. 29−34 Nowadays, frequently used sophisticated
+Received: November 20, 2018
+Published: February 11, 2019
+Article
+pubs.acs.org/JCTCCite This: J. Chem. Theory Comput. 2019, 15, 1652 −1671
+© 2019 American Chemical Society 1652 DOI: 10.1021/acs.jctc.8b01176
+J. Chem. Theory Comput. 2019, 15, 1652 −1671
+This is an open access article published under an ACS AuthorChoice License, which permits
+copying and redistribution of the article or any adaptations for non-commercial purposes.
+Downloaded from pubs.​acs.​org/​jctcce/​article-pdf/​15/​3/​1652/​67594800/​acs.​jctc.​8b01176.​pdf by WUHAN UNIV user on 29 September 2026
+
+
+===== PAGE 2 =====
+Hartree−Fock-based zero-diﬀerential overlap (ZDO) methods
+include PM6 35−40 and OM2. 41−44 While the former mostly
+ﬁnds use in the computation of ground state structures and
+energies,45−48 the latter is still extensively used in excited state
+dynamics studies. 49−53 In the past 20 years, density functional
+tight binding (DFTB) methods have found much atten-
+tion.54−61 Here, the Kohn −Sham DFT energy is expanded in
+terms of density ﬂuctuations δρ relative to a superposition of
+atomic reference densities. The highest-level variant (DFTB3)
+employs a self-consistent charge treatment including up to
+third order density ﬂuctuation terms 55,56 and has been
+parametrized for a number of chemical elements. 58−62
+In particular, the element pair-speci ﬁc parametrization used
+in all aforementioned methods has complicated the para-
+metrization procedure and only PM6 covers large parts of the
+periodic table of elements (70 elements). Recently, we have
+presented a DFTB3 variant, termed GFN-xTB, which mostly
+follows a global and element-speci ﬁc parameters only strategy
+and is parametrized to all elements through radon.
+34 The
+original purpose of the method and main target for the
+parameter optimization has been the computation of molecular
+geometries, vibrational frequencies, and non-covalent inter-
+action energies. As such, it has successfully been used in
+structure optimizations of organometallic complexes 63,64 and
+structural sampling. 65−67 Apart from that, the method
+performed well in high temperature molecular dynamics
+s i m u l a t i o n so fe l e c t r o ni m p a c tm a s ss p e c t r a ,68 and the
+electronic structure information on GFN-xTB can furthermore
+serve as input to generate intermolecular FFs.
+69 Of particular
+signiﬁcance is its contribution to a newly developed protocol
+for the automated computation of nuclear magnetic resonance
+(NMR) spectra. Therein, structural sampling with GFN-xTB is
+employed to generate the conformer-rotamer ensemble, which
+in turn de ﬁnes the detailed shape of an NMR spectrum. While
+the GFN-xTB could successfully identify the relevant
+structures for less polar molecules, polar and strongly
+hydrogen-bonded systems like sugars were not described as
+well. This motivated the present work. Here, we attempt to
+improve upon the GFN-xTB Hamiltonian in a physically
+sound manner. The theory will be described below, but in a
+nutshell, the method, which will be termed GFN2-xTB from
+now on, has the following characteristics:
+• The GFN2-xTB basis set consists of a minimal valence
+basis set of atom centered, contracted Gaussian
+functions, which approximate Slater functions (STO-
+mG).
+70 Polarization functions for most main group
+elements (typically second row or higher) are employed,
+which are particularly important to describe hypervalent
+states. Di ﬀerent from GFN-xTB, hydrogen is only
+assigned a single 1s function.
+• The GFN2-xTB Hamiltonian closely resembles that of
+GFN-xTB or of the well-known DFTB3 method.
+However, GFN2-xTB represents the ﬁrst broadly
+parametrized tight-binding method to include electro-
+static interactions and exchange-correlation e ﬀects up to
+second order in the multipole expansion. Furthermore,
+the simultaneously developed density-dependent D4
+dispersion model in a self-consistent formulation is an
+inherent part of the method. Di ﬀerent from either GFN-
+xTB or DFTB3, GFN2-xTB does not employ other
+classical FF-type corrections, e.g., to describe hydrogen
+or halogen bonds. These are reasonably well described
+within the multipole-extended electrostatics.
+• Diﬀerent from other semiempirical methods, GFN2-xTB
+strictly follows a global and element-speci ﬁc parameter
+strategy. No element pair-speci ﬁc parameters are
+employed.
+• As for the predecessor, properties around energetic
+minima, such as geometries, vibrational frequencies, and
+noncovalent interactions, are the target quantities.
+Already in our work for the GFN-xTB scheme, we
+have identi ﬁed that the preference for geometries
+(instead of covalent bond energies) in the ﬁt procedure
+resulted in systematically overestimated covalent bond
+energies. We have not deviated from this strategy, as
+covalent bond energies are not of primary interest for
+this method, and furthermore, the errors are very
+systematic as in GFN-xTB. This way, the errors will be
+less random and more useful, once the systematic errors
+have been removed see ref 45 for such a correction
+scheme which in combination with GFN-xTB outper-
+forms any other semiempirical method of comparable
+complexity. By keeping the focus on geometries as for
+GFN-xTB, the GFN2-xTB method would likewise be
+well-suited for applications in high (electronic) temper-
+ature molecular dynamics simulations to compute
+electron impact mass spectra.
+68 However, due to the
+more sophisticated physical interaction terms, we ﬁnd
+that some “oﬀ-target” properties related to the electronic
+structure also improve.
+After a detailed description of the GFN2-xTB Hamiltonian,
+technical details of the calculations are given. Then the method
+is benchmarked on standard sets for molecular structures,
+noncovalent energies, and conformational energies. The
+performance for barrier heights and molecular dipole moments
+is also assessed. Other semiempirical methods are used for
+comparison, namely, GFN-xTB,
+34 PM6-D3H4X,35,38,39 and
+DFTB3-D3(BJ).56,58,71
+2. THEORY
+Most previous derivations of density functional tight-binding
+(DFTB) are formally based on a (semi)local density
+approximation (LDA) of DFT.
+28,54−56 Though nonlocal
+exchange variants have been presented, 72−74 the electron
+correlation functional has also been local in those cases. This
+however neglects long-range correlation e ﬀects, which are
+responsible for the important dispersion interactions. Typi-
+cally, corrections for the latter are then added in an a posteriori
+fashion.71,75 Without explicitly referring to a speci ﬁc functional
+approximation, we will assume as starting point a general
+density functional approximation, which includes a nonlocal
+(NL) VV10-type
+76 correlation contribution. The total Kohn −
+Sham energy expression is then given by (atomic units are used
+throughout)
+ET V
+E
+rr r r
+rr rr r r r
+() () () ()
+1
+2
+1 (, ) ( ) d d
+n
+nn
+XC
+LDA
+C
+NL
+Ä
+Ç
+ÅÅ
+Å
+Å
+Å
+Å
+Å
+ÅÅ
+i
+k
+jj
+j
+y
+{
+zz
+z
+É
+Ö
+ÑÑ
+Ñ
+Ñ
+Ñ
+Ñ
+Ñ
+ÑÑ
+∫
+∫
+ρρ ρ ε ρ
+ρ
+[] = [ ] + + [ ]
++ |−′ | +Φ ′ ′ ′ +
+(1)
+Journal of Chemical Theory and Computation Article
+DOI: 10.1021/acs.jctc.8b01176
+J. Chem. Theory Comput. 2019, 15, 1652 −1671
+1653
+Downloaded from pubs.​acs.​org/​jctcce/​article-pdf/​15/​3/​1652/​67594800/​acs.​jctc.​8b01176.​pdf by WUHAN UNIV user on 29 September 2026
+
+
+===== PAGE 19 =====
+(95) Axilrod, B. M.; Teller, E. Interaction of the van der Waals Type
+Between Three Atoms. J. Chem. Phys. 1943, 11, 299 −300.
+(96) Muto, Y. Force between nonpolar molecules. Proc. Phys. Math.
+Soc. Jpn. 1943, 17, 629.
+(97) Grimme, S.; Ehrlich, S.; Goerigk, L. Effect of the Damping
+Function in Dispersion Corrected Density Functional Theory. J.
+Comput. Chem. 2011, 32, 1456 −1465.
+(98) Ghosh, D. C.; Islam, N. Semiempirical evaluation of the global
+hardness of the atoms of 103 elements of the periodic table using the
+most probable radii as their size descriptors. Int. J. Quantum Chem.
+2009, 110, 1206 −1213.
+(99) Levenberg, K. A Method for the Solution of Certain Non-linear
+Problems in Least Squares. Q. Appl. Math. 1944, 2, 164 −168.
+(100) Marquardt, D. An Algorithm for Least-Squares Estimation of
+Nonlinear Parameters. J. Soc. Ind. Appl. Math. 1963, 11, 431 −441.
+(101) TURBOMOLE, V7.0 2015, a development of University of
+Karlsruhe and Forschungszentrum Karlsruhe GmbH, 1989 −2007;
+TURBOMOLE GmbH: since 2007; available from http://www.
+turbomole.com.
+(102) Ahlrichs, R.; Ba ̈r, M.; Ha ̈ser, M.; Horn, H.; Ko ̈lmel, C.
+Electronic Structure Calculations on Workstation Computers: The
+Program System Turbomole. Chem. Phys. Lett. 1989, 162, 165 −169.
+(103) Furche, F.; Ahlrichs, R.; Ha ̈ttig, C.; Klopper, W.; Sierka, M.;
+Weigend, F. Turbomole. WIREs Comput. Mol. Sci. 2014, 4,9 1 −100.
+(104) Vahtras, O.; Almlo ̈f, J.; Feyereisen, M. W. Integral
+approximations for LCAO-SCF calculations. Chem. Phys. Lett. 1993,
+213, 514 −518.
+(105) Eichkorn, K.; Weigend, F.; Treutler, O.; Ahlrichs, R. Auxiliary
+basis sets for main row atoms and transition metals and their use to
+approximate Coulomb potentials. Theor. Chem. Acc. 1997, 97, 119 −
+124.
+(106) Weigend, F. Accurate Coulomb-fitting basis sets for H to Rn.
+Phys. Chem. Chem. Phys. 2006, 8, 1057 −1065.
+(107) Frauenheim, T. DFTB+ (Density Functional based Tight
+Binding); Universität Bremen: Bremen, Germany, 2008; http://www.
+dftb.org (August 9, 2014).
+( 1 0 8 )S t e w a r t ,J .J .P . MOPAC2016; Stewart Computational
+Chemistry: Colorado Springs, CO, USA, 2016; http://
+OpenMOPAC.net (August 16, 2016).
+(109) See http://www.thch.uni-bonn.de/.
+(110) Grimme, S.; Steinmetz, M. Effects of London Dispersion
+Correction in Density Functional Theory on the Structures of
+Organic Molecules in the Gas Phase. Phys. Chem. Chem. Phys. 2013,
+15, 16031 −16042.
+(111) Risthaus, T.; Steinmetz, M.; Grimme, S. Implementation of
+Nuclear Gradients of Range-Separated Hybrid Density Functionals
+and Benchmarking on Rotational Constants for Organic Molecules. J.
+Comput. Chem. 2014, 35, 1509 −1516.
+(112) Bu ̈hl, M.; Kabrede, H. Geometries of Transition-Metal
+Complexes from Density-Functional Theory. J. Chem. Theory Comput.
+2006, 2, 1282 −1290.
+(113) Jurec ̌ka, P.; S ̌poner, J.; Cerny, J.; Hobza, P. Benchmark
+database of accurate (MP2 and CCSD(T) complete basis set limit)
+interaction energies of small model complexes, DNA base pairs, and
+amino acid pairs. Phys. Chem. Chem. Phys. 2006, 8, 1985 −1993.
+(114) R ̌ezáč, J.; Riley, K. E.; Hobza, P. S66: A Well-balanced
+Database of Benchmark Interaction Energies Relevant to Biomolec-
+ular Structures. J. Chem. Theory Comput. 2011, 7, 2427.
+(115) Gra ́fová, L.; Piton
+̌ák, M.; R ̌ezáč, J.; Hobza, P. Comparative
+Study of Selected Wave Function and Density Functional Methods
+for Noncovalent Interaction Energy Calculations Using the Extended
+S22 Data Set. J. Chem. Theory Comput. 2010, 6, 2365 −2376.
+(116) Řezáč, J.; Riley, K. E.; Hobza, P. Benchmark Calculations of
+Noncovalent Interactions of Halogenated Molecules. J. Chem. Theory
+Comput. 2012, 8, 4285 −4292.
+(117) Goerigk, L.; Hansen, A.; Bauer, C.; Ehrlich, S.; Najibi, A.;
+Grimme, S. A look at the density functional theory zoo with the
+advanced GMTKN55 database for general main group thermochem-
+istry, kinetics and noncovalent interactions. Phys. Chem. Chem. Phys.
+2017, 19, 32184 −32215.
+(118) Marshall, M. S.; Burns, L. A.; Sherrill, C. D. Basis set
+convergence of the coupled-cluster correction, δMP2
+CCSD(T): Best practices
+for benchmarking non-covalent interactions and the attendant
+revision of the S22, NBC10, HBC6, and HSG databases. J. Chem.
+Phys. 2011, 135, 194102.
+(119) Kozuch, S.; Martin, J. M. L. Halogen Bonds: Benchmarks and
+Theoretical Analysis. J. Chem. Theory Comput. 2013, 9, 1918 −1931.
+(120) Setiawan, D.; Kraka, E.; Cremer, D. Strength of the Pnicogen
+Bond in Complexes Involving Group Va Elements N, P, and As. J.
+Phys. Chem. A 2015, 119, 1642 −1656.
+( 1 2 1 )C h r i s t e n s e n ,A .S . ;E l s t n e r ,M . ;C u i ,Q .I m p r o v i n g
+intermolecular interactions in DFTB3 using extended polarization
+from chemical-potential equalization. J. Chem. Phys. 2015, 143,
+084123.
+(122) Sure, R.; Grimme, S. Comprehensive Benchmark of
+Association (Free) Energies of Realistic Host-Guest Complexes. J.
+Chem. Theory Comput. 2015, 11, 3785 −3801.
+(123) Riplinger, C.; Sandhoefer, B.; Hansen, A.; Neese, F. Natural
+triple excitations in local coupled cluster calculations with pair natural
+orbitals. J. Chem. Phys. 2013, 139, 134101.
+(124) Gruzman, D.; Karton, A.; Martin, J. M. L. Performance of Ab
+Initio and Density Functional Methods for Conformational Equilibria
+of C nH2n+2 Alkane Isomers ( n =4 − 8). J. Phys. Chem. A 2009, 113,
+11974−11983.
+(125) Kesharwani, M. K.; Karton, A.; Martin, J. M. L. Benchmark ab
+Initio Conformational Energies for the Proteinogenic Amino Acids
+through Explicitly Correlated Methods. Assessment of Density
+Functional Methods. J. Chem. Theory Comput. 2016, 12, 444 −454.
+(126) Řeha, D.; Valde ́s, H.; Vondra ́šek, J.; Hobza, P.; Abu-Riziq, A.;
+Crews, B.; de Vries, M. S. Structure and IR Spectrum of Phenylalanyl-
+Glycyl-Glycine Tripetide in the Gas-Phase: IR/UV Experiments, Ab
+Initio Quantum Chemical Calculations, and Molecular Dynamic
+Simulations. Chem. - Eur. J. 2005, 11, 6803 −6817.
+(127) Goerigk, L.; Karton, A.; Martin, J. M. L.; Radom, L. Accurate
+quantum chemical energies for tetrapeptide conformations: why MP2
+data with an insufficient basis set should be handled with caution.
+Phys. Chem. Chem. Phys. 2013, 15, 7028 −7031.
+(128) Csonka, G. I.; French, A. D.; Johnson, G. P.; Stortz, C. A.
+Evaluation of Density Functionals and Basis Sets for Carbohydrates. J.
+Chem. Theory Comput. 2009, 5, 679 −692.
+(129) Kozuch, S.; Bachrach, S. M.; Martin, J. M. Conformational
+Equilibria in Butane-1,4-diol: A Benchmark of a Prototypical System
+with Strong Intramolecular H-bonds. J. Phys. Chem. A 2014, 118,
+293−303.
+(130) Kozuch, S.; Martin, J. M. L. Spin-component-scaled double
+hybrids: An extensive search for the best fifth-rung functionals
+blending DFT and perturbation theory. J. Comput. Chem. 2013, 34,
+2327−2344.
+(131) Kruse, H.; Mladek, A.; Gkionis, K.; Hansen, A.; Grimme, S.;
+Sponer, J. Quantum Chemical Benchmark Study on 46 RNA
+Backbone Families Using a Dinucleotide Unit. J. Chem. Theory
+Comput. 2015, 11, 4972 −4991.
+(132) Marianski, M.; Supady, A.; Ingram, T.; Schneider, M.; Baldauf,
+C. Assessing the Accuracy of Across-the-Scale Methods for Predicting
+Carbohydrate Conformational Energies for the Examples of Glucose
+and α-Maltose. J. Chem. Theory Comput. 2016, 12, 6157 −6168.
+(133) Dohm, S.; Hansen, A.; Steinmetz, M.; Grimme, S.; Checinski,
+M. P. Comprehensive Thermochemical Benchmark Set of Realistic
+Closed-Shell Metal Organic Reactions. J. Chem. Theory Comput. 2018,
+14, 2596 −2608.
+(134) Grimme, S. Supramolecular binding thermodynamics by
+dispersion corrected density functional theory. Chem. - Eur. J. 2012,
+18, 9955 −9964.
+(135) Bytautas, L.; Ruedenberg, K. Correlation energy extrapolation
+by intrinsic scaling. IV. Accurate binding energies of the homonuclear
+diatomic molecules carbon, nitrogen, oxygen, and fluorine. J. Chem.
+Phys. 2005, 122, 154110.
+Journal of Chemical Theory and Computation Article
+DOI: 10.1021/acs.jctc.8b01176
+J. Chem. Theory Comput. 2019, 15, 1652 −1671
+1670
+Downloaded from pubs.​acs.​org/​jctcce/​article-pdf/​15/​3/​1652/​67594800/​acs.​jctc.​8b01176.​pdf by WUHAN UNIV user on 29 September 2026
+
+
+===== PAGE 20 =====
+(136) Maniero, A. M.; Acioli, P. H. Full configuration interaction
+pseudopotential determination of the ground-state potential energy
+curves of Li 2 and LiH. Int. J. Quantum Chem. 2005, 103, 711 −717.
+(137) Karton, A.; Goerigk, L. Accurate reaction barrier heights of
+pericyclic reactions: Surprisingly large deviations for the CBS-QB3
+composite method and their consequences in DFT benchmark
+studies. J. Comput. Chem. 2015, 36, 622 −632.
+(138) Goerigk, L.; Sharma, R. The INV24 test set: how well do
+quantum-chemical methods describe inversion and racemization
+barriers? Can. J. Chem. 2016, 94, 1133 −1143.
+(139) Karton, A.; O ’Reilly, R. J.; Chan, B.; Radom, L. Determination
+of Barrier Heights for Proton Exchange in Small Water, Ammonia,
+and Hydrogen Fluoride Clusters with G4(MP2)-Type, MPn, and
+SCS-MPn Procedures −A Caveat. J. Chem. Theory Comput. 2012, 8,
+3128−3136.
+(140) Karton, A.; O ’Reilly, R. J.; Radom, L. Assessment of
+Theoretical Procedures for Calculating Barrier Heights for a Diverse
+Set of Water-Catalyzed Proton-Transfer Reactions. J. Phys. Chem. A
+2012, 116, 4211 −4221.
+(141) Bryantsev, V. S.; Diallo, M. S.; van Duin, A. C. T.; Goddard,
+W. A. Evaluation of B3LYP, X3LYP, and M06-Class Density
+Functionals for Predicting the Binding Energies of Neutral,
+Protonated, and Deprotonated Water Clusters. J. Chem. Theory
+Comput. 2009, 5, 1016 −1026.
+(142) Hait, D.; Head-Gordon, M. How Accurate Is Density
+Functional Theory at Predicting Dipole Moments? An Assessment
+Using a New Database of 200 Benchmark Values. J. Chem. Theory
+Comput. 2018, 14, 1969 −1981.
+(143) xtb standalone code (version 5.8.1). Please contact xtb@
+thch.uni-bonn.de for the program.
+■ NOTE ADDED AFTER ASAP PUBLICATION
+This paper was published on February 11, 2019, with errors in
+the Abstract Graphic and the Supporting Information
+paragraph. The corrected version was reposted on February
+12, 2019.
+Journal of Chemical Theory and Computation Article
+DOI: 10.1021/acs.jctc.8b01176
+J. Chem. Theory Comput. 2019, 15, 1652 −1671
+1671
+Downloaded from pubs.​acs.​org/​jctcce/​article-pdf/​15/​3/​1652/​67594800/​acs.​jctc.​8b01176.​pdf by WUHAN UNIV user on 29 September 2026
+
+
+===== PDFMETADATA =====
+{'/Creator': 'PTC Arbortext Advanced Print Publisher 11.1.4300/W Library-x64', '/ModDate': "D:20260929162636+00'00'", '/fpage': '1652', '/CreationDate': "D:20190304145338-05'00'", '/lpage': '1671', '/Producer': 'Acrobat Distiller 8.1.0 (Windows); modified using iTextSharp.LGPLv2.Core 3.7.4.0', '/prism:versionIdentifier': 'Issue', '/JCALibraryBuild': '4.1.i3 HF01', '/Title': 'ct8b01176 1..20', '/prism:doi': '10.1021/acs.jctc.8b01176', '/jav:journal_article_version': 'VoR', '/ACS OpenAccess Version': 'v3.2', '/ACS OpenAccess Stamp': '08/28/2026 04:51:58 (AuthorChoice)'}

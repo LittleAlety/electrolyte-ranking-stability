@@ -1,0 +1,343 @@
+# FILE: 114110_1_5.0197592.pdf
+# PAGES: 29
+
+===== PAGE 1 =====
+ViewOnline
+ExportCitation
+RESEARCH ARTICLE |  MARCH 21 2024
+CREST—A program for the exploration of low-energy
+molecular chemical space
+Special Collection: Modular and Interoperable Software for Chemical Physics
+Philipp Pracht 
+  ; Stefan Grimme 
+  ; Christoph Bannwarth 
+  ; Fabian Bohle 
+  ; Sebastian Ehlert 
+  ;
+Gereon Feldmann 
+  ; Johannes Gorges 
+  ; Marcel Müller 
+  ; Tim Neudecker 
+  ; Christoph Plett 
+  ;
+Sebastian Spicher 
+  ; Pit Steinbach 
+  ; Patryk A. Wesołowski 
+  ; Felix Zeller 
+J. Chem. Phys. 160, 114110 (2024)
+https://doi.org/10.1063/5.0197592
+Articles You May Be Interested In
+Energy decomposition analysis method with the DFT-in-xTB embedding strategy for intermolecular
+interactions in large systems
+J. Chem. Phys. (March 2025)
+An atom-in-molecule adaptive polarized valence single-ζ atomic orbital basis for electronic structure
+calculations
+J. Chem. Phys. (October 2023)
+A semi-automated quantum-mechanical workflow for the generation of molecular monolayers and
+aggregates
+J. Chem. Phys. (September 2024)
+ 29 September 2026 16:27:28
+
+
+===== PAGE 2 =====
+The Journal
+of Chemical Physics ARTICLE pubs.aip.org/aip/jcp
+CREST—A program for the exploration
+of low-energy molecular chemical space
+Cite as: J. Chem. Phys. 160, 114110 (2024); doi: 10.1063/5.0197592
+Submitted: 13 January 2024 • Accepted: 29 February 2024 •
+Published Online: 21 March 2024
+Philipp Pracht,1,a)
+ Stefan Grimme,2
+ Christoph Bannwarth,3
+ Fabian Bohle,2
+ Sebastian Ehlert,4
+Gereon Feldmann,3
+ Johannes Gorges,2
+ Marcel Müller,2
+ Tim Neudecker,5
+ Christoph Plett,2
+Sebastian Spicher,6
+ Pit Steinbach,3
+ Patryk A. Wesołowski,1
+ and Felix Zeller5
+AFFILIATIONS
+1 Yusuf Hamied Department of Chemistry, University of Cambridge, Lensfield Road, Cambridge CB2 1EW, United Kingdom
+2Mulliken Center for Theoretical Chemistry, Institute for Physical and Theoretical Chemistry, University of Bonn, Beringstr. 4,
+53115 Bonn, Germany
+3Institute for Physical Chemistry, RWTH Aachen University, Melatener Str. 20, 52056 Aachen, Germany
+4AI4Science, Microsoft Research, Evert van de Beekstraat 354, 1118 CZ Schiphol, The Netherlands
+5Institute for Physical and Theoretical Chemistry, University of Bremen, 28359 Bremen, Germany
+6BASF SE, Carl-Bosch Straße 38, 67056 Ludwigshafen am Rhein, Germany
+Note: This paper is part of the JCP Special Topic on Modular and Interoperable Software for Chemical Physics.
+a)Author to whom correspondence should be addressed: pp555@cam.ac.uk
+ABSTRACT
+Conformer–rotamer sampling tool (CREST) is an open-source program for the efficient and automated exploration of molecular chemical
+space. Originally developed in Prachtet al. [Phys. Chem. Chem. Phys. 22, 7169 (2020)] as an automated driver for calculations at the extended
+tight-binding level (xTB), it offers a variety of molecular- and metadynamics simulations, geometry optimization, and molecular structure
+analysis capabilities. Implemented algorithms include automated procedures for conformational sampling, explicit solvation studies, the
+calculation of absolute molecular entropy, and the identification of molecular protonation and deprotonation sites. Calculations are set up
+to run concurrently, providing efficient single-node parallelization. CREST is designed to require minimal user input and comes with an
+implementation of the GFNn-xTB Hamiltonians and the GFN-FF force-field. Furthermore, interfaces to any quantum chemistry and force-
+field software can easily be created. In this article, we present recent developments in the CREST code and show a selection of applications for
+the most important features of the program. An important novelty is the refactored calculation backend, which provides significant speed-up
+for sampling of small or medium-sized drug molecules and allows for more sophisticated setups, for example, quantum mechanics/molecular
+mechanics and minimum energy crossing point calculations.
+© 2024 Author(s). All article content, except where otherwise noted, is licensed under a Creative Commons Attribution (CC BY) license
+(http://creativecommons.org/licenses/by/4.0/). https://doi.org/10.1063/5.0197592
+I. INTRODUCTION
+Scientific software development in chemical physics has always
+been driven by the need for greater efficiency and adaptability in
+the face of evolving theoretical methods and advances in com-
+puter hardware. 1–4 The conventional paradigm of self-contained
+codes, while capable of reproducing specific functionalities, has
+inadvertently given rise to duplicated efforts and faces challenges in
+staying ahead of the rapid pace of change. Over the past couple of
+years, and in response to these challenges, software developers are
+increasingly embracing a “divide and conquer” strategy and creat-
+ing interoperable software to advance chemical physics research. 5–8
+New developments focus on creating software tailored to specific
+tasks within the broader field of computational chemistry, which not
+only streamlines development efforts but also facilitates easier adap-
+tation to new methodologies and hardware architectures. Simulta-
+neously, researchers are adopting a collaborative ethos by enhanc-
+ing the interoperability of their software to enable the seamless
+J. Chem. Phys. 160, 114110 (2024); doi: 10.1063/5.0197592 160, 114110-1
+© Author(s) 2024
+ 29 September 2026 16:27:28
+
+
+===== PAGE 28 =====
+The Journal
+of Chemical Physics ARTICLE pubs.aip.org/aip/jcp
+100M. S. Head, J. A. Given, and M. K. Gilson, “‘Mining minima’: Direct com-
+putation of conformational free energy,” J. Phys. Chem. A 101, 1609–1618
+(1997).
+101C.-E. Chang, M. J. Potter, and M. K. Gilson, “Calculation of molecular
+configuration integrals,” J. Phys. Chem. B 107, 1048–1055 (2003).
+102F. Jensen, Introduction to Computational Chemistry (Wiley, Chichester, UK,
+2017).
+103G. P. Pereira and M. Cecchini, “Multibasin quasi-harmonic approach for the
+calculation of the configurational entropy of small molecules in solution,” J. Chem.
+Theory Comput. 17, 1133–1142 (2021).
+104E. Suárez, N. Díaz, and D. Suárez, “Entropy calculations of single molecules
+by combining the rigid-rotor and harmonic-oscillator approximations with con-
+formational entropy estimations from molecular dynamics simulations,” J. Chem.
+Theory Comput. 7, 2638–2653 (2011).
+105E. Suárez, N. Díaz, J. Méndez, and D. Suárez, “CENCALC: A computa-
+tional tool for conformational entropy calculations from molecular simulations,”
+J. Comput. Chem. 34, 2041–2054 (2013).
+106N. Díaz and D. Suárez, “Toward reliable and insightful entropy calculations on
+flexible molecules,” J. Chem. Theory Comput. 18, 7166–7178 (2022).
+107J. Kästner, “Umbrella sampling,” Wiley Interdiscip. Rev.: Comput. Mol. Sci. 1,
+932–942 (2011).
+108S. Grimme, “Supramolecular binding thermodynamics by dispersion-
+corrected density functional theory,” Chem. - Eur. J. 18, 9955–9964 (2012).
+109K. A. Levenberg, “A method for the solution of certain non-linear problems in
+least squares,” Q. Appl. Math. 2, 164–168 (1944).
+110D. Marquardt, “An algorithm for least-squares estimation of nonlinear
+parameters,” J. Soc. Ind. Appl. Math. 11, 431–441 (1963).
+111J. G. Brandenburg, C. Bannwarth, A. Hansen, and S. Grimme, “B97-3c: A
+revised low-cost variant of the B97-D density functional method,” J. Chem. Phys.
+148, 064104 (2018).
+112Y.-P. Li, A. T. Bell, and M. Head-Gordon, “Thermodynamics of anhar-
+monic systems: Uncoupled mode approximations for molecules,” J. Chem. Theory
+Comput. 12, 2861–2870 (2016).
+113M. Steiner, T. Holzknecht, M. Schauperl, and M. Podewitz, “Quantum
+chemical microsolvation by automated water placement,” Molecules 26, 1793
+(2021).
+114G. N. Simm, P. L. Türtscher, and M. Reiher, “Systematic microsolvation
+approach with a cluster-continuum scheme and conformational sampling,”
+J. Comput. Chem. 41, 1144–1155 (2020).
+115J. R. Pliego, Jr. and J. M. Riveros, “Hybrid discrete-continuum solvation
+methods,” Wiley Interdiscip. Rev.: Comput. Mol. Sci. 10, e1440 (2020).
+116S. Grimme, C. Bannwarth, E. Caldeweyher, J. Pisarek, and A. Hansen, “A
+general intermolecular force field based on tight-binding quantum chemical
+calculations,” J. Chem. Phys. 147, 161708 (2017).
+117S. Roehrig, A. Straub, J. Pohlmann, T. Lampe, J. Pernerstorfer, K.-H. Schlem-
+mer, P. Reinemer, and E. Perzborn, “Discovery of the novel antithrombotic agent
+5-chloro-N-({(5S)-2-oxo-3- [4-(3-oxomorpholin-4-yl)phenyl]-1,3-oxazolidin-5-
+yl}methyl)thiophene- 2-carboxamide (BAY 59-7939): An oral, direct factor Xa
+inhibitor,” J. Med. Chem. 48, 5900–5908 (2005).
+118B. Hégely and M. Kállay, “Multilevel approach to the initial guess for
+self-consistent field calculations,” Int. J. Quantum Chem. 122, e26782 (2022).
+119S. A. Grimmel and M. Reiher, “The electrostatic potential as a descriptor for
+the protonation propensity in automated exploration of reaction mechanisms,”
+Faraday Discuss. 220, 443–463 (2019).
+120P. Pracht, R. Wilcken, A. Udvarhelyi, S. Rodde, and S. Grimme, “High accuracy
+quantum-chemistry-based calculation and blind prediction of macroscopic pKa
+values in the context of the SAMPL6 challenge,” J. Comput.-Aided Mol. Des. 32,
+1139–1149 (2018).
+121P. Pracht and S. Grimme, “Efficient quantum-chemical calculations of acid
+dissociation constants from free-energy relationships,” J. Phys. Chem. A 125,
+5681–5692 (2021).
+122O. Abarbanel and G. Hutchison, “QupKake: Integrating machine learning and
+quantum chemistry for micro-pKa predictions,” chemRxiv (2023).
+123J. P. Unsleber and M. Reiher, “The exploration of chemical reaction networks,”
+Annu. Rev. Phys. Chem. 71, 121–142 (2020).
+124R. W. Floyd, “Algorithm 97: Shortest path,” Commun. ACM 5, 345 (1962).
+125S. Grimme, “Towards first principles calculation of electron impact mass
+spectra of molecules,” Angew. Chem., Int. Ed. 52, 6306–6312 (2013).
+126N. van Staalduinen and C. Bannwarth, ChemRxiv (2024).
+127A. O. Lykhin, D. S. Kaliakin, G. E. dePolo, A. A. Kuzubov, and S. A. Varganov,
+“Nonadiabatic transition state theory: Application to intersystem crossings in
+the active sites of metal-sulfur proteins,” Int. J. Quantum Chem. 116, 750–761
+(2016).
+128M. Inamori, Y. Ikabata, T. Yoshikawa, and H. Nakai, “Unveiling control-
+ling factors of the S/S 1 minimum energy conical intersection (2): Application to
+penalty function method,” J. Chem. Phys. 152, 144108 (2020).
+129D. R. Yarkony, “Marching along ridges. Efficient location of energy-minimized
+conical intersections of two states using extrapolatable functions,” J. Phys.
+Chem. A 108, 3200–3205 (2004).
+130B. G. Levine, J. D. Coe, and T. J. Martínez, “Optimizing conical intersec-
+tions without derivative coupling vectors: Application to multistate multireference
+second-order perturbation theory (MS-CASPT2),” J. Phys. Chem. B112, 405–413
+(2008).
+131J. O. Lindner, K. Sultangaleeva, M. I. S. Röhr, and R. Mitri ´c, “metaFALCON:
+A program package for automatic sampling of conical intersection seams using
+multistate metadynamics,” J. Chem. Theory Comput. 15, 3450–3460 (2019).
+132E. Pieri, D. Lahana, A. M. Chang, C. R. Aldaz, K. C. Thompson, and T. J.
+Martínez, “The non-adiabatic nanoreactor: Towards the automated discovery of
+photochemistry,” Chem. Sci. 12, 7294–7307 (2021).
+133C. Bannwarth, J. K. Yu, E. G. Hohenstein, and T. J. Martínez, “Hole–hole
+Tamm–Dancoff-approximated density functional theory: A highly efficient elec-
+tronic structure method incorporating dynamic and static correlation,” J. Chem.
+Phys. 153, 024110 (2020).
+134F. Neese, “The ORCA program system,” Wiley Interdiscip. Rev.: Comput. Mol.
+Sci. 2, 73–78 (2012).
+135F. Neese, F. Wennmohs, U. Becker, and C. Riplinger, “The ORCA quantum
+chemistry program package,” J. Chem. Phys. 152, 224108 (2020).
+136S. Grimme, J. G. Brandenburg, C. Bannwarth, and A. Hansen, “Consistent
+structures and interactions by density functional theory with small atomic orbital
+basis sets,” J. Chem. Phys. 143, 054107 (2015).
+137R. J. Kutta, J. Großkopf, N. van Staalduinen, A. Seitz, P. Pracht, S. Breiten-
+lechner, C. Bannwarth, P. Nuernberger, and T. Bach, “Multifaceted view on the
+mechanism of a photochemical deracemization reaction,” J. Am. Chem. Soc. 145,
+2354–2363 (2023).
+138toml-f–TOML parser implementation for data serialization and deserialization
+in Fortran, https://github.com/toml-f/toml-f, 2024.
+139tblite–A light-weight tight-binding framework, https://github.com/tblite/
+tblite, 2024.
+140S. Ehlert, M. Stahn, S. Spicher, and S. Grimme, “Robust and efficient implicit
+solvation model for fast semiempirical methods,” J. Chem. Theory Comput. 17,
+4250–4261 (2021).
+141GFN0-xTB standalone implementation, https://github.com/pprcht/gfn0, 2024.
+142GFN-FF standalone implementation, https://github.com/pprcht/gfnff, 2024.
+143P. Pyykkö and M. Atsumi, “Molecular single-bond covalent radii for elements
+1–118,” Chem. - Eur. J. 15, 186–197 (2009).
+144V. I. Lebedev and D. Laikov, “A quadrature formula for the sphere of the 131st
+algebraic order of accuracy,” Dokl. Math. 59, 477–481 (1999).
+145R. M. Hazen, H. K. Mao, L. W. Finger, and P. M. Bell, “Structure and compres-
+sion of crystalline methane at high pressure and room temperature,” Appl. Phys.
+Lett. 37, 288–289 (1980).
+146D. Frenkel and B. Smit,Understanding Molecular Simulation: From Algorithms
+to Applications (Elsevier, 2023).
+147H. J. C. Berendsen, J. P. M. Postma, W. F. van Gunsteren, A. DiNola, and J. R.
+Haak, “Molecular dynamics with coupling to an external bath,” J. Chem. Phys.81,
+3684–3690 (1984).
+148H. C. Andersen, “Rattle: A ‘velocity’ version of the shake algorithm for
+molecular dynamics calculations,” J. Comput. Phys. 52, 24–34 (1983).
+149C. W. Hopkins, S. Le Grand, R. C. Walker, and A. E. Roitberg, “Long-time-
+step molecular dynamics through hydrogen mass repartitioning,” J. Chem. Theory
+Comput. 11, 1864–1874 (2015).
+J. Chem. Phys. 160, 114110 (2024); doi: 10.1063/5.0197592 160, 114110-27
+© Author(s) 2024
+ 29 September 2026 16:27:28
+
+
+===== PAGE 29 =====
+The Journal
+of Chemical Physics ARTICLE pubs.aip.org/aip/jcp
+150A. Laio and F. L. Gervasio, “Metadynamics: A method to simulate rare events
+and reconstruct the free energy in biophysics, chemistry and material science,”
+Rep. Prog. Phys. 71, 126601 (2008).
+151A. Barducci, M. Bonomi, and M. Parrinello, “Metadynamics,” Wiley Interdis-
+cip. Rev.: Comput. Mol. Sci. 1, 826–843 (2011).
+152L. Sutto, S. Marsili, and F. L. Gervasio, “New advances in metadynamics,”
+Wiley Interdiscip. Rev.: Comput. Mol. Sci. 2, 771–779 (2012).
+153D. Branduardi, F. L. Gervasio, and M. Parrinello, “From A to B in free energy
+space,” J. Chem. Phys. 126, 054103 (2007).
+154S. Grimme, “ANCOPT: Approximate Normal Coordinate Rational Function
+Optimization Program,” Universität Bonn, Bonn, Germany (2013).
+155A. Banerjee, N. Adams, J. Simons, and R. Shepard, “Search for stationary points
+on surfaces,” J. Phys. Chem. 89, 52–57 (1985).
+156J. Baker, “An algorithm for the location of transition states,” J. Comput. Chem.
+7, 385–395 (1986).
+157F. Eckert, P. Pulay, and H.-J. Werner, “ Ab initio geometry optimization for
+large molecules,” J. Comput. Chem. 18, 1473–1483 (1997).
+158H. B. Schlegel, “Geometry optimization,” Wiley Interdiscip. Rev.: Comput.
+Mol. Sci. 1, 790–809 (2011).
+159E. R. Davidson, “The iterative calculation of a few of the lowest eigenvalues and
+corresponding eigenvectors of large real-symmetric matrices,” J. Comput. Phys.
+17, 87–94 (1975).
+160C. G. Broyden, “The convergence of a class of double-rank minimization
+algorithms 1. General considerations,” IMA J. Appl. Math. 6, 76–90 (1970).
+161R. Fletcher, “A new approach to variable metric algorithms,” Comput. J. 13,
+317–322 (1970).
+162D. Goldfarb, “A family of variable-metric methods derived by variational
+means,” Math. Comput. 24, 23–26 (1970).
+163D. F. Shanno, “Conditioning of quasi-Newton methods for function
+minimization,” Math. Comput. 24, 647–656 (1970).
+164R. Lindh, A. Bernhardsson, G. Karlström, and P.-Å. Malmqvist, “On the use
+of a Hessian model function in molecular geometry optimizations,” Chem. Phys.
+Lett. 241, 423–428 (1995).
+165J. Baker, “Techniques for geometry optimization: A comparison of Cartesian
+and natural internal coordinates,” J. Comput. Chem. 14, 1085–1100 (1993).
+166J. Nocedal, “Updating quasi-Newton matrices with limited storage,” Math.
+Comput. 35, 773–782 (1980).
+167D. C. Liu and J. Nocedal, “On the limited memory BFGS method for large scale
+optimization,” Math. Program. 45, 503–528 (1989).
+168Software developments by D. J. Wales et al., http://www-wales.ch.cam.ac.uk/
+software.html, 2024.
+169J. N. Harvey, M. Aschi, H. Schwarz, and W. Koch, “The singlet and triplet states
+of phenyl cation. A hybrid approach for locating minimum energy crossing points
+between non-interacting potential energy surfaces,” Theor. Chem. Acc. 99, 95–99
+(1998).
+170J. N. Harvey and M. Aschi, “Spin-forbidden dehydrogenation of methoxy
+cation: A statistical view,” Phys. Chem. Chem. Phys. 1, 5555–5563 (1999).
+171J. P. Malhado and J. T. Hynes, “Non-adiabatic transition probability depen-
+dence on conical intersection topography,” J. Chem. Phys. 145, 194104 (2016).
+172P. Wesołowski, D. J. Wales, and P. Pracht, “A multilevel framework for analysis
+of protein folding involving disulphide bond formation,” J. Phys. Chem. B (to be
+published).
+173lwONIOM, A light-weight multi-center n-level ONIOM interface, https://
+github.com/crest-lab/lwoniom, 2024.
+174L. W. Chung, W. M. C. Sameera, R. Ramozzi, A. J. Page, M. Hatanaka, G. P.
+Petrova, T. V. Harris, X. Li, Z. Ke, F. Liu, H.-B. Li, L. Ding, and K. Morokuma,
+“The ONIOM method and its applications,” Chem. Rev. 115, 5678–5796 (2015).
+175L. W. Chung, H. Hirao, X. Li, and K. Morokuma, “The ONIOM method:
+Its foundation and applications to metalloenzymes and photobiology,” Wiley
+Interdiscip. Rev.: Comput. Mol. Sci. 2, 327–350 (2012).
+176H. M. Senn and W. Thiel, “QM/MM methods for biomolecular systems,”
+Angew. Chem., Int. Ed. 48, 1198–1229 (2009).
+177S. Ahmadi, L. Barrios Herrera, M. Chehelamirani, J. Hosta ˇs, S. Jalife, and
+D. R. Salahub, “Multiscale modeling of enzymes: QM-cluster, QM/MM, and
+QM/MM/MD: A tutorial review,” Int. J. Quantum Chem. 118, e25558 (2018).
+178K.-S. Csizi and M. Reiher, “Universal QM/MM approaches for general
+nanoscale applications,” Wiley Interdiscip. Rev.: Comput. Mol. Sci. 13, e1656
+(2023).
+179P. Seeber, S. Seidenath, J. Steinmetzer, and S. Gräfe, “Growing spicy ONIOMs:
+Extending and generalizing concepts of ONIOM and many body expansions,”
+Wiley Interdiscip. Rev.: Comput. Mol. Sci. 13, e1644 (2023).
+180M. A. Majewski, W. Stawski, J. M. Van Raden, M. Clarke, J. Hart, J. N. O’Shea,
+A. Saywell, and H. L. Anderson, “Covalent template-directed synthesis of a spoked
+18-porphyrin nanoring,” Angew. Chem., Int. Ed. 62, e202302114 (2023).
+181C. Plett, A. Katbashev, S. Ehlert, S. Grimme, and M. Bursch, “ONIOM meets
+xtb: Efficient, accurate, and robust multi-layer simulations across the periodic
+table,” Phys. Chem. Chem. Phys. 25, 17860–17868 (2023).
+182P. Pracht, J. W. R. Morgan, and D. J. Wales, “Exploring energy landscapes for
+solid-state systems with variable cells at the extended tight-binding level,” J. Chem.
+Phys. 159, 064801 (2023).
+183S. Grimme, M. Müller, and A. Hansen, “A non-self-consistent tight-binding
+electronic structure potential in a polarized double- ζbasis set for all spd-block
+elements up to Z = 86,” J. Chem. Phys. 158, 124111 (2023).
+184M. Müller, A. Hansen, and S. Grimme, “An atom-in-molecule adaptive polar-
+ized valence single-ζatomic orbital basis for electronic structure calculations,”
+J. Chem. Phys. 159, 164108 (2023).
+J. Chem. Phys. 160, 114110 (2024); doi: 10.1063/5.0197592 160, 114110-28
+© Author(s) 2024
+ 29 September 2026 16:27:28
+
+
+===== PDFMETADATA =====
+{'/Creator': 'LaTeX with hyperref package', '/CreationDate': "D:20240320190356+05'30'", '/ModDate': "D:20260929162731+00'00'", '/Producer': 'pdfTeX; modified using iTextSharp.LGPLv2.Core 3.7.4.0', '/Trapped': 'False', '/GTS_PDFA1Version': 'PDF/A-1b:2005', '/PTEX.Fullbanner': 'This is MiKTeX-pdfTeX 2.9.6100 (1.40.17)'}

@@ -1,0 +1,120 @@
+{
+  "generated_at_utc": "2026-10-25T12:51:36.264681Z",
+  "inputs": {
+    "outputs\\physics_completion\\active_learning\\blind_replay\\target_pool_AB.csv": "445e2c0d6609fe6e3feaa268369390f05b75663f8948e20c300d6e4cfcbad00b",
+    "outputs\\physics_completion\\cost\\production_cost_ledger.csv": "94cf07a19b1b411f0692509a72157296f2bd15e25f747126bdc4f04ce394c03f",
+    "outputs\\week7\\features_core.csv": "e22596a19d8f2fdda82da6b777cbd386fc589f53ff0e0ef2a42f545cb1680c62"
+  },
+  "contract": {
+    "pool": "target_pool_AB.csv holds all 12 molecules for audit, but the CONFIRMATORY replay admits only qc_complete_pair rows (task A: 6 -> 8 today, task B: 5 -> 7 today as recovery released states; the stop budget is evaluated ON THIS SUBSET and must never be read as the full 12-molecule pool",
+    "subset_sizes_at_write": {
+      "task_A_pool": 11,
+      "task_B_pool": 9,
+      "frozen_target": 12,
+      "note": "derived from _pool() at write time; a stop point reached on a subset is a subset result by construction"
+    },
+    "paired_initial_set": "shared by all four baselines per task+repeat",
+    "stop_rule": "JOINT success (v3.0 §13.4): the same batch of repeats must succeed at BOTH consecutive non-exhausted points (set intersection >= 16/20), never per-point counts",
+    "cost": "measured_cost_ledger; task B pays the FULL-POOL free-label prerequisite once (12 molecules x M_tzvpd+M_plus) and then only Li legs per query; task A pays its free pair per query; MISSING when a leg has no measured value; the 0.6/yr ASSUMED_CONSTANT scenario stays in the legacy replay only",
+    "blindness": "Acquirer never receives the full label vector",
+    "executed_models": [
+      "knn_baseline",
+      "ridge_std",
+      "krr_rbf",
+      "gpr_rbf"
+    ],
+    "model_contracts": {
+      "knn_baseline": {
+        "executed_model": "knn_baseline",
+        "kind": "baseline_not_formal",
+        "note": "legacy k-nearest-neighbour mean, kept so older results stay reproducible; NEVER presented as a formal model"
+      },
+      "ridge_std": {
+        "executed_model": "ridge_std",
+        "features": "week7 X0 12-column basis (12 dims)",
+        "visible_only": true,
+        "hyperparameters": {
+          "rbf_gamma": 0.08333333333333333,
+          "rbf_gamma_rule": "1/FEATURE_DIM",
+          "dimension_mismatch": "refused (new basis needs its own contract)",
+          "feature_dim": 12,
+          "ridge_lambda": 0.001,
+          "gpr_noise": 0.01
+        },
+        "no_per_replay_tuning": true
+      },
+      "krr_rbf": {
+        "executed_model": "krr_rbf",
+        "features": "week7 X0 12-column basis (12 dims)",
+        "visible_only": true,
+        "hyperparameters": {
+          "rbf_gamma": 0.08333333333333333,
+          "rbf_gamma_rule": "1/FEATURE_DIM",
+          "dimension_mismatch": "refused (new basis needs its own contract)",
+          "feature_dim": 12,
+          "ridge_lambda": 0.001,
+          "gpr_noise": 0.01
+        },
+        "no_per_replay_tuning": true
+      },
+      "gpr_rbf": {
+        "executed_model": "gpr_rbf",
+        "features": "week7 X0 12-column basis (12 dims)",
+        "visible_only": true,
+        "hyperparameters": {
+          "rbf_gamma": 0.08333333333333333,
+          "rbf_gamma_rule": "1/FEATURE_DIM",
+          "dimension_mismatch": "refused (new basis needs its own contract)",
+          "feature_dim": 12,
+          "ridge_lambda": 0.001,
+          "gpr_noise": 0.01
+        },
+        "no_per_replay_tuning": true
+      }
+    },
+    "acquisition_identity": {
+      "random": "none_label_free",
+      "diversity": "none_label_free",
+      "uncertainty": "internal_knn_k3_v1",
+      "ranking_aware": "internal_knn_k3_v1"
+    },
+    "acquisition_version_in_this_run": "knn_v1",
+    "acquisition_versions_available": [
+      "knn_v1",
+      "model_v2"
+    ],
+    "acquisition_version_default": "knn_v1",
+    "acquisition_uses_executed_model": {
+      "random": "false",
+      "diversity": "false",
+      "uncertainty": "false",
+      "ranking_aware": "false"
+    },
+    "acquisition_v2_status": "model_v2 is IMPLEMENTED and dev-verified on the current sub-pool (tests/test_wp5_acquisition_v2.py), but the plan requires the formal full replay to wait for STABLE labels: the products here were produced by the default knn_v1, so this index describes the CONTROL run.  A full model_v2 replay must be a separate, declared run once the ensemble labels stop moving.",
+    "acquisition_open_decision": "wiring the acquisition to the executed model WOULD CHANGE every reported number, so it is a plan-level decision and has NOT been done here.  Until it is, the A/B comparison varies the EVALUATION model and holds the ACQUISITION fixed; the four models therefore share one queried sequence per (task, baseline, repeat).  Measured evidence: tests/test_wp5_model_axis_invariants.py pins the identical sequences.",
+    "model_comparison_rule": "the formal comparison runs every declared model on the SAME split, features and acquisition budgets; a baseline winning on this subset is a result, not a failure to report"
+  },
+  "rows": {
+    "AB_candidate_rounds": 45440,
+    "AB_round_summary": 4480,
+    "AB_axis_endpoint": 32
+  },
+  "protocol": {
+    "feature_dim": 12,
+    "rbf_gamma": 0.08333333333333333,
+    "ridge_lambda": 0.001,
+    "gpr_noise": 0.01,
+    "acq_bootstrap_replicates": 8,
+    "acq_bootstrap_seed": 20261022,
+    "repeats": 20,
+    "k_top": 3,
+    "o3_threshold": "0.666667",
+    "r3_threshold_ev": "0.100000",
+    "frozen_target_molecules": 12
+  },
+  "outputs": {
+    "directory": "outputs\\physics_completion\\active_learning\\blind_replay",
+    "is_control_directory": true,
+    "acquisition_version": "knn_v1"
+  }
+}

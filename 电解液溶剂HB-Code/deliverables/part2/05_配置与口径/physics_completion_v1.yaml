@@ -1,0 +1,157 @@
+# =============================================================================
+# 新批次协议: physics_completion_v1 (WP0 登记)
+# 依据: 用户提供的《电解液排序稳定性：物理证据补强与决策预算研究执行方案》
+# 基线: 仓库提交 d5217a1f1f7e85c3e117b29d734efc2a8e535ecd (week27 / R15)
+# 状态: REGISTERED (本轮只登记定义与样本, 尚未产生新计算)
+# 纪律: append-only; 旧定义(config/scientific_definitions.yaml)不被覆写;
+#       新阈值/新方法在结果产生前登记, 不按结果反推。
+# =============================================================================
+schema_version: "1.0"
+batch_id: physics_completion_v1
+frozen_date: "2026-10-09"
+baseline_commit: d5217a1f1f7e85c3e117b29d734efc2a8e535ecd
+amends: "config/scientific_definitions.yaml (append-only; legacy aliases preserved)"
+registration_rule: "new thresholds, methods and samples are registered before results"
+no_new_electronic_structure_jobs_in_registration_week: true
+
+fixed_conditions:
+  solvent_model: "SMD, acetonitrile"
+  temperature_K: 298.15
+  standard_state: "1 mol/L (solution)"
+  geometry_start: "r2SCAN-3c"
+  note: "controlled embedding; NOT a real EC/DMC formulation"
+
+objective_direction:
+  oxidation: maximize
+  reduction_resistance_score_Sred: maximize
+  raw_electron_affinity_EA: minimize
+  same_set_rule: "maximise Sred and minimise EA must select the same candidate set"
+
+quantities:
+  - name: Eox_vertical
+    definition: "E(M+) - E(M) on the same initial geometry"
+    unit: "eV"
+    quantity_kind: "electronic_energy_difference"
+    objective_direction: "maximize"
+    geometry_policy: "single shared geometry (vertical)"
+    thermal_policy: "none"
+    ensemble_policy: "none"
+    solvent: "gas_phase"
+    state_identity_eligibility: "any"
+    analysis_cohort: "cheap_reference"
+    role: "cheap / vertical reference"
+  - name: Eox_adiabatic
+    definition: "electronic-energy difference between the two relaxed states"
+    unit: "eV"
+    quantity_kind: "electronic_energy_difference"
+    objective_direction: "maximize"
+    geometry_policy: "each charge state relaxed independently"
+    thermal_policy: "none"
+    ensemble_policy: "single lowest structure per state"
+    solvent: "gas_phase"
+    state_identity_eligibility: "any"
+    analysis_cohort: "relaxation_effect"
+    role: "relaxation effect"
+  - name: Gox_single
+    definition: "free-energy difference from one representative minimum per state"
+    unit: "eV"
+    quantity_kind: "gibbs_free_energy_difference"
+    objective_direction: "maximize"
+    geometry_policy: "each charge state relaxed independently"
+    thermal_policy: "qRRHO thermal correction on solution frequencies"
+    ensemble_policy: "single lowest structure per state"
+    solvent: "SMD_acetonitrile"
+    state_identity_eligibility: "any"
+    analysis_cohort: "thermochemical_correction"
+    role: "thermal correction check"
+  - name: Gox_ensemble
+    definition: "conformer-ensemble free-energy difference, -RT ln sum g_i exp(-G_i/RT)"
+    unit: "eV"
+    quantity_kind: "gibbs_free_energy_difference"
+    objective_direction: "maximize"
+    geometry_policy: "each charge state relaxed independently"
+    thermal_policy: "qRRHO thermal correction on solution frequencies"
+    ensemble_policy: "conformer ensemble within a frozen energy window"
+    solvent: "SMD_acetonitrile"
+    state_identity_eligibility: "any"
+    analysis_cohort: "main_target"
+    role: "main target"
+  - name: Gox_Li_ensemble
+    definition: "G([LiM]2+) - G([LiM]+) using per-state ensembles"
+    unit: "eV"
+    quantity_kind: "gibbs_free_energy_difference"
+    objective_direction: "maximize"
+    geometry_policy: "each charge state relaxed independently"
+    thermal_policy: "qRRHO thermal correction on solution frequencies"
+    ensemble_policy: "conformer/motif ensemble within a frozen energy window"
+    solvent: "SMD_acetonitrile"
+    state_identity_eligibility: "molecule_centered_oxidation"
+    analysis_cohort: "conditional_coordination_target"
+    role: "conditional Li-coordination target"
+  - name: coordination_shift
+    definition: "Gox_Li_ensemble - Gox_free_ensemble"
+    unit: "eV"
+    quantity_kind: "conditional_shift"
+    objective_direction: "maximize"
+    geometry_policy: "difference of two independently relaxed conditional species"
+    thermal_policy: "inherits both legs"
+    ensemble_policy: "inherits both legs"
+    solvent: "SMD_acetonitrile"
+    state_identity_eligibility: "molecule_centered_oxidation"
+    analysis_cohort: "conditional_coordination_target"
+    role: "environment response"
+  - name: Sred
+    definition: "G(reduced) - G(parent) = -EA (unified reduction-resistance score)"
+    unit: "eV"
+    quantity_kind: "gibbs_free_energy_difference"
+    objective_direction: "maximize"
+    geometry_policy: "each charge state relaxed independently"
+    thermal_policy: "qRRHO thermal correction on solution frequencies"
+    ensemble_policy: "conformer ensemble within a frozen energy window"
+    solvent: "SMD_acetonitrile"
+    state_identity_eligibility: "molecule_centered_redox"
+    analysis_cohort: "conditional_reduction_secondary"
+    role: "conditional secondary axis"
+
+legacy_aliases:
+  EA_raw: "raw electron affinity (stored separately; minimize)"
+  P1: "P1v"
+  P2: "P2a"
+  reduction_resistance_score: "Sred"
+
+analysis_cohorts:
+  main: [C01, C02, C03, C04, C05, C08, C09, C13, C14, C15, C16, C17]
+  method_audit: [C01, C02, C04, C08, C13, C14, C16, C17]
+  sampling_audit: [C02, C03, C08, C17]
+
+state_identity_eligibility:
+  rule: "only molecule_centered_redox enters the main reduction ranking"
+  labels: [molecule_centered_redox, molecule_centered_oxidation,
+           Li_centered_or_mixed_redox, ambiguous, intact_unclassified]
+  missing_rule: "ineligible or missing states are recorded as None, never coerced to 0"
+
+four_main_states: [M, M_plus, LiM_plus, LiM_2plus]
+
+resource_budget_first_round:
+  method_audit_single_points: 128      # 8 molecules x 4 states x 4 settings
+  main_production_state_structures: "48-144"
+  sampling_extension_state_structures: 48
+  targeted_pair_second_method_single_points: "16-32"
+
+stop_rules:
+  method_spread_matches_target_gap: unresolved
+  qc_identity_failures_pervasive: "narrow the comparable question before mass production"
+  sampling_not_converged_after_two_rounds: sampling_limited
+  no_complete_molecule_centered_reduction_state: identity_outcome
+  external_quantities_not_comparable: validation_limitation
+  active_learning_not_better_than_random: "report no evidence of saving; do not add models"
+
+repo_landing:
+  protocol: docs/physics_completion_protocol.md
+  claim_migration: docs/claim_migration.md
+  sample_set: data/metadata/physics_completion_set.csv
+  anchor_audit: data/references/anchor_primary_audit.csv
+  products: outputs/physics_completion/
+  final_report: docs/physics_completion_final_report.md
+
+gate_status: "Gate 0 CLOSED; Gate 1 NOT CLOSED and NOT CLOSABLE (unchanged)"

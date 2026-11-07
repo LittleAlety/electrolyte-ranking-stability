@@ -1,0 +1,192 @@
+# =============================================================================
+# 预注册 (pre-registration) — Stage 0 / Gate 0
+# 项目: 电解液溶剂 ranking 稳定性 (decision-centric ranking stability)
+# 依据: ranking-electrolyte-materials-v2.md 第 9/10/13/14 节 + 第 19 节 Stage 0
+# 状态: FROZEN, 编码 UTF-8
+# =============================================================================
+schema_version: "1.0"
+frozen: true
+frozen_date: "2026-09-29"
+project: electrolyte-solvent-ranking-stability
+
+freeze_statement: >
+  本文件中的 k 值、pair tolerance (delta_m)、统计重复次数、随机种子、
+  决策阈值来源规则与各项判据, 全部在查看任何 ranking / inversion / Top-k
+  结果之前冻结; 冻结后不得因为看到数据或结果而修改。
+
+amendment_policy:
+  rule: "任何修改必须以追加 (append-only) 方式写入 amendment_log, 记录时间、修改项、旧值、新值与理由; 历史条目不得删除或改写"
+  forbidden: "禁止在看过数据后静默修改任何已冻结项 (Gate 0)"
+amendment_log: []
+
+# -----------------------------------------------------------------------------
+# 1. Top-k 选择
+# -----------------------------------------------------------------------------
+top_k:
+  definition: "S_model(k) = 按该 objective_direction 排序后的前 k 个候选"
+  fractions: [0.10, 0.20, 0.30]
+  absolute_k_rule: "k_abs = max(1, floor(frac * N + 0.5))  (四舍五入, 且至少为 1)"
+  core_set_k_abs:
+    N: 18
+    k_at_0.10: 2
+    k_at_0.20: 4
+    k_at_0.30: 5
+  broad_pool_k_abs:
+    N: 40
+    k_at_0.10: 4
+    k_at_0.20: 8
+    k_at_0.30: 12
+  pool_size_note: "pool 大小变化时按同一公式重算 k_abs, fractions 保持冻结"
+  metrics:
+    - top_k_overlap: "O_k = |S_A(k) ∩ S_B(k)| / k"
+    - top_k_jaccard: "J_k = |S_A(k) ∩ S_B(k)| / |S_A(k) ∪ S_B(k)|"
+    - selection_regret: "R_k = mean_{i in S_T(k)} P_T(i) - mean_{i in S_M(k)} P_T(i)"
+    - threshold_decision_error: "见第 4 节, 仅在阈值来源合规时报告"
+  report_requirement: "每个 k 必须分别报告 oxidation 与 reduction 两个 objective_direction, 不得合并"
+
+# -----------------------------------------------------------------------------
+# 2. Pair 比较: tolerance 与 delta_m
+# -----------------------------------------------------------------------------
+pair_comparison:
+  pair_difference: "dP_ij^(m) = P_i^(m) - P_j^(m)  (先统一 objective_direction)"
+  unresolved_rule: "|dP_ij^(m)| < delta_m  或  |dP_ij^(m)| < z * sigma_ij^(m)  ==>  该 pair 在模型 m 下记为 unresolved / tied"
+  z_factor:
+    value: 1.0
+    rationale: "预注册为 1.0 (一倍不确定度) 作为基准; 若同时采用 probabilistic pair ordering, 以 p_ij 阈值作为主判据, z 作为交叉检查"
+  delta_m:
+    meaning: "与方法不确定度无关的固定 pair tolerance, 兜底阈值, 单位 kJ/mol"
+    per_objective: "oxidation 与 reduction 各自独立确定, 不允许共用一个未经检验的值"
+    source_rule: >
+      delta_m 只能来自以下顺序中的第一条可用者, 且必须在看到 target-vs-proxy 的
+      ranking 结果之前确定:
+      (1) 外部 anchor 数据自身的实验离散度 (within-series 重复测量标准差);
+      (2) method audit 中同一分子在不同 method / conformer 下的 target quantity 离散度
+          (Stage 1 / Gate 1 冻结具体数值);
+      (3) 若 (1)(2) 均不可得, 使用预注册默认值 delta_default.
+    delta_default:
+      value: 2.0
+      unit: kJ/mol
+      rationale: "约等于 298.15 K 下 RT = 2.4789 kJ/mol 的量级; 小于该量级的热力学差值在室温下不具备决策意义"
+    freeze_point: "Stage 0 冻结来源规则与默认值; Stage 1 / Gate 1 冻结由 (1) 或 (2) 导出的具体数值"
+    units_policy: "dP_ij 与 delta_m 必须使用同一单位 (默认 kJ/mol); 若换算为 V, 必须记录换算常数与 reference electrode"
+  robust_inversion:
+    rule: "两侧模型都解析该 pair, 且 sign(dP_ij^(A)) != sign(dP_ij^(B)), 同时两侧 separation 都超过各自的 uncertainty threshold"
+    fraction: "f_robust_inv = N_robust_inversions / N_pairs_resolved_in_both"
+    forbidden: "未解析 pair 的任意换序不得称为物理 ranking inversion"
+  unresolved_fraction:
+    formula: "f_unresolved = N_unresolved / C(N,2)"
+    must_report: "强制报告; 若某模型 inversion 很少但绝大多数 pair 未解析, 不得称为筛选稳定"
+    denominators:
+      core_set: 153
+      broad_pool: 780
+  probabilistic_pair_ordering:
+    definition: "p_ij^(m) = P(P_i^(m) > P_j^(m))"
+    thresholds:
+      strong_i_gt_j: 0.9
+      strong_i_lt_j: 0.1
+      else: unresolved
+  rank_correlation:
+    primary: "Kendall tau_b (显式允许 ties/unresolved)"
+    auxiliary: ["Spearman rho"]
+
+# -----------------------------------------------------------------------------
+# 3. 不确定度: bootstrap 与随机种子
+# -----------------------------------------------------------------------------
+uncertainty:
+  bootstrap:
+    repetitions: 2000
+    confidence_level: 0.95
+    ci_method: "percentile"
+    resample_unit: "分子内 conformer / Li-motif ensemble (Stage 5 之后), 以及 method-level 变体"
+    report: "median 与 95% 置信区间, 不是单条最漂亮 trajectory"
+    determinism: "必须传入下述固定 seeds; 结果随 seeds 可完全复现"
+  random_seeds: [101, 211, 307, 401, 503, 601, 701, 809, 907, 1009, 1103, 1201, 1301, 1409, 1511, 1601, 1709, 1801, 1901, 2003]
+  seed_policy: "上述 20 个种子一经冻结不得增删; 如需追加, 只能追加到列表末尾并在 amendment_log 记录"
+  variability_sources_to_separate:
+    - method / functional / basis
+    - conformer ensemble
+    - Li+ motif
+    - continuum dielectric setting
+    - bootstrap resampling
+
+# -----------------------------------------------------------------------------
+# 4. 决策阈值来源规则
+# -----------------------------------------------------------------------------
+threshold_decisions:
+  metric: "E_decision = (1/N) * sum_i 1[d_T(i) != d_M(i)]"
+  threshold_definition: "d_X(i) = 1[P_X(i) >= T]"
+  source_rule: >
+    T 只能来自 (a) 外部设计要求, (b) 实验基准, 或 (c) 事先定义的工程标准;
+    且必须在看到 target-vs-proxy 排序结果之前写定并记录出处。
+  forbidden: "严禁看完数据后人为挑选一个最有利的阈值"
+  if_unavailable: "若无合规来源, 该项报告为 not_applicable, 不得用数据分位数临时替代"
+  recorded_fields: ["T", "objective_direction", "source_type", "source_reference", "frozen_date"]
+
+# -----------------------------------------------------------------------------
+# 5. 数据拆分 (三种必须同时报告)
+# -----------------------------------------------------------------------------
+splits:
+  random_split:
+    protocol: "重复随机拆分, 每个 seed 跑一次"
+    seeds: [101, 211, 307, 401, 503]
+  group_split:
+    grouping_key: "family + 环系 + fluorinated 标签 的组合 scaffold group"
+    rationale: "防止同一母骨架的极相似衍生物同时出现在 train/test"
+  lofo:
+    meaning: "leave-one-structural-family-out"
+    folds_core_set: 8
+    rule: "任何一个 ML 表格必须同时给出三种拆分的指标"
+  forbidden: "不得用一个母骨架枚举几十个极相似衍生物再随机切分 train/test"
+
+# -----------------------------------------------------------------------------
+# 6. Feature cost accounting
+# -----------------------------------------------------------------------------
+feature_cost:
+  required_column: feature_cost_level
+  levels:
+    X0: "query 前即可获得 (mw, family/tags, heteroatom/donor count, TPSA, rotatable bonds, fingerprint, xTB 轨道 proxy, mu/alpha, xTB 部分电荷与 ESP 极值, cheap conformer spread)"
+    X1: "获得 free-molecule DFT 之后 (vertical/adiabatic gas redox quantities, DFT mu/alpha, free-molecule geometry response, continuum free-molecule target, DFT-level ESP)"
+    X2: "必须完成 Li-complex DFT 之后 (DFT dGdG_bind, 优化后的 Li-X 距离, Li-complex 电荷重分布, coordination geometry descriptors)"
+  rule: "若 active-learning acquisition 依赖某个 feature, 该 feature 必须在 query 前真实可用; X2 只能用于机制解释, 不能用于证明'无需做 C1 就能低成本预测 C1'"
+
+# -----------------------------------------------------------------------------
+# 7. Active learning 复现协议
+# -----------------------------------------------------------------------------
+active_learning:
+  protocol: "retrospective replay: 在 core set 已有完整 target labels 后隐藏它们, 模拟真实 acquisition loop"
+  initial_seed_size: 4
+  batch_size: 1
+  hidden_label_replay: true
+  in_loop_hygiene: "所有 normalization / hyperparameter tuning / feature selection 必须在每一轮可见数据内部完成, 不得偷看完整 target set"
+  baselines: [random, diversity, uncertainty, ranking_aware]
+  ranking_aware_acquisition: "优先 query 二元 entropy H_i 最大的候选, H_i = -p_i ln p_i - (1 - p_i) ln(1 - p_i), p_i = P(i in Top-k)"
+  repeats: 20
+  repeats_rule: "每个 baseline 使用同一组随机种子各跑一次, 报告 median 与置信区间"
+
+# -----------------------------------------------------------------------------
+# 8. 模型复杂度顺序
+# -----------------------------------------------------------------------------
+model_complexity_order:
+  order:
+    - "constant / family mean baseline"
+    - "linear / ridge / elastic net"
+    - "kernel ridge / GPR"
+    - "tree ensemble / GBDT"
+    - "graph neural network (仅在前述模型仍不足时)"
+  rule: "必须按此顺序报告; 复杂度更高的模型若不能带来超出不确定度的提升, 不得声称更优"
+
+# -----------------------------------------------------------------------------
+# 9. 报告与判定规则
+# -----------------------------------------------------------------------------
+reporting_requirements:
+  must_report:
+    - "Kendall tau_b (含 unresolved 处理)"
+    - "f_unresolved"
+    - "f_robust_inv"
+    - "Top-k overlap 与 Jaccard (k = 10% / 20% / 30%)"
+    - "selection regret"
+    - "median + 95% CI over seeds"
+  forbidden_claims:
+    - "把 S_ox / S_red 简写为真实电化学稳定窗口"
+    - "在未报告 unresolved fraction 的情况下宣称排序稳定"
+    - "使用接近目标层成本的 feature 去证明'低成本预测'"

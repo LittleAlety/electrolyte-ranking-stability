@@ -1,0 +1,2515 @@
+{
+  "stage": 18,
+  "part": "B -- zero-extra-cost self-diagnosis of the default SCF solution",
+  "generated_utc": "2026-09-30T15:55:10.240806+00:00",
+  "seed": 20261001,
+  "monte_carlo_samples": 20000,
+  "one_line_verdict": "输了（样本外）：`gap_warn_value` 在发现集上看着不错（LOO 0.917 > 基线 0.911，精确 p = 2.56e-19），但在真正留出的 54 格上只到 0.796、输给多数类基线 0.907（TP=0, FP=6）。这正是 Week 15 的教训重演 —— 池化发现集上的漂亮数字不是可用的预警。",
+  "discovery": {
+    "csv": "outputs\\week15\\stage16_cells.csv",
+    "n_rows": 360,
+    "n_positive": 32
+  },
+  "census": {
+    "note": "Stage 17's build_census resolves every discovery cell; the holdout index reuses the same primitives with the '_holdout' infix stripped",
+    "n_outfiles_scanned": 1066,
+    "n_outfiles_parsed": 756,
+    "n_discovery_index_keys": 720,
+    "n_holdout_index_keys": 828
+  },
+  "features": [
+    {
+      "name": "scf_n_cycles",
+      "definition": "number of SCF cycles in the (contiguous) default trajectory",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "scf_de2",
+      "definition": "Delta-E of cycle 2, the first real energy drop; 0 for cycle 1",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "scf_max_abs_de",
+      "definition": "largest |Delta-E| over the whole trajectory",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "scf_last3_abs_de_sum",
+      "definition": "sum of |Delta-E| over the last three cycles",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "scf_last_abs_de",
+      "definition": "|Delta-E| of the final cycle before convergence",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "scf_has_energy_increase",
+      "definition": "1 if any cycle raised the energy",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "scf_final_rmsdp",
+      "definition": "final RMSDP of the default SCF",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "scf_final_maxdp",
+      "definition": "final MaxDP of the default SCF",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "scf_final_diiserr",
+      "definition": "DIISErr of the last DIIS-block cycle (None if it never used DIIS)",
+      "n_missing": 2,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "gap_warn_present",
+      "definition": "ORCA printed its small-HOMO/LUMO-gap pre-diagonalisation warning",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "gap_warn_count",
+      "definition": "how many times that warning was printed",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "gap_warn_value",
+      "definition": "signed gap in Eh quoted by the warning; +1.0 when the warning did not fire (a large gap is the healthy case)",
+      "n_missing": 140,
+      "missing_fill": 1.0
+    },
+    {
+      "name": "s2",
+      "definition": "<S**2> of the default solution; 0.75 is a clean doublet",
+      "n_missing": 138,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "spin_max",
+      "definition": "largest |Mulliken atomic spin| of the default solution",
+      "n_missing": 138,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "spin_pr",
+      "definition": "participation ratio 1/sum s_i^2 of the Mulliken atomic spin",
+      "n_missing": 138,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "spin_n90",
+      "definition": "atoms needed to carry 90% of the Mulliken spin",
+      "n_missing": 138,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "loewdin_spin_max",
+      "definition": "largest |Loewdin atomic spin| of the default solution",
+      "n_missing": 138,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "loewdin_spin_pr",
+      "definition": "participation ratio of the Loewdin atomic spin",
+      "n_missing": 138,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "loewdin_spin_n90",
+      "definition": "atoms needed to carry 90% of the Loewdin spin",
+      "n_missing": 138,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "orbital_abs",
+      "definition": "largest |reduced-orbital Mulliken spin| (the spin channel)",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "homo_eh",
+      "definition": "alpha HOMO eigenvalue of the default solution, Eh",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "lumo_eh",
+      "definition": "alpha LUMO eigenvalue of the default solution, Eh",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "homo_ev",
+      "definition": "alpha HOMO eigenvalue of the default solution, eV",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "lumo_ev",
+      "definition": "alpha LUMO eigenvalue of the default solution, eV",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    },
+    {
+      "name": "homo_lumo_gap_ev",
+      "definition": "converged alpha LUMO - HOMO gap, eV",
+      "n_missing": 0,
+      "missing_fill": 0.0
+    }
+  ],
+  "label_features": [
+    "spin_center_label",
+    "orbital_label"
+  ],
+  "screen": [
+    {
+      "descriptor": "gap_warn_value",
+      "definition": "signed gap in Eh quoted by the warning; +1.0 when the warning did not fire (a large gap is the healthy case)",
+      "sign": "smaller_is_riskier",
+      "auc": 0.08403201219512195,
+      "abs_auc_above_half": 0.41596798780487804,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 122,
+      "missing_fill": 1.0,
+      "threshold_frozen": -0.0395,
+      "accuracy_in_sample": 0.9166666666666666,
+      "balanced_accuracy_in_sample": 0.6863567073170731,
+      "loo_accuracy": 0.9166666666666666,
+      "loo_balanced_accuracy": 0.6863567073170731,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": true,
+      "beats_majority_loo": true,
+      "holdout_accuracy_post_hoc": 0.7962962962962963,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 6,
+        "true_negative": 43,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "spin_n90",
+      "definition": "atoms needed to carry 90% of the Mulliken spin",
+      "sign": "larger_is_riskier",
+      "auc": 0.8145960365853658,
+      "abs_auc_above_half": 0.31459603658536583,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 120,
+      "missing_fill": 0.0,
+      "threshold_frozen": 8.5,
+      "accuracy_in_sample": 0.9388888888888889,
+      "balanced_accuracy_in_sample": 0.65625,
+      "loo_accuracy": 0.9388888888888889,
+      "loo_balanced_accuracy": 0.65625,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": true,
+      "beats_majority_loo": true,
+      "holdout_accuracy_post_hoc": 0.8333333333333334,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 4,
+        "true_negative": 45,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "loewdin_spin_n90",
+      "definition": "atoms needed to carry 90% of the Loewdin spin",
+      "sign": "larger_is_riskier",
+      "auc": 0.8090701219512195,
+      "abs_auc_above_half": 0.3090701219512195,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 120,
+      "missing_fill": 0.0,
+      "threshold_frozen": 8.5,
+      "accuracy_in_sample": 0.9388888888888889,
+      "balanced_accuracy_in_sample": 0.65625,
+      "loo_accuracy": 0.9388888888888889,
+      "loo_balanced_accuracy": 0.65625,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": true,
+      "beats_majority_loo": true,
+      "holdout_accuracy_post_hoc": 0.7777777777777778,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 7,
+        "true_negative": 42,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "scf_last_abs_de",
+      "definition": "|Delta-E| of the final cycle before convergence",
+      "sign": "larger_is_riskier",
+      "auc": 0.7858231707317073,
+      "abs_auc_above_half": 0.28582317073170727,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 0.0002044945,
+      "accuracy_in_sample": 0.9083333333333333,
+      "balanced_accuracy_in_sample": 0.49847560975609756,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.49847560975609756,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 0,
+        "true_negative": 49,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "loewdin_spin_pr",
+      "definition": "participation ratio of the Loewdin atomic spin",
+      "sign": "larger_is_riskier",
+      "auc": 0.7803925304878049,
+      "abs_auc_above_half": 0.2803925304878049,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 120,
+      "missing_fill": 0.0,
+      "threshold_frozen": 7.290672808545057,
+      "accuracy_in_sample": 0.9083333333333333,
+      "balanced_accuracy_in_sample": 0.49847560975609756,
+      "loo_accuracy": 0.9055555555555556,
+      "loo_balanced_accuracy": 0.4969512195121951,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.8333333333333334,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 4,
+        "true_negative": 45,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "spin_pr",
+      "definition": "participation ratio 1/sum s_i^2 of the Mulliken atomic spin",
+      "sign": "larger_is_riskier",
+      "auc": 0.7553353658536586,
+      "abs_auc_above_half": 0.25533536585365857,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 120,
+      "missing_fill": 0.0,
+      "threshold_frozen": 6.6300712641493575,
+      "accuracy_in_sample": 0.9305555555555556,
+      "balanced_accuracy_in_sample": 0.6516768292682926,
+      "loo_accuracy": 0.9277777777777778,
+      "loo_balanced_accuracy": 0.6501524390243902,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": true,
+      "beats_majority_loo": true,
+      "holdout_accuracy_post_hoc": 0.7777777777777778,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 7,
+        "true_negative": 42,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "orbital_abs",
+      "definition": "largest |reduced-orbital Mulliken spin| (the spin channel)",
+      "sign": "larger_is_riskier",
+      "auc": 0.7178925304878049,
+      "abs_auc_above_half": 0.21789253048780488,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 1.1063395,
+      "accuracy_in_sample": 0.9222222222222223,
+      "balanced_accuracy_in_sample": 0.6189024390243902,
+      "loo_accuracy": 0.9194444444444444,
+      "loo_balanced_accuracy": 0.6032774390243902,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": true,
+      "beats_majority_loo": true,
+      "holdout_accuracy_post_hoc": 0.9444444444444444,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 2,
+        "false_positive": 0,
+        "true_negative": 49,
+        "false_negative": 3
+      }
+    },
+    {
+      "descriptor": "gap_warn_present",
+      "definition": "ORCA printed its small-HOMO/LUMO-gap pre-diagonalisation warning",
+      "sign": "larger_is_riskier",
+      "auc": 0.6859756097560976,
+      "abs_auc_above_half": 0.18597560975609762,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 0.5,
+      "accuracy_in_sample": 0.42777777777777776,
+      "balanced_accuracy_in_sample": 0.6859756097560976,
+      "loo_accuracy": 0.42777777777777776,
+      "loo_balanced_accuracy": 0.6859756097560976,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.42592592592592593,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 5,
+        "false_positive": 31,
+        "true_negative": 18,
+        "false_negative": 0
+      }
+    },
+    {
+      "descriptor": "gap_warn_count",
+      "definition": "how many times that warning was printed",
+      "sign": "larger_is_riskier",
+      "auc": 0.6844512195121951,
+      "abs_auc_above_half": 0.18445121951219512,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 1.5,
+      "accuracy_in_sample": 0.9083333333333333,
+      "balanced_accuracy_in_sample": 0.49847560975609756,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.49847560975609756,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 0,
+        "true_negative": 49,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "scf_final_maxdp",
+      "definition": "final MaxDP of the default SCF",
+      "sign": "larger_is_riskier",
+      "auc": 0.6832126524390244,
+      "abs_auc_above_half": 0.1832126524390244,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 0.08315,
+      "accuracy_in_sample": 0.9111111111111111,
+      "balanced_accuracy_in_sample": 0.5141006097560976,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.49847560975609756,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 0,
+        "true_negative": 49,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "scf_de2",
+      "definition": "Delta-E of cycle 2, the first real energy drop; 0 for cycle 1",
+      "sign": "smaller_is_riskier",
+      "auc": 0.3289824695121951,
+      "abs_auc_above_half": 0.17101753048780488,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": -0.187,
+      "accuracy_in_sample": 0.9083333333333333,
+      "balanced_accuracy_in_sample": 0.49847560975609756,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.49847560975609756,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.9259259259259259,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 2,
+        "false_positive": 1,
+        "true_negative": 48,
+        "false_negative": 3
+      }
+    },
+    {
+      "descriptor": "scf_max_abs_de",
+      "definition": "largest |Delta-E| over the whole trajectory",
+      "sign": "larger_is_riskier",
+      "auc": 0.6710175304878049,
+      "abs_auc_above_half": 0.17101753048780488,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 0.1865,
+      "accuracy_in_sample": 0.9083333333333333,
+      "balanced_accuracy_in_sample": 0.49847560975609756,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.49847560975609756,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.9259259259259259,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 2,
+        "false_positive": 1,
+        "true_negative": 48,
+        "false_negative": 3
+      }
+    },
+    {
+      "descriptor": "spin_max",
+      "definition": "largest |Mulliken atomic spin| of the default solution",
+      "sign": "larger_is_riskier",
+      "auc": 0.6683498475609756,
+      "abs_auc_above_half": 0.1683498475609756,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 120,
+      "missing_fill": 0.0,
+      "threshold_frozen": 1.4778235,
+      "accuracy_in_sample": 0.9222222222222223,
+      "balanced_accuracy_in_sample": 0.6189024390243902,
+      "loo_accuracy": 0.9166666666666666,
+      "loo_balanced_accuracy": 0.6017530487804879,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": true,
+      "beats_majority_loo": true,
+      "holdout_accuracy_post_hoc": 0.9444444444444444,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 2,
+        "false_positive": 0,
+        "true_negative": 49,
+        "false_negative": 3
+      }
+    },
+    {
+      "descriptor": "loewdin_spin_max",
+      "definition": "largest |Loewdin atomic spin| of the default solution",
+      "sign": "larger_is_riskier",
+      "auc": 0.6413871951219512,
+      "abs_auc_above_half": 0.1413871951219512,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 120,
+      "missing_fill": 0.0,
+      "threshold_frozen": 0.6796355000000001,
+      "accuracy_in_sample": 0.9083333333333333,
+      "balanced_accuracy_in_sample": 0.49847560975609756,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.49847560975609756,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.7962962962962963,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 6,
+        "true_negative": 43,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "s2",
+      "definition": "<S**2> of the default solution; 0.75 is a clean doublet",
+      "sign": "larger_is_riskier",
+      "auc": 0.6334317835365854,
+      "abs_auc_above_half": 0.13343178353658536,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 120,
+      "missing_fill": 0.0,
+      "threshold_frozen": 0.7596745,
+      "accuracy_in_sample": 0.9083333333333333,
+      "balanced_accuracy_in_sample": 0.5125762195121951,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.5125762195121951,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.8703703703703703,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 2,
+        "true_negative": 47,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "scf_final_diiserr",
+      "definition": "DIISErr of the last DIIS-block cycle (None if it never used DIIS)",
+      "sign": "smaller_is_riskier",
+      "auc": 0.3909108231707317,
+      "abs_auc_above_half": 0.10908917682926828,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 2,
+      "missing_fill": 0.0,
+      "threshold_frozen": 0.0,
+      "accuracy_in_sample": 0.9055555555555556,
+      "balanced_accuracy_in_sample": 0.4969512195121951,
+      "loo_accuracy": 0.9055555555555556,
+      "loo_balanced_accuracy": 0.4969512195121951,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 0,
+        "true_negative": 49,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "homo_lumo_gap_ev",
+      "definition": "converged alpha LUMO - HOMO gap, eV",
+      "sign": "smaller_is_riskier",
+      "auc": 0.40139100609756095,
+      "abs_auc_above_half": 0.09860899390243905,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 0.1349999999999998,
+      "accuracy_in_sample": 0.9083333333333333,
+      "balanced_accuracy_in_sample": 0.49847560975609756,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.49847560975609756,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.8888888888888888,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 1,
+        "true_negative": 48,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "scf_final_rmsdp",
+      "definition": "final RMSDP of the default SCF",
+      "sign": "larger_is_riskier",
+      "auc": 0.5801257621951219,
+      "abs_auc_above_half": 0.08012576219512191,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 0.00835,
+      "accuracy_in_sample": 0.9083333333333333,
+      "balanced_accuracy_in_sample": 0.49847560975609756,
+      "loo_accuracy": 0.9027777777777778,
+      "loo_balanced_accuracy": 0.4954268292682927,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 0,
+        "true_negative": 49,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "scf_n_cycles",
+      "definition": "number of SCF cycles in the (contiguous) default trajectory",
+      "sign": "larger_is_riskier",
+      "auc": 0.5393959603658537,
+      "abs_auc_above_half": 0.03939596036585369,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 29.5,
+      "accuracy_in_sample": 0.9138888888888889,
+      "balanced_accuracy_in_sample": 0.5861280487804879,
+      "loo_accuracy": 0.9055555555555556,
+      "loo_balanced_accuracy": 0.5815548780487805,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": true,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 1,
+        "false_positive": 1,
+        "true_negative": 48,
+        "false_negative": 4
+      }
+    },
+    {
+      "descriptor": "lumo_eh",
+      "definition": "alpha LUMO eigenvalue of the default solution, Eh",
+      "sign": "smaller_is_riskier",
+      "auc": 0.4770388719512195,
+      "abs_auc_above_half": 0.022961128048780477,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": -0.159663,
+      "accuracy_in_sample": 0.9083333333333333,
+      "balanced_accuracy_in_sample": 0.49847560975609756,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.49847560975609756,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.8888888888888888,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 1,
+        "true_negative": 48,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "lumo_ev",
+      "definition": "alpha LUMO eigenvalue of the default solution, eV",
+      "sign": "smaller_is_riskier",
+      "auc": 0.4770388719512195,
+      "abs_auc_above_half": 0.022961128048780477,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": -4.3447,
+      "accuracy_in_sample": 0.9083333333333333,
+      "balanced_accuracy_in_sample": 0.49847560975609756,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.49847560975609756,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.8888888888888888,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 1,
+        "true_negative": 48,
+        "false_negative": 5
+      }
+    },
+    {
+      "descriptor": "scf_has_energy_increase",
+      "definition": "1 if any cycle raised the energy",
+      "sign": "smaller_is_riskier",
+      "auc": 0.4771341463414634,
+      "abs_auc_above_half": 0.022865853658536606,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 0,
+      "accuracy_in_sample": 0.33611111111111114,
+      "balanced_accuracy_in_sample": 0.5228658536585366,
+      "loo_accuracy": 0.33611111111111114,
+      "loo_balanced_accuracy": 0.5228658536585366,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.48148148148148145,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 3,
+        "false_positive": 26,
+        "true_negative": 23,
+        "false_negative": 2
+      }
+    },
+    {
+      "descriptor": "homo_eh",
+      "definition": "alpha HOMO eigenvalue of the default solution, Eh",
+      "sign": "larger_is_riskier",
+      "auc": 0.518483231707317,
+      "abs_auc_above_half": 0.018483231707317027,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 0.0846355,
+      "accuracy_in_sample": 0.9111111111111111,
+      "balanced_accuracy_in_sample": 0.5141006097560976,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.5125762195121951,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.9259259259259259,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 1,
+        "false_positive": 0,
+        "true_negative": 49,
+        "false_negative": 4
+      }
+    },
+    {
+      "descriptor": "homo_ev",
+      "definition": "alpha HOMO eigenvalue of the default solution, eV",
+      "sign": "larger_is_riskier",
+      "auc": 0.518483231707317,
+      "abs_auc_above_half": 0.018483231707317027,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 2.30305,
+      "accuracy_in_sample": 0.9111111111111111,
+      "balanced_accuracy_in_sample": 0.5141006097560976,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.5125762195121951,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.9259259259259259,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 1,
+        "false_positive": 0,
+        "true_negative": 49,
+        "false_negative": 4
+      }
+    },
+    {
+      "descriptor": "scf_last3_abs_de_sum",
+      "definition": "sum of |Delta-E| over the last three cycles",
+      "sign": "smaller_is_riskier",
+      "auc": 0.4848513719512195,
+      "abs_auc_above_half": 0.015148628048780477,
+      "n_rows": 360,
+      "n_positive": 32,
+      "n_missing": 0,
+      "missing_fill": 0.0,
+      "threshold_frozen": 3.146e-06,
+      "accuracy_in_sample": 0.9111111111111111,
+      "balanced_accuracy_in_sample": 0.5141006097560976,
+      "loo_accuracy": 0.9083333333333333,
+      "loo_balanced_accuracy": 0.49847560975609756,
+      "majority_accuracy": 0.9111111111111111,
+      "beats_majority_in_sample": false,
+      "beats_majority_loo": false,
+      "holdout_accuracy_post_hoc": 0.8703703703703703,
+      "holdout_majority_accuracy_post_hoc": 0.9074074074074074,
+      "holdout_confusion_post_hoc": {
+        "true_positive": 0,
+        "false_positive": 2,
+        "true_negative": 47,
+        "false_negative": 5
+      }
+    }
+  ],
+  "frozen_rule": {
+    "descriptor": "gap_warn_value",
+    "definition": "signed gap in Eh quoted by the warning; +1.0 when the warning did not fire (a large gap is the healthy case)",
+    "sign": "smaller_is_riskier",
+    "threshold_frozen": -0.0395,
+    "n_rows_used": 360,
+    "n_positive": 32,
+    "selection_basis": "top of the discovery-set single-variable screen by |AUC - 0.5|, i.e. the Stage 16 selection rule; the threshold maximises plain accuracy on the full discovery set",
+    "missing_fill": 1.0,
+    "n_missing": 122
+  },
+  "in_sample": {
+    "feature": "gap_warn_value",
+    "sign": "smaller_is_riskier",
+    "threshold": -0.0395,
+    "accuracy": 0.9166666666666666,
+    "balanced_accuracy": 0.6863567073170731,
+    "majority_accuracy": 0.9111111111111111,
+    "confusion_matrix": {
+      "true_positive": 13,
+      "false_positive": 11,
+      "true_negative": 317,
+      "false_negative": 19
+    },
+    "beats_majority": true,
+    "balanced_beats_trivial": true
+  },
+  "loo": {
+    "accuracy": 0.9166666666666666,
+    "balanced_accuracy": 0.6863567073170731,
+    "majority_accuracy": 0.9111111111111111,
+    "confusion_matrix": {
+      "true_positive": 13,
+      "false_positive": 11,
+      "true_negative": 317,
+      "false_negative": 19
+    },
+    "beats_majority": true,
+    "definition": "threshold re-fit on the n-1 remaining rows by maximising plain accuracy; the direction is held at the one frozen on the full discovery set, exactly as in Stage 16"
+  },
+  "significance": {
+    "method": "exact_mann_whitney_dp",
+    "tie_aware": true,
+    "statistic": "|AUC - 0.5|",
+    "auc_observed": 0.08403201219512195,
+    "p_value": 2.560555991250992e-19,
+    "p_value_smoothed_upper": 2.560555991250992e-19,
+    "lower_tail_count": 745063301796158471149547515,
+    "total_assignments": 5819543133147019445394075492854593103326158555,
+    "n_rows": 360,
+    "n_positive": 32,
+    "dp_states": 70637,
+    "dp_operations": 19854825,
+    "note": "exact null of the tie-aware Mann-Whitney statistic; U is a monotone function of the AUC, and the two tails of its null distribution are equal by symmetry",
+    "monte_carlo_cross_check": {
+      "method": "monte_carlo",
+      "p_value": 4.999750012499375e-05,
+      "samples": 20000,
+      "seed": 20261001
+    }
+  },
+  "holdout": {
+    "feature": "gap_warn_value",
+    "sign": "smaller_is_riskier",
+    "threshold": -0.0395,
+    "n_rows": 54,
+    "n_positive": 5,
+    "accuracy": 0.7962962962962963,
+    "balanced_accuracy": 0.4387755102040816,
+    "majority_accuracy": 0.9074074074074074,
+    "confusion_matrix": {
+      "true_positive": 0,
+      "false_positive": 6,
+      "true_negative": 43,
+      "false_negative": 5
+    },
+    "beats_majority": false,
+    "per_row": [
+      {
+        "name": "DEC",
+        "state": "anion",
+        "epsilon": 5.0,
+        "value": -0.03,
+        "raw_value": -0.03,
+        "predicted": false,
+        "truth": true,
+        "delta_ev": -0.11983301318944413,
+        "classification": "moread_lower"
+      },
+      {
+        "name": "DEC",
+        "state": "anion",
+        "epsilon": 20.0,
+        "value": -0.027,
+        "raw_value": -0.027,
+        "predicted": false,
+        "truth": true,
+        "delta_ev": -0.058581701743683386,
+        "classification": "moread_lower"
+      },
+      {
+        "name": "DEC",
+        "state": "anion",
+        "epsilon": 200.0,
+        "value": -0.026,
+        "raw_value": -0.026,
+        "predicted": false,
+        "truth": true,
+        "delta_ev": -0.06410796037952489,
+        "classification": "moread_lower"
+      },
+      {
+        "name": "DEC",
+        "state": "cation",
+        "epsilon": 5.0,
+        "value": -0.025,
+        "raw_value": -0.025,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 4.774019555538151e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "DEC",
+        "state": "cation",
+        "epsilon": 20.0,
+        "value": -0.025,
+        "raw_value": -0.025,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 3.080335945111889e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "DEC",
+        "state": "cation",
+        "epsilon": 200.0,
+        "value": -0.025,
+        "raw_value": -0.025,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -2.3479807532100393e-05,
+        "classification": "coincident"
+      },
+      {
+        "name": "DEC",
+        "state": "neutral",
+        "epsilon": 5.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -2.640599520295746e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "DEC",
+        "state": "neutral",
+        "epsilon": 20.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -1.7341816197636858e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "DEC",
+        "state": "neutral",
+        "epsilon": 200.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -1.8506547731938294e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "EA",
+        "state": "anion",
+        "epsilon": 5.0,
+        "value": 0.008,
+        "raw_value": 0.008,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 4.3082970885224545e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "EA",
+        "state": "anion",
+        "epsilon": 20.0,
+        "value": 0.012,
+        "raw_value": 0.012,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -5.326365256795479e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "EA",
+        "state": "anion",
+        "epsilon": 200.0,
+        "value": 0.013,
+        "raw_value": 0.013,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -4.3943634790026675e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "EA",
+        "state": "cation",
+        "epsilon": 5.0,
+        "value": -0.054,
+        "raw_value": -0.054,
+        "predicted": true,
+        "truth": false,
+        "delta_ev": -1.7611761678866985e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "EA",
+        "state": "cation",
+        "epsilon": 20.0,
+        "value": -0.052,
+        "raw_value": -0.052,
+        "predicted": true,
+        "truth": false,
+        "delta_ev": -2.379798651058699e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "EA",
+        "state": "cation",
+        "epsilon": 200.0,
+        "value": -0.051,
+        "raw_value": -0.051,
+        "predicted": true,
+        "truth": false,
+        "delta_ev": -1.206199379856665e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "EA",
+        "state": "neutral",
+        "epsilon": 5.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -4.993836723934758e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "EA",
+        "state": "neutral",
+        "epsilon": 20.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -6.606115963594465e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "EA",
+        "state": "neutral",
+        "epsilon": 200.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 5.7592958134165e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "FEC",
+        "state": "anion",
+        "epsilon": 5.0,
+        "value": -0.029,
+        "raw_value": -0.029,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -5.196014319400193e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "FEC",
+        "state": "anion",
+        "epsilon": 20.0,
+        "value": -0.024,
+        "raw_value": -0.024,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -7.284841996870517e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "FEC",
+        "state": "anion",
+        "epsilon": 200.0,
+        "value": -0.023,
+        "raw_value": -0.023,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 1.2484313387956186e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "FEC",
+        "state": "cation",
+        "epsilon": 5.0,
+        "value": -0.029,
+        "raw_value": -0.029,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -4.819668369668701e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "FEC",
+        "state": "cation",
+        "epsilon": 20.0,
+        "value": -0.03,
+        "raw_value": -0.03,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -1.3275619308697129e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "FEC",
+        "state": "cation",
+        "epsilon": 200.0,
+        "value": -0.03,
+        "raw_value": -0.03,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -4.861177978506036e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "FEC",
+        "state": "neutral",
+        "epsilon": 5.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 1.6359450995200147e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "FEC",
+        "state": "neutral",
+        "epsilon": 20.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 9.852422285373744e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "FEC",
+        "state": "neutral",
+        "epsilon": 200.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 1.2641869236673243e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "MA",
+        "state": "anion",
+        "epsilon": 5.0,
+        "value": 0.003,
+        "raw_value": 0.003,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -1.4394009067742693e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "MA",
+        "state": "anion",
+        "epsilon": 20.0,
+        "value": 0.007,
+        "raw_value": 0.007,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -9.985214054589916e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "MA",
+        "state": "anion",
+        "epsilon": 200.0,
+        "value": 0.008,
+        "raw_value": 0.008,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -1.0337881770155292e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "MA",
+        "state": "cation",
+        "epsilon": 5.0,
+        "value": 0.003,
+        "raw_value": 0.003,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 6.589944292689921e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "MA",
+        "state": "cation",
+        "epsilon": 20.0,
+        "value": 0.003,
+        "raw_value": 0.003,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 4.974678204965492e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "MA",
+        "state": "cation",
+        "epsilon": 200.0,
+        "value": 0.004,
+        "raw_value": 0.004,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 6.145120481397926e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "MA",
+        "state": "neutral",
+        "epsilon": 5.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -2.969585908118552e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "MA",
+        "state": "neutral",
+        "epsilon": 20.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 1.6370278512783295e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "MA",
+        "state": "neutral",
+        "epsilon": 200.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 3.808223548580109e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "TEGDME",
+        "state": "anion",
+        "epsilon": 5.0,
+        "value": -0.028,
+        "raw_value": -0.028,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -6.91169944555541e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "TEGDME",
+        "state": "anion",
+        "epsilon": 20.0,
+        "value": -0.016,
+        "raw_value": -0.016,
+        "predicted": false,
+        "truth": true,
+        "delta_ev": -0.12051870025697621,
+        "classification": "moread_lower"
+      },
+      {
+        "name": "TEGDME",
+        "state": "anion",
+        "epsilon": 200.0,
+        "value": -0.013,
+        "raw_value": -0.013,
+        "predicted": false,
+        "truth": true,
+        "delta_ev": -0.1425925522643189,
+        "classification": "moread_lower"
+      },
+      {
+        "name": "TEGDME",
+        "state": "cation",
+        "epsilon": 5.0,
+        "value": -0.069,
+        "raw_value": -0.069,
+        "predicted": true,
+        "truth": false,
+        "delta_ev": 2.8742326011284504e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "TEGDME",
+        "state": "cation",
+        "epsilon": 20.0,
+        "value": -0.055,
+        "raw_value": -0.055,
+        "predicted": true,
+        "truth": false,
+        "delta_ev": 7.040673741429411e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "TEGDME",
+        "state": "cation",
+        "epsilon": 200.0,
+        "value": -0.051,
+        "raw_value": -0.051,
+        "predicted": true,
+        "truth": false,
+        "delta_ev": -6.134753906706175e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "TEGDME",
+        "state": "neutral",
+        "epsilon": 5.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -3.0581797505603168e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "TEGDME",
+        "state": "neutral",
+        "epsilon": 20.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -2.9042433862924827e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "TEGDME",
+        "state": "neutral",
+        "epsilon": 200.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -2.935401888320329e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "VC",
+        "state": "anion",
+        "epsilon": 5.0,
+        "value": -0.015,
+        "raw_value": -0.015,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 2.284994453888886e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "VC",
+        "state": "anion",
+        "epsilon": 20.0,
+        "value": -0.015,
+        "raw_value": -0.015,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 8.932686538214411e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "VC",
+        "state": "anion",
+        "epsilon": 200.0,
+        "value": -0.015,
+        "raw_value": -0.015,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 1.0722645341413569e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "VC",
+        "state": "cation",
+        "epsilon": 5.0,
+        "value": 0.032,
+        "raw_value": 0.032,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -1.057687601897988e-05,
+        "classification": "coincident"
+      },
+      {
+        "name": "VC",
+        "state": "cation",
+        "epsilon": 20.0,
+        "value": 0.038,
+        "raw_value": 0.038,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -9.216523724503718e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "VC",
+        "state": "cation",
+        "epsilon": 200.0,
+        "value": 0.04,
+        "raw_value": 0.04,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": -9.442323869759128e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "VC",
+        "state": "neutral",
+        "epsilon": 5.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 3.2264455609553334e-07,
+        "classification": "coincident"
+      },
+      {
+        "name": "VC",
+        "state": "neutral",
+        "epsilon": 20.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 2.3587917201591666e-06,
+        "classification": "coincident"
+      },
+      {
+        "name": "VC",
+        "state": "neutral",
+        "epsilon": 200.0,
+        "value": 1.0,
+        "raw_value": null,
+        "predicted": false,
+        "truth": false,
+        "delta_ev": 3.2968491738574107e-06,
+        "classification": "coincident"
+      }
+    ],
+    "note": "the descriptor, the direction and the threshold all come from the discovery set; nothing here is fitted on the held-out arm"
+  },
+  "one_sided_screening": {
+    "question": "can a cell the default SCF did *not* warn about still be a missed solution?  (necessity, not separation)",
+    "alert_definition": "gap_warn_present == 1 (ORCA's pre-SCF small-gap warning)",
+    "coverage": {
+      "n_pairs": 414,
+      "n_pairs_with_gap_warning_field": 414,
+      "n_neutral_pairs": 138,
+      "note": "the warning is printed by the SCF itself, so unlike the spin-based identity features it is defined for every one of the 414 pairs -- including the closed-shell neutrals that print no spin block at all"
+    },
+    "necessity": {
+      "statement": "no warning => no missed solution, i.e. P(no warning | positive) = 0",
+      "overall": {
+        "n_positive": 37,
+        "n_positive_with_warning": 37,
+        "n_positive_without_warning": 0,
+        "p_positive_has_warning": 1.0,
+        "p_no_warning_given_positive": 0.0
+      },
+      "by_arm": {
+        "discovery": {
+          "n_positive": 32,
+          "n_positive_with_warning": 32,
+          "n_positive_without_warning": 0,
+          "p_positive_has_warning": 1.0,
+          "p_no_warning_given_positive": 0.0
+        },
+        "holdout": {
+          "n_positive": 5,
+          "n_positive_with_warning": 5,
+          "n_positive_without_warning": 0,
+          "p_positive_has_warning": 1.0,
+          "p_no_warning_given_positive": 0.0
+        },
+        "pooled": {
+          "n_positive": 37,
+          "n_positive_with_warning": 37,
+          "n_positive_without_warning": 0,
+          "p_positive_has_warning": 1.0,
+          "p_no_warning_given_positive": 0.0
+        }
+      }
+    },
+    "specificity": {
+      "statement": "the converse fails: 'warning => missed solution' is false, so the warning is necessary but not sufficient",
+      "overall": {
+        "n_negative": 377,
+        "n_negative_with_warning": 237,
+        "false_alarm_rate": 0.6286472148541115,
+        "specificity": 0.37135278514588854
+      },
+      "by_arm": {
+        "discovery": {
+          "n_negative": 328,
+          "n_negative_with_warning": 206,
+          "false_alarm_rate": 0.6280487804878049,
+          "specificity": 0.3719512195121951
+        },
+        "holdout": {
+          "n_negative": 49,
+          "n_negative_with_warning": 31,
+          "false_alarm_rate": 0.6326530612244898,
+          "specificity": 0.36734693877551017
+        },
+        "pooled": {
+          "n_negative": 377,
+          "n_negative_with_warning": 237,
+          "false_alarm_rate": 0.6286472148541115,
+          "specificity": 0.37135278514588854
+        }
+      }
+    },
+    "positive_gap_warn_value_range": {
+      "discovery": {
+        "n_positive_with_value": 32,
+        "min_eh": -0.047,
+        "max_eh": -0.03,
+        "all_negative": true
+      },
+      "holdout": {
+        "n_positive_with_value": 5,
+        "min_eh": -0.03,
+        "max_eh": -0.013,
+        "all_negative": true
+      },
+      "pooled": {
+        "n_positive_with_value": 37,
+        "min_eh": -0.047,
+        "max_eh": -0.013,
+        "all_negative": true
+      }
+    },
+    "by_state": {
+      "discovery": {
+        "anion": {
+          "n_rows": 120,
+          "n_positive": 16,
+          "n_warning": 119,
+          "n_positive_with_warning": 16,
+          "n_no_warning": 1,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.13445378151260504,
+          "p_positive_given_no_warning": 0.0
+        },
+        "cation": {
+          "n_rows": 120,
+          "n_positive": 16,
+          "n_warning": 119,
+          "n_positive_with_warning": 16,
+          "n_no_warning": 1,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.13445378151260504,
+          "p_positive_given_no_warning": 0.0
+        },
+        "neutral": {
+          "n_rows": 120,
+          "n_positive": 0,
+          "n_warning": 0,
+          "n_positive_with_warning": 0,
+          "n_no_warning": 120,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": null,
+          "p_positive_given_no_warning": 0.0
+        }
+      },
+      "holdout": {
+        "anion": {
+          "n_rows": 18,
+          "n_positive": 5,
+          "n_warning": 18,
+          "n_positive_with_warning": 5,
+          "n_no_warning": 0,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.2777777777777778,
+          "p_positive_given_no_warning": null
+        },
+        "cation": {
+          "n_rows": 18,
+          "n_positive": 0,
+          "n_warning": 18,
+          "n_positive_with_warning": 0,
+          "n_no_warning": 0,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.0,
+          "p_positive_given_no_warning": null
+        },
+        "neutral": {
+          "n_rows": 18,
+          "n_positive": 0,
+          "n_warning": 0,
+          "n_positive_with_warning": 0,
+          "n_no_warning": 18,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": null,
+          "p_positive_given_no_warning": 0.0
+        }
+      },
+      "pooled": {
+        "anion": {
+          "n_rows": 138,
+          "n_positive": 21,
+          "n_warning": 137,
+          "n_positive_with_warning": 21,
+          "n_no_warning": 1,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.15328467153284672,
+          "p_positive_given_no_warning": 0.0
+        },
+        "cation": {
+          "n_rows": 138,
+          "n_positive": 16,
+          "n_warning": 137,
+          "n_positive_with_warning": 16,
+          "n_no_warning": 1,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.11678832116788321,
+          "p_positive_given_no_warning": 0.0
+        },
+        "neutral": {
+          "n_rows": 138,
+          "n_positive": 0,
+          "n_warning": 0,
+          "n_positive_with_warning": 0,
+          "n_no_warning": 138,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": null,
+          "p_positive_given_no_warning": 0.0
+        }
+      }
+    },
+    "by_epsilon": {
+      "discovery": {
+        "5.0": {
+          "n_rows": 36,
+          "n_positive": 5,
+          "n_warning": 24,
+          "n_positive_with_warning": 5,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.20833333333333334,
+          "p_positive_given_no_warning": 0.0
+        },
+        "7.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 24,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.125,
+          "p_positive_given_no_warning": 0.0
+        },
+        "10.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 24,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.125,
+          "p_positive_given_no_warning": 0.0
+        },
+        "14.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 24,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.125,
+          "p_positive_given_no_warning": 0.0
+        },
+        "20.0": {
+          "n_rows": 36,
+          "n_positive": 4,
+          "n_warning": 24,
+          "n_positive_with_warning": 4,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.16666666666666666,
+          "p_positive_given_no_warning": 0.0
+        },
+        "28.0": {
+          "n_rows": 36,
+          "n_positive": 2,
+          "n_warning": 24,
+          "n_positive_with_warning": 2,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.08333333333333333,
+          "p_positive_given_no_warning": 0.0
+        },
+        "40.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 22,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 14,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.13636363636363635,
+          "p_positive_given_no_warning": 0.0
+        },
+        "80.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 24,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.125,
+          "p_positive_given_no_warning": 0.0
+        },
+        "200.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 24,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.125,
+          "p_positive_given_no_warning": 0.0
+        },
+        "1000.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 24,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.125,
+          "p_positive_given_no_warning": 0.0
+        }
+      },
+      "holdout": {
+        "5.0": {
+          "n_rows": 18,
+          "n_positive": 1,
+          "n_warning": 12,
+          "n_positive_with_warning": 1,
+          "n_no_warning": 6,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.08333333333333333,
+          "p_positive_given_no_warning": 0.0
+        },
+        "20.0": {
+          "n_rows": 18,
+          "n_positive": 2,
+          "n_warning": 12,
+          "n_positive_with_warning": 2,
+          "n_no_warning": 6,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.16666666666666666,
+          "p_positive_given_no_warning": 0.0
+        },
+        "200.0": {
+          "n_rows": 18,
+          "n_positive": 2,
+          "n_warning": 12,
+          "n_positive_with_warning": 2,
+          "n_no_warning": 6,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.16666666666666666,
+          "p_positive_given_no_warning": 0.0
+        }
+      },
+      "pooled": {
+        "5.0": {
+          "n_rows": 54,
+          "n_positive": 6,
+          "n_warning": 36,
+          "n_positive_with_warning": 6,
+          "n_no_warning": 18,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.16666666666666666,
+          "p_positive_given_no_warning": 0.0
+        },
+        "7.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 24,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.125,
+          "p_positive_given_no_warning": 0.0
+        },
+        "10.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 24,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.125,
+          "p_positive_given_no_warning": 0.0
+        },
+        "14.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 24,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.125,
+          "p_positive_given_no_warning": 0.0
+        },
+        "20.0": {
+          "n_rows": 54,
+          "n_positive": 6,
+          "n_warning": 36,
+          "n_positive_with_warning": 6,
+          "n_no_warning": 18,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.16666666666666666,
+          "p_positive_given_no_warning": 0.0
+        },
+        "28.0": {
+          "n_rows": 36,
+          "n_positive": 2,
+          "n_warning": 24,
+          "n_positive_with_warning": 2,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.08333333333333333,
+          "p_positive_given_no_warning": 0.0
+        },
+        "40.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 22,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 14,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.13636363636363635,
+          "p_positive_given_no_warning": 0.0
+        },
+        "80.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 24,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.125,
+          "p_positive_given_no_warning": 0.0
+        },
+        "200.0": {
+          "n_rows": 54,
+          "n_positive": 5,
+          "n_warning": 36,
+          "n_positive_with_warning": 5,
+          "n_no_warning": 18,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.1388888888888889,
+          "p_positive_given_no_warning": 0.0
+        },
+        "1000.0": {
+          "n_rows": 36,
+          "n_positive": 3,
+          "n_warning": 24,
+          "n_positive_with_warning": 3,
+          "n_no_warning": 12,
+          "n_positive_without_warning": 0,
+          "p_positive_given_warning": 0.125,
+          "p_positive_given_no_warning": 0.0
+        }
+      }
+    },
+    "tradeoff": [
+      {
+        "id": "any_warning",
+        "rule": "predict moread_lower iff gap_warn_present == 1",
+        "by_arm": {
+          "discovery": {
+            "n_rows": 360,
+            "n_positive": 32,
+            "confusion_matrix": {
+              "true_positive": 32,
+              "false_positive": 206,
+              "true_negative": 122,
+              "false_negative": 0
+            },
+            "sensitivity": 1.0,
+            "specificity": 0.3719512195121951,
+            "precision": 0.13445378151260504,
+            "accuracy": 0.42777777777777776,
+            "balanced_accuracy": 0.6859756097560976,
+            "majority_accuracy": 0.9111111111111111
+          },
+          "holdout": {
+            "n_rows": 54,
+            "n_positive": 5,
+            "confusion_matrix": {
+              "true_positive": 5,
+              "false_positive": 31,
+              "true_negative": 18,
+              "false_negative": 0
+            },
+            "sensitivity": 1.0,
+            "specificity": 0.3673469387755102,
+            "precision": 0.1388888888888889,
+            "accuracy": 0.42592592592592593,
+            "balanced_accuracy": 0.6836734693877551,
+            "majority_accuracy": 0.9074074074074074
+          },
+          "pooled": {
+            "n_rows": 414,
+            "n_positive": 37,
+            "confusion_matrix": {
+              "true_positive": 37,
+              "false_positive": 237,
+              "true_negative": 140,
+              "false_negative": 0
+            },
+            "sensitivity": 1.0,
+            "specificity": 0.3713527851458886,
+            "precision": 0.13503649635036497,
+            "accuracy": 0.427536231884058,
+            "balanced_accuracy": 0.6856763925729443,
+            "majority_accuracy": 0.9106280193236715
+          }
+        }
+      },
+      {
+        "id": "frozen_value_threshold",
+        "rule": "predict moread_lower iff gap_warn_value <= -0.0395 (the frozen rule, unchanged)",
+        "by_arm": {
+          "discovery": {
+            "n_rows": 360,
+            "n_positive": 32,
+            "confusion_matrix": {
+              "true_positive": 13,
+              "false_positive": 11,
+              "true_negative": 317,
+              "false_negative": 19
+            },
+            "sensitivity": 0.40625,
+            "specificity": 0.9664634146341463,
+            "precision": 0.5416666666666666,
+            "accuracy": 0.9166666666666666,
+            "balanced_accuracy": 0.6863567073170731,
+            "majority_accuracy": 0.9111111111111111
+          },
+          "holdout": {
+            "n_rows": 54,
+            "n_positive": 5,
+            "confusion_matrix": {
+              "true_positive": 0,
+              "false_positive": 6,
+              "true_negative": 43,
+              "false_negative": 5
+            },
+            "sensitivity": 0.0,
+            "specificity": 0.8775510204081632,
+            "precision": 0.0,
+            "accuracy": 0.7962962962962963,
+            "balanced_accuracy": 0.4387755102040816,
+            "majority_accuracy": 0.9074074074074074
+          },
+          "pooled": {
+            "n_rows": 414,
+            "n_positive": 37,
+            "confusion_matrix": {
+              "true_positive": 13,
+              "false_positive": 17,
+              "true_negative": 360,
+              "false_negative": 24
+            },
+            "sensitivity": 0.35135135135135137,
+            "specificity": 0.9549071618037135,
+            "precision": 0.43333333333333335,
+            "accuracy": 0.9009661835748792,
+            "balanced_accuracy": 0.6531292565775324,
+            "majority_accuracy": 0.9106280193236715
+          }
+        }
+      }
+    ],
+    "gap_warn_count_observation": {
+      "distribution": {
+        "pooled": {
+          "0": 140,
+          "1": 273,
+          "2": 1
+        },
+        "positive": {
+          "1": 37
+        },
+        "negative": {
+          "0": 140,
+          "1": 236,
+          "2": 1
+        }
+      },
+      "note": "gap_warn_count > 0 is identical to gap_warn_present == 1 for all 414 pairs, and every positive has count 1, so the count adds no separation; it is reported, not used"
+    },
+    "limitations": [
+      "the necessity claim rests on 37 positives (32 discovery + 5 holdout); a different functional, basis set or solvent model must re-check it",
+      "'no warning => coincident' is an empirical statement about these 18 molecules under r2SCAN-3c/C-PCM, not a theorem",
+      "necessary is not sufficient: 237/377 negatives also carry the warning, so this gates the safe set rather than picking the misses",
+      "the held-out positives are all anions; a cation miss that produced no warning would not be caught by this corpus",
+      "the 3-10 epsilons of one (molecule, state) are not independent rows, so the counts overstate the effective sample size"
+    ]
+  },
+  "by_state_post_hoc": {
+    "neutral": {
+      "post_hoc": true,
+      "n_rows": 120,
+      "n_positive": 0,
+      "majority_accuracy": 1.0,
+      "poisoned_by_trivial_negatives": true,
+      "frozen_feature": "gap_warn_value",
+      "auc": 0.5,
+      "abs_auc_above_half": 0.0,
+      "sign": "smaller_is_riskier",
+      "positive_ranks_of_frozen_feature": [],
+      "significance": {
+        "method": "degenerate",
+        "p_value": 1.0,
+        "n_rows": 120,
+        "n_positive": 0,
+        "note": "one class is absent; no assignment can be extreme",
+        "monte_carlo_cross_check": {
+          "method": "monte_carlo",
+          "p_value": 1.0,
+          "samples": 1,
+          "seed": 20261001
+        }
+      },
+      "threshold_frozen_from_pooled": -0.0395,
+      "best_feature_in_state_post_hoc": "scf_n_cycles",
+      "best_abs_auc_above_half_in_state_post_hoc": 0.0,
+      "state_screen_top5": [
+        {
+          "descriptor": "scf_n_cycles",
+          "auc": 0.5,
+          "abs_auc_above_half": 0.0,
+          "threshold_frozen": 9.5,
+          "loo_accuracy": 0.4166666666666667,
+          "beats_majority_loo": false
+        },
+        {
+          "descriptor": "scf_de2",
+          "auc": 0.5,
+          "abs_auc_above_half": 0.0,
+          "threshold_frozen": -0.04165,
+          "loo_accuracy": 0.9583333333333334,
+          "beats_majority_loo": false
+        },
+        {
+          "descriptor": "scf_max_abs_de",
+          "auc": 0.5,
+          "abs_auc_above_half": 0.0,
+          "threshold_frozen": 0.1575,
+          "loo_accuracy": 0.9583333333333334,
+          "beats_majority_loo": false
+        },
+        {
+          "descriptor": "scf_last3_abs_de_sum",
+          "auc": 0.5,
+          "abs_auc_above_half": 0.0,
+          "threshold_frozen": 0.0005692799999999999,
+          "loo_accuracy": 0.9916666666666667,
+          "beats_majority_loo": false
+        },
+        {
+          "descriptor": "scf_last_abs_de",
+          "auc": 0.5,
+          "abs_auc_above_half": 0.0,
+          "threshold_frozen": 7.785e-07,
+          "loo_accuracy": 0.9833333333333333,
+          "beats_majority_loo": false
+        }
+      ]
+    },
+    "cation": {
+      "post_hoc": true,
+      "n_rows": 120,
+      "n_positive": 16,
+      "majority_accuracy": 0.8666666666666667,
+      "poisoned_by_trivial_negatives": false,
+      "frozen_feature": "gap_warn_value",
+      "auc": 0.13191105769230768,
+      "abs_auc_above_half": 0.3680889423076923,
+      "sign": "smaller_is_riskier",
+      "positive_ranks_of_frozen_feature": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        14,
+        26,
+        29,
+        30,
+        31,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40
+      ],
+      "significance": {
+        "method": "exact_mann_whitney_dp",
+        "tie_aware": true,
+        "statistic": "|AUC - 0.5|",
+        "auc_observed": 0.13191105769230768,
+        "p_value": 2.52720823627748e-07,
+        "p_value_smoothed_upper": 2.527208236278124e-07,
+        "lower_tail_count": 3922739980472,
+        "total_assignments": 31044058215401404845,
+        "n_rows": 120,
+        "n_positive": 16,
+        "dp_states": 8134,
+        "dp_operations": 630289,
+        "note": "exact null of the tie-aware Mann-Whitney statistic; U is a monotone function of the AUC, and the two tails of its null distribution are equal by symmetry",
+        "monte_carlo_cross_check": {
+          "method": "monte_carlo",
+          "p_value": 4.999750012499375e-05,
+          "samples": 20000,
+          "seed": 20261001
+        }
+      },
+      "threshold_frozen_from_pooled": -0.0395,
+      "loo_accuracy": 0.8833333333333333,
+      "loo_balanced_accuracy": 0.5889423076923077,
+      "beats_majority_loo": true,
+      "best_feature_in_state_post_hoc": "loewdin_spin_n90",
+      "best_abs_auc_above_half_in_state_post_hoc": 0.43870192307692313,
+      "state_screen_top5": [
+        {
+          "descriptor": "loewdin_spin_n90",
+          "auc": 0.9387019230769231,
+          "abs_auc_above_half": 0.43870192307692313,
+          "threshold_frozen": 8.5,
+          "loo_accuracy": 0.95,
+          "beats_majority_loo": true
+        },
+        {
+          "descriptor": "spin_n90",
+          "auc": 0.8996394230769231,
+          "abs_auc_above_half": 0.39963942307692313,
+          "threshold_frozen": 8.5,
+          "loo_accuracy": 0.95,
+          "beats_majority_loo": true
+        },
+        {
+          "descriptor": "gap_warn_value",
+          "auc": 0.13191105769230768,
+          "abs_auc_above_half": 0.3680889423076923,
+          "threshold_frozen": -0.0395,
+          "loo_accuracy": 0.8833333333333333,
+          "beats_majority_loo": true
+        },
+        {
+          "descriptor": "spin_pr",
+          "auc": 0.8515625,
+          "abs_auc_above_half": 0.3515625,
+          "threshold_frozen": 6.6300712641493575,
+          "loo_accuracy": 0.9166666666666666,
+          "beats_majority_loo": true
+        },
+        {
+          "descriptor": "spin_max",
+          "auc": 0.14963942307692307,
+          "abs_auc_above_half": 0.3503605769230769,
+          "threshold_frozen": 0.2527545,
+          "loo_accuracy": 0.95,
+          "beats_majority_loo": true
+        }
+      ]
+    },
+    "anion": {
+      "post_hoc": true,
+      "n_rows": 120,
+      "n_positive": 16,
+      "majority_accuracy": 0.8666666666666667,
+      "poisoned_by_trivial_negatives": false,
+      "frozen_feature": "gap_warn_value",
+      "auc": 0.14152644230769232,
+      "abs_auc_above_half": 0.3584735576923077,
+      "sign": "smaller_is_riskier",
+      "positive_ranks_of_frozen_feature": [
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        31,
+        35,
+        37,
+        38,
+        39,
+        40
+      ],
+      "significance": {
+        "method": "exact_mann_whitney_dp",
+        "tie_aware": true,
+        "statistic": "|AUC - 0.5|",
+        "auc_observed": 0.14152644230769232,
+        "p_value": 6.399646073935541e-07,
+        "p_value_smoothed_upper": 6.399646073936186e-07,
+        "lower_tail_count": 9933549263861,
+        "total_assignments": 31044058215401404845,
+        "n_rows": 120,
+        "n_positive": 16,
+        "dp_states": 9105,
+        "dp_operations": 726251,
+        "note": "exact null of the tie-aware Mann-Whitney statistic; U is a monotone function of the AUC, and the two tails of its null distribution are equal by symmetry",
+        "monte_carlo_cross_check": {
+          "method": "monte_carlo",
+          "p_value": 4.999750012499375e-05,
+          "samples": 20000,
+          "seed": 20261001
+        }
+      },
+      "threshold_frozen_from_pooled": -0.0395,
+      "loo_accuracy": 0.775,
+      "loo_balanced_accuracy": 0.44711538461538464,
+      "beats_majority_loo": false,
+      "best_feature_in_state_post_hoc": "scf_final_diiserr",
+      "best_abs_auc_above_half_in_state_post_hoc": 0.4110576923076923,
+      "state_screen_top5": [
+        {
+          "descriptor": "scf_final_diiserr",
+          "auc": 0.0889423076923077,
+          "abs_auc_above_half": 0.4110576923076923,
+          "threshold_frozen": 0.0036049999999999997,
+          "loo_accuracy": 0.925,
+          "beats_majority_loo": true
+        },
+        {
+          "descriptor": "gap_warn_value",
+          "auc": 0.14152644230769232,
+          "abs_auc_above_half": 0.3584735576923077,
+          "threshold_frozen": -0.0385,
+          "loo_accuracy": 0.775,
+          "beats_majority_loo": false
+        },
+        {
+          "descriptor": "orbital_abs",
+          "auc": 0.8191105769230769,
+          "abs_auc_above_half": 0.31911057692307687,
+          "threshold_frozen": 1.1063395,
+          "loo_accuracy": 0.8916666666666667,
+          "beats_majority_loo": true
+        },
+        {
+          "descriptor": "scf_n_cycles",
+          "auc": 0.7328725961538461,
+          "abs_auc_above_half": 0.23287259615384615,
+          "threshold_frozen": 29.5,
+          "loo_accuracy": 0.85,
+          "beats_majority_loo": false
+        },
+        {
+          "descriptor": "spin_max",
+          "auc": 0.7223557692307693,
+          "abs_auc_above_half": 0.22235576923076927,
+          "threshold_frozen": 1.4778235,
+          "loo_accuracy": 0.8833333333333333,
+          "beats_majority_loo": true
+        }
+      ]
+    },
+    "open_shell_pooled": {
+      "post_hoc": true,
+      "n_rows": 240,
+      "n_positive": 32,
+      "majority_accuracy": 0.8666666666666667,
+      "poisoned_by_trivial_negatives": false,
+      "frozen_feature": "gap_warn_value",
+      "auc": 0.13251201923076922,
+      "abs_auc_above_half": 0.3674879807692308,
+      "sign": "smaller_is_riskier",
+      "positive_ranks_of_frozen_feature": [
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        22,
+        23,
+        24,
+        32,
+        33,
+        34,
+        54,
+        59,
+        61,
+        64,
+        65,
+        66,
+        68,
+        69,
+        70,
+        71,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80
+      ],
+      "significance": {
+        "method": "exact_mann_whitney_dp",
+        "tie_aware": true,
+        "statistic": "|AUC - 0.5|",
+        "auc_observed": 0.13251201923076922,
+        "p_value": 2.2973014801216347e-13,
+        "p_value_smoothed_upper": 2.2973014801216347e-13,
+        "lower_tail_count": 736491809115546903147927897,
+        "total_assignments": 6411799369724447257020014861362229109165,
+        "n_rows": 240,
+        "n_positive": 32,
+        "dp_states": 70010,
+        "dp_operations": 11583915,
+        "note": "exact null of the tie-aware Mann-Whitney statistic; U is a monotone function of the AUC, and the two tails of its null distribution are equal by symmetry",
+        "monte_carlo_cross_check": {
+          "method": "monte_carlo",
+          "p_value": 4.999750012499375e-05,
+          "samples": 20000,
+          "seed": 20261001
+        }
+      },
+      "threshold_frozen_from_pooled": -0.0395,
+      "loo_accuracy": 0.875,
+      "loo_balanced_accuracy": 0.6766826923076923,
+      "beats_majority_loo": true,
+      "best_feature_in_state_post_hoc": "gap_warn_value",
+      "best_abs_auc_above_half_in_state_post_hoc": 0.3674879807692308,
+      "state_screen_top5": [
+        {
+          "descriptor": "gap_warn_value",
+          "auc": 0.13251201923076922,
+          "abs_auc_above_half": 0.3674879807692308,
+          "threshold_frozen": -0.0395,
+          "loo_accuracy": 0.875,
+          "beats_majority_loo": true
+        },
+        {
+          "descriptor": "scf_last_abs_de",
+          "auc": 0.7224308894230769,
+          "abs_auc_above_half": 0.22243088942307687,
+          "threshold_frozen": 0.0002044945,
+          "loo_accuracy": 0.8625,
+          "beats_majority_loo": false
+        },
+        {
+          "descriptor": "spin_n90",
+          "auc": 0.7076322115384616,
+          "abs_auc_above_half": 0.20763221153846156,
+          "threshold_frozen": 8.5,
+          "loo_accuracy": 0.9083333333333333,
+          "beats_majority_loo": true
+        },
+        {
+          "descriptor": "loewdin_spin_n90",
+          "auc": 0.6989182692307693,
+          "abs_auc_above_half": 0.19891826923076927,
+          "threshold_frozen": 8.5,
+          "loo_accuracy": 0.9083333333333333,
+          "beats_majority_loo": true
+        },
+        {
+          "descriptor": "loewdin_spin_pr",
+          "auc": 0.6536959134615384,
+          "abs_auc_above_half": 0.15369591346153844,
+          "threshold_frozen": 7.290672808545057,
+          "loo_accuracy": 0.8583333333333333,
+          "beats_majority_loo": false
+        }
+      ],
+      "note": "post-hoc: the set Stage 16 actually used, i.e. neutrals dropped; reported next to the pooled view because a closed-shell neutral cannot carry the label and therefore drags any pooled baseline up to ~0.91"
+    }
+  },
+  "multivariate_ceiling": {
+    "loo_auc": 0.8358422256097561,
+    "n_features": 3,
+    "features": [
+      "gap_warn_value",
+      "spin_n90",
+      "loewdin_spin_n90"
+    ],
+    "holdout_accuracy": 0.8333333333333334,
+    "holdout_auc": 0.7020408163265306
+  },
+  "extraction_gaps": [
+    "`scf_final_diiserr`：2/414 行缺失（the run never used a DIIS block (straight to SOSCF)）",
+    "`gap_warn_value`：140/414 行缺失（ORCA only warns for a small gap; absence means a large, healthy gap. Filled with +1.0 Eh）",
+    "`s2`：138/414 行缺失（closed-shell neutral prints no Mulliken spin block）",
+    "`spin_max`：138/414 行缺失（closed-shell neutral prints no Mulliken spin block）",
+    "`spin_pr`：138/414 行缺失（closed-shell neutral prints no Mulliken spin block）",
+    "`spin_n90`：138/414 行缺失（closed-shell neutral prints no Mulliken spin block）",
+    "`loewdin_spin_max`：138/414 行缺失（closed-shell neutral prints no Loewdin spin block）",
+    "`loewdin_spin_pr`：138/414 行缺失（closed-shell neutral prints no Loewdin spin block）",
+    "`loewdin_spin_n90`：138/414 行缺失（closed-shell neutral prints no Loewdin spin block）",
+    "Löwdin 原子自旋的**约化轨道**子块：Stage 17 只解析 MULLIKEN REDUCED ORBITAL，没有 LOEWDIN REDUCED ORBITAL 解析器，因此没有 `loewdin_orbital_abs`。",
+    "beta (SPIN DOWN) 轨道的 HOMO/LUMO：只解析了 alpha 块，UKS 的 beta 本征值未提取。",
+    "`scf_final_diiserr` 对少数直接进入 SOSCF 的格子为空（无 DIIS 块），按 0 填充。"
+  ],
+  "extraction_gaps_md": [
+    "有缺失的特征列（行数）：scf_final_diiserr 2/414；gap_warn_value 140/414；s2 138/414；spin_max 138/414；spin_pr 138/414；spin_n90 138/414；loewdin_spin_max 138/414；loewdin_spin_pr 138/414；loewdin_spin_n90 138/414。",
+    "缺失原因：闭壳中性分子不打印自旋块（s2 / spin_* / loewdin_spin_* 各缺 138/414）；gap_warn_value 缺 140/414＝ORCA 未报警（gap 大），按 +1.0 Eh 填充；scf_final_diiserr 缺 2/414＝该 run 无 DIIS 块。",
+    "Löwdin 原子自旋的约化轨道子块未解析（Stage 17 只有 MULLIKEN REDUCED ORBITAL 解析器）→ 没有 loewdin_orbital_abs。",
+    "只解析 alpha 块 → 没有 beta (SPIN DOWN) 的 HOMO/LUMO。",
+    "自旋中心/轨道通道是字符串（如 C0、N2 s），无序，只进 CSV，不参与 AUC 筛选。"
+  ],
+  "limits": [
+    "标签只对开壳层（cation/anion）有定义；120 个中性格天然是负例，把池化多数类基线抬到 0.911，所以池化准确率本身信息量很低。",
+    "留出臂只有 5 个正例，留出 accuracy 的分辨率是 1/54 ≈ 0.019，任何 1-2 个格子的差别都可能是噪声。",
+    "精确零分布用的是 tie-aware Mann-Whitney U；它假设行之间可交换，忽略分子内的格子间相关（同一分子的 9-10 个 epsilon 并不独立）。",
+    "特征来自已算完的默认臂 `.out`，因此这是一次**事后诊断**，不是事前预报；它的价值在于省掉第二次计算，而不是省掉第一次。",
+    "发现集与留出臂的分子不同（12 vs 6），但都在同一套 r2SCAN-3c/C-PCM 协议下，方法学外推没有验证。",
+    "筛选表里的留出列只作事后展示：确有其它零成本特征（例如 orbital_abs）在留出臂上同时胜过基线，但它们是在看到留出臂之后才被挑出来的，不构成证据；冻结规则只能看发现集。",
+    "单边筛查那一节只证明『警告是漏解的必要条件』，不构成事前预报：ORCA 的 gap 警告在 run 开始前就打了，它标的是体系难度而不是收敛到的解；把它反读成『必然漏解』是误用（负例假阳性率见 JSON 的 one_sided_screening.specificity）。"
+  ]
+}

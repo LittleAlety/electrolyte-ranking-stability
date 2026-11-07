@@ -1,0 +1,470 @@
+# FILE: acs.jctc.6c00575.pdf
+# PAGES: 10
+
+===== PAGE 1 =====
+Systematic Molecularity-Dependent Entropy Errors in Continuum/
+RRHO Solution Thermochemistry: Origin and Correction
+Aida Rebollar-Zepeda, Mirzam Carreon-Gonzalez, Leonardo Mun ̃oz-Rugeles,
+and Juan Rau ́l Alvarez-Idaboy*
+Cite This: J. Chem. Theory Comput. 2026, 22, 6367−6376
+ Read Online
+ACCESS
+Metrics & More
+ Article Recommendations
+ABSTRACT: Continuum solvation models often reproduce
+standard solvation free energies accurately, but this does not
+ensure that solution-phase reaction free energies are thermody-
+namically consistent. In common workflows, continuum solvation
+terms are combined with gas-phase RRHO thermochemical
+corrections. For molecularity-changing processes such as associa-
+tion, clustering, and transition-state formation, the ideal-gas
+translational and rotational entropy terms do not cancel and can
+impose an artificial penalty against associated species. Here, we
+analyze this effect by decomposing solution-phase association free
+energies into electronic, differential solvation, and RRHO
+contributions. Carbon tetrachloride self-association in liquid CCl
+4
+provides a simple diagnostic case: the electronic association is
+favorable, and the differential continuum solvation term is small, yet the final 1 M association free energy remains positive and
+essentially gas-phase-like. Water and chloroform clusters further show how this molecularity-dependent RRHO penalty accumulates
+with increasing association. Confinement-based corrections, including Martin−Pratt density scaling and Benson’s free-volume
+formulation, reduce this artificial destabilization without modifying electronic energies or continuum solvation terms. The main
+limitation identified here is therefore not the absolute continuum solvation free energy of isolated species but the use of gas-phase
+RRHO thermochemical corrections to construct reaction free energies in solution. This distinction provides a physical basis for
+applying condensed-phase translational entropy corrections in association and activation thermochemistry.
+■
+INTRODUCTION
+Understanding solvation free energies is essential for
+describing molecular stability, reactivity, and recognition in
+condensed phases. Continuum-solvent models�including the
+Solvation Model based on Density (SMD)
+1
+and COSMO
+2
+approaches�have achieved notable success in reproducing
+experimental ΔG°
+solv
+values across broad classes of chemical
+systems. Yet, a thermodynamic inconsistency can arise when
+continuum solvation free energies are combined with ideal-gas
+RRHO thermochemical corrections to construct solution-
+phase reaction free energies. Although the electronic
+component of solvation implicitly includes both enthalpic
+and entropic contributions from the solvent environment, the
+molecular entropy is evaluated using the ideal-gas rigid-rotor
+harmonic-oscillator (RRHO) approximation. In models such
+as SMD, the solvation term is a parametrized standard transfer
+free energy composed of continuum electrostatic polarization
+and empirical short-range contributions, rather than a quantity
+derived explicitly from molecular translational, rotational, and
+vibrational partition functions. By contrast, practical reaction
+free energies in solution are commonly assembled by
+combining such continuum solvation free energies with gas-
+phase RRHO thermochemical corrections.
+3
+This issue is general and does not depend on the particular
+continuum model employed. It is closely related to the
+assumption, often implicit in continuum solvation thermo-
+chemistry, that molecular partition-function contributions
+largely cancel between the gas-phase and solution-phase legs
+of a thermodynamic cycle.
+4,7,15
+Such cancellation may be
+reasonable for some intramolecular vibrational contributions,
+but it is much less secure for translational and rotational
+motions.
+4,7,15
+Whether the solvation contribution is obtained
+from SMD, PCM, COSMO, or related approaches, the usual
+computational workflow is essentially the same: an electronic
+energy is combined with a continuum solvation free energy,
+Received: March 23, 2026
+Revised: June 19, 2026
+Accepted: June 22, 2026
+Published: June 30, 2026
+Articlepubs.acs.org/JCTC
+© 2026 The Authors. Published by
+American Chemical Society
+6367
+https://doi.org/10.1021/acs.jctc.6c00575
+J. Chem. Theory Comput. 2026, 22, 6367−6376
+This article is licensed under CC-BY 4.0
+Downloaded from pubs.​acs.​org/​jctcce/​article-pdf/​22/​13/​6367/​65304483/​acs.​jctc.​6c00575.​pdf by WUHAN UNIV user on 29 September 2026
+
+
+===== PAGE 2 =====
+and gas-phase RRHO thermochemical corrections are then
+added to obtain a molecular Gibbs free energy. The continuum
+model may differ in how it evaluates the solvation contribution,
+but the translational and rotational entropy terms are still taken
+from the ideal-gas partition functions used in the frequency
+calculation. Therefore, changing from one continuum model to
+another does not solve the problem. The inconsistency arises
+from importing ideal-gas thermochemical corrections into
+solution-phase reaction free energies, especially when the
+number of independently moving species changes.
+In solution, molecules do not possess the translational
+freedom assumed in the gas phase. As a result, the RRHO
+treatment systematically overestimates translational entropy,
+leading to exaggerated −TΔS° penalties whenever the number
+of independently translating species decreases (Δn ≠ 0; the
+confinement contribution is intrinsically positive per species,
+and its effect on ΔG depends on the sign of Δn). This
+mismatch between gas-phase statistical thermodynamics and
+condensed-phase molecular confinement has been explicitly
+identified as a major source of systematic error in continuum-
+solvent free-energy calculations and remains an active subject
+of methodological refinement in computational chemistry.
+4,7,15
+The key issue, however, is not merely the existence of
+translational-entropy errors, which have been previously
+recognized, but their magnitude, universality, and systematic
+propagation across all association processes. In particular, we
+show that the relevant error becomes apparent in molecularity-
+changing processes, where ideal-gas translational and rotational
+entropy terms are combined with continuum solvation free
+energies. As will be demonstrated below, the critical
+contribution is not generated by the continuum solvation
+free energy itself but by the thermochemical workflow used to
+combine continuum transfer terms with gas-phase partition-
+function corrections.
+This conceptual conflict becomes relevant in association
+processes such as A + B → TS, addition reactions, and cluster
+formation although the same thermodynamic principle applies
+symmetrically to dissociation processes. The problem is not
+diagnosed primarily from isolated solvation free energies but
+from reaction free energies in which the number of
+independently moving species changes. In an A + B → C
+association or an A + B → TS activation process, the gas-phase
+RRHO treatment assigns ideal-gas translational and rotational
+freedom to two independently moving reactants and to one
+associated product or transition-state structure. Upon sub-
+traction, this mismatch appears as an exaggerated −TΔS°
+penalty against association. In a liquid, much of translational
+entropy has already been lost upon solvation; therefore, the
+entropy change associated with forming an encounter complex
+or a transition state is modest. When ideal-gas entropies are
+used instead, ΔS° becomes excessively negative and −TΔS°
+becomes disproportionately large. The immediate consequence
+is a systematic and artificial destabilization of any associated
+species�dimers, clusters, and transition states�relative to
+separated monomers. This phenomenon has been explicitly
+documented in continuum solvation studies.
+4
+Benchmark
+studies of association thermodynamics in solution have
+shown that entropy-related modeling artifacts can shift
+computed binding free energies by several kilocalories per
+mole, thereby influencing the mechanistic interpretation of
+noncovalent assembly.
+5,6
+This conceptual conflict is not restricted to weakly bound
+clusters. It is equally relevant to encounter-complex formation,
+transition-state formation, and covalent addition reactions,
+including Diels−Alder-type processes. In such cases, the
+product or transition state is an ordinary chemical species,
+and there is no a priori reason to expect its absolute continuum
+solvation error to become several kilocalories per mole larger
+than the corresponding errors for the separated reactants.
+When a large error appears in the computed ΔG of reaction or
+activation, it should not be attributed automatically to a
+catastrophic failure of the electronic solvation energy of the
+associated product or transition state. Rather, the relevant
+diagnostic is the consistency of the complete continuum/
+RRHO thermochemical cycle used to construct ΔG in
+solution.
+Previous studies have quantified this effect with increasing
+clarity. Ardura, Lo ́pez, and Sordo demonstrated that
+continuum-based activation free energies for bimolecular
+reactions are strongly affected by the treatment of the loss of
+translational degrees of freedom in solution.
+7
+Benson’s free-
+volume formulation offers a physically motivated correction by
+introducing a cell-like model for molecular confinement in
+condensed media.
+4
+Related theoretical advances by Pratt and
+LaViolette established quasi-chemical frameworks that account
+for the restricted motional freedom within liquids,
+8
+while
+Martin, Hay, and Pratt showed that the use of real molecular
+number densities introduces a finite-volume contribution
+absent from the conventional ideal-gas reference,
+9
+comparable
+to the one recovered by the Benson approach.
+4
+These
+approaches differ in formalism, but they converge on a
+common physical point: molecular association in liquids
+cannot be represented simply as the loss of ideal-gas
+translational freedom. Modern statistical-mechanical analyses
+of solvation thermodynamics likewise emphasize that finite-
+volume confinement constitutes an intrinsic contribution to
+solvation behavior, as formalized in rigorous thermodynamic
+treatments of solvent reorganizational energy and entropy.
+A fundamental conceptual advance was provided by Garza’s
+εα formulation,
+10
+which bypasses ideal-gas entropy by
+obtaining solvation entropy directly from the temperature
+derivative of ΔG°
+solv
+.
+10
+Because εα incorporates dielectric
+response, thermal expansion, and cavity volume changes, it
+offers a fully thermodynamic way to estimate solvation
+entropies and enthalpies within a continuum framework. In
+this sense, εα does not correct the entropy obtained from
+ideal-gas expressions but replaces it entirely with a thermody-
+namic quantity derived under condensed-phase conditions. Its
+relevance here is that it illustrates how solution-phase entropy
+can be formulated without importing ideal-gas molecular
+partition functions into condensed-phase thermochemistry. A
+continuum solvation free energy may reproduce an exper-
+imental transfer free energy at a given temperature without
+providing a unique or explicit decomposition into translational,
+rotational, vibrational, and solvent-reorganization entropy
+components. This distinction is directly relevant to reaction
+thermochemistry, where such components re-enter through
+RRHO corrections when molecular free energies are
+assembled. This temperature-derivative perspective aligns
+with broader efforts to obtain condensed-phase entropies
+from thermodynamic response functions rather than from gas-
+phase partition functions, thereby avoiding conceptual
+inconsistencies inherent to RRHO treatments in liquids.
+10
+Related multiscale implicit-solvation approaches have also
+sought to predict not only solvation free energies but also
+solvation entropies and heat capacities by combining
+Journal of Chemical Theory and Computation pubs.acs.org/JCTC Article
+https://doi.org/10.1021/acs.jctc.6c00575
+J. Chem. Theory Comput. 2026, 22, 6367−6376
+6368
+Downloaded from pubs.​acs.​org/​jctcce/​article-pdf/​22/​13/​6367/​65304483/​acs.​jctc.​6c00575.​pdf by WUHAN UNIV user on 29 September 2026
+
+
+===== PAGE 9 =====
+phase RRHO thermochemical corrections can systematically
+overestimate the free energy penalty for association. This
+behavior arises from the inappropriate application of ideal-gas
+translational entropy expressions to a condensed-phase
+environment, where the surrounding solvent intrinsically
+constrains molecular association. Without correction, this
+artifact can convert an electronically favorable association
+into an apparently unfavorable solution-phase process, thereby
+obscuring the underlying chemistry of association and
+activation in condensed media.
+The CCl
+4
+self-association diagnostic illustrates the origin of
+the problem particularly clearly: the electronic association
+energy is favorable, and the differential continuum solvation
+term is small, yet the final 1 M association free energy remains
+positive and nearly indistinguishable from the gas-phase value.
+This behavior shows that the dominant penalty does not arise
+from the continuum solvation term itself but from the
+molecularity-dependent RRHO contribution introduced
+when two independently moving reactants are converted into
+one associated species.
+Among the approaches examined, Benson’s translational
+entropy correction provides a robust and physically transparent
+improvement, effectively compensating for the missing
+confinement contribution. Although this approach lacks
+explicit size dependence, it yields consistent and quantitatively
+reasonable trends and remains attractive for its simplicity and
+broad applicability. In contrast, the Martin−Pratt, or real-
+number-density, treatment introduces a macroscopic finite-
+volume correction by replacing the conventional 1 M reference
+with the molecular concentration of the liquid. This correction
+captures an important part of the confinement effect, whereas
+Benson’s free-volume treatment provides a more microscopic
+estimate of the translational volume available in the condensed
+phase.
+Despite their different theoretical formulations, all correc-
+tions considered here reflect a common physical principle:
+molecular association in solution occurs within a finite effective
+volume that is not captured by ideal-gas standard-state
+thermodynamics. In this context, effective concentration and
+free volume approaches can be viewed as complementary
+approximations to the same underlying confinement effect.
+Finally, it is important to recognize that none of the entropy
+corrections discussed here constitutes an explicit treatment of
+solvent structure or dynamics. Rather, they provide effective
+remedies for the thermodynamic inconsistency introduced
+when continuum solvation free energies are combined with
+gas-phase RRHO corrections in molecularly-changing reac-
+tions.
+It is also worth noting that this interpretation is not
+universally accepted, and alternative views have been advanced
+within the continuum-solvation community, including treat-
+ments in which entropy-related effects are assumed to be partly
+embedded in parametrized continuum free energies or
+addressed through mixed explicit/continuum solvation mod-
+els.
+1,3,4,25,26
+Nevertheless, the present analysis highlights the
+critical role of translational entropy corrections in the reliable
+interpretation of solution-phase free energies and provides a
+coherent framework for understanding and comparing
+alternative approaches. We hope that recognizing the
+molecularity-dependent nature of these entropy errors will
+encourage the development of more realistic thermochemical
+treatments for association and activation processes in solution.
+■
+ASSOCIATED CONTENT
+Data Availability Statement
+No data are associated with this article.
+■
+AUTHOR INFORMATION
+Corresponding Author
+Juan Rau ́l Alvarez-Idaboy − Departamento de Física y
+Química Teórica, Facultad de Química, Universidad
+Nacional Autónoma de México, México City 04510, Mexico;
+orcid.org/0000-0002-2901-5412; Email: jidaboy@
+unam.mx
+Authors
+Aida Rebollar-Zepeda − Departamento de Física y Química
+Teórica, Facultad de Química, Universidad Nacional
+Autónoma de México, México City 04510, Mexico
+Mirzam Carreon-Gonzalez − Departamento de Física y
+Química Teórica, Facultad de Química, Universidad
+Nacional Autónoma de México, México City 04510, Mexico;
+orcid.org/0000-0002-3526-1468
+Leonardo Mun ̃oz-Rugeles − Laboratorio de Espectroscopía
+Atómica y Molecular (LEAM), Universidad Industrial de
+Santander, Bucaramanga 680002, Colombia
+Complete contact information is available at:
+https://pubs.acs.org/10.1021/acs.jctc.6c00575
+Notes
+The authors declare no competing financial interest.
+■
+ACKNOWLEDGMENTS
+The authors acknowledge the support of the Faculty of
+Chemistry and DGAPA via Grant PAPIIT IN223018, as well
+as DGTIC, at the National Autonomous University of Mexico,
+through Grant No. LANCAD UNAM-DGTIC-192. A.M.R.-Z.
+acknowledges support from DGAPA’s “Programa de Becas
+Posdoctorales” at UNAM.
+■
+REFERENCES
+(1) Marenich, A. V.; Cramer, C. J.; Truhlar, D. G. Universal
+Solvation Model Based on Solute Electron Density and on a
+Continuum Model of the Solvent Defined by the Bulk Dielectric
+Constant and Atomic Surface Tensions. J. Phys. Chem. B 2009, 113
+(18), 6378−6396.
+(2) Klamt, A.; Schu ̈u ̈rmann, G. COSMO: A New Approach to
+Dielectric Screening in Solvents with Explicit Expressions for the
+Screening Energy and Its Gradient. J. Chem. Soc., Perkin Trans. 2
+1993, 799−805.
+(3) Cramer, C. J.; Truhlar, D. G. Implicit Solvation Models:
+Equilibria, Structure, Spectra, and Dynamics. Chem. Rev. 1999, 99 (8),
+2161−2200.
+(4) Benson, S. W. The Foundations of Chemical Kinetics Krieger.
+1982.
+(5) Grimme, S. Supramolecular Binding Thermodynamics by
+Dispersion-Corrected DFT. Chem. - Eur. J. 2012, 18, 9955−9964.
+(6) Ben-Amotz, D.; Raineri, F. O.; Stell, G. Solvation thermody-
+namics: theory and applications. J. Phys. Chem. B 2005, 109, 6866−
+6878.
+(7) Ardura, D.; López, R.; Sordo, T. L. Relative Gibbs Energies in
+Solution through Continuum Models: Effect of the Loss of
+Translational Degrees of Freedom in Bimolecular Reactions on
+Gibbs Energy Barriers. J. Phys. Chem. B 2005, 109 (49), 23618−
+23623.
+(8) Pratt, L. R.; LaViolette, R. A. Quasi-Chemical Theories of
+Associated Liquids. Mol. Phys. 1998, 94 (6), 909−915.
+Journal of Chemical Theory and Computation pubs.acs.org/JCTC Article
+https://doi.org/10.1021/acs.jctc.6c00575
+J. Chem. Theory Comput. 2026, 22, 6367−6376
+6375
+Downloaded from pubs.​acs.​org/​jctcce/​article-pdf/​22/​13/​6367/​65304483/​acs.​jctc.​6c00575.​pdf by WUHAN UNIV user on 29 September 2026
+
+
+===== PAGE 10 =====
+(9) Martin, R. L.; Hay, P. J.; Pratt, L. R. Hydrolysis of Ferric Ion in
+Water and Conformational Equilibrium. J. Phys. Chem. A 1998, 102
+(20), 3565−3573.
+(10) Garza, A. J. Solvation Entropy Made Simple. J. Chem. Theory
+Comput. 2019, 15 (5), 3204−3214.
+(11) Rahimi, A. M.; Jamali, S.; Bardhan, J. P.; Lustig, S. R. Solvation
+Thermodynamics of Solutes in Water and Ionic Liquids Using the
+Multiscale Solvation-Layer Interface Condition Continuum Model. J.
+Chem. Theory Comput. 2022, 18 (9), 5539−5558.
+(12) Chandler, D. Interfaces and the Driving Force of Hydrophobic
+Assembly. Nature 2005, 437, 640−647.
+(13) Laage, D.; Hynes, J. T. A Molecular Jump Mechanism of Water
+Reorientation. Science 2006, 311, 832−835.
+(14) Velez-Vega, C.; McKay, D. J. J.; Kurtzman, T.; Aravamuthan,
+V.; Pearlstein, R. A.; Duca, J. S. Estimation of Solvation Entropy and
+Enthalpy via Analysis of Water Oxygen−Hydrogen Correlations. J.
+Chem. Theory Comput. 2015, 11, 5090−5102.
+(15) Izato, Y.-i.; Koshi, M. Calculating Liquid-Phase Entropy Using
+a Real Gas Model within the QM/PCM Framework. Phys. Chem.
+Chem. Phys. 2026, 28, 6952−6962.
+(16) Galano, A.; Alvarez-Idaboy, J. R. A Computational Method-
+ology for Accurate Predictions of Rate Constants in Solution:
+Application to the Assessment of Primary Antioxidant Activity. J.
+Comput. Chem. 2013, 34 (28), 2430−2445.
+(17) Zhao, Y.; Truhlar, D. G. The M06 suite of density functionals
+for main group thermochemistry, thermochemical kinetics, non-
+covalent interactions, excited states, and transition elements: two new
+functionals and systematic testing of four M06-class functionals and
+12 other functionals. Theor. Chem. Acc. 2008, 120, 215−241.
+(18) Krishnan, R.; Binkley, J. S.; Seeger, R.; Pople, J. A. Self-
+Consistent Molecular Orbital Methods. XX. A Basis Set for
+Correlated Wave Functions. J. Chem. Phys. 1980, 72, 650−654.
+(19) Frisch, M. J.; Pople, J. A.; Binkley, J. S. Self-Consistent
+Molecular Orbital Methods. 25. Supplementary Functions for
+Gaussian Basis Sets. J. Chem. Phys. 1984, 80, 3265−3269.
+(20) Spitznagel, G. W.; Schleyer, P.; von, R.; Hehre, W. J. An
+Evaluation of the Performance of Diffuse Function-Augmented Basis
+Sets for Second Row Elements, Na-Cl. J. Comput. Chem. 1987, 8,
+1109−1116.
+(21) Frisch, M. J.; Trucks, G. W.; Schlegel, H. B.; Scuseria, G. E.;
+Robb, M. A.; Cheeseman, J. R.; Scalmani, G.; Barone, V.; Petersson,
+G. A.; Nakatsuji, H.; Li, X.; Caricato, M.; Marenich, A. V.; Bloino, J.;
+Janesko, B. G.; Gomperts, R.; Mennucci, B.; Hratchian, H. P.; Ortiz, J.
+V.; Izmaylov, A. F.; Sonnenberg, J. L.; Williams-Young, D.; Ding, F.;
+Lipparini, F.; Egidi, F.; Goings, J.; Peng, B.; Petrone, A.; Henderson,
+T.; Ranasinghe, D.; Zakrzewski, V. G.; Gao, J.; Rega, N.; Zheng, G.;
+Liang, W.; Hada, M.; Ehara, M.; Toyota, K.; Fukuda, R.; Hasegawa, J.;
+Ishida, M.; Nakajima, T.; Honda, Y.; Kitao, O.; Nakai, H.; Vreven, T.;
+Throssell, K.; Montgomery, J. A., Jr.; Peralta, J. E.; Ogliaro, F.;
+Bearpark, M. J.; Heyd, J. J.; Brothers, E. N.; Kudin, K. N.; Staroverov,
+V. N.; Keith, T. A.; Kobayashi, R.; Normand, J.; Raghavachari, K.;
+Rendell, A. P.; Burant, J. C.; Iyengar, S. S.; Tomasi, J.; Cossi, M.;
+Millam, J. M.; Klene, M.; Adamo, C.; Cammi, R.; Ochterski, J. W.;
+Martin, R. L.; Morokuma, K.; Farkas, O.; Foresman, J. B.; Fox, D. J.
+Gaussian 16, Revision 01,C.; Gaussian, Inc.: Wallingford CT, 2016.
+(22) Shields, R. M.; Temelso, B.; Archer, K. A.; Morrell, T. E.;
+Shields, G. C. Accurate Predictions of Water Cluster Formation,
+(H2O)
+n=2−10
+. J. Phys. Chem. A 2010, 114 (43), 11725−11737.
+(23) Temelso, B.; Archer, K. A.; Shields, G. C. Benchmark
+Structures and Binding Energies of Small Water Clusters with
+Anharmonicity Corrections. J. Phys. Chem. A 2011, 115, 12034−
+12046.
+(24) Pliego, J. R.; Riveros, J. M. The Cluster−Continuum Model for
+the Calculation of the Solvation Free Energy of Ionic Species. J. Phys.
+Chem. A 2001, 105, 7241−7247.
+(25) Kelly, C. P.; Cramer, C. J.; Truhlar, D. G. Adding Explicit
+Solvent Molecules to Continuum Solvent Calculations for the
+Calculation of Aqueous Acid Dissociation Constants. J. Phys. Chem.
+A 2006, 110, 2493−2499.
+(26) da Silva, E. F.; Svendsen, H. F.; Merz, K. M. Explicitly
+Representing the Solvation Shell in Continuum Solvent Calculations.
+J. Phys. Chem. A 2009, 113, 6404−6409.
+Journal of Chemical Theory and Computation pubs.acs.org/JCTC Article
+https://doi.org/10.1021/acs.jctc.6c00575
+J. Chem. Theory Comput. 2026, 22, 6367−6376
+6376
+Downloaded from pubs.​acs.​org/​jctcce/​article-pdf/​22/​13/​6367/​65304483/​acs.​jctc.​6c00575.​pdf by WUHAN UNIV user on 29 September 2026
+
+
+===== PDFMETADATA =====
+{'/Creator': 'Arbortext Publishing Engine', '/ModDate': "D:20260929162606+00'00'", '/fpage': '6367', '/CreationDate': "D:20260702173444-04'00'", '/PrintEngine': 'Arbortext Advanced Print Publisher 11.2.5208/W Library-x64', '/Title': 'ct6c00575 1..10', '/EPSprocessor': 'PStill version 1.84.42', '/prism:doi': '10.1021/acs.jctc.6c00575', '/lpage': '6376', '/Producer': 'PDFlib+PDI 9.1.2p4 (C++/Win64); modified using iTextSharp.LGPLv2.Core 3.7.4.0', '/prism:versionIdentifier': 'Issue', '/JCALibraryBuild': '5.2.i3', '/jav:journal_article_version': 'VoR', '/ACS OpenAccess Version': 'v3.2', '/ACS OpenAccess Stamp': '07/14/2026 07:30:26 (CCBY4_0)'}
