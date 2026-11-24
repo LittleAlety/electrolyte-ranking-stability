@@ -61,19 +61,33 @@ WORK_GATED = pytest.mark.skipif(
 
 
 @WORK_GATED
-def test_p4v2_activation_rows_are_exactly_the_two_authorized_starts():
+def test_p4v2_activation_rows_are_exactly_the_authorized_starts():
     m = _load("build_production_ensemble_manifest")
     rows = m.p4v2_candidate_rows()
     assert [(r["name"], r["slot"]) for r in rows] == [
-        ("DOL", "LiM_2plus"), ("EC", "LiM_2plus")]
+        ("DOL", "LiM_2plus"), ("EC", "LiM_2plus"), ("EC", "LiM_2plus"),
+        ("EC", "LiM_2plus")]
+    assert [r["seed"] for r in rows] == [
+        "p4_02_ring_pucker_twist", "p4_02_ring_pucker_twist", "ec_v2_p4", "ec_v2_p7"]
     for r in rows:
         assert r["source_kind"] == "p4v2_screening_v1_start"
         assert r["member_role"] == "recovery_v1_start"
-        assert r["seed"] == "p4_02_ring_pucker_twist"
         gp = REPO / r["geometry"]
         assert gp.is_file(), "activated start geometry missing: %s" % r["geometry"]
         assert hashlib.sha256(gp.read_bytes()).hexdigest() == r["sha256"], \
             "geometry hash drifted from the activation registry"
+
+
+def test_activation_task_path_cannot_escape_package(tmp_path):
+    m = _load("build_production_ensemble_manifest")
+    registry = tmp_path / "activation.json"
+    registry.write_text(json.dumps({"activated": [{
+        "state_key": "EC|LiM_2plus", "leaf": "ec_v2_p4",
+        "package": str(tmp_path / "package"), "task_relpath": "../outside",
+    }]}), encoding="utf-8")
+    m.P4V2_ACTIVATION = registry
+    with pytest.raises(ValueError, match="escapes its package"):
+        m.p4v2_candidate_rows()
 
 
 @WORK_GATED

@@ -719,11 +719,11 @@ def _strict_gate_snapshot() -> str:
     """逐项严格闸门，从产物**机械推导**；任何异常都返回"无法判定"，绝不默认通过。"""
     try:
         spec = importlib.util.spec_from_file_location(
-            "readme_strict_wiring", REPO / "scripts/wp_production/strict_readiness_wiring.py")
+            "readme_strict_wiring", REPO / "scripts/production/validation/strict_readiness_wiring.py")
         wiring = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(wiring)
         spec2 = importlib.util.spec_from_file_location(
-            "readme_strict_readiness", REPO / "scripts/wp_production/strict_readiness.py")
+            "readme_strict_readiness", REPO / "scripts/production/validation/strict_readiness.py")
         strict = importlib.util.module_from_spec(spec2)
         spec2.loader.exec_module(strict)
         checks = wiring.derive_checks()
@@ -811,7 +811,7 @@ def current_progress_block() -> "list[str]":
         f"| 现有合规总体项 | **{overall}**（不是完整 v3 严格目标证书） | "
         "[合规台账](outputs/physics_completion/compliance/plan_compliance.md) |",
         f"| **逐项严格总闸门** | {strict_gate} | "
-        "[strict_readiness_wiring](scripts/wp_production/strict_readiness_wiring.py) |", "",
+        "[strict_readiness_wiring](scripts/production/validation/strict_readiness_wiring.py) |", "",
         f"未 accepted：{remaining}。", "",
         "**四态现状（逐态一行，勿读成\"只差四态\"）**：`DMC/M_plus`、`DMC/LiM_2plus` = `unresolved_qc`"
         "（`draft_torsion_probe`：各有 **7 个从未被合法探过的登记二面角**，去重后为 2 个 / 1 个重骨架操作"
@@ -829,8 +829,8 @@ def current_progress_block() -> "list[str]":
         "**五分钟自证**（任一条都可独立复核）：", "",
         "```bash",
         ".venv/Scripts/python.exe -B docs/handoffs/four_state_recovery_20261023/preflight.py   # 0=契约一致（不等于可提交）",
-        "pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1                          # 79 步 + OFFLINE CLOSURE GREEN",
-        "pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1 -Commit                  # 仅当全部一致才提交",
+        "pwsh -NoProfile -File scripts/production/release/finalize_wp2.ps1                          # 79 步 + OFFLINE CLOSURE GREEN",
+        "pwsh -NoProfile -File scripts/production/release/finalize_wp2.ps1 -Commit                  # 仅当全部一致才提交",
         "```", "",
         "工程检查通过不等于科学完成；完整身份、正式 WP5 与触发后的 WP6 仍须单独核验。", "",
         "**先读**：[项目导航 / 下一步 / 核心代码](docs/PROJECT_GUIDE.md) · "
@@ -921,7 +921,7 @@ def build_readme() -> str:
         "```powershell",
         "python scripts/build_github_readme.py --check",
         "python -m pytest tests/test_repo_layout.py tests/test_terminal_site.py -q",
-        "pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1",
+        "pwsh -NoProfile -File scripts/production/release/finalize_wp2.ps1",
         "git diff --check",
         "```", "",
         "`finalize_wp2.ps1` 是当前生产链的一致性检查入口；不带 `-Commit` 不会提交计算。"

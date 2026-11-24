@@ -18,6 +18,8 @@ Two measured hazards motivate these tests:
 
 Failures here must be REFUSALS that get recorded, never silent skips.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import importlib.util
 import json
 import sys
@@ -26,7 +28,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-SCRIPT = REPO / "scripts" / "wp_production" / "import_ensemble_structures.py"
+SCRIPT = prod_script("import_ensemble_structures.py")
 
 
 @pytest.fixture(scope="module")
@@ -173,14 +175,29 @@ def test_followup_builders_declare_the_role(imp):
 
 
 def test_ledger_roles_are_consistent_per_member(imp):
-    """Why the ledger is a valid declaration source: one role per member."""
+    """Why the ledger is a valid declaration source: one role per member.
+
+    2026-11-02: the importer also writes BOOKKEEPING rows for candidates rejected at
+    identity (`source_kind=rejected_identity`, `status=failed`,
+    `qc_flags=member_identity_unknown`) with an EMPTY member_role -- they never became
+    members, so they carry no role.  Exempting exactly those rows (and pinning that the
+    exempt set is exactly the rejected ones) keeps the invariant honest for members
+    instead of weakening it for everyone.
+    """
     path = (REPO / "outputs" / "physics_completion" / "ensembles"
             / "production_ensemble_structures.csv")
     if not path.is_file():
         pytest.skip("no structure ledger in this checkout")
     import csv
     by_member = {}
+    rejected = []
     for row in csv.DictReader(path.open(encoding="utf-8")):
+        if row.get("source_kind") == "rejected_identity":
+            rejected.append(row["member_key"])
+            assert row["member_role"] == "", \
+                "a rejected_identity row must not claim a member role: %s" % row["member_key"]
+            assert row["status"] == "failed", row["member_key"]
+            continue
         by_member.setdefault(row["member_key"], set()).add(row["member_role"])
     conflicting = {k: v for k, v in by_member.items() if len(v) > 1}
     assert not conflicting, conflicting

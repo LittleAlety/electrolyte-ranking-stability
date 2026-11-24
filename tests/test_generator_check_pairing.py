@@ -18,6 +18,8 @@ This file supplies the missing assertion for the last two: ``emit_wp2`` must be
 covered by a refreeze check.  The idempotence test restores the original file if
 the invariant is violated, so a failure cannot corrupt the tree.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import hashlib
 import re
 import shutil
@@ -30,8 +32,8 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 PY = REPO / ".venv" / "Scripts" / "python.exe"
 GEN = REPO / "scripts" / "build_physics_completion_batch.py"
-EMIT = REPO / "scripts" / "wp_production" / "emit_wp2.py"
-CHAIN = REPO / "scripts" / "wp_production" / "finalize_wp2.ps1"
+EMIT = prod_script("emit_wp2.py")
+CHAIN = prod_script("finalize_wp2.ps1")
 
 
 def _sha(path: Path) -> str:

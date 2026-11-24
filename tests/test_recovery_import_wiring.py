@@ -12,6 +12,8 @@ production leg vanish without any error:
 And the role semantics: a recovery member is ``recovery_v1_start`` -- it counts
 for BOTH acceptance and the ceiling, unlike ``round2_audit_extra``.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import importlib.util
 import sys
 from pathlib import Path
@@ -32,9 +34,9 @@ if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
 # ---------------------------------------------------------------------------
 
 REPO = Path(__file__).resolve().parents[1]
-IMP = REPO / "scripts" / "wp_production" / "import_ensemble_structures.py"
-AGG = REPO / "scripts" / "wp_production" / "build_production_ensemble_aggregator.py"
-DIFF = REPO / "scripts" / "wp_production" / "build_sampling_3to6_diff.py"
+IMP = prod_script("import_ensemble_structures.py")
+AGG = prod_script("build_production_ensemble_aggregator.py")
+DIFF = prod_script("build_sampling_3to6_diff.py")
 
 
 def _load(name, path):

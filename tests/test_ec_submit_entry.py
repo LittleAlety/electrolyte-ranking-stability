@@ -269,9 +269,12 @@ def test_refusal_leaves_no_journal_and_no_campaign_entry(tmp_path):
 
 
 def test_hold_package_is_refused_at_the_entry(tmp_path):
+    # 2026-10-29: the GENERIC submission_gate now runs before the EC contract, so a
+    # HOLD package is refused by the generic gate with a stricter message.  Assert
+    # the refusal (not the wording) so this test does not pin the wrong layer.
     pkg = make_package(tmp_path, gate="HOLD")
     runner = FakeRunner()
-    expect_refused(pkg, tmp_path, runner, "is HOLD")
+    expect_refused(pkg, tmp_path, runner, "not authorized|is HOLD")
 
 
 def test_wrong_profile_cannot_bypass_the_ec_contract(tmp_path):

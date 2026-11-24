@@ -5,11 +5,13 @@ the highest attempt made a batch that had already produced eight completed
 failures read as "12 pending, nothing has run" -- which would have hidden the
 very evidence the plan requires us to preserve.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-GEN = REPO / "scripts" / "wp_production" / "build_strict_recovery_report.py"
+GEN = prod_script("build_strict_recovery_report.py")
 REPORT = REPO / "outputs" / "physics_completion" / "recovery" / "strict_recovery_v1_report.md"
 STRUCTS = (REPO / "outputs" / "physics_completion" / "ensembles"
            / "production_ensemble_structures.csv")

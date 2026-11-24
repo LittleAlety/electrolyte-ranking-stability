@@ -1,66 +1,24 @@
-"""Explicit provenance-hash contract: text artifacts are LF-normalised.
+"""HISTORICAL_ENTRY — 兼容入口；实现已迁移到 ``scripts/production/validation/provenance_hash.py``。
 
-**The measured defect (2026-10-22).** ``sha256_file`` hashed RAW BYTES.  Of the
-726 text artifacts under the frontier/torsion work trees, **34 carried CRLF**
-and 692 carried LF -- so the same logical geometry hashed two different ways
-depending on which generator wrote it, and any re-checkout (git stores LF per
-``.gitattributes: * text=auto eol=lf``) silently invalidated the recorded
-provenance.  The repair had to patch hashes by hand.
+本文件由 ``scripts/production/build_script_index.py --emit-shims`` 生成，**请勿手工编辑**。
+它存在的唯一理由：历史产物把 ``scripts/wp_production/provenance_hash.py`` 记为生成者，文档与测试也用它作为定位键；
+删掉它会让那些已登记的路径悬空（= 破坏可追溯性）。退休条件见 ``scripts/wp_production/README.md``。
 
-**The contract, stated once and enforced here:**
-
-* a TEXT artifact (known text suffix) is hashed over its bytes with every
-  ````\\r\\n```` collapsed to ````\\n```` -- the form git stores, so the digest is
-  identical before/after checkout and across platforms;
-* a BINARY artifact (or an unknown suffix) is hashed over its raw bytes --
-  never normalised, because a byte change there is a real content change;
-* every generator that records provenance uses :func:`sha256_artifact`, and the
-  registries stay comparable because the normalisation is a no-op for the 692
-  already-LF files.
-
-Callers never pass ``normalise=`` themselves: the dispatch is by artifact kind,
-so a future call site cannot quietly pick the wrong side of the contract.
+实现方式：在**本模块自己的命名空间里** exec 目标源码（而不是复制符号），这样
+``monkeypatch.setattr(<本模块>, ...)`` 对目标函数真正生效——222 个测试依赖这一点。
+``__file__`` 指向真实实现，目标文件自己的 ``Path(__file__)`` 定位因此正确。
 """
 from __future__ import annotations
 
-import hashlib
+import sys
 from pathlib import Path
 
-#: suffixes treated as TEXT (normalised).  Everything else is raw bytes.
-TEXT_SUFFIXES = frozenset({
-    ".xyz", ".inp", ".log", ".input", ".out", ".txt", ".csv", ".tsv",
-    ".json", ".md", ".py", ".ps1", ".sh", ".sbatch", ".html", ".css",
-    ".js", ".yaml", ".yml", ".toml", ".cfg", ".ini", ".smi", ".mol",
-})
+TARGET = Path(__file__).resolve().parents[1] / "production" / "validation" / "provenance_hash.py"
+if not TARGET.is_file():
+    raise SystemExit("HISTORICAL_ENTRY 目标缺失：%s" % TARGET)
 
-#: the contract, quoted verbatim into every registry index that uses it
-CONTRACT = (
-    "text artifacts: sha256 over CRLF->LF normalised bytes "
-    "(git-stable, platform-stable); binary/unknown suffixes: sha256 over raw "
-    "bytes; dispatch by suffix via sha256_artifact -- never by caller choice"
-)
-
-
-def sha256_raw(path: Path) -> str:
-    """Digest of the file's raw bytes (binary caliber)."""
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def sha256_text(path: Path) -> str:
-    """Digest of the file's LF-normalised bytes (text caliber)."""
-    data = Path(path).read_bytes().replace(b"\r\n", b"\n")
-    return hashlib.sha256(data).hexdigest()
-
-
-def is_text(path: Path) -> bool:
-    return Path(path).suffix.lower() in TEXT_SUFFIXES
-
-
-def sha256_artifact(path: Path) -> str:
-    """The contract: normalise text, keep binary raw."""
-    p = Path(path)
-    return sha256_text(p) if is_text(p) else sha256_raw(p)
+__file__ = str(TARGET)
+sys.path.insert(0, str(TARGET.parent))
+with open(TARGET, encoding="utf-8") as _legacy_fh:
+    _legacy_code = compile(_legacy_fh.read(), str(TARGET), "exec")
+exec(_legacy_code, globals())

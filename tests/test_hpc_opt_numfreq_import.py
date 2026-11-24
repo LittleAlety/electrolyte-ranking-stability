@@ -668,6 +668,51 @@ MAX step            0.0001500000            0.0002000000      YES
         mod.enforce_geometry_convergence(table.replace("0.0000200000", "0.0000400000"), inp)
 
 
+def test_final_geometry_convergence_rejects_incomplete_trailing_table():
+    """A complete earlier iteration cannot stand in for an incomplete final one."""
+    inp = "! wB97X-D4 def2-TZVPD Opt NumFreq SMD(acetonitrile) VeryTightOpt TightSCF SlowConv\n"
+    complete = """
+----------------------|Geometry convergence|-------------------------
+Item                value                   Tolerance       Converged
+Energy change       0.0000001000            0.0000002000      YES
+RMS gradient        0.0000070000            0.0000080000      YES
+MAX gradient        0.0000200000            0.0000300000      YES
+RMS step            0.0000800000            0.0001000000      YES
+MAX step            0.0001500000            0.0002000000      YES
+"""
+    incomplete = complete.replace(
+        "MAX step            0.0001500000            0.0002000000      YES\n", ""
+    )
+    assert mod.final_geometry_convergence(complete)["max_step_Bohr"] == pytest.approx(0.00015)
+    with pytest.raises(ValueError, match="missing complete final geometry"):
+        mod.final_geometry_convergence(complete + incomplete)
+    with pytest.raises(ValueError, match="missing complete final geometry"):
+        mod.enforce_geometry_convergence(complete + incomplete, inp)
+    malformed_energy = complete.replace(
+        "Energy change       0.0000001000            0.0000002000      YES",
+        "Energy change       0.0000001000            0.0000002000"
+    )
+    with pytest.raises(ValueError, match="missing complete final geometry"):
+        mod.final_geometry_convergence(malformed_energy)
+
+
+def test_final_geometry_convergence_uses_absolute_energy_and_inclusive_limit():
+    inp = "! wB97X-D4 def2-TZVPD Opt NumFreq SMD(acetonitrile) VeryTightOpt TightSCF SlowConv\n"
+    table = """
+----------------------|Geometry convergence|-------------------------
+Energy change      -0.0000002000            0.0000002000      YES
+RMS gradient        0.0000080000            0.0000080000      YES
+MAX gradient        0.0000300000            0.0000300000      YES
+RMS step            0.0001000000            0.0001000000      YES
+MAX step            0.0002000000            0.0002000000      YES
+"""
+    result = mod.enforce_geometry_convergence(table, inp)
+    assert result["energy_change_Eh"] == pytest.approx(2e-7)
+    assert result["max_step_Bohr"] == pytest.approx(2e-4)
+    with pytest.raises(ValueError, match="final criterion not met"):
+        mod.enforce_geometry_convergence(table.replace("-0.0000002000", "-0.0000002001"), inp)
+
+
 def test_verytight_first_point_convergence_without_energy_row():
     """A leg already VeryTight-clean at its FIRST check never moves, so ORCA
     prints no "Energy change" row.  The four geometry criteria must still be

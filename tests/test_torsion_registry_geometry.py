@@ -17,6 +17,8 @@ After the fix, DOL resolves to ``c05``'s real production geometry and the count
 class from returning: no row may claim "no geometry" while a representative
 member's geometry is on disk.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 import importlib.util
 import sys
@@ -38,7 +40,7 @@ pytestmark = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 
 REPO = Path(__file__).resolve().parents[1]
-MOD = REPO / "scripts" / "wp_production" / "build_torsion_registry.py"
+MOD = prod_script("build_torsion_registry.py")
 REGISTRY = (REPO / "outputs" / "physics_completion" / "recovery"
             / "torsion_freedom_registry.csv")
 WEIGHTS = (REPO / "outputs" / "physics_completion" / "ensembles"

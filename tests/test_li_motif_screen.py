@@ -11,6 +11,8 @@
 """
 
 from __future__ import annotations
+from _prod_paths import PROD_DIR, prod_script
+
 
 import csv
 import hashlib
@@ -35,8 +37,8 @@ pytestmark = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = REPO_ROOT / "scripts" / "wp_production" / "screen_li_motifs.py"
-PLAN_SCRIPT = REPO_ROOT / "scripts" / "wp_production" / "build_li_motif_sampling_plan.py"
+SCRIPT = prod_script("screen_li_motifs.py")
+PLAN_SCRIPT = prod_script("build_li_motif_sampling_plan.py")
 PLAN = REPO_ROOT / "outputs" / "physics_completion" / "li_motif_sampling" / "motif_plan.csv"
 ACCEPTANCE = REPO_ROOT / "outputs" / "physics_completion" / "li_motif_sampling" / "acceptance.csv"
 RUN_RECORD = REPO_ROOT / "outputs" / "physics_completion" / "li_motif_sampling" / "li_motif_screen.json"

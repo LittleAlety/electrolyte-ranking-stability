@@ -9,6 +9,8 @@ These tests pin BOTH the interface (the fields exist and say the truth) and the
 behaviour (the acquisition genuinely ignores the model today), and they pin the
 open decision so it cannot be quietly "fixed" into different numbers.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 import importlib.util
 import json
@@ -18,7 +20,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-MOD = REPO / "scripts" / "wp_production" / "run_wp5_AB_replay.py"
+MOD = prod_script("run_wp5_AB_replay.py")
 BLIND = (REPO / "outputs" / "physics_completion" / "active_learning"
          / "blind_replay")
 

@@ -13,6 +13,8 @@ mechanism silently replace published results.  These tests pin:
 * random/diversity stay label-free in both versions;
 * the products and the index record which version produced them.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 import importlib.util
 import json
@@ -23,8 +25,8 @@ import numpy as np
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-REPLAY = REPO / "scripts" / "wp_production" / "run_wp5_AB_replay.py"
-MODELS = REPO / "scripts" / "wp_production" / "wp5_formal_models.py"
+REPLAY = prod_script("run_wp5_AB_replay.py")
+MODELS = prod_script("wp5_formal_models.py")
 BLIND = (REPO / "outputs" / "physics_completion" / "active_learning"
          / "blind_replay")
 
@@ -39,12 +41,12 @@ def _load(name, rel):
 
 @pytest.fixture(scope="module")
 def replay():
-    return _load("ab_replay", REPO / "scripts" / "wp_production" / "run_wp5_AB_replay.py")
+    return _load("ab_replay", prod_script("run_wp5_AB_replay.py"))
 
 
 @pytest.fixture(scope="module")
 def fmodels():
-    return _load("wp5_formal_models", REPO / "scripts" / "wp_production" / "wp5_formal_models.py")
+    return _load("wp5_formal_models", prod_script("wp5_formal_models.py"))
 
 
 # ---- version axis -----------------------------------------------------------
@@ -84,7 +86,7 @@ def test_no_external_callback_can_carry_the_truth(replay):
     truth vector through DEFAULT ARGUMENTS (which live in ``__defaults__``, not
     ``__closure__``), so a guard walking the closure could never fire.
     """
-    src = (REPO / "scripts" / "wp_production" / "run_wp5_AB_replay.py"
+    src = (prod_script("run_wp5_AB_replay.py")
            ).read_text(encoding="utf-8")
     assert "_score_fn" not in src, "an external scoring callback came back"
     assert "def _model_scores(self, query):" in src
@@ -94,7 +96,7 @@ def test_no_external_callback_can_carry_the_truth(replay):
 
 def test_acquirer_holds_exactly_the_visible_labels(replay):
     """The owned label container must not be wider than the visible set."""
-    src = (REPO / "scripts" / "wp_production" / "run_wp5_AB_replay.py"
+    src = (prod_script("run_wp5_AB_replay.py")
            ).read_text(encoding="utf-8")
     assert "len(self.y_vis) == len(self.visible)" in src
 

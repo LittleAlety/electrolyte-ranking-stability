@@ -14,6 +14,8 @@ reproductions of an already-kept minimum -- so its evidence lives in
 Anything else still fails: a resolved review with no evidence of either shape
 cannot pass, which keeps the anti-cheat property.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 from pathlib import Path
 
@@ -60,7 +62,7 @@ def test_resolved_reviews_carry_route_matching_kept_pool_evidence():
 # the route vocabulary itself must not drift silently
 # --------------------------------------------------------------------------- #
 
-COV_SCRIPT = REPO / "scripts" / "wp_production" / "build_coverage_reviews.py"
+COV_SCRIPT = prod_script("build_coverage_reviews.py")
 
 #: The exact set of route strings ``coverage_route()`` may return.
 #: ``pending`` is returned as a bare ``return "pending", "..."`` tuple, which is
@@ -71,6 +73,8 @@ FROZEN_ROUTES = (
     "multi_basin_coverage",
     "pending",
     "search_exhausted",
+    "single_basin_scope_review",
+    "strict_member_evidence_required",
     "single_basin_verified",
     "unresolved_qc",
 )

@@ -4,6 +4,20 @@
 
 历史 Week 1–44 已从根 README 的单一长日志拆为[按研究主题组织的进度索引](progress/README.md)。旧周报与 `outputs/week*` 均保留原位；新索引只负责导航，不改变证据或哈希。
 
+## 0. 阅读路径：五个跳点
+
+按下面五跳读，每一跳只承担一种职责；**哪一跳是生成物、哪一跳冻结不可改**都写在右边。
+
+| 跳 | 去哪里 | 你要找什么 | 这一跳的性质 |
+| --- | --- | --- | --- |
+| ① 项目入口 | 根 [`README.md`](../README.md) → 本文件 | 项目在问什么问题、当前快照与三个主入口 | `README.md` 是**生成物**（`scripts/build_github_readme.py`），数字不得手改 |
+| ② 当前生产流程 | [`scripts/production/README.md`](../scripts/production/README.md)（手写：导数政策 / 一键收口 / 队列纪律）→ [`SCRIPT_INDEX.md`](../scripts/production/SCRIPT_INDEX.md)（生成的逐脚本索引）→ [仓库骨架 §3/§3.1](65_repo_layout.md) | 六个分类目录各放什么、每个脚本的职责与输入→输出、收口链 79 步的顺序约束 | 实现按职责分 `jobs/ingest/validation/ensembles/analysis/release`；旧路径 `scripts/wp_production/` 只剩**兼容入口** |
+| ③ 权威证据 | [§1 下表](#1-从哪里看真实进度) → `outputs/physics_completion/**` | 每个结论对应的机器可读账本（CSV/JSON）与人读摘要（同目录 `.md`） | **数字的权威来源是账本**；同目录 Markdown 只是摘要。这些是生成物，改数要改生成器再重跑 |
+| ④ 历史归档 | [`docs/progress/README.md`](progress/README.md)（按研究主题）→ [骨架 §2](65_repo_layout.md)（周 ↔ WP 对照）→ [骨架 §2.2](65_repo_layout.md)（`docs/NN_*.md` 编号区间）→ `outputs/week1..week43/` | 某个结论是哪一轮得到的、当时的定义与失败记录 | `outputs/week*`、`docs/NN_*.md` **保留原位不可搬**：`outputs/week2|week3/SHA256SUMS` 与各 `manifest.json` 记录了脚本与产物路径 |
+| ⑤ 对外交付 | [`deliverables/part1/README.md`](../deliverables/part1/README.md)、[`deliverables/part2/README.md`](../deliverables/part2/README.md) | 已按「成果种类」分组的交付镜像、每份的 `SHA256SUMS_新结构.txt` 与路径映射表 | 镜像由 `scripts/production/release/build_physics_completion_deliverables.py` 从**仓库源路径**生成，不手工整理内部文件；仓库外同名目录是同一份 |
+
+**三条跨跳规则**：① 想要数字 → 去 ③ 的账本，不要抄任何 `.md`；② 想要"为什么这样判" → 去 ④ 的周报与交接件；③ 想知道"是哪份代码算出来的" → 去 ② 的脚本索引，再回 ③ 看该产物自带的 `generator` / 输入哈希。
+
 ## 1. 从哪里看真实进度
 
 | 问题 | 权威入口 | 读法 |
@@ -118,20 +132,20 @@ def validate_batches(all_task_ids, batches):
 
 | 职责 | 正式实现 |
 | --- | --- |
-| 输入/收敛/频率/哈希 QC 与 attempt 导入 | [import_ensemble_structures.py](../scripts/wp_production/import_ensemble_structures.py) |
-| 覆盖证据登记 | [build_coverage_reviews.py](../scripts/wp_production/build_coverage_reviews.py) |
-| 同态去重、log-sum-exp、验收三态 | [build_production_ensemble_aggregator.py](../scripts/wp_production/build_production_ensemble_aggregator.py)，尤其 `acceptance_decision` |
-| FMO 轨道人口及身份报告 | [frontier_fmopop.py](../scripts/wp_production/frontier_fmopop.py)、[build_frontier_localization.py](../scripts/wp_production/build_frontier_localization.py) |
-| 同自旋同轨道与同源身份证据 | [frontier_spin_qc.py](../scripts/wp_production/frontier_spin_qc.py)、[build_frontier_identity_evidence.py](../scripts/wp_production/build_frontier_identity_evidence.py)；存在模块不等于所有消费者已正确接线 |
-| 探针任务、片段预检与分批模板 | [build_torsion_probe_package.py](../scripts/wp_production/build_torsion_probe_package.py)：`render_batch_script`、`validate_batch_partition`、`rotate_fragment`、`equivalent_start`、`build_repair_package`；[包回归测试](../tests/test_build_torsion_probe_package.py) |
-| Top-3 集合平均损失 | [run_wp5_AB_replay.py](../scripts/wp_production/run_wp5_AB_replay.py)，`Evaluator.r3_mean` |
-| 相邻预算联合停止 | [wp5_replay_contract.py](../scripts/wp_production/wp5_replay_contract.py)，`empirical_stop_budget` + `_validate_stop_rows`（坏输入必 raise） |
-| 正式预测器与模型契约 | [wp5_formal_models.py](../scripts/wp_production/wp5_formal_models.py)：`ridge_std`/`krr_rbf`/`gpr_rbf`（`knn_baseline` 是**基线的独立名字**）；带宽 `1/FEATURE_DIM`，维度不符即拒绝 |
-| 来源哈希契约与清单重冻 | [provenance_hash.py](../scripts/wp_production/provenance_hash.py)（文本 LF 归一化、二进制原始、按后缀分派）、[refreeze_manifest.py](../scripts/wp_production/refreeze_manifest.py)（EOL 重标定 vs 真实内容变化分开、`--drop` 带理由） |
-| 按族成本账（唯一作业身份） | [build_ensemble_cost_by_family.py](../scripts/wp_production/build_ensemble_cost_by_family.py)：基础主态 vs 完整系综标签两个分母；missing 如实登记不估 |
-| 方案验收与新鲜度 | [build_plan_compliance.py](../scripts/wp_production/build_plan_compliance.py) |
+| 输入/收敛/频率/哈希 QC 与 attempt 导入 | [import_ensemble_structures.py](../scripts/production/ingest/import_ensemble_structures.py) |
+| 覆盖证据登记 | [build_coverage_reviews.py](../scripts/production/ensembles/build_coverage_reviews.py) |
+| 同态去重、log-sum-exp、验收三态 | [build_production_ensemble_aggregator.py](../scripts/production/ensembles/build_production_ensemble_aggregator.py)，尤其 `acceptance_decision` |
+| FMO 轨道人口及身份报告 | [frontier_fmopop.py](../scripts/production/validation/frontier_fmopop.py)、[build_frontier_localization.py](../scripts/production/validation/build_frontier_localization.py) |
+| 同自旋同轨道与同源身份证据 | [frontier_spin_qc.py](../scripts/production/validation/frontier_spin_qc.py)、[build_frontier_identity_evidence.py](../scripts/production/validation/build_frontier_identity_evidence.py)；存在模块不等于所有消费者已正确接线 |
+| 探针任务、片段预检与分批模板 | [build_torsion_probe_package.py](../scripts/production/ensembles/build_torsion_probe_package.py)：`render_batch_script`、`validate_batch_partition`、`rotate_fragment`、`equivalent_start`、`build_repair_package`；[包回归测试](../tests/test_build_torsion_probe_package.py) |
+| Top-3 集合平均损失 | [run_wp5_AB_replay.py](../scripts/production/analysis/run_wp5_AB_replay.py)，`Evaluator.r3_mean` |
+| 相邻预算联合停止 | [wp5_replay_contract.py](../scripts/production/analysis/wp5_replay_contract.py)，`empirical_stop_budget` + `_validate_stop_rows`（坏输入必 raise） |
+| 正式预测器与模型契约 | [wp5_formal_models.py](../scripts/production/analysis/wp5_formal_models.py)：`ridge_std`/`krr_rbf`/`gpr_rbf`（`knn_baseline` 是**基线的独立名字**）；带宽 `1/FEATURE_DIM`，维度不符即拒绝 |
+| 来源哈希契约与清单重冻 | [provenance_hash.py](../scripts/production/validation/provenance_hash.py)（文本 LF 归一化、二进制原始、按后缀分派）、[refreeze_manifest.py](../scripts/production/release/refreeze_manifest.py)（EOL 重标定 vs 真实内容变化分开、`--drop` 带理由） |
+| 按族成本账（唯一作业身份） | [build_ensemble_cost_by_family.py](../scripts/production/analysis/build_ensemble_cost_by_family.py)：基础主态 vs 完整系综标签两个分母；missing 如实登记不估 |
+| 方案验收与新鲜度 | [build_plan_compliance.py](../scripts/production/analysis/build_plan_compliance.py) |
 | 探针强度分级 | 包 `manifest.json` 与候选行 `probe_class`（`heavy_fragment_torsion` vs `methyl_rotor`） |
-| 一致性收口入口 | [finalize_wp2.ps1](../scripts/wp_production/finalize_wp2.ps1)（**79 步**）；不需要发布时不带 `-Commit` |
+| 一致性收口入口 | [finalize_wp2.ps1](../scripts/production/release/finalize_wp2.ps1)（**79 步**）；不需要发布时不带 `-Commit` |
 
 停止规则核心关系（正式实现已在上表，不复制修改阈值）：
 

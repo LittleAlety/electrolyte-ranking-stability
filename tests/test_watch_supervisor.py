@@ -10,6 +10,8 @@
 """
 
 from __future__ import annotations
+from _prod_paths import PROD_DIR, prod_script
+
 
 import importlib.util
 import shutil
@@ -18,8 +20,8 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-POLICY = REPO_ROOT / "scripts" / "wp_production" / "supervisor_policy.py"
-WATCHER = REPO_ROOT / "scripts" / "wp_production" / "watch_supervisor.ps1"
+POLICY = prod_script("supervisor_policy.py")
+WATCHER = prod_script("watch_supervisor.ps1")
 
 
 def _load():

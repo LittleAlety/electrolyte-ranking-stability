@@ -7,11 +7,11 @@ window.HB = {
   "figures": 65,
   "orca_out": 1282,
   "scripts": 166,
-  "test_files": 184,
+  "test_files": 185,
   "tests_passed": 1732
  },
  "wp2_progress": {
-  "generated_at_utc": "2026-10-28T16:09:27Z",
+  "generated_at_utc": "2026-11-02T10:38:00Z",
   "runtime": {
    "computed": 60,
    "total": 60
@@ -32,8 +32,8 @@ window.HB = {
   "source": "outputs/physics_completion/compliance/plan_compliance_meta.json",
   "ensemble": {
    "accepted": 45,
-   "provisional": 0,
-   "limited": 3,
+   "provisional": 1,
+   "limited": 2,
    "total": 48,
    "remaining": [
     {
@@ -51,7 +51,7 @@ window.HB = {
     {
      "name": "EC",
      "state": "LiM_2plus",
-     "status": "limited",
+     "status": "provisional",
      "reason": "rescue_budget_exhausted"
     }
    ],
@@ -1090,8 +1090,9 @@ window.HB = {
    "stage": "探针世代与接线",
    "phase": "three",
    "tag": "交接包六项契约缺口全部闭合（探针 **9 PASS/6 FAIL → 15 PASS/0 FAIL**）；决定性缺口是探针成员从未登记为系综候选 → 接线后系综 **43 → 44/48** accepted（已完成）",
-   "summary": "导航核对：2026-10-22。数字只是该次已提交产物的快照；最新状态以以下机器可读账本为准。本文不改变科学协议、阈值、预算或计算授权。 历史 Week 1–44 已从根 README 的单一长日志拆为[按研究主题组织的进度索引](progress/README.md)。旧周报与 outputs/week* 均保留原位；新索引只负责导航，不改变证据或哈希。",
+   "summary": "按下面五跳读，每一跳只承担一种职责；哪一跳是生成物、哪一跳冻结不可改都写在右边。 三条跨跳规则：① 想要数字 → 去 ③ 的账本，不要抄任何 .md；② 想要\"为什么这样判\" → 去 ④ 的周报与交接件；③ 想知道\"是哪份代码算出来的\" → 去 ② 的脚本索引，再回 ③ 看该产物自带的 generator / 输入哈希。",
    "sections": [
+    "0. 阅读路径：五个跳点",
     "1. 从哪里看真实进度",
     "2. 接下来怎么做（按依赖，不按口头完成度）",
     "3. 核心代码：复用入口，不另造一套验收",
@@ -1794,8 +1795,8 @@ window.HB = {
    "file": "F64_physics_completion_budget_curve.png",
    "week": 44,
    "caption": "累计成本 -> 选集恢复曲线（方案 WP5）：冻结的 20 种子池内回放，tau_b 与 Top-3 重叠随已查询标签数 n_T 的曲线与端点线；这是已知数据的回放，不是盲预注册",
-   "sha": "d5d98c9cba47def1bc44aa6064d5f7efd354c742e9dcd4ef5a28b535cb42905b",
-   "bytes": 179055,
+   "sha": "e62bd4404dc9df84ed6139b162e25e7713500a15650adf7416a97f9a7c77ffef",
+   "bytes": 178898,
    "w": 1856,
    "h": 832
   }
@@ -1808,7 +1809,7 @@ window.HB = {
   },
   {
    "path": "scripts",
-   "note": "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）",
+   "note": "生成器与校验脚本（顶层入口 + production/ 六分类生产流程 + 旧路径兼容入口）",
    "files": 261
   },
   {
@@ -1834,12 +1835,12 @@ window.HB = {
   {
    "path": "tests",
    "note": "pytest 契约：生成器 --check、镜像一致性、冻结哈希、脚本索引",
-   "files": 187
+   "files": 188
   },
   {
    "path": "docs",
    "note": "技术报告与周报（NN_*.md）、协议、结题报告、站点",
-   "files": 267
+   "files": 275
   },
   {
    "path": "deliverables",

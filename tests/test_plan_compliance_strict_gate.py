@@ -12,14 +12,16 @@ These tests pin the wiring itself (the artifact, not a mock):
 * the item names WHICH checks failed, so the report says what is missing;
 * the trigger booleans are derived, never constants.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 COMPLIANCE = (REPO / "outputs" / "physics_completion" / "compliance"
               / "plan_compliance.csv")
-COMPLIANCE_SRC = REPO / "scripts" / "wp_production" / "build_plan_compliance.py"
-WIRING_SRC = REPO / "scripts" / "wp_production" / "strict_readiness_wiring.py"
+COMPLIANCE_SRC = prod_script("build_plan_compliance.py")
+WIRING_SRC = prod_script("strict_readiness_wiring.py")
 
 
 def _rows():

@@ -12,6 +12,8 @@ fix (simulated clean clone):
 The plan's words: "依赖必须显式，缺失不能被静默跳过".  Both must refuse, and both
 must keep working when the layer IS present.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import importlib.util
 import sys
 from pathlib import Path
@@ -19,7 +21,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-PROD = REPO / "scripts" / "wp_production"
+PROD = PROD_DIR
 sys.path.insert(0, str(PROD))
 
 

@@ -14,6 +14,8 @@ These tests are written to FAIL on that implementation and PASS on the strict
 one.  Each bad-evidence case pins one specific looseness; the positive controls
 exist so "reject everything" is not mistaken for strictness.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 import importlib.util
 import sys
@@ -22,7 +24,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-WIRING = REPO / "scripts" / "wp_production" / "strict_readiness_wiring.py"
+WIRING = prod_script("strict_readiness_wiring.py")
 OUT = REPO / "outputs" / "physics_completion"
 
 
@@ -238,7 +240,7 @@ def test_unknown_trigger_blocks_the_gate(wiring):
 
 def _load_readiness():
     spec = importlib.util.spec_from_file_location(
-        "sr", REPO / "scripts" / "wp_production" / "strict_readiness.py")
+        "sr", prod_script("strict_readiness.py"))
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m

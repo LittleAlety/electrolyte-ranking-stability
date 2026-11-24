@@ -12,6 +12,8 @@ Covered here:
   must keep working, so the gate cannot be "fixed" by refusing everything;
 * the learner interface must carry only the visible labels.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import importlib.util
 import json
 import sys
@@ -83,7 +85,7 @@ def _rows(mutation: str) -> list[dict]:
 
 
 def _contract():
-    return _load("wp5_replay_contract", "scripts/wp_production/wp5_replay_contract.py")
+    return _load("wp5_replay_contract", "scripts/production/analysis/wp5_replay_contract.py")
 
 
 @pytest.mark.parametrize("mutation", [
@@ -128,7 +130,7 @@ def test_exhausted_pool_is_an_honest_none():
                                      "invalid_repeat"])
 def test_replay_records_invalid_input_instead_of_crashing(mutation):
     """A contract violation is a third outcome, recorded with its reason."""
-    src = (REPO / "scripts" / "wp_production" / "run_wp5_AB_replay.py"
+    src = (prod_script("run_wp5_AB_replay.py")
            ).read_text(encoding="utf-8")
     assert "invalid_input" in src
     assert "stop_budget_invalid_reason" in src
@@ -137,8 +139,8 @@ def test_replay_records_invalid_input_instead_of_crashing(mutation):
 
 def test_learner_interface_carries_only_visible_labels():
     """Behaviour AND interface: the hidden truth must not cross the boundary."""
-    replay = _load("ab_replay", "scripts/wp_production/run_wp5_AB_replay.py")
-    models = _load("wp5_formal_models", "scripts/wp_production/wp5_formal_models.py")
+    replay = _load("ab_replay", "scripts/production/analysis/run_wp5_AB_replay.py")
+    models = _load("wp5_formal_models", "scripts/production/analysis/wp5_formal_models.py")
     features = np.random.default_rng(20261022).normal(size=(8, 12)).tolist()
     visible = [0, 2, 4, 6]
     labels = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
@@ -164,8 +166,8 @@ def test_learner_interface_carries_only_visible_labels():
 
 
 def test_hidden_labels_cannot_change_predictions_behaviourally():
-    replay = _load("ab_replay", "scripts/wp_production/run_wp5_AB_replay.py")
-    models = _load("wp5_formal_models", "scripts/wp_production/wp5_formal_models.py")
+    replay = _load("ab_replay", "scripts/production/analysis/run_wp5_AB_replay.py")
+    models = _load("wp5_formal_models", "scripts/production/analysis/wp5_formal_models.py")
     features = np.random.default_rng(7).normal(size=(8, 12)).tolist()
     visible = [0, 2, 4, 6]
     labels = [float(i) for i in range(8)]
@@ -179,7 +181,7 @@ def test_hidden_labels_cannot_change_predictions_behaviourally():
 
 def test_model_contract_refuses_a_dimension_mismatch():
     """The bandwidth is frozen per basis; another width must not inherit it."""
-    m = _load("wp5_formal_models", "scripts/wp_production/wp5_formal_models.py")
+    m = _load("wp5_formal_models", "scripts/production/analysis/wp5_formal_models.py")
     with pytest.raises(ValueError, match="frozen basis"):
         m.model_contract("ridge_std", 7)
     assert m.model_contract("ridge_std", m.FEATURE_DIM)["executed_model"] == "ridge_std"

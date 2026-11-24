@@ -686,7 +686,7 @@ def repo_inventory():
     """
     spec = [
         ("src/electrolyte_ranking", "可复用库：ORCA / xTB 驱动、不确定度、排序、稳健性、决策状态"),
-        ("scripts", "生成器与校验脚本（顶层入口 + wp_production/ 生产子包）"),
+        ("scripts", "生成器与校验脚本（顶层入口 + production/ 六分类生产流程 + 旧路径兼容入口）"),
         ("config", "冻结定义与预注册（scientific_definitions.yaml、prereg.yaml）"),
         ("data", "元数据、外部锚点与参考文献"),
         ("structures", "起始几何：构象池、Li 配位 motif、微溶剂化"),

@@ -8,23 +8,29 @@
 | 位置 | 放什么 |
 | --- | --- |
 | `scripts/*.py` | 历史各周（week1–week36）的分析 / 生成入口，以及仍被测试或门禁直接调用的全局入口。**不要为“好看”把历史脚本搬走**：`outputs/**` 的冻结产物里记录了它们的路径，移动会断掉可追溯性。 |
-| `scripts/wp_production/` | 当前批次 **physics_completion_v1（WP0–WP6）的完整流水线**：生产驱动 + 生成器 emit + 各派生层 + 一键收口。见 `scripts/wp_production/README.md`，一键收口入口是 `scripts/wp_production/finalize_wp2.ps1` |
-| `scripts/wp_production/wp1_audit_src.txt` | WP1 方法审计的补丁源（由 `emit_wp1.py` 折进生成器；同内容的旧 `wp1_newsrc.py` 留档因从不被执行已删除） |
+| `scripts/production/` | 当前批次 **physics_completion_v1（WP0–WP6）的生产流程**，按职责分六类：`jobs/`（提交/队列/监守）、`ingest/`（回收与导入）、`validation/`（QC/身份/证据门）、`ensembles/`（候选/覆盖/去重/恢复/采样）、`analysis/`（排序/学习/成本/合规）、`release/`（产物/镜像/归档/收口）。索引是生成物：`scripts/production/SCRIPT_INDEX.md`（手写流程说明在 `scripts/production/README.md`）。一键收口入口 `scripts/production/release/finalize_wp2.ps1` |
+| `scripts/wp_production/` | **历史入口兼容层**（HISTORICAL_ENTRY）：每个 `*.py` 都在本模块命名空间内 exec 真实实现，保留是为了让已生成产物里登记的旧路径不悬空。索引是生成物：`scripts/wp_production/README.md`；退休条件写在里面 |
+| `scripts/production/registry.json` | 「旧路径 → 新路径 + 分类」的**唯一权威表**；兼容入口、两份索引都由它派生 |
+| `scripts/production/ingest/wp1_audit_src.txt` | WP1 方法审计的补丁源（由 `emit_wp1.py` 折进生成器；同内容的旧 `wp1_newsrc.py` 留档因从不被执行已删除） |
 | `work/`（不跟踪） | 原始 ORCA / xTB 输出、生成器基线缓存、临时脚本 |
 | `docs/65_repo_layout.md` | **仓库骨架图**（顶层目录职责、阶段编号 ↔ WP 对应、收口链、冻结与不可改清单）；由 `tests/test_repo_layout.py` 强制覆盖，骨架漂了就会测试失败 |
 
 ## 新增脚本的落点规则
 
-1. 属于当前批次流水线 → 放 `scripts/wp_production/`，并在该目录 README 的脚本表里登记；
+1. 属于当前批次流水线 → 按职责放进 `scripts/production/<jobs|ingest|validation|ensembles|analysis|release>/`，
+   把条目写进 `scripts/production/registry.json`，再跑 `python scripts/production/build_script_index.py`
+   重生成两份 README 与对应的旧路径兼容入口（`--check` 在 `tests/test_repo_layout.py` 里）；
 2. 全局门禁 / 交付入口（被 `tests/` 或 `freeze_gates.py` 直接调用）→ 留在 `scripts/` 顶层，并在下面的索引里归到「门禁 / 交付入口」；
 3. 一次性历史分析 → 也放 `scripts/` 顶层，命名沿用 `analyze_*`（分析）、`build_week*`（出交付）、`run_*`（跑计算/驱动）；
-4. 脚本只能用 `Path(__file__).resolve().parents[N]` 定位仓库根：顶层脚本 `N = 1`，`scripts/wp_production/` 内脚本 `N = 2`；
+4. 仓库根定位：顶层脚本用 `Path(__file__).resolve().parents[1]`；`scripts/production/` 下的脚本
+   **一律 `import _paths` 并取 `_paths.REPO_ROOT`**（按 `pyproject.toml` + `src/electrolyte_ranking/` 定位，
+   与目录深度解耦），跨分类调用同类脚本用 `_paths.script_path("<name>.py")`；不要再写 `parents[N]`；
 5. **新增顶层入口后必须在下面的索引里登记**：`tests/test_scripts_index.py` 会断言每个顶层
    `scripts/*.py`、`*.ps1` 都出现在本文件里。不登记就会测试失败，防止顶层再漂新脚本。
 
 ## 入口脚本索引（由 `tests/test_scripts_index.py` 强制覆盖）
 
-共 **169** 个顶层入口（不含 `wp_production/`），按批次分组：
+共 **169** 个顶层入口（不含 `production/` 与 `wp_production/`），按批次分组：
 
 **门禁 / 交付入口（被 tests 或 freeze_gates 直接调用，必须保留在顶层）**（13）
 
@@ -239,7 +245,7 @@
 `outputs/**` 是**生成物**。改动量名、阈值、措辞或路径时，要改生成脚本，然后跑
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\wp_production\finalize_wp2.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\production\release\finalize_wp2.ps1
 ```
 
 让产物、交付镜像、站点、冻结门与测试一起收敛；直接手改 `outputs/**` 会在下一次 `--check` 失败。

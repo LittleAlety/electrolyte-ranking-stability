@@ -21,6 +21,8 @@ and each of them was wrong at least once:
 
 Everything here runs on synthetic data: no network, no ORCA, no xtb.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import hashlib
 import importlib.util
 import sys
@@ -42,7 +44,7 @@ if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
 # ---------------------------------------------------------------------------
 
 REPO = Path(__file__).resolve().parents[1]
-LOC = REPO / "scripts" / "wp_production" / "build_frontier_localization.py"
+LOC = prod_script("build_frontier_localization.py")
 FETCH = REPO / "work" / "_fetch_frontier.py"
 
 

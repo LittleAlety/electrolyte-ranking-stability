@@ -1,0 +1,349 @@
+#!/usr/bin/env python3
+"""Zero-compute, fail-closed strict replay into a fresh isolated directory.
+
+No production output is written. All 48 states and every structure-ledger row
+are indexed; eligibility is determined before calling the production deduper.
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import json
+import math
+import sys
+from collections import Counter, defaultdict
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+sys.path.insert(0, str(HERE))
+import build_production_ensemble_aggregator as agg  # noqa: E402
+import import_hpc_opt_numfreq as importer  # noqa: E402
+
+STRUCTURES = ROOT / "outputs/physics_completion/ensembles/production_ensemble_structures.csv"
+CANDIDATES = ROOT / "outputs/physics_completion/ensembles/production_ensemble_candidates.csv"
+DISPOSITIONS = ROOT / "outputs/physics_completion/ensembles/production_ensemble_dispositions.csv"
+OLD_DEDUP = ROOT / "outputs/physics_completion/ensembles/production_ensemble_dedup.csv"
+OLD_LABELS = ROOT / "outputs/physics_completion/ensembles/production_ensemble_labels.csv"
+PRODUCTION_INDEX = ROOT / "outputs/physics_completion/ensembles/production_ensemble_index.json"
+PRODUCTION_MANIFEST = ROOT / "outputs/physics_completion/ensembles/production_ensemble_manifest.json"
+COST = ROOT / "outputs/physics_completion/cost/ensemble_cost_by_family.csv"
+COST_INDEX = ROOT / "outputs/physics_completion/cost/ensemble_cost_by_family_index.json"
+COVERAGE = ROOT / "outputs/physics_completion/recovery/coverage_reviews.csv"
+DMC_STAGED = ROOT / "outputs/physics_completion/recovery/dmc_reception_registrations.csv"
+SETTLEMENT = ROOT / "work/lead_reception_20261102/AUTHORITATIVE_SETTLEMENT.json"
+EC_FOLLOWUP = ROOT / "work/ec_followup_20261103/VERIFIED_RESULTS.json"
+EC_OLD_LEDGER = ROOT / "work/ec_followup_20261103/previous_ledger_backup.json"
+RULE = ROOT / "docs/handoffs/strict_evidence_matrix_20261103/RULE_ADJUDICATION_PROPOSAL.md"
+FROZEN = ROOT / "config/production_method_freeze_v1.json"
+DEFAULT_BASE = ROOT / "docs/handoffs/strict_rebuild_20261103"
+THRESHOLDS = {
+    "energy_change_Eh": ("TolE_Eh", 2e-7),
+    "rms_gradient_Eh_per_Bohr": ("TolRMSG_Eh_per_Bohr", 8e-6),
+    "max_gradient_Eh_per_Bohr": ("TolMaxG_Eh_per_Bohr", 3e-5),
+    "rms_step_Bohr": ("TolRMSD_Bohr", 1e-4),
+    "max_step_Bohr": ("TolMaxD_Bohr", 2e-4),
+}
+INPUTS = (STRUCTURES, CANDIDATES, DISPOSITIONS, OLD_DEDUP, OLD_LABELS,
+          PRODUCTION_INDEX, PRODUCTION_MANIFEST, COST, COST_INDEX,
+          COVERAGE, DMC_STAGED, SETTLEMENT, EC_FOLLOWUP, EC_OLD_LEDGER,
+          RULE, FROZEN, Path(__file__).resolve(),
+          Path(agg.__file__).resolve(), Path(importer.__file__).resolve())
+
+
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def read_csv(path: Path) -> list[dict[str, str]]:
+    with path.open(encoding="utf-8-sig", newline="") as stream:
+        return list(csv.DictReader(stream))
+
+
+def old_primary_opt_sources(row: dict[str, str]) -> tuple[Path, Path]:
+    state = "M_tzvpd" if row["slot"] == "M" else row["slot"]
+    folder = ROOT / row["task_relpath"] / "superseded_numfreq"
+    stem = f"{row['name']}_{state}"
+    return folder / f"{stem}.log", folder / f"{stem}.inp"
+
+
+def evidence_sources(row: dict[str, str]) -> tuple[Path, Path]:
+    if row["member_role"] == "primary":
+        return old_primary_opt_sources(row)
+    log = ROOT / row["log_path"] if row.get("log_path") else ROOT / "MISSING_LOG"
+    return log, log.with_name("job.inp")
+
+
+def assess_member(row: dict[str, str], root: Path = ROOT) -> dict:
+    """Inspect actual Opt evidence; never infer a pass from ready/computed alone."""
+    log_path, inp_path = evidence_sources(row)
+    result = {"member_key": row["member_key"], "attempt": row.get("attempt", ""),
+              "old_status": row["status"], "old_member_role": row["member_role"],
+              "old_kept": None, "eligible": False, "reasons": [],
+              "source_paths": {"opt_log": str(log_path.relative_to(ROOT)).replace("\\", "/"),
+                               "opt_input": str(inp_path.relative_to(ROOT)).replace("\\", "/")},
+              "source_sha256": {}, "five_items": {}}
+    for label, path in (("opt_log", log_path), ("opt_input", inp_path)):
+        result["source_sha256"][label] = digest(path) if path.is_file() else "MISSING"
+    for label, path in (("registered_frequency_log", ROOT / row["log_path"] if row.get("log_path") else ROOT / "MISSING_LOG"),
+                        ("registered_final_geometry", agg.geometry_path(row, ROOT))):
+        result["source_paths"][label] = str(path.relative_to(ROOT)).replace("\\", "/")
+        result["source_sha256"][label] = digest(path) if path.is_file() else "MISSING"
+    if row["status"] not in ("ready", "computed"):
+        result["reasons"].append("NOT_CURRENT_NUMERIC_MEMBER")
+        return result
+    if not log_path.is_file() or not inp_path.is_file():
+        result["reasons"].append("RAW_OPT_SOURCE_MISSING")
+        return result
+    if row["member_role"] != "primary" and result["source_sha256"]["opt_log"] != row.get("log_sha256"):
+        result["reasons"].append("REGISTERED_LOG_HASH_MISMATCH")
+        return result
+    inp = inp_path.read_text(encoding="utf-8", errors="replace")
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    try:
+        values = importer.final_geometry_convergence(text)
+    except ValueError:
+        result["reasons"].append("FINAL_CONVERGENCE_TABLE_MISSING")
+        return result
+    result["five_items"] = {key: {"value": values.get(key),
+                                   "printed_tolerance": values.get(tol_key),
+                                   "strict_limit": limit}
+                              for key, (tol_key, limit) in THRESHOLDS.items()}
+    for key, (tol_key, limit) in THRESHOLDS.items():
+        if key not in values:
+            result["reasons"].append("FIVE_ITEM_MISSING:" + key)
+        elif values[key] > limit:
+            result["reasons"].append("FIVE_ITEM_EXCEEDS_STRICT_LIMIT:" + key)
+        if tol_key in values and not math.isclose(values[tol_key], limit, rel_tol=0, abs_tol=5e-12):
+            result["reasons"].append("PRINTED_OPT_TOLERANCE_DIFFERS:" + key)
+    line = next((line.strip() for line in inp.splitlines() if line.lstrip().startswith("!")), "")
+    result["effective_opt_keyword"] = line
+    if not all(token in line.split() for token in ("wB97X-D4", "def2-TZVPD", "SMD(acetonitrile)", "TightSCF")):
+        result["reasons"].append("FROZEN_PHYSICAL_OR_SCF_CONTRACT_UNVERIFIED")
+    if row["member_role"] != "primary" and "VeryTightOpt" not in line.split():
+        result["reasons"].append("VERY_TIGHT_OPT_UNVERIFIED")
+    if row.get("frequency_hessian") != "analytical_hessian" or row.get("qrrho", "").lower() != "true":
+        result["reasons"].append("FREQUENCY_OR_THERMOCHEMISTRY_UNVERIFIED")
+    if row.get("method", "").replace(" SMD(acetonitrile)", "") != "wB97X-D4 def2-TZVPD":
+        result["reasons"].append("STRUCTURE_METHOD_DIFFERS")
+    if row.get("temp_k") != "298.15" or row.get("imaginary_modes") != "0":
+        result["reasons"].append("TEMPERATURE_OR_FREQUENCY_UNVERIFIED")
+    if row["member_role"] != "primary" and row.get("connectivity_ok") != "true":
+        result["reasons"].append("CONNECTIVITY_UNVERIFIED")
+    if row["member_role"] != "primary" and (
+        row.get("candidate_species_ok") != "true" or row.get("candidate_bond_graph_ok") != "true"):
+        result["reasons"].append("SPECIES_IDENTITY_UNVERIFIED")
+    # Historical primary identity is retained as provenance but not converted
+    # into an independent strict identity pass by this replay.
+    if row["member_role"] == "primary":
+        result["reasons"].append("PRIMARY_IDENTITY_SEPARATE_SOURCE_NOT_REVERIFIED")
+    result["eligible"] = not result["reasons"]
+    return result
+
+
+def rebuild_state(state_key: str, members: list[dict], audits: dict[str, dict],
+                  old_kept: set[str], review: dict | None, historical: dict) -> dict:
+    """Entry-level ordering: filter ALL members, then dedup and reweight."""
+    eligible = [m for m in members if audits[m["member_key"]]["eligible"]]
+    if eligible:
+        agg.validate_pool(eligible)
+    kept, decisions = agg.dedup_members(eligible, ROOT)
+    keys = {m["member_key"] for m in kept}
+    for decision in decisions:
+        assert decision["member_key"] in {m["member_key"] for m in eligible}
+    g_ensemble = None
+    weights = []
+    if kept:
+        g_vals = [float(m["g_single_eh"]) * agg.HARTREE_TO_KCAL for m in kept]
+        g_ensemble, w, _ = agg.boltzmann(g_vals, agg.TEMP_K)
+        weights = [{"member_key": m["member_key"], "weight": weight}
+                   for m, weight in zip(kept, w)]
+    claimed = []
+    if review:
+        claimed = [x for x in (review.get("computed_new_members") or "").split(";") if x] or [
+            x for x in (review.get("kept_pool_evidence") or "").split(";") if x]
+    claim_survives = bool(claimed) and all(x in keys for x in claimed)
+    unresolved_registration = int(historical.get("n_pending") or 0) > 0 or int(historical.get("n_unresolved") or 0) > 0
+    if not kept:
+        category = "NO_QUALIFIED_MEMBER"
+    elif unresolved_registration:
+        category = "REGISTRATION_OR_HISTORICAL_GAP_PENDING"
+    elif review and review.get("verdict") == "resolved" and not claim_survives:
+        category = "COVERAGE_CLAIM_REVIEW_REQUIRED"
+    elif historical["acceptance_status"] != "accepted":
+        category = "HISTORICAL_LIMITATION_REVIEW_REQUIRED"
+    elif any(d["kept"] == "false" and not d["duplicate_of"] for d in decisions):
+        category = "DEDUP_MAPPING_UNRESOLVED"
+    else:
+        category = "CONDITIONAL_EVIDENCE_SUFFICIENT"
+    return {"state_key": state_key, "historical_label": historical["acceptance_status"],
+            "total_current_members": len(members), "eligible_members": [m["member_key"] for m in eligible],
+            "strict_kept": [m["member_key"] for m in kept], "dedup_decisions": decisions,
+            "new_representatives_from_old_nonkept": sorted(keys - old_kept),
+            "lost_old_representatives": sorted(old_kept - keys),
+            "weights": weights, "g_ensemble_kcal_conditional": g_ensemble,
+            "old_coverage_verdict": review.get("verdict") if review else None,
+            "old_coverage_claim": claimed, "old_coverage_claim_survives": claim_survives,
+            "old_coverage_review_reusable_without_recheck": False,
+            "category": category, "formal_acceptance": "NOT_PUBLISHED"}
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base", type=Path, default=DEFAULT_BASE)
+    args = parser.parse_args()
+    input_hashes = {str(p.relative_to(ROOT)).replace("\\", "/"): digest(p) for p in INPUTS}
+    corrections_path = ROOT / "outputs/physics_completion/recovery/candidate_source_metadata_corrections.jsonl"
+    if corrections_path.is_file():
+        input_hashes[corrections_path.relative_to(ROOT).as_posix()] = digest(corrections_path)
+    run_id = hashlib.sha256(json.dumps(input_hashes, sort_keys=True).encode()).hexdigest()[:16]
+    out = args.base / f"run_{run_id}"
+    if out.exists():
+        raise SystemExit(f"Refusing to overwrite frozen isolated run: {out}")
+    rows = read_csv(STRUCTURES)
+    candidate_rows = read_csv(CANDIDATES)
+    registered_keys = {f"{r['name']}|{r['slot']}|{r['seed']}" for r in candidate_rows
+                       if r["member_role"] in ("round1_extra", "recovery_v1_start")}
+    old_dedup = read_csv(OLD_DEDUP)
+    old_kept = defaultdict(set)
+    for d in old_dedup:
+        if d["kept"] == "true":
+            name, slot, _ = d["member_key"].split("|", 2)
+            old_kept[f"{name}|{slot}"].add(d["member_key"])
+    labels = {f"{r['name']}|{r['state']}": r for r in read_csv(OLD_LABELS)}
+    reviews = {f"{r['name']}|{r['state']}": r for r in read_csv(COVERAGE)}
+    assert len(labels) == 48
+    latest = agg.latest_attempt_per_member(rows)
+    current = {r["member_key"]: r for r in rows if r["member_role"] == "primary"}
+    current.update(latest)
+    audits = {}
+    inventory = []
+    for row in rows:
+        assessed = assess_member(row)
+        assessed["old_kept"] = row["member_key"] in old_kept[f"{row['name']}|{row['slot']}"]
+        if row["member_role"] != "primary" and row["member_key"] not in registered_keys:
+            assessed["eligible"] = False
+            assessed["reasons"].append("NOT_IN_FORMAL_CANDIDATE_REGISTER")
+        assessed["is_current_attempt"] = current.get(row["member_key"]) is row
+        if not assessed["is_current_attempt"]:
+            assessed["eligible"] = False
+            assessed["reasons"].append("SUPERSEDED_BY_LATER_ATTEMPT")
+        inventory.append(assessed)
+        if assessed["is_current_attempt"]:
+            audits[row["member_key"]] = assessed
+    by_state = defaultdict(list)
+    for row in current.values():
+        by_state[f"{row['name']}|{row['slot']}"].append(row)
+    assert set(by_state) == set(labels)
+    results = [rebuild_state(key, by_state[key], audits, old_kept[key], reviews.get(key), labels[key])
+               for key in sorted(labels)]
+    staged = read_csv(DMC_STAGED)
+    settlement = json.loads(SETTLEMENT.read_text(encoding="utf-8"))
+    settled_protocols = {r["job_element"]: r.get("protocol") for r in
+                         settlement.get("reference_rows_already_settled", [])}
+    for row in staged:
+        row["isolated_disposition"] = "STAGED_NOT_IN_QUALIFIED_POOL"
+        row["c3_i"] = "CLOSED_UNAPPROVED_EQUIVALENCE_RULE"
+        row["frozen_source_sha256"] = {}
+        for field in ("start_geometry", "final_geometry", "staging_record"):
+            source = ROOT / row[field]
+            row["frozen_source_sha256"][field] = digest(source) if source.is_file() else "MISSING"
+        staged_record = json.loads((ROOT / row["staging_record"]).read_text(encoding="utf-8"))
+        row["effective_opt_scf_from_receiver"] = (
+            staged_record.get("protocol", {}).get("parsed_inputs", {}).get("opt", {}).get("scf"))
+        from source_metadata_corrections import effective_protocol
+        metadata = effective_protocol(row["leg_id"], settled_protocols.get(row["leg_id"]),
+                                      digest(SETTLEMENT), corrections_path)
+        row["settlement_protocol_label_original"] = metadata["original"]
+        row["settlement_protocol_label"] = metadata["effective"]
+        row["protocol_metadata_correction_ids"] = metadata["correction_ids"]
+        row["protocol_source_conflict"] = bool(
+            row["settlement_protocol_label"] and row["settlement_protocol_label"].endswith("(TightSCF)")
+            and row["effective_opt_scf_from_receiver"] != "TightSCF")
+        if row["leg_id"] == "3928500_0":
+            raw_opt = ROOT / "work/ec_dmc_campaign_20261031/results/3928500_0/opt/job_opt.inp"
+            row["raw_opt_input_path"] = str(raw_opt.relative_to(ROOT)).replace("\\", "/")
+            row["raw_opt_input_sha256"] = digest(raw_opt) if raw_opt.is_file() else "MISSING"
+            row["raw_opt_keyword"] = next((line.strip() for line in raw_opt.read_text(
+                encoding="utf-8", errors="replace").splitlines() if line.lstrip().startswith("!")), "") if raw_opt.is_file() else ""
+        final_opt_dir = (ROOT / row["final_geometry"]).parent
+        raw_files = list(final_opt_dir.glob("*.log")) + list(final_opt_dir.glob("*.inp"))
+        freq_dir = final_opt_dir.parent / "freq"
+        raw_files += list(freq_dir.glob("*.log")) + list(freq_dir.glob("*.inp")) + list(freq_dir.glob("*.hess"))
+        row["raw_opt_frequency_sha256"] = {
+            str(p.relative_to(ROOT)).replace("\\", "/"): digest(p) for p in sorted(set(raw_files)) if p.is_file()}
+    ec_followup = []
+    for candidate in json.loads(EC_FOLLOWUP.read_text(encoding="utf-8")):
+        base = ROOT / "work/ec_followup_20261103/results" / candidate["name"]
+        evidence = {str(p.relative_to(ROOT)).replace("\\", "/"): digest(p)
+                    for p in sorted(base.rglob("*")) if p.is_file()}
+        ec_followup.append({"name": candidate["name"], "numerical_qc": candidate.get("numerical_QC"),
+                            "comparability": candidate.get("comparability"), "coverage": candidate.get("coverage"),
+                            "isolated_disposition": "UNRECEIVED_NOT_IN_QUALIFIED_POOL", "raw_evidence_sha256": evidence})
+    source_index = {"input_sha256": input_hashes,
+                    "member_sources": inventory,
+                    "staged_dmc": staged,
+                    "ec_new_candidates": ec_followup,
+                    "ec_new_candidate_stop": "NOT_IN_PRODUCTION_STRUCTURE_LEDGER; identity and old p4/p7 registration unresolved",
+                    "rule_basis": "user-directed isolated technical replay; no user approval signature forged",
+                    "p1_execution_rule": "primary uses same five measured evidence items; raw superseded NumFreq Opt logs inspected; historical and strict eligibility kept separate",
+                    "c3_i": "CLOSED_UNAPPROVED_EQUIVALENCE_RULE"}
+    gap_actions = []
+    for state in results:
+        member_audits = [audits[m["member_key"]] for m in by_state[state["state_key"]]]
+        ranked = sorted(member_audits, key=lambda a: (len(a["reasons"]), a["member_key"]))
+        action = {
+            "state_key": state["state_key"], "category": state["category"],
+            "current_member_blockers": [
+                {"member_key": a["member_key"], "reasons": a["reasons"],
+                 "five_items": a["five_items"]} for a in member_audits],
+            "least_blocked_existing_member": ranked[0]["member_key"] if ranked else None,
+            "existing_archive_action": "recheck raw Opt, frequency, identity and registration sources for the listed blockers",
+            "coverage_action": "rebuild claim from qualified representatives and independent search evidence; old resolved label is not inherited",
+            "new_physical_evidence": "NOT_AUTHORIZED; scope only after archive search and approved rule stop points",
+        }
+        if state["state_key"] in ("DMC|M_plus", "DMC|LiM_2plus"):
+            action["staged_candidate_action"] = "assess five staged legs individually; apply hash-bound 3928500_0 metadata correction if present; C3(i) remains closed"
+        if state["state_key"] == "EC|LiM_2plus":
+            action["external_candidate_action"] = "review new EC legs' terminal identity, reception and dedup; settle old p4/p7 registration independently"
+        gap_actions.append(action)
+    out.mkdir(parents=True)
+    (out / "source_index.json").write_text(json.dumps(source_index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out / "states.json").write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out / "gap_actions.json").write_text(json.dumps(gap_actions, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    counts = Counter(r["category"] for r in results)
+    member_counts = Counter("ELIGIBLE" if a["eligible"] else "NOT_ELIGIBLE" for a in inventory if a["is_current_attempt"])
+    lines = ["# 48 态零计算隔离重建", "",
+             f"运行 ID：`{run_id}`。本次未写正式表、账本或费用。输入与逐成员原始证据哈希见 `source_index.json`。",
+             "规则依据是用户指定的隔离技术重建；未记录虚构的用户签名。C3(i) 等效几何/频率规则尚未批准，保持关闭。",
+             "", "## 结果", "",
+             f"- 当前结构成员 {len(current)}，结构账本原始行 {len(rows)}；资格核查：{dict(member_counts)}。",
+             f"- 48 态条件分类：{dict(counts)}。任何 `CONDITIONAL_*` 均非正式 accepted。",
+             "- DMC 五条暂存候选仍单列；EC 新候选未进入生产结构成员表，本次不暗中接入。",
+             "- P1 按 primary 与其他成员同样五项实测执行，已逐一读取其原始优化日志；历史资格和严格资格分开。原裁定草案中的 `PRIMARY_RULE_PENDING` 不用于本次技术筛选。",
+             "- `3928500_0` 保留原结算标签；若存在匹配原文件哈希的追加更正，读取有效标签并保留更正ID。原始 VeryTightSCF 证据不能据旧标签走 C2；C3(i)仍关闭。",
+             "- 旧 28/14/15/14 仅为历史模拟，不是本次重建预期值。逐态具体停点见 `gap_actions.json`。",
+             "", "| 态 | 历史 | 当前成员/合格 | 重建代表 | 旧追随者转代表 | 旧 coverage claim | 条件分类 |",
+             "|---|---|---:|---|---|---|---|"]
+    for r in results:
+        lines.append("| " + " | ".join((r["state_key"].replace("|", "\\|"), r["historical_label"],
+             f"{r['total_current_members']}/{len(r['eligible_members'])}",
+             ", ".join(r["strict_kept"]).replace("|", "\\|") or "—",
+             ", ".join(r["new_representatives_from_old_nonkept"]).replace("|", "\\|") or "—",
+             "存活" if r["old_coverage_claim_survives"] else ("需重审" if r["old_coverage_claim"] else "无"),
+             r["category"])) + " |")
+    lines.extend(["", "## 下一动作边界", "",
+                  "- `NO_QUALIFIED_MEMBER`：逐成员读取 `source_index.json` 的五项实测与原因；先查现有原始证据，不从态数推作业数。",
+                  "- 有合格代表但仍有历史限制/coverage claim 的态：在已批准规则下重做 coverage，不沿用旧 `resolved` 字样。",
+                  "- `CONDITIONAL_EVIDENCE_SUFFICIENT`：仅表示隔离成员池与现有登记没有在本次检查中显示阻断；仍需独立身份/协议和 coverage 复核，不作正式发布。",
+                  "- 所有待补证项均为零计算检索或明确条款停点；本轮不提出未经逐项审定的补算预算。", ""])
+    (out / "README.md").write_text("\n".join(lines), encoding="utf-8")
+    if {str(p.relative_to(ROOT)).replace("\\", "/"): digest(p) for p in INPUTS} != input_hashes:
+        raise RuntimeError("An input changed during the isolated rebuild; discard this run")
+    print(out)
+    print(json.dumps({"states": len(results), "members": len(current), "categories": dict(counts)}, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

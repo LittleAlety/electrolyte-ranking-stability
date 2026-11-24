@@ -11,6 +11,8 @@ The user's ruling: 新增一个成功结构，不会自动解除旧成员造成�
 * a `pending` / `unresolved` review never upgrades;
 * historical failures keep their rows untouched.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 import importlib.util
 import sys
@@ -32,9 +34,9 @@ if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
 # ---------------------------------------------------------------------------
 
 REPO = Path(__file__).resolve().parents[1]
-AGG = REPO / "scripts" / "wp_production" / "build_production_ensemble_aggregator.py"
-COV = REPO / "scripts" / "wp_production" / "build_coverage_reviews.py"
-MANIFEST = REPO / "scripts" / "wp_production" / "build_strict_recovery_manifest.py"
+AGG = prod_script("build_production_ensemble_aggregator.py")
+COV = prod_script("build_coverage_reviews.py")
+MANIFEST = prod_script("build_strict_recovery_manifest.py")
 
 RECOVERY_CSV = REPO / "outputs" / "physics_completion" / "recovery" / "coverage_reviews.csv"
 MANIFEST_CSV = (REPO / "outputs" / "physics_completion" / "recovery"

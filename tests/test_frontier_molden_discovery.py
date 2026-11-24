@@ -6,12 +6,14 @@ An earlier discovery only looked for ``*.mkl`` / ``*.mol``, which matches
 neither -- a fully successful single point would still have been recorded as
 ``not_computed``.  These tests pin the accepted spellings and the directory.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import importlib.util
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-LOC = REPO / "scripts" / "wp_production" / "build_frontier_localization.py"
+LOC = prod_script("build_frontier_localization.py")
 
 
 def _m():

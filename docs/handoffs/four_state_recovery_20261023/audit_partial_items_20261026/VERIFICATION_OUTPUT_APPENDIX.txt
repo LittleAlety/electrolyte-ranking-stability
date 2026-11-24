@@ -1,0 +1,76 @@
+# 撤回复核附录（#3 / #6 / #16）——原始命令输出留档
+
+审计者：audit-partial-items（本目录唯一所有者）
+用途：本报告 v3 中对 #3、#16 的改判、以及 #6 的自我更正，均基于以下**我自己跑出的**原始输出；
+不是照抄 Lead 叙述。逐条可复跑。
+
+绑定快照（终检）：`plan_compliance.csv` sha256=a1f70503e766121e…（**审计全程未变**，逐行内容零变化）；
+`plan_compliance.md` 在审计期间随 `generated_at` 头行三次重生成（04:31:51Z → 11:01:34Z → 12:51:40Z，终值 sha256=13c76d7c27826e8b…）；
+git HEAD 由 569ccd215670bc44… 前进至 291270a233c891d6…（并发会话提交；我未 add/commit）。
+
+## 命令 21（#3 撤回复核）：§6.3 口径的数据源读到底
+
+```
+$ .venv/Scripts/python.exe -X utf8 -c "..."
+state_identity_qc.csv rows: 60
+cols: [... 'frontier_localization_status', 'raw_log_path', 'raw_log_sha256', 'status', 'note']
+frontier_localization_status: {'not_computed': 60}
+mtime: 2026-10-25T11:00:18.538799Z
+acceptance check 12: ok= true
+  description: frontier 定位显式登记为 not_computed（生产输入未要求逐轨道原子组成）
+  detail: no orbital-energy read-out is published from these concatenated Opt logs
+exit code: 0
+```
+
+结论：台账 `frontier_localization=not_computed` **与它自己引用的数据源一致**（60/60 行 + acceptance check 12）。
+⇒ #3 状态判定维持「一致」；只有「台账未引用 frontier/ 管线（80 computed/80 verified）」这一**口径覆盖不全**属记录缺陷。
+（附：`state_identity_qc.csv` 与 `thresholds.json` 均 mtime 2026-10-25T11:00:18Z，同一生成波。）
+
+## 命令 23/24（#6 自查）：mechanism md 全文行 + 系综/翻转实测
+
+```
+mechanism_cases.md L53: ### 2. 电子密度/自旋 —— 部分（…；电子密度本体与 frontier 局域化 未具、待补）
+L58: - 缺口（未具、待补）：没有电子密度本体产物——无 .cube/.dens…；frontier 轨道局域化在
+      `outputs/physics_completion/state_identity/thresholds.json` 里显式登记为
+      `frontier_localization.status = not_computed`（理由：生产 Opt 日志未要求逐轨道原子组成）。
+      ← 自带数据源、与 qc.csv 同口径 ⇒ **准确，我初版称其陈旧是错的（已撤回）**
+L78: - 缺口（未具、待补）：G_ensemble（生产 R4）未做——`flip_persistence.csv` R4 = `not_computed`；
+      现有系综只有筛选层 GFN2… ← **与磁盘矛盾**
+exit code: 0
+```
+
+```
+main: {'C01':'DMC','C02':'EMC','C03':'DEC','C04':'EC','C05':'PC','C08':'DME',
+       'C09':'DOL','C13':'GBL','C14':'SL','C15':'DMSO','C16':'AN','C17':'TMP'}
+C02 EMC [('M','accepted'),('M_plus','accepted'),('LiM_plus','accepted'),('LiM_2plus','accepted')]
+C13 GBL [('M','accepted'),('M_plus','accepted'),('LiM_plus','accepted'),('LiM_2plus','accepted')]
+C14 SL  [('M','accepted'),('M_plus','accepted'),('LiM_plus','accepted'),('LiM_2plus','accepted')]
+flip: EMC | GBL R2 computed 0.436638 | R3 computed 0.442629 | R4 computed 0.404536
+      EMC | GBL R4 note: delta = G_ensemble(M_plus) - G_ensemble(M), same definition as R3; n_unique M_plus: EMC=2, GBL=1
+      EMC | SL  R2 computed 0.286060 | R3 computed 0.359540 | R4 computed 0.356963
+      EMC | SL  R4 note 同上；n_unique M_plus: EMC=2, SL=2
+exit code: 0
+```
+
+另：04:31:51Z 版台账（审计开始时读到的版本）第 24 行已记 `rungs_computed=10/10 production + 2/2 screen`
+（flip_prod 的 10 rung = R1a/R1b/R2/R3/R4 × 2 对，含 R4）⇒ md 的 L78 在**其自身写时（10:57:59Z）就已过时**。
+
+## 命令 18（#16 撤回复核）：两种口径各自复现
+
+```
+derive_check_details(): 6 项 REQUIRED_CHECKS 中 5 过 1 败
+  wp5_full_target_pool_evaluated passed=False，32 problems，n_pool ∈ {11, 9}（≠ 完整 12 池）
+strict_readiness(...) 组合口径: blocked_by=['ensemble_not_48_accepted','wp5_full_target_pool_evaluated']; complete=False
+exit code: 0
+```
+
+结论：台账该行是 **wiring 六项**口径，`checks_passed=5/6; failed=wp5_full_target_pool_evaluated` 在自身口径内准确；
+`ensemble_not_48_accepted` 属**组合**口径（并已在 #17 行 `production_ensembles=44/48` 展示）⇒ 跨层比数字即"拿错尺子"。
+
+## 复跑方式
+
+```
+& "<repo>\.venv\Scripts\python.exe" -X utf8 <本目录>\verify_audit.py        # A–O 段全量重算（VERIFICATION_OUTPUT.txt）
+```
+
+本附录所有数字均可在上述命令中重现；未写入 `outputs/**`、`scripts/**`、测试，未 commit，未联网，未跑 ORCA/xtB/Slurm。

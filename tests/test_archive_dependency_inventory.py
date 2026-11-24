@@ -21,8 +21,9 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-CHAIN = REPO / "scripts" / "wp_production" / "finalize_wp2.ps1"
-PROD = REPO / "scripts" / "wp_production"
+CHAIN = REPO / "scripts" / "production" / "release" / "finalize_wp2.ps1"
+PROD = REPO / "scripts" / "production"
+CATEGORIES = ("jobs", "ingest", "validation", "ensembles", "analysis", "release")
 INVENTORY = (REPO / "docs" / "handoffs" / "four_state_recovery_20261023"
              / "ARCHIVE_DEPENDENCIES.json")
 
@@ -31,11 +32,22 @@ def _inventory() -> dict:
     return json.loads(INVENTORY.read_text(encoding="utf-8"))["entries"]
 
 
+def _script_path(name: str) -> Path:
+    """Locate a production script by basename across the six category directories."""
+    for category in CATEGORIES:
+        candidate = PROD / category / name
+        if candidate.is_file():
+            return candidate
+    return REPO / "scripts" / name
+
+
 def _chain_scripts() -> set:
-    """Scripts the closure chain invokes (either scripts/ or scripts/wp_production/)."""
+    """Scripts the closure chain invokes (`scripts\\production\\<cat>\\*.py` or `scripts\\*.py`)."""
     text = CHAIN.read_text(encoding="utf-8")
     names = set()
-    for m in re.finditer(r"scripts\\(?:wp_production\\)?([A-Za-z0-9_]+\.py)", text):
+    for m in re.finditer(r"scripts\\production\\[a-z]+\\[A-Za-z0-9_]+\.py", text):
+        names.add(m.group(0).rsplit("\\", 1)[-1])
+    for m in re.finditer(r"scripts\\(?!production\\)([A-Za-z0-9_]+\.py)", text):
         names.add(m.group(1))
     return names
 
@@ -44,18 +56,16 @@ def _readers(names: set) -> set:
     """Those of `names` that reference the machine-local work/ layer."""
     out = set()
     for n in names:
-        for base in (PROD, REPO / "scripts"):
-            p = base / n
-            if not p.is_file():
+        p = _script_path(n)
+        if not p.is_file():
+            continue
+        src = p.read_text(encoding="utf-8", errors="replace")
+        for line in src.splitlines():
+            if line.lstrip().startswith("#"):
                 continue
-            src = p.read_text(encoding="utf-8", errors="replace")
-            for line in src.splitlines():
-                if line.lstrip().startswith("#"):
-                    continue
-                if ('"work"' in line or "'work'" in line or "work/" in line):
-                    out.add(n)
-                    break
-            break
+            if ('"work"' in line or "'work'" in line or "work/" in line):
+                out.add(n)
+                break
     return out
 
 
@@ -121,7 +131,7 @@ def test_the_three_refusals_actually_raise(tmp_path, monkeypatch):
     for script, call, needle in (
             ("build_ensemble_cost_by_family", "build_rows", "silent skip"),
             ("build_recovery_budget_accounting", "collect", "nothing was spent")):
-        spec = importlib.util.spec_from_file_location(script, PROD / (script + ".py"))
+        spec = importlib.util.spec_from_file_location(script, _script_path(script + ".py"))
         m = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(m)
         monkeypatch.setattr(m, "REPO", tmp_path)
@@ -130,7 +140,7 @@ def test_the_three_refusals_actually_raise(tmp_path, monkeypatch):
         assert needle in str(exc.value), (script, str(exc.value))
 
     spec = importlib.util.spec_from_file_location(
-        "build_coverage_reviews", PROD / "build_coverage_reviews.py")
+        "build_coverage_reviews", _script_path("build_coverage_reviews.py"))
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     monkeypatch.setattr(m, "REPO", tmp_path)

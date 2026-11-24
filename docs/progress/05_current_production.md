@@ -23,7 +23,7 @@
 ## 收口入口
 
 ```powershell
-pwsh -NoProfile -File scripts/wp_production/finalize_wp2.ps1
+pwsh -NoProfile -File scripts/production/release/finalize_wp2.ps1
 ```
 
 该命令执行离线一致性检查。提交计算需要额外、明确的授权；工程就绪与计算授权是两件事。

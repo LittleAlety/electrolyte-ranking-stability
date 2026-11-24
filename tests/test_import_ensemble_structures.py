@@ -75,6 +75,9 @@ def _log(n_freq=6, negative=False, close_enough=False, terminated=True):
         value = -50.0 if (negative and i == 0) else 100.0 + 10.0 * i
         freqs.append("   %d:  %.2f cm**-1" % (i, value))
     body = (
+        "Total Charge           Charge .... 0\n"
+        "Multiplicity           Mult .... 1\n"
+        "Number of Electrons    NEL .... 2\n"
         # Real ORCA logs carry this line for every converged SCF pass (measured
         # 2026-10-24: all 115 ensemble-feeding legs have it), and the acceptance
         # path now asserts it (RE_SCF_CONVERGED), so the fixture must not invent
@@ -1181,12 +1184,18 @@ def test_li_round2_leg_imports_as_a_computed_audit_member(tmp_path, monkeypatch)
     (task / "run").mkdir(parents=True)
     li_input = INPUT.replace("xyzfile 0 1", "xyzfile 1 1")
     (task / "job.inp").write_text(li_input, encoding="utf-8")
-    (task / "geom.xyz").write_text(GEOM, encoding="utf-8")
+    # LiH2+ is a full-atom, four-electron singlet; the old H2-only fixture
+    # silently omitted Li and did not describe its declared slot.
+    li_geom = GEOM.replace("2\nensemble", "3\nensemble") + "Li 0.0 0.0 2.0\n"
+    (task / "geom.xyz").write_text(li_geom, encoding="utf-8")
     sums = ["%s  %s" % (hashlib.sha256((task / name).read_bytes()).hexdigest(), name)
             for name in ("job.inp", "geom.xyz")]
     (task / "inputs.sha256").write_text("\n".join(sums) + "\n", encoding="utf-8")
-    (task / "run" / "job.log").write_text(_log(), encoding="utf-8")
-    (task / "run" / "job.hess").write_text(_hess_bytes(), encoding="utf-8")
+    li_log = _log(n_freq=9).replace("Charge .... 0", "Charge .... 1").replace("NEL .... 2", "NEL .... 4")
+    li_log = li_log.replace("Electronic energy", "  Li 0.0 0.0 2.0\nElectronic energy")
+    (task / "run" / "job.log").write_text(li_log, encoding="utf-8")
+    li_hess = _hess_bytes().replace("$atoms\n2", "$atoms\n3").replace("$end", "Li 7.0 0.0 0.0 %.10f\n$end" % (2.0/0.5291772083))
+    (task / "run" / "job.hess").write_text(li_hess, encoding="utf-8")
     (pkg / "tasks.txt").write_text("tasks/DMC/LiM_plus__r2_c01_c00\n", encoding="utf-8")
     (pkg / "manifest.json").write_text(json.dumps({
         "package": pkg.name,

@@ -10,6 +10,8 @@ progress) instead of ``limited`` (bounded coverage).
 ``recovery_v1_start`` was missing from the disposition loop, so every recovery
 leg looked like it still had a rescue queued.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 from pathlib import Path
 
@@ -17,7 +19,7 @@ REPO = Path(__file__).resolve().parents[1]
 ENS = REPO / "outputs" / "physics_completion" / "ensembles"
 STRUCTURES = ENS / "production_ensemble_structures.csv"
 DISPOSITIONS = ENS / "production_ensemble_dispositions.csv"
-IMP = REPO / "scripts" / "wp_production" / "import_ensemble_structures.py"
+IMP = prod_script("import_ensemble_structures.py")
 
 
 def _rows(path: Path) -> list[dict]:

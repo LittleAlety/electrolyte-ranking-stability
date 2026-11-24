@@ -18,6 +18,8 @@ script that fails ``bash -n`` (see ``_check_shell_syntax``).
 
 These tests keep both properties.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import importlib.util
 import re
 import subprocess
@@ -27,7 +29,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-BUILD = REPO / "scripts" / "wp_production" / "build_frontier_legs.py"
+BUILD = prod_script("build_frontier_legs.py")
 PKG = REPO / "work" / "hpc_frontier_localization_v1"
 
 

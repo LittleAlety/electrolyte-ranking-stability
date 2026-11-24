@@ -15,8 +15,12 @@ The ruling names EIGHT minimum cases; each maps to one test below:
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
+import pathlib
+import subprocess
 import sys
+import tempfile
 from decimal import Decimal
 from pathlib import Path
 
@@ -158,7 +162,11 @@ def test_duplicate_record_refuses_simple_addition():
 def test_third_task_or_dmc_mixed_in_refused(tmp_path):
     if _IN_SANDBOX:
         pytest.skip("repo-tree fixtures are not available in the RED sandbox")
-    act = EG.activation_member_keys()
+    # 2026-11-02: two batches exist; this fixture is the dol_ec_recovery_v1 package,
+    # so the precondition must be that batch's own two starts, not the union.
+    doc = EG.activation_doc_for_package("dol_ec_recovery_v1")
+    assert doc is not None
+    act = EG.activation_member_keys(doc)
     assert len(act) == 2
     # build a fake package dir whose tasks.txt carries a DMC task
     pkg = tmp_path / "dol_ec_recovery_v1"
@@ -176,7 +184,11 @@ def test_slot_mismatch_refused(tmp_path):
     """F-3: same name+seed, WRONG slot must fail the three-way check."""
     if _IN_SANDBOX:
         pytest.skip("repo-tree fixtures are not available in the RED sandbox")
-    act = EG.activation_member_keys()
+    # 2026-11-02: two batches exist; this fixture is the dol_ec_recovery_v1 package,
+    # so the precondition must be that batch's own two starts, not the union.
+    doc = EG.activation_doc_for_package("dol_ec_recovery_v1")
+    assert doc is not None
+    act = EG.activation_member_keys(doc)
     assert len(act) == 2
     pkg = tmp_path / "dol_ec_recovery_v1"
     (pkg / "tasks").mkdir(parents=True)
@@ -403,3 +415,73 @@ def test_per_element_still_charges_a_failed_element():
     legs = CS.per_element_core_hours(rows, "3791416", _REOPT_TASKS)
     assert legs[0]["core_hours"] == Decimal("0.9")            # failure is not free
     assert legs[1]["core_hours"].quantize(Decimal("0.000001")) == Decimal("1.115556")
+
+
+# ---- 9b. 2026-11-02: batches assert their own size, and cannot be cross-mixed ----
+def _batch_docs():
+    return {d.get("batch"): d for d in EG.activation_documents()}
+
+
+def test_each_batch_asserts_its_own_size():
+    """An extra leg inside one batch file must be an ERROR, never a silent widening.
+
+    Before the split, the v1 file held 4 starts while declaring max_legs=2 -- the
+    invariant was already false and every "exactly two" check was reading the union.
+    """
+    docs = _batch_docs()
+    v2 = docs["ec_recovery_v2"]
+    broken = dict(v2)
+    broken["activated"] = list(v2["activated"]) + [dict(v2["activated"][0], leaf="ec_v2_extra")]
+    with tempfile.TemporaryDirectory() as td:
+        p = pathlib.Path(td) / "recovery_start_activation_v2_extraleg.json"
+        p.write_text(json.dumps(broken), encoding="utf-8")
+        out = subprocess.run(
+            [sys.executable, "-X", "utf8", "-c",
+             "import sys,json;sys.path.insert(0,%r);import build_production_ensemble_manifest as m;"
+             "m.ACTIVATION_DIR=__import__('pathlib').Path(%r);"
+             "m.P4V2_ACTIVATION=__import__('pathlib').Path(%r);"
+             "m.merged_activation()" % (str(REPO / "scripts" / "wp_production"), td, str(p))],
+            capture_output=True, text=True, encoding="utf-8", errors="replace")
+        assert out.returncode != 0, out.stdout
+        assert "must name exactly" in (out.stderr or "") + (out.stdout or "")
+
+
+def test_a_v2_package_is_judged_against_its_own_batch_only(tmp_path):
+    """A package from one batch can never be validated by another batch's keys."""
+    v1 = EG.activation_doc_for_package("dol_ec_recovery_v1")
+    v2 = EG.activation_doc_for_package("hpc_ec_recovery_v2_p4_authorized_20261029")
+    assert v1 is not None and v2 is not None and v1 is not v2
+    assert EG.activation_member_keys(v1) != EG.activation_member_keys(v2)
+    # the v2 package carrying the v1 task list must be refused
+    pkg = tmp_path / "hpc_ec_recovery_v2_p4_authorized_20261029"
+    (pkg / "tasks").mkdir(parents=True)
+    lines = ["tasks/%s/%s__%s" % k for k in EG.activation_member_keys(v1)]
+    (pkg / "tasks.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert EG.batch_is_exactly_activated(pkg) is False
+
+
+def test_unknown_package_dir_is_refused(tmp_path):
+    """A third, unauthorised package dir must not inherit any batch's authorisation."""
+    pkg = tmp_path / "hpc_someone_elses_package"
+    (pkg / "tasks").mkdir(parents=True)
+    (pkg / "tasks.txt").write_text(
+        "tasks/EC/LiM_2plus__ec_v2_p4\n", encoding="utf-8")
+    assert EG.batch_is_exactly_activated(pkg) is False
+
+
+def test_profile_and_cap_are_declared_per_batch():
+    """A profile/cap swap is visible in the registry instead of silently accepted.
+
+    dol_ec_recovery_v1 was authorised under the 12h production profile; the 2026-10-29
+    EC campaign under a 4h / 32-CH cap.  Each document must declare its own, so a leg
+    cannot borrow another batch's more generous envelope.
+    """
+    docs = _batch_docs()
+    v1, v2 = docs["dol_ec_recovery_v1"], docs["ec_recovery_v2"]
+    assert v1["resource_profile"] == "orca_production_12h_v1"
+    assert v2["resource_profile"] == "orca_production_4h_v1"
+    for entry in v2["activated"]:
+        assert entry["resource_profile"] == "orca_production_4h_v1"
+        assert int(entry["budget_cap_core_hours"]) == 32
+    for entry in v1["activated"]:
+        assert entry.get("resource_profile", v1["resource_profile"]) == "orca_production_12h_v1"

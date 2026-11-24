@@ -87,3 +87,80 @@ DOL MaxD 超 1.24×、EC TolE 超 2.6× vs DMC 的 1.6×–2.2× 且 DMC 是循�
 - 成本：sacct `-P -o JobIDRaw,State,AllocCPUS,ElapsedRaw`（`batch_cost_settlement.allocated_core_hours` 结算）
 - 审计与修复：`docs/handoffs/four_state_recovery_20261027_gate_code_audit/REPORT.md`（14 缺陷全采信）、
   commits `bd754f8`/`9e0c377`/`d7bcbdf`/`c170997`
+
+---
+
+## 7. 2026-10-28 本轮收口（追加节，不覆盖）
+
+> **本轮结束条件**：阶段交付完成（45/48 科学结果）。严格 48/48 研究目标仍未完成。
+
+### 7.1 系综现状
+
+| 态 | 验收判定 | 依据 |
+|---|---|---|
+| DOL\|LiM_2plus | **accepted** | 生产腿通过 + 两轮严格重优化 QC 通过（五阈值全过、身份全过、0 虚频、热化学完整） |
+| EC\|LiM_2plus | **limited** | reopt 在冻结边界内再次失败（TolE abs 6.366e-7 = 3.18× 阈值）；按用户 2026-10-27 裁定「本次仍失败即保留 limited，不自动追加」 |
+| DMC\|M_plus | **limited** | 用户 2026-10-27 裁决本轮停止，不重新提交 |
+| DMC\|LiM_2plus | **limited** | 同上 |
+| 其余 44 态 | **accepted** | 生产腿直接通过 |
+
+**系综计数：45 accepted / 3 limited / 0 provisional；分母 48 不变。**
+
+### 7.2 成本修正（per-leg 结算）
+
+2026-10-28 发现 reopt 批次（job 3791416）的手工结算将 DOL/EC 两腿成本**交叉互换**。原因：`sacct JobIDRaw` 不是元素 id——该批次 raw id 交叉（element 0→3791417, element 1→3791416），而 810+1004 对称，total-only 检查无法发现。
+
+| 腿 | slurm_element | job_id_raw | ElapsedRaw | **实测 core-hours** |
+|---|---|---|---|---|
+| DOL | 3791416_0 | 3791417 | 810 s | **0.900000 CH** |
+| EC | 3791416_1 | 3791416 | 1004 s | **1.115556 CH** |
+| **reopt 合计** | | | | **2.015556 CH** |
+
+- 权威结算链：`tasks.txt line i` → `array element i` → `sacct JobID "<array>_<i>"` → 该行的 `JobIDRaw` → `AllocCPUS × ElapsedRaw / 3600`
+- `.batch`/`.extern` 子行携带 `_b`/`_e` 后缀，已被 `per_element_core_hours()` 显式拒绝（避免 3× 超计）
+- 新增 `per_element_core_hours()` 函数 + 6 个 pytest（35/35 绿）+ RED 证明（缺陷注入后 5/6 失败）确保此 bug 不复发
+
+### 7.3 下游重建
+
+1. `ensemble_cost_by_family.csv`：reopt 精确值 0.9000 + 1.1156 = 2.0156 CH 已登记
+2. `recovery_budget_accounting.md`：严格恢复包 187.0 / 600 CH；DOL/EC 恢复（9.6 CH）与 reopt（2.0 CH）分别归档
+3. `plan_compliance`：`strict_readiness_evidence` 从 4/6 → 5/6（`identity_all_members_complete` 现在通过）；唯一未过项 `wp5_full_target_pool_evaluated`
+4. 网站 `data.js` + `index.html`：系综 45/48、strict evidence 5/6、进度 83%、3 limited 态及原因已同步
+5. `build_ensemble_cost_by_family.py --check` / `build_recovery_budget_accounting.py --check` / `plan_compliance --check` / `site --check` / `readme --check` 全部通过
+
+### 7.4 当前 blocker
+
+| 缺口 | 原因 |
+|---|---|
+| `ensemble_not_48_accepted` | DMC 两态 + EC 仍 limited |
+| `wp5_full_target_pool_evaluated` | 全池评估未完成 |
+
+### 7.5 下一轮诊断方案（EC/DMC，设计-only，不提交、不预算）
+
+**EC**：
+- 前提：本轮 reopt 在 TolE 上再次失败（abs 6.366e-7），但优化几何已完全弛豫回已登记极小邻域，无物种漂移
+- 诊断：若用户批准，在**有界预算内**（≤32 CH 新授权；≤256 rescue）运行 `single_basin_verified` 全池评估，聚焦已注册二面角探针路径（pucker/twist 5 个合法连续）
+- 停止条件：任一探针到达另一盆地 → 状态更新为 `resolved`；全探针仍单盆地 → `unresolved`；成本或预算超限 → `limited`
+- 预注册：9 点（方法、探针定义、停止条件、成本上限、标识链、双重口径预防）
+
+**DMC**：
+- 前提：用户 2026-10-27 裁决本轮停止，不重新提交
+- 诊断：下一轮须**新机制**（如显式 Li 配位几何、不同预优化路径）+ 版本化方案 + 独立预算
+- 停止条件：同 EC 框架，但方法变更需通过 gate code audit + 用户明确批准
+- 预注册：9 点（新机制、版本化、独立预算、标识链、停止条件）
+
+### 7.6 复现命令
+
+```bash
+# 依赖已安装的 .venv
+python scripts/wp_production/batch_cost_settlement.py  # --check
+python tests/red_per_element_cost_swap.py               # RED 证明
+python -m pytest tests/test_evidence_gate_and_cost.py -k per_element -v
+python scripts/wp_production/build_ensemble_cost_by_family.py --check
+python scripts/wp_production/build_recovery_budget_accounting.py --check
+python scripts/wp_production/build_plan_compliance.py --check
+python scripts/build_terminal_site.py --check
+python scripts/build_github_readme.py --check
+python scripts/wp_production/refreeze_manifest.py --check
+git diff --check
+```

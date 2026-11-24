@@ -13,6 +13,9 @@ The contract these tests pin:
 * the committed index states which directory produced it and whether that
   directory is the control one.
 """
+from _prod_paths import PROD_DIR, prod_script
+import _prod_paths
+
 import importlib.util
 import json
 import sys
@@ -27,9 +30,11 @@ BLIND = (REPO / "outputs" / "physics_completion" / "active_learning"
 
 def _load():
     spec = importlib.util.spec_from_file_location(
-        "ab", REPO / "scripts" / "wp_production" / "run_wp5_AB_replay.py")
+        "ab", prod_script("run_wp5_AB_replay.py"))
     m = importlib.util.module_from_spec(spec)
-    sys.path.insert(0, str(REPO / "scripts" / "wp_production"))
+    sys.path.insert(0, str(_prod_paths.PRODUCTION))
+    for _category in _prod_paths.CATEGORIES:
+        sys.path.insert(0, str(_prod_paths.PRODUCTION / _category))
     spec.loader.exec_module(m)
     return m
 
@@ -79,7 +84,7 @@ def test_committed_index_declares_its_directory_and_version(replay):
 
 def test_source_does_not_write_the_control_path_unconditionally():
     """A regression guard: the writer must resolve paths per version."""
-    src = (REPO / "scripts" / "wp_production" / "run_wp5_AB_replay.py"
+    src = (prod_script("run_wp5_AB_replay.py")
            ).read_text(encoding="utf-8")
     assert "def output_paths(" in src
     assert 'paths = output_paths(acq_version)' in src

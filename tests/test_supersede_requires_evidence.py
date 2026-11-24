@@ -10,12 +10,14 @@ made "did this leg fail?" unanswerable from the table.
 These tests pin the corrected contract: only an attempt that ACTUALLY RAN (it
 has a ``log_sha256``) may supersede an earlier one.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import importlib.util
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-IMP = REPO / "scripts" / "wp_production" / "import_ensemble_structures.py"
+IMP = prod_script("import_ensemble_structures.py")
 ENS = REPO / "outputs" / "physics_completion" / "ensembles"
 
 

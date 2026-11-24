@@ -1,45 +1,24 @@
-"""Per-state probe routing for the five limited states (plan v3.1 item 4).
+"""HISTORICAL_ENTRY — 兼容入口；实现已迁移到 ``scripts/production/validation/probe_route.py``。
 
-The plan's draft B, verbatim in structure: the route proposes the NEXT PATH
-ONLY -- it never submits a job and never raises acceptance.  Zero means "no
-executable candidate within THIS preflight", never "physically no other
-minimum exists".
+本文件由 ``scripts/production/build_script_index.py --emit-shims`` 生成，**请勿手工编辑**。
+它存在的唯一理由：历史产物把 ``scripts/wp_production/probe_route.py`` 记为生成者，文档与测试也用它作为定位键；
+删掉它会让那些已登记的路径悬空（= 破坏可追溯性）。退休条件见 ``scripts/wp_production/README.md``。
 
-Inputs are derived, never hand-filled:
-* in_flight            -- any non-pending recovery/audit row of the state;
-* identity_verified    -- the evidence table says verified for the state's
-                           weighted members;
-* unused_starts        -- frozen-pool conformers never run at production;
-* eligible_torsions    -- registered free dihedrals (a torsion probe needs a
-                           REGISTERED degree of freedom, not an invented one);
-* new_li_motifs        -- unregistered coordination motifs from the motif
-                           search (independent candidates only);
-* independent_reproductions -- computed members that reproduced the known
-                           minimum (single-basin review evidence).
+实现方式：在**本模块自己的命名空间里** exec 目标源码（而不是复制符号），这样
+``monkeypatch.setattr(<本模块>, ...)`` 对目标函数真正生效——222 个测试依赖这一点。
+``__file__`` 指向真实实现，目标文件自己的 ``Path(__file__)`` 定位因此正确。
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 
-def probe_route(*, in_flight: bool, identity_verified: bool,
-                unused_starts: list | None, eligible_torsions: list | None,
-                new_li_motifs: list | None,
-                independent_reproductions: list) -> str:
-    """Propose the next path; submit nothing, raise nothing."""
-    if in_flight:
-        return "wait_existing_job"
-    if not identity_verified:
-        return "finish_identity_qc"
+TARGET = Path(__file__).resolve().parents[1] / "production" / "validation" / "probe_route.py"
+if not TARGET.is_file():
+    raise SystemExit("HISTORICAL_ENTRY 目标缺失：%s" % TARGET)
 
-    if any(v is None for v in (unused_starts, eligible_torsions, new_li_motifs)):
-        return "preflight_required"
-
-    if unused_starts:
-        return "draft_direct_dft_multistart"
-    if new_li_motifs:
-        return "draft_coordination_motif_probe"
-    if eligible_torsions:
-        return "draft_torsion_probe"
-    if independent_reproductions:
-        return "review_single_basin_evidence"
-
-    return "limited_no_registered_executable_probe"
+__file__ = str(TARGET)
+sys.path.insert(0, str(TARGET.parent))
+with open(TARGET, encoding="utf-8") as _legacy_fh:
+    _legacy_code = compile(_legacy_fh.read(), str(TARGET), "exec")
+exec(_legacy_code, globals())

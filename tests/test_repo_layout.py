@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LAYOUT = REPO_ROOT / "docs" / "65_repo_layout.md"
+PRODUCTION = REPO_ROOT / "scripts" / "production"
+PRODUCTION_CATEGORIES = ("jobs", "ingest", "validation", "ensembles", "analysis", "release")
 SKIP_DIRS = {"__pycache__"}
 WEEK_RE = re.compile(r"week(\d+)")
 SCRATCH_RE = re.compile(r"_(week\d+_scratch|tools)")
@@ -131,13 +134,76 @@ def test_layout_doc_names_the_pipeline_and_forced_indexes():
 
 
 
-def test_layout_doc_covers_every_wp_production_script():
-    """scripts/wp_production/ 下每个 *.py 都要逐脚本登记，新增脚本不登记即失败。"""
+def test_layout_doc_covers_every_production_script():
+    """`scripts/production/<category>/` 下每个 *.py 都要逐脚本登记，新增脚本不登记即失败。
+
+    这条取代了旧的「逐脚本登记 scripts/wp_production/」：实现按职责分六类之后，
+    读者从 `docs/65_repo_layout.md` §3.1 可按「分类/文件名」找到每一个生产脚本。
+    """
     doc = _doc()
-    scripts = sorted(p.name for p in (REPO_ROOT / "scripts" / "wp_production").glob("*.py"))
-    assert scripts, "scripts/wp_production/ 下应有 *.py 脚本"
+    scripts: list[str] = []
+    for category in PRODUCTION_CATEGORIES:
+        directory = PRODUCTION / category
+        assert directory.is_dir(), "缺少 scripts/production/%s/" % category
+        scripts.extend("%s/%s" % (category, path.name)
+                       for path in sorted(directory.glob("*.py")))
+    assert scripts, "scripts/production/<category>/ 下应有 *.py 脚本"
     missing = [name for name in scripts if name not in doc]
-    assert not missing, "wp_production 脚本未登记到骨架图：%s" % missing
+    assert not missing, "生产脚本未登记到骨架图：%s" % missing
+
+
+def test_production_layout_contract_holds():
+    """生成的索引与旧路径兼容入口必须与磁盘一致（生成器自带 --check）。"""
+    result = subprocess.run(
+        [sys.executable, "-X", "utf8", str(PRODUCTION / "build_script_index.py"), "--check"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT))
+    assert result.returncode == 0, (result.stdout + result.stderr)
+
+
+def test_the_reading_path_is_written_down_and_resolves():
+    """「入口 → 当前生产流程 → 权威证据 → 历史归档 → 对外交付」必须成文且落点存在。
+
+    这条钉住的是**阅读路径本身**而不是目录：仓库可以有 170 个顶层脚本和 43 个周目录，
+    但读者必须能从 `docs/PROJECT_GUIDE.md` 的五跳找到每一跳的入口。少一跳、
+    或某一跳的落点被改名/搬走却没更新，都算骨架漂移。
+    """
+    guide = (REPO_ROOT / "docs" / "PROJECT_GUIDE.md").read_text(encoding="utf-8")
+    for stage in ("项目入口", "当前生产流程", "权威证据", "历史归档", "对外交付"):
+        assert stage in guide, "阅读路径缺少一跳：%s" % stage
+    for landing in ("README.md",
+                    "scripts/production/README.md",
+                    "scripts/production/SCRIPT_INDEX.md",
+                    "docs/65_repo_layout.md",
+                    "docs/progress/README.md",
+                    "deliverables/part1/README.md",
+                    "deliverables/part2/README.md"):
+        assert (REPO_ROOT / landing).is_file(), "阅读路径落点不存在：%s" % landing
+        assert landing.split("/")[-1] in guide or landing in guide, \
+            "阅读路径未指向 %s" % landing
+
+
+def test_production_does_not_depend_on_the_compatibility_layer():
+    """依赖方向必须是单向：实现层 →（绝不）→ 兼容层。
+
+    这条是 `scripts/wp_production/` 的**退休条件**的技术前提：只要实现层还 import
+    `wp_production` 或以它为主路径，删兼容入口就会崩。反向（兼容层 → 实现层）是允许且必需的。
+    `_paths.script_path()` 里保留一个"找不到就退回旧目录"的兜底是可以的，但**不能有代码
+    主动把旧目录当常规路径**——所以这里只禁 import，并单列兜底位置的说明。
+    """
+    offenders = []
+    for path in sorted(PRODUCTION.rglob("*.py")):
+        if path.name in ("_paths.py", "build_script_index.py"):
+            continue  # 基础设施：前者定义兜底，后者生成兼容入口
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for lineno, line in enumerate(text.splitlines(), 1):
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            if ("import wp_production" in stripped or "from wp_production" in stripped
+                    or 'SCRIPTS_DIR / "wp_production"' in stripped):
+                offenders.append("%s:%d: %s" % (path.relative_to(REPO_ROOT).as_posix(),
+                                                lineno, stripped[:80]))
+    assert not offenders, "实现层反向依赖兼容层：%s" % offenders
 
 
 def test_layout_doc_names_the_reproduction_evidence_chain():

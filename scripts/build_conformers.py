@@ -339,6 +339,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--geometry-dir", type=Path, default=DEFAULT_GEOMETRY_DIR)
     parser.add_argument("--no-g1-anchor", action="store_true",
                         help="do NOT force the historical G1 geometry into the ensemble (not recommended)")
+    # 🔴 新增（2026-11-23）：只做 ETKDG 嵌入、不做任何 xTB 步骤。
+    #    动机（实测）：本机有 RDKit 2026.09.2 但无 xTB；集群有 xTB 但 `import rdkit` 失败
+    #    （ModuleNotFoundError，python 3.9.18）。本工具原本在同一进程里「嵌入 + 弛豫」，
+    #    因此在任一侧都会缺一半依赖。这个开关把前半段单独暴露出来，让第一步能在本机跑，
+    #    产出的 xyz 再送集群做 xTB。
+    #    **它不改变任何筛选 / 去重 / 能量窗口 / keep 规则**，只是把同一流程分段。
+    parser.add_argument("--embed-only", action="store_true",
+                        help="only run RDKit ETKDG embedding; write the embedded xyz files and skip every "
+                             "xTB step (for hosts that have RDKit but no xTB)")
     parser.add_argument("--force", action="store_true", help="recompute even when a cached manifest entry exists")
     return parser
 
@@ -346,8 +355,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     args = build_arg_parser().parse_args(argv)
     located = toolchain.find_executable("xtb")
+    if located is None and not args.embed_only:
+        raise SystemExit("xTB not found; cannot build the conformer ensemble "
+                         "(use --embed-only to run just the RDKit embedding)")
     if located is None:
-        raise SystemExit("xTB not found; cannot build the conformer ensemble")
+        print("note: xTB not found, but --embed-only was given, so only the embedding runs")
     rows = select_molecules(args.molecules, load_core_set(CORE_SET))
 
     manifest_path = args.outdir / "t6_conformer_manifest.json"
@@ -372,6 +384,21 @@ def main(argv=None) -> int:
         )
         print("%-6s embedded %d conformers; relaxing with %d parallel xTB jobs"
               % (name, len(embedded), args.jobs))
+
+        if args.embed_only:
+            # 只把嵌入结果落盘，按 order 命名；不弛豫、不筛选。
+            dest = args.outdir / name / "embed"
+            dest.mkdir(parents=True, exist_ok=True)
+            written = []
+            for order, path, _ in embedded:
+                target = dest / ("embed_c%03d.xyz" % order)
+                target.write_bytes(Path(path).read_bytes())
+                written.append({"order": order, "path": str(target.relative_to(REPO_ROOT))
+                                if str(target).startswith(str(REPO_ROOT)) else str(target)})
+            entries.append({"name": name, "mol_id": mol_id, "embed_only": True,
+                            "n_embedded": len(written), "conformers": written})
+            print("%-6s EMBED-ONLY: wrote %d xyz to %s" % (name, len(written), dest))
+            continue
 
         def relax(item):
             order, path, _ = item
@@ -498,6 +525,12 @@ def main(argv=None) -> int:
     args.outdir.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + chr(10),
                             encoding="utf-8", newline=chr(10))
+    # 🔴 --embed-only 模式没有能量/筛选字段（那些要 xTB 才有），
+    #    所以不写那张按「已筛选构象」定义的 CSV，避免用空值冒充"已筛选"。
+    if args.embed_only:
+        print("EMBED-ONLY: wrote %s (%d molecules, %d embedded geometries); no xTB-derived columns"
+              % (manifest_path, len(entries), sum(e["n_embedded"] for e in entries)))
+        return 0
     csv_path = args.outdir / "t6_conformer_manifest.csv"
     with csv_path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=COLUMNS)

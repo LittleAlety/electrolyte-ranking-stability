@@ -11,6 +11,8 @@
 """
 
 from __future__ import annotations
+from _prod_paths import PROD_DIR, prod_script
+
 
 import importlib.util
 import sys
@@ -19,7 +21,7 @@ import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = REPO_ROOT / "scripts" / "wp_production" / "run_batch.py"
+SCRIPT = prod_script("run_batch.py")
 
 
 def _load():
@@ -90,6 +92,6 @@ def test_nonzero_exit_still_writes_the_log(tmp_path):
 def test_drivers_use_capture_run_instead_of_capture_output():
     """不许回退到 `capture_output=True`：那正是丢现场的那一行。"""
     for name in ("run_wp2_production.py", "run_wp2_extra.py"):
-        text = (REPO_ROOT / "scripts" / "wp_production" / name).read_text(encoding="utf-8")
+        text = prod_script(name).read_text(encoding="utf-8")
         assert "capture_run(" in text, "%s 没有用 capture_run" % name
         assert "capture_output" not in text, "%s 又用回了 capture_output" % name

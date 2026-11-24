@@ -15,6 +15,8 @@ Invariants pinned here:
 * the legacy BUILDER declares its namespace, and the formal tables are named
   separately so the two cannot be confused.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 import importlib.util
 import re
@@ -40,7 +42,7 @@ def _items():
 
 
 def test_formal_ab_source_is_read_by_its_own_path():
-    src = (REPO / "scripts" / "wp_production" / "build_plan_compliance.py"
+    src = (prod_script("build_plan_compliance.py")
            ).read_text(encoding="utf-8")
     assert "blind_replay/AB_axis_endpoint.csv" in src
     assert "blind_replay/AB_index.json" in src
@@ -112,7 +114,7 @@ def test_formal_item_reports_the_executed_models_and_stop_status():
 
 def test_invalid_input_can_never_satisfy_the_formal_item():
     """The verdict must key on invalid==0, not merely on having rows."""
-    src = (REPO / "scripts" / "wp_production" / "build_plan_compliance.py"
+    src = (prod_script("build_plan_compliance.py")
            ).read_text(encoding="utf-8")
     assert "formal_invalid == 0" in src
     assert "invalid_input" in src
@@ -159,7 +161,7 @@ def test_the_consecutive_points_item_reports_both_sources_separately():
 
 
 def test_legacy_builder_declares_its_namespace():
-    m = _load("emit_wp2", "scripts/wp_production/emit_wp2.py")
+    m = _load("emit_wp2", "scripts/production/ingest/emit_wp2.py")
     assert any("success_budget.csv" in t for t in m.LEGACY_AL_TABLES)
     assert any("round_diagnostics.csv" in t for t in m.LEGACY_AL_TABLES)
     assert any("blind_replay" in t for t in m.FORMAL_AB_TABLES)

@@ -1,0 +1,212 @@
+{
+  "schema": "a00_validation/v1",
+  "generator_version": "a00_v1_3/1.0.0",
+  "generated_at_utc": "2026-11-22T15:44:59Z",
+  "audit_id": "A00-v1.3",
+  "policy": {
+    "authoritative_main_ensemble_counts": {
+      "file": "outputs/physics_completion/ensembles/production_ensemble_labels.csv",
+      "reason": "the frozen 48-position ensemble table; it is the only artifact that carries acceptance_status, sampling_status and limitation_reason per (mol,state) and it is the table the publication pipeline consumes"
+    },
+    "authoritative_72_position_axes": {
+      "files": [
+        "work/evidence18_strict_closure_20261116_codex/EVIDENCE_MATRIX_18x4.csv",
+        "work/evidence18_strict_closure_20261116_codex/FINAL_VERDICT.json#evidence_matrix_after_tegdme"
+      ],
+      "reason": "two independent encodings agree exactly (A1 72 COMPLETED; A5 45 accepted / 27 missing; 71 rows with G_qRRHO; the single row without G is MA|LiM_2plus).  Where two sources agree the value is accepted as current; where they disagree the audit reports EVIDENCE_CONFLICT and refuses to pick a winner."
+    },
+    "stale_but_retained": {
+      "files": [
+        "work/evidence18_strict_closure_20261116_codex/EVIDENCE_MATRIX_18x4_summary.json",
+        "work/evidence18_strict_closure_20261116_codex/FINAL_VERDICT.json#matrix_18x4_current",
+        "work/evidence18_strict_closure_20261116_codex/FINAL_VERDICT.json#matrix_integrity_after_rebuild"
+      ],
+      "reason": "all three still report extension6 A1 = 4 NOT_STARTED and A5 = 45/26/1, which the 11-22 CSV and evidence_matrix_after_tegdme supersede.  They are recorded as STALE_SUMMARY, not silently dropped: the plan forbids deleting history."
+    },
+    "not_authoritative": {
+      "files": [
+        "outputs/physics_completion/compliance/plan_compliance.md"
+      ],
+      "reason": "a derived read-only roll-up generated 2026-11-02; it is a cross-check, never a source of truth for the 11-17..11-22 closure generation"
+    }
+  },
+  "checks": [
+    {
+      "id": "A00-01",
+      "title": "72 canonical state keys complete and unique",
+      "status": "PASS",
+      "detail": "72 unique (mol_id,state_id) keys over 18 parents x 4 canonical states; charge/multiplicity mismatches: 0; unevaluated: 20",
+      "severity": "required"
+    },
+    {
+      "id": "A00-02",
+      "title": "60 historical legs map onto 48 canonical positions",
+      "status": "PASS",
+      "detail": "60 legs -> 48 canonical positions ({'M': 12, 'M_plus': 12, 'LiM_plus': 12, 'LiM_2plus': 12, 'M_tzvpd': 12}); every main position resolves to at least one legacy leg; 12 extra legs are the M/M_tzvpd pair",
+      "severity": "required"
+    },
+    {
+      "id": "A00-03",
+      "title": "extension pool 6 core_remaining + 5 broad_pool filtered correctly",
+      "status": "PASS",
+      "detail": "6 core_remaining accepted (C06, C07, C10, C11, C12, C18); 5 broad_pool excluded (B09, B24, B37, B38, B39)",
+      "severity": "required"
+    },
+    {
+      "id": "A00-04",
+      "title": "CSV and summary same generation, or stale explicitly flagged",
+      "status": "HOLD",
+      "detail": "STALE_SUMMARY raised: EVIDENCE_MATRIX_18x4_summary.json (2026-11-17T12:51:10Z) declares extension6 NOT_STARTED=4 while EVIDENCE_MATRIX_18x4.csv (2026-11-22T09:10:38Z) declares 24/24 COMPLETED. The pair is not the same data generation; the regression fired as designed and the conflict is registered rather than passed silently.",
+      "severity": "required"
+    },
+    {
+      "id": "A00-05",
+      "title": "45 accepted / 2 limited / 1 provisional recomputed row-by-row",
+      "status": "PASS",
+      "detail": "45/2/1 recomputed row-by-row from 48 frozen rows; non-accepted = C01|LiM_2plus, C01|M_plus, C04|LiM_2plus",
+      "severity": "required"
+    },
+    {
+      "id": "A00-06",
+      "title": "24 extension execution and ensemble states counted separately",
+      "status": "PASS",
+      "detail": "extension execution {'COMPLETED': 24} vs ensemble {'MISSING_EVIDENCE': 24}: 24 completed single-conformer positions, 0 with an accepted ensemble",
+      "severity": "required"
+    },
+    {
+      "id": "A00-07",
+      "title": "every key claim has a real, hash-verifiable source",
+      "status": "PASS",
+      "detail": "26 claims and 22 reconciliation rows resolve to an existing file with a matching sha256 (51 hash checks)",
+      "severity": "required"
+    },
+    {
+      "id": "A00-08",
+      "title": "no silent overwrite, fabricated fill or historical write-back",
+      "status": "PASS",
+      "detail": "every open position carries an explicit reason; no ensemble acceptance without a legacy leg; no fabricated InChIKey; frozen acceptance_status strings copied verbatim",
+      "severity": "required"
+    },
+    {
+      "id": "A00-09",
+      "title": "working tree classified into four categories",
+      "status": "PASS",
+      "detail": "4 working-tree categories registered; 6 refs; 9751 files hashed individually",
+      "severity": "required"
+    },
+    {
+      "id": "A00-10",
+      "title": "authorization record matches the granted scope",
+      "status": "PASS",
+      "detail": "audit-only flags exact; historical 800 core-hour allocation not inherited",
+      "severity": "required"
+    },
+    {
+      "id": "A00-11",
+      "title": "evidence manifest self-consistent",
+      "status": "PASS",
+      "detail": "manifest holds 10099 files and verifies all delivered artifacts",
+      "severity": "required"
+    },
+    {
+      "id": "A00-12",
+      "title": "audited sources unchanged since the artifacts were built",
+      "status": "PASS",
+      "detail": "1 cited source files and every claim citation are byte-identical to what the artifacts recorded at build time",
+      "severity": "required"
+    }
+  ],
+  "regressions": [
+    {
+      "id": "REG-01",
+      "title": "STALE_SUMMARY must fire when the old summary says 4 NOT_STARTED and the new CSV says 24/24 COMPLETED",
+      "expected": "STALE_SUMMARY or EVIDENCE_CONFLICT, never a silent pass",
+      "observed": "summary extension6 NOT_STARTED=4; csv extension6 COMPLETED=24",
+      "status": "FIRED_AS_DESIGNED",
+      "effect": "validation check A00-04 returns HOLD and C08 is registered as EVIDENCE_CONFLICT; no artifact states 24/24 as an uncontested current value"
+    }
+  ],
+  "test_runs": [
+    {
+      "suite": "tests/test_a00_v1_3_contract.py + tests/test_a13_plan_refinement.py",
+      "command": "python -m pytest tests/test_a00_v1_3_contract.py tests/test_a13_plan_refinement.py --junitxml=outputs/physics_completion_v2/a00_v1_3/A13_pytest.xml -q",
+      "artifact": "outputs/physics_completion_v2/a00_v1_3/A13_pytest.xml",
+      "artifact_sha256": "0ce87e002cc72032e74a986650dc4eae53dba7cfc11af3e8e0d7a31cb31a6fc5",
+      "tests": "34",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "status": "PASSED",
+      "newer_than_audited_artifacts": true
+    }
+  ],
+  "summary": {
+    "total": 12,
+    "by_status": {
+      "PASS": 11,
+      "HOLD": 1
+    },
+    "claims_total": 26,
+    "claims_hold": 7
+  },
+  "decision": {
+    "status": "A00_HOLD",
+    "rule": "A00_PASS requires every V0-V5 necessary check to pass AND no open key-evidence conflict.  Any HOLD/FAIL check or any HOLD claim forces A00_HOLD with explicit remediation.",
+    "blockers": [
+      "validation HOLD: A00-04",
+      "claims awaiting decision: C04, C08, C09, C17, C21, C22, C26"
+    ],
+    "remediation": [
+      {
+        "id": "REM-01",
+        "owner": "author",
+        "task": "Regenerate EVIDENCE_MATRIX_18x4_summary.json from EVIDENCE_MATRIX_18x4.csv and record the supersession in the closure README; then re-run A00-04."
+      },
+      {
+        "id": "REM-02",
+        "owner": "author",
+        "task": "Retire or re-scope FINAL_VERDICT.json#matrix_18x4_current and #matrix_integrity_after_rebuild so one file cannot carry two different tallies."
+      },
+      {
+        "id": "REM-03",
+        "owner": "author",
+        "task": "Rewrite the 44/4 statement and the four-limited-state enumeration in the A04/A12 specification to 45/2/1 + 2 limited + 1 provisional."
+      },
+      {
+        "id": "REM-04",
+        "owner": "scientist",
+        "task": "Decide the DMC gap taxonomy: sampling_limited (frozen table) vs E_single_screened_QC_failed (verdict).  Until decided, A04 must not open a new rescue arm."
+      },
+      {
+        "id": "REM-05",
+        "owner": "scientist",
+        "task": "Name the two-source sigma estimator behind 'ROBUST_INVERSION = 0' and identify its input table, or withdraw the number."
+      },
+      {
+        "id": "REM-06",
+        "owner": "author",
+        "task": "Reconcile README.md against matrix v3: the 7-molecule protocol-clean subset and the 4.84 kcal/mol margin must be either re-derived under v3 or marked superseded."
+      },
+      {
+        "id": "REM-07",
+        "owner": "author",
+        "task": "Recover the declared charge/multiplicity for the 20 positions (FEC, VC, EA, MA, SN) from the extension job inputs and normalise the '1/2' vs '+1/2' formatting."
+      },
+      {
+        "id": "REM-08",
+        "owner": "author",
+        "task": "Generate and review neutral InChIKeys for the 18 parent molecules; the H1 handoff cannot be built without them."
+      },
+      {
+        "id": "REM-09",
+        "owner": "author",
+        "task": "Restore the tracked-but-missing coverage-v4 evidence (work/coverage_fix_20261106/, work/coverage_review_20261106/) from HEAD, or record a written retirement decision.  A12 cannot certify a reproducible release while committed evidence is absent on disk."
+      },
+      {
+        "id": "REM-10",
+        "owner": "operator",
+        "task": "Quiesce the working tree before any re-take of the A00 snapshot.  During this audit a concurrent process regenerated work/research_completion_20261119/B_replay/ (19:02-19:03) and the whole work/evidence18_strict_closure_20261116_codex/ package including FINAL_VERDICT.json and CLAIM_LEDGER.csv (19:22).  A00-12 now halts on that condition."
+      }
+    ]
+  }
+}

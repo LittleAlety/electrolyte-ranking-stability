@@ -23,6 +23,8 @@ never once appeared in the project's history.
 These tests are deliberately data-driven where possible so a future rename or a
 newly introduced role fails loudly instead of degrading silently.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 import re
 from pathlib import Path
@@ -30,7 +32,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-SCRIPTS = REPO / "scripts" / "wp_production"
+SCRIPTS = PROD_DIR
 ENS = REPO / "outputs" / "physics_completion" / "ensembles"
 RECOVERY = REPO / "outputs" / "physics_completion" / "recovery"
 

@@ -6,7 +6,7 @@ import pytest
 
 
 MODULE = (Path(__file__).resolve().parents[1] /
-          "scripts/wp_production/orca_derivative_policy.py")
+          "scripts/production/validation/orca_derivative_policy.py")
 spec = importlib.util.spec_from_file_location("orca_derivative_policy", MODULE)
 policy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(policy)
@@ -129,7 +129,7 @@ def test_the_prose_copies_of_the_thresholds_cannot_drift():
              % (FROZEN_FIVE["TolE_Eh"], FROZEN_FIVE["TolMaxG_Eh_per_Bohr"],
                 FROZEN_FIVE["TolRMSG_Eh_per_Bohr"], FROZEN_FIVE["TolMaxD_Bohr"],
                 FROZEN_FIVE["TolRMSD_Bohr"]))
-    for name in ("build_physics_completion_batch.py", "wp_production/emit_wp2.py"):
+    for name in ("build_physics_completion_batch.py", "production/ingest/emit_wp2.py"):
         source = (SCRIPTS / name).read_text(encoding="utf-8")
         assert block in source, (
             "%s restates the five thresholds differently from the frozen "

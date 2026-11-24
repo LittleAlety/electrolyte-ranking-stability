@@ -14,6 +14,8 @@ This file closes that gap in two halves:
   paid once per run, task A has none, the printed identity holds, and a MISSING
   status never carries a number (least of all 0).
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 import json
 from pathlib import Path
@@ -142,7 +144,7 @@ def test_missing_never_carries_a_number():
 
 def test_query_cost_never_recharges_the_free_label_for_task_b():
     """B's per-query legs are the Li pair only; the free label is the prerequisite."""
-    src = (REPO / "scripts" / "wp_production" / "run_wp5_AB_replay.py"
+    src = (prod_script("run_wp5_AB_replay.py")
            ).read_text(encoding="utf-8")
     assert 'legs = ("LiM_plus", "LiM_2plus")' in src
     assert 'legs = ("M_tzvpd", "M_plus")' in src

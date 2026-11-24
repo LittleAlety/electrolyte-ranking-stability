@@ -111,14 +111,26 @@ def test_absolute_headlines_fill_only_when_project_loop_and_costs_are_complete()
     assert not gate(missing, loop_closed=True, cost_complete=True)
 
 
-def test_wp2_progress_is_indexed_and_layout_count_is_exact():
-    readme = (REPO / "scripts/wp_production/README.md").read_text(encoding="utf-8")
+def test_wp2_progress_is_indexed_and_production_layout_is_registered():
+    """`wp2_progress.py` 必须可定位，六分类布局必须是成文的规则。
+
+    取代旧的「wp_production 精确文件数」断言：实现搬到 `scripts/production/<category>/`
+    之后目录计数不再是契约（会随新增脚本变化），契约改为
+    「每个生产脚本都登记在 registry.json 里，并出现在生成索引与骨架图中」。
+    """
+    prod_readme = (REPO / "scripts/production/SCRIPT_INDEX.md").read_text(encoding="utf-8")
+    legacy_readme = (REPO / "scripts/wp_production/README.md").read_text(encoding="utf-8")
     layout = (REPO / "docs/65_repo_layout.md").read_text(encoding="utf-8")
-    assert "`wp2_progress.py`" in readme
-    assert "`wp2_progress.py`" in layout
-    root = REPO / "scripts/wp_production"
-    counts = {"all": sum(path.is_file() for path in root.iterdir()
-                        if path.name != "__pycache__"),
-              "py": len(list(root.glob("*.py"))), "ps1": len(list(root.glob("*.ps1")))}
-    assert counts == {"all": 90, "py": 84, "ps1": 4}
-    assert "**90** 个跟踪文件：84 `*.py` + 4 `*.ps1` + `wp1_audit_src.txt` + `README.md`" in layout
+    assert "`wp2_progress.py`" in prod_readme
+    assert "`validation/wp2_progress.py`" in layout
+    assert "`wp2_progress.py`" in legacy_readme, "兼容入口索引也要列出 wp2_progress.py"
+
+    registry = json.loads((REPO / "scripts/production/registry.json").read_text(encoding="utf-8"))
+    categories = set(registry["categories"])
+    assert categories == {"jobs", "ingest", "validation", "ensembles", "analysis", "release"}
+    registered = {Path(row["name"]).name for row in registry["scripts"]}
+    on_disk: set[str] = set()
+    for category in categories:
+        on_disk |= {path.name for path in (REPO / "scripts/production" / category).glob("*.py")}
+    registered_py = {name for name in registered if name.endswith(".py")}
+    assert on_disk == registered_py, "分类目录与 registry.json 不一致：%s" % (on_disk ^ registered_py)

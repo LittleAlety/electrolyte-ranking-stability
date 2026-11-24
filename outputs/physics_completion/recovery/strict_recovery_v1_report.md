@@ -7,19 +7,19 @@
 
 | 状态 | 态数 |
 |---|---|
-| accepted | 44 |
-| provisional | 0 |
-| limited | 4 |
+| accepted | 45 |
+| provisional | 1 |
+| limited | 2 |
 
-分母固定 48；未 accepted 共 **4** 态（`provisional` = 有登记补救，`limited` = 首轮搜索耗尽）。
+分母固定 48；未 accepted 共 **3** 态（`provisional` = 有登记补救，`limited` = 首轮搜索耗尽）。
 
 ## 恢复腿终局统计（按**最后一次真实运行**；规划中的补救另计）
 
 | 状态 | 腿数 |
 |---|---|
-| `computed` | 13 |
+| `computed` | 14 |
 | `never_ran` | 2 |
-| `technical_complete_qc_failed` | 8 |
+| `technical_complete_qc_failed` | 11 |
 
 **pending 行（`status=pending`）**：2 条腿——**本报告不校验它是否真的提交过**（判据只有那一行的 `status`）⇒ 「在飞」必须另与实时 `squeue`/提交日志交叉核对；**从未提交或已被预检拒收的登记行也会落在这里**。
 
@@ -27,16 +27,15 @@
 失败类分布（最后一次真实运行）：
 
 - `max_cycles_exhausted`: 2
-- `strict_reopt_not_needed`: 13
-- `strict_reopt_required`: 1
+- `strict_reopt_not_needed`: 14
+- `strict_reopt_required`: 4
 - `verytight_convergence`: 5
 
 ## 覆盖复核裁决（离开 `limited` 的唯一通道）
 
 | verdict | 态数 |
 |---|---|
-| `search_exhausted` | 2 |
-| `unresolved` | 2 |
+| `unresolved` | 3 |
 
 ## 本批放行的态（覆盖复核 resolved）
 
@@ -47,6 +46,7 @@
 | `DME|LiM_2plus` | `accepted` | 2 | **1** | -316.18568257157 |
 | `DME|M_plus` | `accepted` | 3 | **1** | -308.75146090372 |
 | `DMSO|LiM_plus` | `accepted` | 1 | **1** | -560.78564823000 |
+| `DOL|LiM_2plus` | `accepted` | 1 | **1** | -275.66158232000 |
 | `EMC|M_plus` | `accepted` | 2 | **1** | -382.82477506813 |
 | `SL|LiM_2plus` | `accepted` | 2 | **1** | -713.21346632930 |
 | `TMP|LiM_2plus` | `accepted` | 3 | **1** | -769.48074188281 |
@@ -62,14 +62,12 @@
 |---|---|---|---|---|---|
 | DMC\|LiM_2plus | `limited` | `unresolved` | `no_new_minimum_found` | 0 | LiM_2plus\|tors_6_0_1_2（1/2；结果 technical_complete_qc_failed/max_cycles_exhausted；当前 technical_complete_qc_failed）<br>LiM_2plus\|tors_7_0_1_2（2/2；结果 technical_complete_qc_failed/verytight_convergence；当前 technical_complete_qc_failed）<br>LiM_2plus\|tors_8_0_1_2（1/2；结果 technical_complete_qc_failed/max_cycles_exhausted；当前 technical_complete_qc_failed） |
 | DMC\|M_plus | `limited` | `unresolved` | `no_new_minimum_found` | 0 | M_plus\|tors_6_0_1_2（1/2；结果 technical_complete_qc_failed/verytight_convergence；当前 technical_complete_qc_failed）<br>M_plus\|tors_7_0_1_2（1/2；结果 technical_complete_qc_failed/verytight_convergence；当前 technical_complete_qc_failed）<br>M_plus\|tors_8_0_1_2（2/2；结果 technical_complete_qc_failed/strict_reopt_required；当前 technical_complete_qc_failed） |
-| DOL\|LiM_2plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | —（无恢复腿） |
-| EC\|LiM_2plus | `limited` | `search_exhausted` | `no_new_minimum_found` | 0 | LiM_2plus\|tors_2_3_4_10（0/2；结果 未跑；当前 pending）<br>LiM_2plus\|tors_5_3_4_10（0/2；结果 未跑；当前 pending） |
+| EC\|LiM_2plus | `provisional` | `unresolved` | `no_new_minimum_found` | 0 | LiM_2plus\|ec_v2_p4（1/2；结果 technical_complete_qc_failed/strict_reopt_required；当前 technical_complete_qc_failed）<br>LiM_2plus\|ec_v2_p7（1/2；结果 technical_complete_qc_failed/strict_reopt_required；当前 technical_complete_qc_failed）<br>LiM_2plus\|p4_02_ring_pucker_twist（2/2；结果 technical_complete_qc_failed/strict_reopt_required；当前 technical_complete_qc_failed）<br>LiM_2plus\|tors_2_3_4_10（0/2；结果 未跑；当前 pending）<br>LiM_2plus\|tors_5_3_4_10（0/2；结果 未跑；当前 pending） |
 
 ## 本轮无法恢复的态（需换搜索方法，不在本批预算内）
 
 - `DMC|LiM_2plus` — no_new_minimum_found
 - `DMC|M_plus` — no_new_minimum_found
-- `DOL|LiM_2plus` — no_new_minimum_found
 - `EC|LiM_2plus` — no_new_minimum_found
 
 ## 尝试预算已用尽的腿（不再自动重试，保留原因）
@@ -78,5 +76,6 @@
 - `DME|LiM_2plus|r3m_c03` — `verytight_convergence`：VeryTightOpt final criterion not met: energy_change_Eh=2.63e-07 > 2e-07;hess_act
 - `DMC|M_plus|tors_8_0_1_2` — `strict_reopt_required`：orca_close_enough_but_frozen_tolE_missed_reopt_required;hess_act_energy=0_anfreq
 - `DMC|LiM_2plus|tors_7_0_1_2` — `verytight_convergence`：VeryTightOpt final criterion not met: energy_change_Eh=4.344e-07 > 2e-07;hess_ac
+- `EC|LiM_2plus|p4_02_ring_pucker_twist` — `strict_reopt_required`：orca_close_enough_but_frozen_tolE_missed_reopt_required;hess_act_energy=0_anfreq
 
-**结论口径**：本报告不改变任何验收判定。系综达到 44/48；`plan_overall_complete` 与 WP6 只有在 48/48 时才可能开闸。
+**结论口径**：本报告不改变任何验收判定。系综达到 45/48；`plan_overall_complete` 与 WP6 只有在 48/48 时才可能开闸。

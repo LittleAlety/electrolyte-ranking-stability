@@ -11,8 +11,9 @@ from types import SimpleNamespace
 import pytest
 
 
-MODULE = Path(__file__).resolve().parents[1] / "scripts/wp_production/submit_hpc_batch.py"
-README = MODULE.parent / "README.md"
+MODULE = Path(__file__).resolve().parents[1] / "scripts/production/jobs/submit_hpc_batch.py"
+# 手写的流程说明（容量门控提交纪律）在 scripts/production/README.md
+README = MODULE.parent.parent / "README.md"
 spec = importlib.util.spec_from_file_location("submit_hpc_batch", MODULE)
 submit = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(submit)
@@ -25,7 +26,15 @@ def package(tmp_path, count=3, *, resource_profile=None):
     (root / "batch_1.txt").write_text("".join("tasks/X%d/M\n" % i for i in range(count)),
                                        encoding="utf-8")
     manifest = {
-        "schema_version": 2, "batches": [{"batch": 1, "count": count}], "legs": []}
+        "schema_version": 2, "batches": [{"batch": 1, "count": count}], "legs": [],
+        # 2026-10-29 contract (a065e7f): a MISSING submission_gate is never an
+        # authorization.  This fixture submits for real (injected runner), so it
+        # declares the gate OPEN explicitly instead of the contract being relaxed.
+        "submission_gate": "OPEN",
+        # the same 2026-10-29 contract also requires an explicit not-yet-submitted
+        # state: `submitted: None` is refused because a missing field is not an
+        # authorization.  The fixture is pre-submission by construction.
+        "submitted": False}
     if resource_profile is not None:
         manifest["resource_profile"] = resource_profile
     (root / "manifest.json").write_text(json.dumps(manifest),

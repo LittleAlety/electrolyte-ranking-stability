@@ -25,7 +25,7 @@ if not (Path(__file__).resolve().parents[1] / "work" / "wp2prod").is_dir():
 # ---------------------------------------------------------------------------
 
 REPO = Path(__file__).resolve().parents[1]
-CHAIN = REPO / "scripts" / "wp_production" / "finalize_wp2.ps1"
+CHAIN = REPO / "scripts" / "production" / "release" / "finalize_wp2.ps1"
 
 
 def test_chain_contains_no_control_bytes():

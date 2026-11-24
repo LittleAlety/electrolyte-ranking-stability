@@ -16,6 +16,8 @@ What this file forbids, explicitly:
 * making the item green by CHANGING status or filling a zero -- the two DEC legs must
   stay ``incomplete`` with a blank total, because the total genuinely is unknown.
 """
+from _prod_paths import PROD_DIR, prod_script
+
 import csv
 import importlib.util
 import json
@@ -25,7 +27,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-PROD = REPO / "scripts" / "wp_production"
+PROD = PROD_DIR
 COST = REPO / "outputs" / "physics_completion" / "cost" / "production_cost_ledger.csv"
 WP2PROD = REPO / "work" / "wp2prod"
 sys.path.insert(0, str(PROD))
